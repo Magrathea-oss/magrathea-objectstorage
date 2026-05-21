@@ -232,6 +232,35 @@ For every newly implemented S3 operation:
 6. Update this PLAN coverage table.
 7. Update ARC42 and ADRs if the operation introduces a new architectural decision.
 
+### Domain / Application / Test Requirement
+
+Every new S3 operation MUST include:
+
+**Domain layer (`object-storage-domain`):**
+- Add or update domain value objects / aggregates if the operation introduces new data concepts (e.g., ACL, tagging, storage class)
+- Add pure JUnit tests in `object-storage-domain/src/test/` for every new domain type
+
+**Application layer (`object-storage-application`):**
+- Add or update application service methods in `BucketService` / `ObjectService`
+- Add or update DTOs in `application/dto/`
+- Data MUST flow through domain → application → handler, NOT be stored directly in handler `ConcurrentHashMap`
+
+**Tests:**
+- At least 1 success scenario + at least 1 failure scenario per operation in Cucumber
+- Failure scenarios must cover every error case documented in the AWS S3 API spec (e.g., NoSuchBucket, NoSuchKey, BucketAlreadyExists, InvalidArgument)
+- AWS CLI failure tests for every error case that AWS CLI exposes
+
+### Coverage Verification
+
+```bash
+# Verify success + failure coverage
+mvn test -pl s3-api
+bash test-aws-cli.sh
+
+# Verify domain unit tests
+mvn test -pl object-storage-domain
+```
+
 ## Verification
 
 ```bash

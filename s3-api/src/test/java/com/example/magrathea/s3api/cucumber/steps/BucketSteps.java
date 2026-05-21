@@ -165,10 +165,12 @@ public class BucketSteps {
 
     @When("the bucket is deleted via S3 API")
     public void bucketDeleted() {
-        webTestClient.delete()
+        var status = webTestClient.delete()
             .uri("/{bucket}", bucketName)
             .exchange()
-            .expectStatus().isNoContent();
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
     }
 
     @Then("the response status is {int}")

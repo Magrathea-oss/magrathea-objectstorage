@@ -45,6 +45,9 @@ public class ObjectService {
             command.contentType(), command.contentDisposition(),
             command.contentEncoding(), command.size(),
             command.metadata() != null ? command.metadata() : Map.of());
+        if (command.storageClass() != null) {
+            object = object.withStorageClass(command.storageClass());
+        }
         s3ObjectRepository.save(new DefaultS3ObjectWrite(object, content)).join();
 
         return toResponse(object);

@@ -9,6 +9,7 @@ import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 /**
  * Bucket-context S3 operations.
@@ -26,127 +27,176 @@ public class S3BucketOperationsHandler {
 
     /** GET / — ListBuckets (XML) */
     public Mono<ServerResponse> listBucketsXml(ServerRequest request) {
-        var buckets = bucketService.findAll();
-        var result = S3XmlResponses.ListAllMyBucketsResult.from(buckets);
-        return ServerResponse.ok()
-            .contentType(MediaType.APPLICATION_XML)
-            .bodyValue(result);
+        return Mono.fromCallable(() -> bucketService.findAll())
+            .subscribeOn(Schedulers.boundedElastic())
+            .flatMap(buckets -> {
+                var result = S3XmlResponses.ListAllMyBucketsResult.from(buckets);
+                return ServerResponse.ok()
+                    .contentType(MediaType.APPLICATION_XML)
+                    .bodyValue(result);
+            });
     }
 
     /** GET / — ListBuckets (JSON, test convenience only) */
     public Mono<ServerResponse> listBucketsJson(ServerRequest request) {
-        return ServerResponse.ok()
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(bucketService.findAll());
+        return Mono.fromCallable(() -> bucketService.findAll())
+            .subscribeOn(Schedulers.boundedElastic())
+            .flatMap(buckets -> ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(buckets));
     }
 
     /** PUT /{bucket} — CreateBucket */
     public Mono<ServerResponse> createBucket(ServerRequest request) {
         var bucketName = request.pathVariable("bucket");
-        var exists = S3WebSupport.findBucket(bucketService, bucketName).isPresent();
-        if (exists) {
-            return ServerResponse.status(HttpStatus.CONFLICT)
-                .bodyValue(S3XmlResponses.Error.from("BucketAlreadyExists", bucketName));
-        }
-        var cmd = new CreateBucketCommand(bucketName, "us-east-1", "STANDARD");
-        bucketService.createBucket(cmd);
-        return ServerResponse.ok()
-            .header("Location", "/" + bucketName)
-            .build();
+        return Mono.fromCallable(() -> {
+            var exists = S3WebSupport.findBucket(bucketService, bucketName).isPresent();
+            if (exists) {
+                return ServerResponse.status(HttpStatus.CONFLICT)
+                    .bodyValue(S3XmlResponses.Error.from("BucketAlreadyExists", bucketName));
+            }
+            // Validate bucket name before creating
+            if (bucketName.length() < 3 || bucketName.length() > 63) {
+                return S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "InvalidBucketName", "Bucket name must be 3-63 characters");
+            }
+            if (!bucketName.matches("^[a-z0-9][a-z0-9.-]*[a-z0-9]$")) {
+                return S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "InvalidBucketName", "Bucket name must be lowercase, no underscores");
+            }
+            var cmd = new CreateBucketCommand(bucketName, "us-east-1", "STANDARD");
+            bucketService.createBucket(cmd);
+            return ServerResponse.ok()
+                .header("Location", "/" + bucketName)
+                .build();
+        }).subscribeOn(Schedulers.boundedElastic())
+        .flatMap(Mono::from);
     }
 
     /** HEAD /{bucket} — HeadBucket */
     public Mono<ServerResponse> headBucket(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
-        var found = S3WebSupport.findBucket(bucketService, bucket).isPresent();
-        return found
-            ? ServerResponse.ok().build()
-            : ServerResponse.notFound().build();
+        return Mono.fromCallable(() -> {
+            var found = S3WebSupport.findBucket(bucketService, bucket).isPresent();
+            return found
+                ? ServerResponse.ok().build()
+                : ServerResponse.notFound().build();
+        }).subscribeOn(Schedulers.boundedElastic())
+        .flatMap(Mono::from);
     }
 
     /** GET /{bucket}?location — GetBucketLocation */
     public Mono<ServerResponse> getBucketLocation(ServerRequest request) {
-        return S3WebSupport.findBucket(bucketService, request.pathVariable("bucket"))
-            .map(bucket -> ServerResponse.ok()
-                .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(new S3XmlResponses.LocationConstraint(bucket.region())))
-            .orElseGet(() -> S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        var bucketName = request.pathVariable("bucket");
+        return Mono.fromCallable(() -> {
+            var bucket = S3WebSupport.findBucket(bucketService, bucketName);
+            if (bucket.isPresent()) {
+                var b = bucket.get();
+                return ServerResponse.ok()
+                    .contentType(MediaType.APPLICATION_XML)
+                    .bodyValue(new S3XmlResponses.LocationConstraint(b.region()));
+            } else {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+            }
+        }).subscribeOn(Schedulers.boundedElastic())
+        .flatMap(Mono::from);
     }
 
     /** GET /{bucket}?versioning — GetBucketVersioning */
     public Mono<ServerResponse> getBucketVersioning(ServerRequest request) {
-        return S3WebSupport.findBucket(bucketService, request.pathVariable("bucket"))
-            .map(bucket -> ServerResponse.ok()
-                .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(S3XmlResponses.VersioningConfiguration.from(bucket.versioningEnabled())))
-            .orElseGet(() -> S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        var bucketName = request.pathVariable("bucket");
+        return Mono.fromCallable(() -> {
+            var bucket = S3WebSupport.findBucket(bucketService, bucketName);
+            if (bucket.isPresent()) {
+                var b = bucket.get();
+                return ServerResponse.ok()
+                    .contentType(MediaType.APPLICATION_XML)
+                    .bodyValue(S3XmlResponses.VersioningConfiguration.from(b.versioningEnabled()));
+            } else {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+            }
+        }).subscribeOn(Schedulers.boundedElastic())
+        .flatMap(Mono::from);
     }
 
     /** PUT /{bucket}?versioning — PutBucketVersioning */
     public Mono<ServerResponse> putBucketVersioning(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
-        if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
-            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
-        }
-        return request.bodyToMono(String.class)
-            .defaultIfEmpty("")
-            .flatMap(body -> {
-                var enabled = body.contains("<Status>Enabled</Status>") || body.contains("Status=Enabled");
-                bucketService.putBucketVersioning(bucket, enabled);
-                return ServerResponse.ok().build();
-            });
+        return Mono.fromCallable(() -> {
+            if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+            }
+            return request.bodyToMono(String.class)
+                .defaultIfEmpty("")
+                .flatMap(body -> {
+                    var enabled = body.contains("<Status>Enabled</Status>") || body.contains("Status=Enabled");
+                    bucketService.putBucketVersioning(bucket, enabled);
+                    return ServerResponse.ok().build();
+                });
+        }).subscribeOn(Schedulers.boundedElastic())
+        .flatMap(Mono::from);
     }
 
     /** GET /{bucket} — ListObjects (XML) */
     public Mono<ServerResponse> listObjectsXml(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
-        var bucketInfo = S3WebSupport.findBucket(bucketService, bucket);
-        if (bucketInfo.isEmpty()) {
-            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
-        }
-        var objects = objectService.findByBucket(bucketInfo.get().id());
-        var result = S3XmlResponses.ListBucketResult.from(bucket, objects);
-        return ServerResponse.ok()
-            .contentType(MediaType.APPLICATION_XML)
-            .bodyValue(result);
+        return Mono.fromCallable(() -> {
+            var bucketInfo = S3WebSupport.findBucket(bucketService, bucket);
+            if (bucketInfo.isEmpty()) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+            }
+            var objects = objectService.findByBucket(bucketInfo.get().id());
+            var result = S3XmlResponses.ListBucketResult.from(bucket, objects);
+            return ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(result);
+        }).subscribeOn(Schedulers.boundedElastic())
+        .flatMap(Mono::from);
     }
 
     /** GET /{bucket}?list-type=2 — ListObjectsV2 */
     public Mono<ServerResponse> listObjectsV2Xml(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
-        var bucketInfo = S3WebSupport.findBucket(bucketService, bucket);
-        if (bucketInfo.isEmpty()) {
-            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
-        }
-        var objects = objectService.findByBucket(bucketInfo.get().id());
-        var result = S3XmlResponses.ListBucketV2Result.from(bucket, objects);
-        return ServerResponse.ok()
-            .contentType(MediaType.APPLICATION_XML)
-            .bodyValue(result);
+        return Mono.fromCallable(() -> {
+            var bucketInfo = S3WebSupport.findBucket(bucketService, bucket);
+            if (bucketInfo.isEmpty()) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+            }
+            var objects = objectService.findByBucket(bucketInfo.get().id());
+            var result = S3XmlResponses.ListBucketV2Result.from(bucket, objects);
+            return ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(result);
+        }).subscribeOn(Schedulers.boundedElastic())
+        .flatMap(Mono::from);
     }
 
     /** GET /{bucket}?versions — ListObjectVersions */
     public Mono<ServerResponse> listObjectVersions(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
-        var bucketInfo = S3WebSupport.findBucket(bucketService, bucket);
-        if (bucketInfo.isEmpty()) {
-            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
-        }
-        var objects = objectService.findByBucket(bucketInfo.get().id());
-        var result = S3XmlResponses.ListVersionsResult.from(bucket, objects);
-        return ServerResponse.ok()
-            .contentType(MediaType.APPLICATION_XML)
-            .bodyValue(result);
+        return Mono.fromCallable(() -> {
+            var bucketInfo = S3WebSupport.findBucket(bucketService, bucket);
+            if (bucketInfo.isEmpty()) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+            }
+            var objects = objectService.findByBucket(bucketInfo.get().id());
+            var result = S3XmlResponses.ListVersionsResult.from(bucket, objects);
+            return ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(result);
+        }).subscribeOn(Schedulers.boundedElastic())
+        .flatMap(Mono::from);
     }
 
     /** DELETE /{bucket} — DeleteBucket */
     public Mono<ServerResponse> deleteBucket(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
-        var bucketInfo = S3WebSupport.findBucket(bucketService, bucket);
-        if (bucketInfo.isEmpty()) {
-            return ServerResponse.notFound().build();
-        }
-        bucketService.deleteBucket(bucketInfo.get().id());
-        return ServerResponse.noContent().build();
+        return Mono.fromCallable(() -> {
+            var bucketInfo = S3WebSupport.findBucket(bucketService, bucket);
+            if (bucketInfo.isEmpty()) {
+                return ServerResponse.notFound().build();
+            }
+            bucketService.deleteBucket(bucketInfo.get().id());
+            return ServerResponse.noContent().build();
+        }).subscribeOn(Schedulers.boundedElastic())
+        .flatMap(Mono::from);
     }
 }

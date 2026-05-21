@@ -1,18 +1,18 @@
 # Magrathea ObjectStorage Test Report
 
-Generated: 2026-05-21T15:37:15+02:00
+Generated: 2026-05-21T18:39:28+02:00
 
 ## Summary
 
 | Suite | Passed | Failed | Total | Notes |
 |---|---:|---:|---:|---|
-| AWS CLI S3 compatibility | 33 | 0 | 33 | Endpoint: `http://localhost:18090` |
+| AWS CLI S3 compatibility | 46 | 0 | 46 | Endpoint: `http://localhost:8081` |
 | Maven Surefire | See section | See section | See section | Latest reports under `*/target/surefire-reports` |
 | Clover coverage | See section | - | - | Latest report under `target/site/clover` |
 
 ## AWS CLI S3 Compatibility
 
-Bucket: `magrathea-cli-test-1779370622-46050`
+Bucket: `magrathea-cli-test-1779381551-50730`
 
 | Check | Status | Notes |
 |---|---|---|
@@ -45,10 +45,23 @@ Bucket: `magrathea-cli-test-1779370622-46050`
 | HeadObject copy existing | ✅ Passed | Expected success |
 | DeleteObjects | ✅ Passed | Expected success |
 | HeadObject copy after DeleteObjects | ✅ Passed | Expected failure |
+| PutObject PARANOIC_MODE | ✅ Passed | Expected success |
+| HeadObject PARANOIC_MODE | ✅ Passed | Expected success |
+| GetObjectAttributes PARANOIC_MODE | ✅ Passed | Expected success |
+| DeleteObject PARANOIC_MODE | ✅ Passed | Expected success |
 | DeleteObject | ✅ Passed | Expected success |
 | HeadObject after DeleteObject | ✅ Passed | Expected failure |
 | DeleteBucket | ✅ Passed | Expected success |
 | HeadBucket after DeleteBucket | ✅ Passed | Expected failure |
+| GetObject nonexistent | ✅ Passed | Expected failure |
+| HeadObject nonexistent | ✅ Passed | Expected failure |
+| GetBucketLocation nonexistent | ✅ Passed | Expected failure |
+| GetBucketVersioning nonexistent | ✅ Passed | Expected failure |
+| GetBucketAcl nonexistent | ✅ Passed | Expected failure |
+| GetBucketTagging nonexistent | ✅ Passed | Expected failure |
+| CopyObject nonexistent source | ✅ Passed | Expected failure |
+| PutObject nonexistent bucket | ✅ Passed | Expected failure |
+| GetObjectAcl nonexistent | ✅ Passed | Expected failure |
 
 ## Maven Surefire Results
 
@@ -59,19 +72,15 @@ Bucket: `magrathea-cli-test-1779370622-46050`
 | object-storage-domain | com.example.magrathea.objectstorage.domain.ObjectStorageEventTest.txt | 6 | 0 | 0 | 0 | ✅ Passed |
 | object-storage-domain | com.example.magrathea.objectstorage.domain.RegionTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
 | object-storage-domain | com.example.magrathea.objectstorage.domain.S3ObjectTest.txt | 8 | 0 | 0 | 0 | ✅ Passed |
-| object-storage-domain | com.example.magrathea.objectstorage.domain.StorageClassTest.txt | 6 | 0 | 0 | 0 | ✅ Passed |
-| s3-api | com.example.magrathea.s3api.cucumber.ObjectStorageCucumberTest.txt | 21 | 0 | 0 | 0 | ✅ Passed |
-| **Total** |  | **62** | **0** | **0** | **0** | **✅ Passed** |
+| object-storage-domain | com.example.magrathea.objectstorage.domain.StorageClassTest.txt | 7 | 0 | 0 | 0 | ✅ Passed |
+| s3-api | com.example.magrathea.s3api.cucumber.ObjectStorageCucumberTest.txt | 48 | 0 | 0 | 0 | ✅ Passed |
+| **Total** |  | **90** | **0** | **0** | **0** | **✅ Passed** |
 
 ## Clover Coverage
 
 | Metric | Covered | Total | Coverage |
 |---|---:|---:|---:|
-| Elements | 503 | 663 | 75.87% |
-| Statements | 315 | 394 | 79.95% |
-| Methods | 110 | 125 | 88.00% |
-| Conditionals | 78 | 144 | 54.17% |
-| NCLOC | - | 1474 | - |
+| Clover | - | - | ⚠️ Not generated |
 
 Report HTML: `target/site/clover/index.html`
 
@@ -103,9 +112,27 @@ Report HTML: `target/site/clover/index.html`
 | PutBucketVersioning | `aws s3api put-bucket-versioning` | ✅ |
 | ListObjectVersions | `aws s3api list-object-versions` | ✅ |
 | CopyObject | `aws s3api copy-object` | ✅ |
+| PutObject PARANOIC_MODE | `aws s3api put-object --storage-class PARANOIC_MODE` | ✅ |
+| HeadObject PARANOIC_MODE | `aws s3api head-object` | ✅ |
+| GetObjectAttributes PARANOIC_MODE | `aws s3api get-object-attributes` | ✅ |
+| DeleteObject PARANOIC_MODE | `aws s3api delete-object` | ✅ |
 | DeleteObject | `aws s3api delete-object` | ✅ |
 | DeleteObjects | `aws s3api delete-objects` | ✅ |
 | DeleteBucket | `aws s3api delete-bucket` | ✅ |
+
+### Failure Tests
+
+| Check | Status | Notes |
+|---|---|---|
+| GetObject nonexistent | ✅ | Expected failure |
+| HeadObject nonexistent | ✅ | Expected failure |
+| GetBucketLocation nonexistent | ✅ | Expected failure |
+| GetBucketVersioning nonexistent | ✅ | Expected failure |
+| GetBucketAcl nonexistent | ✅ | Expected failure |
+| GetBucketTagging nonexistent | ✅ | Expected failure |
+| CopyObject nonexistent source | ✅ | Expected failure |
+| PutObject nonexistent bucket | ✅ | Expected failure |
+| GetObjectAcl nonexistent | ✅ | Expected failure |
 
 ## Not Implemented Yet
 

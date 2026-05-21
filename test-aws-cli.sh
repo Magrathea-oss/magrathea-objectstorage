@@ -135,10 +135,25 @@ run_success "CopyObject" aws_s3api copy-object --bucket "$BUCKET" --key "$COPY_K
 run_success "HeadObject copy existing" aws_s3api head-object --bucket "$BUCKET" --key "$COPY_KEY" --output json
 run_success "DeleteObjects" aws_s3api delete-objects --bucket "$BUCKET" --delete "Objects=[{Key=$COPY_KEY}],Quiet=false" --output json
 run_failure "HeadObject copy after DeleteObjects" aws_s3api head-object --bucket "$BUCKET" --key "$COPY_KEY" --output json
+run_success "PutObject PARANOIC_MODE" aws_s3api put-object --bucket "$BUCKET" --key "paranoid.txt" --body "$BODY_FILE" --storage-class PARANOIC_MODE --output json
+run_success "HeadObject PARANOIC_MODE" aws_s3api head-object --bucket "$BUCKET" --key "paranoid.txt" --output json
+run_success "GetObjectAttributes PARANOIC_MODE" aws_s3api get-object-attributes --bucket "$BUCKET" --key "paranoid.txt" --object-attributes ETag ObjectSize StorageClass --output json
+run_success "DeleteObject PARANOIC_MODE" aws_s3api delete-object --bucket "$BUCKET" --key "paranoid.txt" --output json
 run_success "DeleteObject" aws_s3api delete-object --bucket "$BUCKET" --key "$KEY" --output json
 run_failure "HeadObject after DeleteObject" aws_s3api head-object --bucket "$BUCKET" --key "$KEY" --output json
 run_success "DeleteBucket" aws_s3api delete-bucket --bucket "$BUCKET" --output json
 run_failure "HeadBucket after DeleteBucket" aws_s3api head-bucket --bucket "$BUCKET"
+
+# Failure tests
+run_failure "GetObject nonexistent" aws_s3api get-object --bucket "$BUCKET" --key "nonexistent.txt" /dev/null --output json
+run_failure "HeadObject nonexistent" aws_s3api head-object --bucket "$BUCKET" --key "nonexistent.txt" --output json
+run_failure "GetBucketLocation nonexistent" aws_s3api get-bucket-location --bucket "nonexistent-bucket" --output json
+run_failure "GetBucketVersioning nonexistent" aws_s3api get-bucket-versioning --bucket "nonexistent-bucket" --output json
+run_failure "GetBucketAcl nonexistent" aws_s3api get-bucket-acl --bucket "nonexistent-bucket" --output json
+run_failure "GetBucketTagging nonexistent" aws_s3api get-bucket-tagging --bucket "nonexistent-bucket" --output json
+run_failure "CopyObject nonexistent source" aws_s3api copy-object --bucket "$BUCKET" --key "target.txt" --copy-source "$BUCKET/nonexistent.txt" --output json
+run_failure "PutObject nonexistent bucket" aws_s3api put-object --bucket "nonexistent-bucket" --key "x" --body "$BODY_FILE" --output json
+run_failure "GetObjectAcl nonexistent" aws_s3api get-object-acl --bucket "$BUCKET" --key "nonexistent.txt" --output json
 
 SUREFIRE_SUMMARY=$(python3 <<'PY'
 from pathlib import Path
@@ -255,9 +270,27 @@ Report HTML: \`target/site/clover/index.html\`
 | PutBucketVersioning | \`aws s3api put-bucket-versioning\` | ✅ |
 | ListObjectVersions | \`aws s3api list-object-versions\` | ✅ |
 | CopyObject | \`aws s3api copy-object\` | ✅ |
+| PutObject PARANOIC_MODE | \`aws s3api put-object --storage-class PARANOIC_MODE\` | ✅ |
+| HeadObject PARANOIC_MODE | \`aws s3api head-object\` | ✅ |
+| GetObjectAttributes PARANOIC_MODE | \`aws s3api get-object-attributes\` | ✅ |
+| DeleteObject PARANOIC_MODE | \`aws s3api delete-object\` | ✅ |
 | DeleteObject | \`aws s3api delete-object\` | ✅ |
 | DeleteObjects | \`aws s3api delete-objects\` | ✅ |
 | DeleteBucket | \`aws s3api delete-bucket\` | ✅ |
+
+### Failure Tests
+
+| Check | Status | Notes |
+|---|---|---|
+| GetObject nonexistent | ✅ | Expected failure |
+| HeadObject nonexistent | ✅ | Expected failure |
+| GetBucketLocation nonexistent | ✅ | Expected failure |
+| GetBucketVersioning nonexistent | ✅ | Expected failure |
+| GetBucketAcl nonexistent | ✅ | Expected failure |
+| GetBucketTagging nonexistent | ✅ | Expected failure |
+| CopyObject nonexistent source | ✅ | Expected failure |
+| PutObject nonexistent bucket | ✅ | Expected failure |
+| GetObjectAcl nonexistent | ✅ | Expected failure |
 
 ## Not Implemented Yet
 

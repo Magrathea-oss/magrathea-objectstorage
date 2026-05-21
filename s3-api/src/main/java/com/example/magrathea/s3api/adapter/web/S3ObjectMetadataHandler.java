@@ -9,6 +9,7 @@ import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 import java.util.Optional;
@@ -37,90 +38,108 @@ public class S3ObjectMetadataHandler {
 
     /** GET /{bucket}/{key}?acl — GetObjectAcl */
     public Mono<ServerResponse> getObjectAcl(ServerRequest request) {
-        var bucket = findBucketOrError(request);
-        if (bucket.isEmpty()) {
-            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
-        }
-        if (objectMissing(request, bucket.get())) {
-            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found");
-        }
-        return ServerResponse.ok()
-            .contentType(MediaType.APPLICATION_XML)
-            .bodyValue(S3XmlResponses.AccessControlPolicy.canned(objectAclStore.getOrDefault(objectStoreKey(request), "private")));
+        return Mono.fromCallable(() -> {
+            var bucket = findBucketOrError(request);
+            if (bucket.isEmpty()) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+            }
+            if (objectMissing(request, bucket.get())) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found");
+            }
+            return ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(S3XmlResponses.AccessControlPolicy.canned(objectAclStore.getOrDefault(objectStoreKey(request), "private")));
+        }).subscribeOn(Schedulers.boundedElastic())
+        .flatMap(Mono::from);
     }
 
     /** PUT /{bucket}/{key}?acl — PutObjectAcl */
     public Mono<ServerResponse> putObjectAcl(ServerRequest request) {
-        var bucket = findBucketOrError(request);
-        if (bucket.isEmpty()) {
-            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
-        }
-        if (objectMissing(request, bucket.get())) {
-            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found");
-        }
-        objectAclStore.put(objectStoreKey(request), request.headers().firstHeader("x-amz-acl") != null
-            ? request.headers().firstHeader("x-amz-acl")
-            : "private");
-        return ServerResponse.ok().build();
+        return Mono.fromCallable(() -> {
+            var bucket = findBucketOrError(request);
+            if (bucket.isEmpty()) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+            }
+            if (objectMissing(request, bucket.get())) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found");
+            }
+            objectAclStore.put(objectStoreKey(request), request.headers().firstHeader("x-amz-acl") != null
+                ? request.headers().firstHeader("x-amz-acl")
+                : "private");
+            return ServerResponse.ok().build();
+        }).subscribeOn(Schedulers.boundedElastic())
+        .flatMap(Mono::from);
     }
 
     /** GET /{bucket}/{key}?tagging — GetObjectTagging */
     public Mono<ServerResponse> getObjectTagging(ServerRequest request) {
-        var bucket = findBucketOrError(request);
-        if (bucket.isEmpty()) {
-            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
-        }
-        if (objectMissing(request, bucket.get())) {
-            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found");
-        }
-        return ServerResponse.ok()
-            .contentType(MediaType.APPLICATION_XML)
-            .bodyValue(new S3XmlResponses.Tagging(objectTagStore.getOrDefault(objectStoreKey(request), List.of())));
+        return Mono.fromCallable(() -> {
+            var bucket = findBucketOrError(request);
+            if (bucket.isEmpty()) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+            }
+            if (objectMissing(request, bucket.get())) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found");
+            }
+            return ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(new S3XmlResponses.Tagging(objectTagStore.getOrDefault(objectStoreKey(request), List.of())));
+        }).subscribeOn(Schedulers.boundedElastic())
+        .flatMap(Mono::from);
     }
 
     /** PUT /{bucket}/{key}?tagging — PutObjectTagging */
     public Mono<ServerResponse> putObjectTagging(ServerRequest request) {
-        var bucket = findBucketOrError(request);
-        if (bucket.isEmpty()) {
-            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
-        }
-        if (objectMissing(request, bucket.get())) {
-            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found");
-        }
-        return request.bodyToMono(String.class)
-            .defaultIfEmpty("")
-            .flatMap(body -> {
-                objectTagStore.put(objectStoreKey(request), parseTags(body));
-                return ServerResponse.ok().build();
-            });
+        return Mono.fromCallable(() -> {
+            var bucket = findBucketOrError(request);
+            if (bucket.isEmpty()) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+            }
+            if (objectMissing(request, bucket.get())) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found");
+            }
+            return request.bodyToMono(String.class)
+                .defaultIfEmpty("")
+                .flatMap(body -> {
+                    objectTagStore.put(objectStoreKey(request), parseTags(body));
+                    return ServerResponse.ok().build();
+                });
+        }).subscribeOn(Schedulers.boundedElastic())
+        .flatMap(Mono::from);
     }
 
     /** DELETE /{bucket}/{key}?tagging — DeleteObjectTagging */
     public Mono<ServerResponse> deleteObjectTagging(ServerRequest request) {
-        var bucket = findBucketOrError(request);
-        if (bucket.isEmpty()) {
-            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
-        }
-        if (objectMissing(request, bucket.get())) {
-            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found");
-        }
-        objectTagStore.remove(objectStoreKey(request));
-        return ServerResponse.noContent().build();
+        return Mono.fromCallable(() -> {
+            var bucket = findBucketOrError(request);
+            if (bucket.isEmpty()) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+            }
+            if (objectMissing(request, bucket.get())) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found");
+            }
+            objectTagStore.remove(objectStoreKey(request));
+            return ServerResponse.noContent().build();
+        }).subscribeOn(Schedulers.boundedElastic())
+        .flatMap(Mono::from);
     }
 
     /** GET /{bucket}/{key}?attributes — GetObjectAttributes */
     public Mono<ServerResponse> getObjectAttributes(ServerRequest request) {
-        var bucket = findBucketOrError(request);
-        if (bucket.isEmpty()) {
-            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
-        }
-        var object = S3WebSupport.findObject(objectService, bucket.get(), request.pathVariable("key"));
-        if (object.isEmpty()) {
-            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found");
-        }
-        return ServerResponse.ok()
-            .contentType(MediaType.APPLICATION_XML)
-            .bodyValue(S3XmlResponses.GetObjectAttributesOutput.from(object.get()));
+        return Mono.fromCallable(() -> {
+            var bucket = findBucketOrError(request);
+            if (bucket.isEmpty()) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+            }
+            var object = S3WebSupport.findObject(objectService, bucket.get(), request.pathVariable("key"));
+            if (object.isEmpty()) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found");
+            }
+            return ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(S3XmlResponses.GetObjectAttributesOutput.from(object.get()));
+        }).subscribeOn(Schedulers.boundedElastic())
+        .flatMap(Mono::from);
     }
 
     private Optional<BucketResponse> findBucketOrError(ServerRequest request) {

@@ -10,6 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -50,16 +51,46 @@ final class S3WebSupport {
         return false;
     }
 
+    /**
+     * Blocking lookup — used inside Mono.fromCallable / subscribeOn(Schedulers.boundedElastic).
+     * Finds a bucket by name from the full bucket list.
+     */
     static Optional<BucketResponse> findBucket(BucketService bucketService, String bucketName) {
         return bucketService.findAll().stream()
             .filter(bucket -> bucket.name().equals(bucketName))
             .findFirst();
     }
 
+    /**
+     * Blocking lookup — used inside Mono.fromCallable / subscribeOn(Schedulers.boundedElastic).
+     * Finds an object by key within a bucket.
+     */
     static Optional<ObjectResponse> findObject(ObjectService objectService, BucketResponse bucket, String key) {
         return objectService.findByBucket(bucket.id()).stream()
             .filter(object -> object.key().equals(key))
             .findFirst();
+    }
+
+    /**
+     * Reactive lookup — returns Mono<Optional<BucketResponse>> without blocking.
+     */
+    static Mono<Optional<BucketResponse>> findBucketReactive(BucketService bucketService, String bucketName) {
+        return Mono.fromCallable(() ->
+            bucketService.findAll().stream()
+                .filter(bucket -> bucket.name().equals(bucketName))
+                .findFirst()
+        ).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /**
+     * Reactive lookup — returns Mono<Optional<ObjectResponse>> without blocking.
+     */
+    static Mono<Optional<ObjectResponse>> findObjectReactive(ObjectService objectService, BucketResponse bucket, String key) {
+        return Mono.fromCallable(() ->
+            objectService.findByBucket(bucket.id()).stream()
+                .filter(object -> object.key().equals(key))
+                .findFirst()
+        ).subscribeOn(Schedulers.boundedElastic());
     }
 
     static Optional<String[]> decodeCopySource(String header) {

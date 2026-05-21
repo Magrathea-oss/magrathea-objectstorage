@@ -4,7 +4,7 @@ import java.util.Map;
 
 /**
  * Input command for putting an object into a bucket — Java 17+ record.
- * Uses AWS S3 native fields: contentType, contentDisposition, contentEncoding, metadata.
+ * Uses AWS S3 native fields: contentType, contentDisposition, contentEncoding, metadata, storageClass.
  */
 public record PutObjectCommand(
     String bucketId,
@@ -13,5 +13,6 @@ public record PutObjectCommand(
     String contentDisposition,
     String contentEncoding,
     long size,
+    String storageClass,
     Map<String, String> metadata
 ) {}

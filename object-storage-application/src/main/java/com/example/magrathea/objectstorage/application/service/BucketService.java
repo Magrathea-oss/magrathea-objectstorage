@@ -8,15 +8,15 @@ import com.example.magrathea.objectstorage.application.dto.CreateBucketCommand;
 import com.example.magrathea.objectstorage.application.dto.BucketResponse;
 
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
 
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Application service for bucket operations.
  * CAN use Spring annotations (@Service).
  * Orchestrates domain logic and repository calls.
- * Repository returns CompletableFuture — service handles async.
+ * Repository returns CompletableFuture — service bridges to reactive Mono.
  */
 @Service
 public class BucketService {
@@ -43,6 +43,11 @@ public class BucketService {
             .join()
             .orElseThrow(() -> new IllegalArgumentException("Bucket not found: " + id));
         return toResponse(bucket);
+    }
+
+    public Mono<List<BucketResponse>> findAllReactive() {
+        return Mono.fromFuture(repository.findAll())
+            .map(buckets -> buckets.stream().map(this::toResponse).toList());
     }
 
     public List<BucketResponse> findAll() {

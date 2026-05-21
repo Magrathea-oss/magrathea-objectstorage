@@ -17,4 +17,8 @@ public class CommonSteps {
     public HttpStatusCode getResponseStatus() {
         return responseStatus;
     }
+
+    public void reset() {
+        this.responseStatus = null;
+    }
 }

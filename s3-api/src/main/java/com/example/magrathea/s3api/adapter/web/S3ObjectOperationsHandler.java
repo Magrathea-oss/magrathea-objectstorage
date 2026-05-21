@@ -51,8 +51,9 @@ public class S3ObjectOperationsHandler {
                 .bodyValue(S3XmlResponses.Error.from("NoSuchBucket", "Bucket not found"));
         }
         var contentLength = request.headers().contentLength().orElse(0L);
+        var storageClass = request.headers().firstHeader("x-amz-storage-class");
         var cmd = new PutObjectCommand(bucketInfo.get().id(), key,
-            contentType, null, null, contentLength, Map.of());
+            contentType, null, null, contentLength, storageClass, Map.of());
         return Mono.fromCallable(() -> objectService.putObject(cmd, request.bodyToFlux(DataBuffer.class)))
             .subscribeOn(Schedulers.boundedElastic())
             .flatMap(ignored -> ServerResponse.ok()
@@ -92,8 +93,11 @@ public class S3ObjectOperationsHandler {
                         try {
                             var bytes = new byte[dataBuffer.readableByteCount()];
                             dataBuffer.read(bytes);
+                            var sourceStorageClass = sourceObject.get().storageClass() != null
+                                ? sourceObject.get().storageClass()
+                                : null;
                             var cmd = new PutObjectCommand(targetBucketInfo.get().id(), targetKey,
-                                sourceObject.get().contentType(), null, null, bytes.length, Map.of());
+                                sourceObject.get().contentType(), null, null, bytes.length, sourceStorageClass, Map.of());
                             return Mono.fromCallable(() -> objectService.putObject(cmd, Flux.just(DATA_BUFFER_FACTORY.wrap(bytes))))
                                 .subscribeOn(Schedulers.boundedElastic())
                                 .flatMap(ignored -> ServerResponse.ok()

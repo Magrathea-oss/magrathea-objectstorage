@@ -71,10 +71,44 @@ public class ObjectSteps {
         commonSteps.setResponseStatus(status);
     }
 
+    @When("the object is stored via S3 API with storage class {string}")
+    public void objectStoredWithStorageClass(String storageClass) {
+        var status = webTestClient.put()
+            .uri("/test-bucket/{key}", objectKey)
+            .header("x-amz-storage-class", storageClass)
+            .bodyValue(objectContent)
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("the object is stored via S3 API in bucket {string}")
+    public void objectStoredInBucket(String bucket) {
+        var status = webTestClient.put()
+            .uri("/{bucket}/{key}", bucket, objectKey)
+            .bodyValue(objectContent)
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
     @When("the object is retrieved via S3 API")
     public void objectRetrieved() {
         var result = webTestClient.get()
             .uri("/test-bucket/{key}", objectKey)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        retrievedContent = result.getResponseBody();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("the object with key {string} is retrieved via S3 API")
+    public void objectWithKeyRetrieved(String key) {
+        var result = webTestClient.get()
+            .uri("/test-bucket/{key}", key)
             .exchange()
             .expectBody(String.class)
             .returnResult();
@@ -108,6 +142,18 @@ public class ObjectSteps {
     public void objectCopied(String sourceKey, String targetKey) {
         var result = webTestClient.put()
             .uri("/test-bucket/{key}", targetKey)
+            .header("x-amz-copy-source", "/test-bucket/" + sourceKey)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        responseBody = result.getResponseBody();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("object {string} is copied to {string} in bucket {string}")
+    public void objectCopiedToBucket(String sourceKey, String targetKey, String targetBucket) {
+        var result = webTestClient.put()
+            .uri("/{bucket}/{key}", targetBucket, targetKey)
             .header("x-amz-copy-source", "/test-bucket/" + sourceKey)
             .exchange()
             .expectBody(String.class)
@@ -157,10 +203,33 @@ public class ObjectSteps {
         commonSteps.setResponseStatus(status);
     }
 
+    @When("object ACL {string} is applied to {string} in bucket {string}")
+    public void objectAclAppliedInBucket(String acl, String key, String bucket) {
+        var status = webTestClient.put()
+            .uri("/{bucket}/{key}?acl", bucket, key)
+            .header("x-amz-acl", acl)
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
     @When("object ACL is requested for {string}")
     public void objectAclRequested(String key) {
         var result = webTestClient.get()
             .uri("/test-bucket/{key}?acl", key)
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        responseBody = result.getResponseBody();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("object ACL is requested for {string} in bucket {string}")
+    public void objectAclRequestedInBucket(String key, String bucket) {
+        var result = webTestClient.get()
+            .uri("/{bucket}/{key}?acl", bucket, key)
             .accept(MediaType.APPLICATION_XML)
             .exchange()
             .expectBody(String.class)
@@ -182,6 +251,19 @@ public class ObjectSteps {
         commonSteps.setResponseStatus(status);
     }
 
+    @When("object tag {string} = {string} is applied to {string} in bucket {string}")
+    public void objectTagAppliedInBucket(String tagKey, String tagValue, String objectKey, String bucket) {
+        var body = "<Tagging><TagSet><Tag><Key>" + tagKey + "</Key><Value>" + tagValue + "</Value></Tag></TagSet></Tagging>";
+        var status = webTestClient.put()
+            .uri("/{bucket}/{key}?tagging", bucket, objectKey)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
     @When("object tags are requested for {string}")
     public void objectTagsRequested(String key) {
         var result = webTestClient.get()
@@ -194,10 +276,32 @@ public class ObjectSteps {
         commonSteps.setResponseStatus(result.getStatus());
     }
 
+    @When("object tags are requested for {string} in bucket {string}")
+    public void objectTagsRequestedInBucket(String key, String bucket) {
+        var result = webTestClient.get()
+            .uri("/{bucket}/{key}?tagging", bucket, key)
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        responseBody = result.getResponseBody();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
     @When("object tags are deleted for {string}")
     public void objectTagsDeleted(String key) {
         var status = webTestClient.delete()
             .uri("/test-bucket/{key}?tagging", key)
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("object tags are deleted for {string} in bucket {string}")
+    public void objectTagsDeletedInBucket(String key, String bucket) {
+        var status = webTestClient.delete()
+            .uri("/{bucket}/{key}?tagging", bucket, key)
             .exchange()
             .returnResult()
             .getStatus();
@@ -217,12 +321,27 @@ public class ObjectSteps {
         commonSteps.setResponseStatus(result.getStatus());
     }
 
+    @When("object attributes are requested for {string} in bucket {string}")
+    public void objectAttributesRequestedInBucket(String key, String bucket) {
+        var result = webTestClient.get()
+            .uri("/{bucket}/{key}?attributes", bucket, key)
+            .header("x-amz-object-attributes", "ETag,ObjectSize,StorageClass")
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        responseBody = result.getResponseBody();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
     @When("the object is deleted via S3 API")
     public void objectDeleted() {
-        webTestClient.delete()
+        var status = webTestClient.delete()
             .uri("/test-bucket/{key}", objectKey)
             .exchange()
-            .expectStatus().isNoContent();
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
     }
 
     @Then("the object appears in the object list")

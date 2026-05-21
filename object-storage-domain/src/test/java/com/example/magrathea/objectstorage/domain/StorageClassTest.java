@@ -34,6 +34,14 @@ class StorageClassTest {
     }
 
     @Test
+    void paranoidModeExists() {
+        assertEquals("PARANOIC_MODE", StorageClass.PARANOIC_MODE.name());
+        assertEquals("Paranoid Mode — maximum encryption, minimum exposure", StorageClass.PARANOIC_MODE.description());
+        assertEquals(365, StorageClass.PARANOIC_MODE.minStorageDurationDays());
+        assertEquals(0.050, StorageClass.PARANOIC_MODE.pricePerGBMonth());
+    }
+
+    @Test
     void customStorageClass() {
         var sc = new StorageClass("CUSTOM", "Custom Class", 0, 0.05);
         assertEquals("CUSTOM", sc.name());

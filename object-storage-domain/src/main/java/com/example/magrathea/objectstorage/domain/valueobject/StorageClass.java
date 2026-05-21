@@ -13,4 +13,5 @@ public record StorageClass(String name, String description, long minStorageDurat
     public static final StorageClass GLACIER = new StorageClass("GLACIER", "Glacier", 90, 0.004);
     public static final StorageClass GLACIER_DEEP_ARCHIVE = new StorageClass("GLACIER_DEEP_ARCHIVE", "Glacier Deep Archive", 180, 0.001);
     public static final StorageClass INTELLIGENT_TIERING = new StorageClass("INTELLIGENT_TIERING", "Intelligent Tiering", 0, 0.025);
+    public static final StorageClass PARANOIC_MODE = new StorageClass("PARANOIC_MODE", "Paranoid Mode — maximum encryption, minimum exposure", 365, 0.050);
 }
