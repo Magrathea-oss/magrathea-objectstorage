@@ -220,6 +220,15 @@ Goal: support common AWS CLI object workflows beyond current CRUD.
 | UpdateBucketMetadataInventoryTableConfiguration |
 | UpdateBucketMetadataJournalTableConfiguration |
 
+## Current API Coverage Analysis
+
+See [`docs/api-coverage.md`](docs/api-coverage.md) for a detailed breakdown of every implemented operation,
+including which HTTP headers and query parameters are:
+
+- ✅ **Tested** — read and actively used in business logic
+- ⬜ **Not implemented (hashtable)** — stored in ConcurrentHashMap only, not in domain/application
+- 🔴 **Not implemented (ignored)** — completely ignored
+
 ## Implementation Rule for New S3 Operations
 
 For every newly implemented S3 operation:
