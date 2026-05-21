@@ -89,15 +89,33 @@ aws --endpoint-url http://localhost:8080 s3api get-object --bucket test-bucket -
 | 3 | S3 API Cucumber only | `mvn test -pl s3-api` |
 | 4 | Clover coverage | `mvn -Pcoverage clover:setup test clover:aggregate clover:clover` |
 | 5 | AWS CLI compatibility | `bash test-aws-cli.sh` |
-| 6 | AWS CLI via Maven profile | `mvn -N verify -Paws-cli-tests` |
+| 6 | AWS CLI via Maven profile | `mvn verify -Paws-cli-tests` (auto-starts/stops server) |
 
 Consolidated Markdown report: [`docs/test-report.md`](docs/test-report.md)
 
 AWS CLI tests require:
 
-- Magrathea server running (default endpoint: `http://localhost:8080`)
 - AWS CLI installed
-- Optional override: `ENDPOINT_URL=http://host:port bash test-aws-cli.sh`
+- Port 8080 free (the profile starts/stops the server automatically)
+- Optional endpoint override: `ENDPOINT_URL=http://host:port bash test-aws-cli.sh`
+
+#### Workflow
+
+```bash
+# Manual: start server in one shell, run tests in another
+java -jar bootstrap-application/target/bootstrap-application-1.0.0-SNAPSHOT.jar
+bash test-aws-cli.sh
+
+# Automatic via Maven (starts server, runs tests, stops server):
+mvn verify -Paws-cli-tests
+```
+
+The Maven profile (`aws-cli-tests`):
+1. **pre-integration-test** — starts the JAR on port 8080
+2. **integration-test** — runs `test-aws-cli.sh`
+3. **post-integration-test** — stops the server
+
+Use `mvn verify -Paws-cli-tests` for a fully automated AWS CLI compatibility run.
 
 ---
 

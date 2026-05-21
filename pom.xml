@@ -130,8 +130,22 @@
                         <inherited>false</inherited>
                         <executions>
                             <execution>
+                                <id>start-server</id>
+                                <phase>pre-integration-test</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>bash</executable>
+                                    <arguments>
+                                        <argument>-c</argument>
+                                        <argument>cd ${project.basedir} && java -jar bootstrap-application/target/bootstrap-application-1.0.0-SNAPSHOT.jar --server.port=8080 > /tmp/magrathea-aws-cli.log 2>&1 & echo "PID:$$!"</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
                                 <id>aws-cli-s3-compatibility</id>
-                                <phase>verify</phase>
+                                <phase>integration-test</phase>
                                 <goals>
                                     <goal>exec</goal>
                                 </goals>
@@ -139,6 +153,20 @@
                                     <executable>bash</executable>
                                     <arguments>
                                         <argument>${project.basedir}/test-aws-cli.sh</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>stop-server</id>
+                                <phase>post-integration-test</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>bash</executable>
+                                    <arguments>
+                                        <argument>-c</argument>
+                                        <argument>fuser -k 8080/tcp 2>/dev/null; echo "Server stopped"</argument>
                                     </arguments>
                                 </configuration>
                             </execution>

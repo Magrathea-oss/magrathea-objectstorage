@@ -1,6 +1,6 @@
 # Magrathea ObjectStorage Test Report
 
-Generated: 2026-05-21T18:39:28+02:00
+Generated: 2026-05-21T19:01:09+02:00
 
 ## Summary
 
@@ -12,7 +12,7 @@ Generated: 2026-05-21T18:39:28+02:00
 
 ## AWS CLI S3 Compatibility
 
-Bucket: `magrathea-cli-test-1779381551-50730`
+Bucket: `magrathea-cli-test-1779382852-53235`
 
 | Check | Status | Notes |
 |---|---|---|
