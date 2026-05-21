@@ -2,6 +2,10 @@ package com.example.magrathea.s3api.config;
 
 import com.example.magrathea.objectstorage.application.service.BucketService;
 import com.example.magrathea.objectstorage.application.service.ObjectService;
+import com.example.magrathea.s3api.adapter.web.S3BucketMetadataHandler;
+import com.example.magrathea.s3api.adapter.web.S3BucketOperationsHandler;
+import com.example.magrathea.s3api.adapter.web.S3ObjectMetadataHandler;
+import com.example.magrathea.s3api.adapter.web.S3ObjectOperationsHandler;
 import com.example.magrathea.s3api.adapter.web.S3ProxyRouter;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -25,9 +29,34 @@ import org.springframework.web.reactive.function.server.ServerResponse;
 public class S3ApiConfig {
 
     @Bean
-    public S3ProxyRouter s3ProxyRouter(BucketService bucketService,
-                                        ObjectService objectService) {
-        return new S3ProxyRouter(bucketService, objectService);
+    public S3BucketOperationsHandler s3BucketOperationsHandler(BucketService bucketService,
+                                                               ObjectService objectService) {
+        return new S3BucketOperationsHandler(bucketService, objectService);
+    }
+
+    @Bean
+    public S3BucketMetadataHandler s3BucketMetadataHandler(BucketService bucketService) {
+        return new S3BucketMetadataHandler(bucketService);
+    }
+
+    @Bean
+    public S3ObjectOperationsHandler s3ObjectOperationsHandler(BucketService bucketService,
+                                                               ObjectService objectService) {
+        return new S3ObjectOperationsHandler(bucketService, objectService);
+    }
+
+    @Bean
+    public S3ObjectMetadataHandler s3ObjectMetadataHandler(BucketService bucketService,
+                                                           ObjectService objectService) {
+        return new S3ObjectMetadataHandler(bucketService, objectService);
+    }
+
+    @Bean
+    public S3ProxyRouter s3ProxyRouter(S3BucketOperationsHandler bucketOperations,
+                                        S3BucketMetadataHandler bucketMetadata,
+                                        S3ObjectOperationsHandler objectOperations,
+                                        S3ObjectMetadataHandler objectMetadata) {
+        return new S3ProxyRouter(bucketOperations, bucketMetadata, objectOperations, objectMetadata);
     }
 
     @Bean

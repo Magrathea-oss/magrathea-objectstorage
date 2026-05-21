@@ -35,41 +35,44 @@ public class BucketService {
         var bucket = Bucket.create(id, command.name(), region, storageClass);
         repository.save(bucket).join();
 
-        return new BucketResponse(
-            bucket.id().value(),
-            bucket.name(),
-            bucket.region().name(),
-            bucket.storageClass().name(),
-            bucket.versioningEnabled(),
-            bucket.encryptionEnabled()
-        );
+        return toResponse(bucket);
     }
 
     public BucketResponse findById(String id) {
         var bucket = repository.findById(Bucket.Id.of(id))
             .join()
             .orElseThrow(() -> new IllegalArgumentException("Bucket not found: " + id));
-        return new BucketResponse(
-            bucket.id().value(),
-            bucket.name(),
-            bucket.region().name(),
-            bucket.storageClass().name(),
-            bucket.versioningEnabled(),
-            bucket.encryptionEnabled()
-        );
+        return toResponse(bucket);
     }
 
     public List<BucketResponse> findAll() {
         return repository.findAll().join().stream()
-            .map(b -> new BucketResponse(
-                b.id().value(), b.name(),
-                b.region().name(), b.storageClass().name(),
-                b.versioningEnabled(), b.encryptionEnabled()))
+            .map(this::toResponse)
             .toList();
+    }
+
+    public BucketResponse putBucketVersioning(String bucketName, boolean enabled) {
+        var bucket = repository.findByName(bucketName)
+            .join()
+            .orElseThrow(() -> new IllegalArgumentException("Bucket not found: " + bucketName));
+        var updated = enabled ? bucket.withVersioningEnabled() : bucket.withVersioningSuspended();
+        repository.save(updated).join();
+        return toResponse(updated);
     }
 
     public void deleteBucket(String id) {
         repository.delete(Bucket.Id.of(id)).join();
+    }
+
+    private BucketResponse toResponse(Bucket bucket) {
+        return new BucketResponse(
+            bucket.id().value(),
+            bucket.name(),
+            bucket.region().id(),
+            bucket.storageClass().name(),
+            bucket.versioningEnabled(),
+            bucket.encryptionEnabled()
+        );
     }
 
     private Region findRegion(String regionId) {

@@ -9,6 +9,7 @@ set -u
 ENDPOINT="${ENDPOINT_URL:-http://localhost:8080}"
 BUCKET="magrathea-cli-test-$(date +%s)-$$"
 KEY="hello.txt"
+COPY_KEY="copy.txt"
 OUTDIR="${OUTDIR:-/tmp/magrathea-s3-cli-test}"
 BODY_FILE="$OUTDIR/input.txt"
 OUTPUT_FILE="$OUTDIR/output.txt"
@@ -80,13 +81,19 @@ run_failure() {
 
 cleanup() {
     aws_s3api delete-object --bucket "$BUCKET" --key "$KEY" >/dev/null 2>&1 || true
+    aws_s3api delete-object --bucket "$BUCKET" --key "$COPY_KEY" >/dev/null 2>&1 || true
     aws_s3api delete-bucket --bucket "$BUCKET" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
 # Implemented S3 operations in s3-api:
-# ListBuckets, CreateBucket, HeadBucket, ListObjects, PutObject, GetObject,
-# HeadObject, DeleteObject, DeleteBucket.
+# ListBuckets, CreateBucket, HeadBucket, GetBucketLocation,
+# GetBucketVersioning, PutBucketVersioning, GetBucketAcl, PutBucketAcl,
+# GetBucketTagging, PutBucketTagging, DeleteBucketTagging,
+# ListObjects, ListObjectsV2, PutObject, GetObject, HeadObject,
+# GetObjectAcl, PutObjectAcl, GetObjectTagging, PutObjectTagging,
+# DeleteObjectTagging, GetObjectAttributes, CopyObject, ListObjectVersions,
+# DeleteObject, DeleteObjects, DeleteBucket.
 
 echo "=============================================="
 echo "Magrathea ObjectStorage — AWS CLI S3 Test Suite"
@@ -104,9 +111,30 @@ run_success "CreateBucket" aws_s3api create-bucket --bucket "$BUCKET" --output j
 run_success "HeadBucket existing" aws_s3api head-bucket --bucket "$BUCKET"
 run_success "PutObject" aws_s3api put-object --bucket "$BUCKET" --key "$KEY" --body "$BODY_FILE" --content-type text/plain --output json
 run_success "HeadObject existing" aws_s3api head-object --bucket "$BUCKET" --key "$KEY" --output json
+run_success "PutObjectAcl" aws_s3api put-object-acl --bucket "$BUCKET" --key "$KEY" --acl private --output json
+run_success "GetObjectAcl" aws_s3api get-object-acl --bucket "$BUCKET" --key "$KEY" --output json
+run_success "PutObjectTagging" aws_s3api put-object-tagging --bucket "$BUCKET" --key "$KEY" --tagging "TagSet=[{Key=kind,Value=demo}]" --output json
+run_success "GetObjectTagging" aws_s3api get-object-tagging --bucket "$BUCKET" --key "$KEY" --output json
+run_success "DeleteObjectTagging" aws_s3api delete-object-tagging --bucket "$BUCKET" --key "$KEY" --output json
+run_success "GetObjectAttributes" aws_s3api get-object-attributes --bucket "$BUCKET" --key "$KEY" --object-attributes ETag ObjectSize StorageClass --output json
 run_success "GetObject" aws_s3api get-object --bucket "$BUCKET" --key "$KEY" "$OUTPUT_FILE" --output json
 run_success "GetObject content matches" cmp -s "$BODY_FILE" "$OUTPUT_FILE"
 run_success "ListObjects" aws_s3api list-objects --bucket "$BUCKET" --output json
+run_success "ListObjectsV2" aws_s3api list-objects-v2 --bucket "$BUCKET" --output json
+run_success "GetBucketLocation" aws_s3api get-bucket-location --bucket "$BUCKET" --output json
+run_success "PutBucketAcl" aws_s3api put-bucket-acl --bucket "$BUCKET" --acl private --output json
+run_success "GetBucketAcl" aws_s3api get-bucket-acl --bucket "$BUCKET" --output json
+run_success "PutBucketTagging" aws_s3api put-bucket-tagging --bucket "$BUCKET" --tagging "TagSet=[{Key=environment,Value=test}]" --output json
+run_success "GetBucketTagging" aws_s3api get-bucket-tagging --bucket "$BUCKET" --output json
+run_success "DeleteBucketTagging" aws_s3api delete-bucket-tagging --bucket "$BUCKET" --output json
+run_success "GetBucketVersioning initial" aws_s3api get-bucket-versioning --bucket "$BUCKET" --output json
+run_success "PutBucketVersioning Enabled" aws_s3api put-bucket-versioning --bucket "$BUCKET" --versioning-configuration Status=Enabled --output json
+run_success "GetBucketVersioning enabled" aws_s3api get-bucket-versioning --bucket "$BUCKET" --output json
+run_success "ListObjectVersions" aws_s3api list-object-versions --bucket "$BUCKET" --output json
+run_success "CopyObject" aws_s3api copy-object --bucket "$BUCKET" --key "$COPY_KEY" --copy-source "$BUCKET/$KEY" --output json
+run_success "HeadObject copy existing" aws_s3api head-object --bucket "$BUCKET" --key "$COPY_KEY" --output json
+run_success "DeleteObjects" aws_s3api delete-objects --bucket "$BUCKET" --delete "Objects=[{Key=$COPY_KEY}],Quiet=false" --output json
+run_failure "HeadObject copy after DeleteObjects" aws_s3api head-object --bucket "$BUCKET" --key "$COPY_KEY" --output json
 run_success "DeleteObject" aws_s3api delete-object --bucket "$BUCKET" --key "$KEY" --output json
 run_failure "HeadObject after DeleteObject" aws_s3api head-object --bucket "$BUCKET" --key "$KEY" --output json
 run_success "DeleteBucket" aws_s3api delete-bucket --bucket "$BUCKET" --output json
@@ -209,8 +237,26 @@ Report HTML: \`target/site/clover/index.html\`
 | PutObject | \`aws s3api put-object\` | ✅ |
 | HeadObject | \`aws s3api head-object\` | ✅ |
 | GetObject | \`aws s3api get-object\` | ✅ |
+| GetObjectAcl | \`aws s3api get-object-acl\` | ✅ |
+| PutObjectAcl | \`aws s3api put-object-acl\` | ✅ |
+| GetObjectTagging | \`aws s3api get-object-tagging\` | ✅ |
+| PutObjectTagging | \`aws s3api put-object-tagging\` | ✅ |
+| DeleteObjectTagging | \`aws s3api delete-object-tagging\` | ✅ |
+| GetObjectAttributes | \`aws s3api get-object-attributes\` | ✅ |
 | ListObjects | \`aws s3api list-objects\` | ✅ |
+| ListObjectsV2 | \`aws s3api list-objects-v2\` | ✅ |
+| GetBucketLocation | \`aws s3api get-bucket-location\` | ✅ |
+| GetBucketAcl | \`aws s3api get-bucket-acl\` | ✅ |
+| PutBucketAcl | \`aws s3api put-bucket-acl\` | ✅ |
+| GetBucketTagging | \`aws s3api get-bucket-tagging\` | ✅ |
+| PutBucketTagging | \`aws s3api put-bucket-tagging\` | ✅ |
+| DeleteBucketTagging | \`aws s3api delete-bucket-tagging\` | ✅ |
+| GetBucketVersioning | \`aws s3api get-bucket-versioning\` | ✅ |
+| PutBucketVersioning | \`aws s3api put-bucket-versioning\` | ✅ |
+| ListObjectVersions | \`aws s3api list-object-versions\` | ✅ |
+| CopyObject | \`aws s3api copy-object\` | ✅ |
 | DeleteObject | \`aws s3api delete-object\` | ✅ |
+| DeleteObjects | \`aws s3api delete-objects\` | ✅ |
 | DeleteBucket | \`aws s3api delete-bucket\` | ✅ |
 
 ## Not Implemented Yet

@@ -11,7 +11,7 @@ magrathea-objectstorage/
 ├── pom.xml
 ├── s3-api/                         # Pluggable S3 HTTP adapter (RouterFunction, XML, AWS CLI tests)
 ├── object-storage-domain/          # Pure S3 domain: Bucket, S3Object, repository interfaces
-├── object-storage-application/     # Application services, DTOs, ContentStore port
+├── object-storage-application/     # Application services, DTOs, S3ObjectWrite implementation with Flux<DataBuffer>
 ├── object-storage-infrastructure/  # Repository implementations only (BucketRepositoryImpl, InMemoryObjectRepository)
 ├── persistence-context-domain/     # EMPTY — reserved for future use
 ├── persistence-context-application/# EMPTY — reserved for future use
@@ -25,6 +25,19 @@ Removed modules/components:
 - `shared-domain` removed.
 - `InternalApiRouter` removed because it was not standard S3.
 - `S3ObjectRepositoryImpl` renamed to `InMemoryObjectRepository` and no longer references persistence-context.
+
+## S3 API Handler Organization
+
+`s3-api` route mapping is intentionally split by context:
+
+| Class | Responsibility |
+|---|---|
+| `S3ProxyRouter` | Route composition only |
+| `S3BucketOperationsHandler` | Bucket lifecycle, bucket configuration, bucket-level listings |
+| `S3ObjectOperationsHandler` | Object CRUD, copy, and multi-delete |
+| `S3WebSupport` | Shared request predicates and S3 XML error helpers |
+
+`ContentStore` has been removed. Object content is saved through `S3ObjectRepository.save(S3ObjectWrite)`. The domain-level `S3ObjectWrite` and `S3ObjectContent` interfaces expose no framework types; application implementations `DefaultS3ObjectWrite` and `DefaultS3ObjectContent` carry `Flux<DataBuffer>`. `InMemoryObjectRepository` casts the interfaces to the supported implementations internally and persists metadata plus content.
 
 ## Pluggable S3 API
 
@@ -78,7 +91,7 @@ Source: https://docs.aws.amazon.com/AmazonS3/latest/API/API_Operations.md
 
 Scope: **Amazon S3 actions only**. Amazon S3 Control actions are intentionally out of scope for the object-storage S3 REST API module.
 
-### Current Implemented Operations (9/111)
+### Current Implemented Operations (27/111)
 
 | Operation | Endpoint | Test coverage |
 |---|---|---|
@@ -91,36 +104,54 @@ Scope: **Amazon S3 actions only**. Amazon S3 Control actions are intentionally o
 | GetObject | `GET /{bucket}/{key}` | Cucumber + AWS CLI |
 | HeadObject | `HEAD /{bucket}/{key}` | Cucumber + AWS CLI |
 | DeleteObject | `DELETE /{bucket}/{key}` | Cucumber + AWS CLI |
+| ListObjectsV2 | `GET /{bucket}?list-type=2` | Cucumber + AWS CLI |
+| CopyObject | `PUT /{bucket}/{key}` with `x-amz-copy-source` | Cucumber + AWS CLI |
+| DeleteObjects | `POST /{bucket}?delete` | Cucumber + AWS CLI |
+| GetBucketLocation | `GET /{bucket}?location` | Cucumber + AWS CLI |
+| GetBucketVersioning | `GET /{bucket}?versioning` | Cucumber + AWS CLI |
+| PutBucketVersioning | `PUT /{bucket}?versioning` | Cucumber + AWS CLI |
+| ListObjectVersions | `GET /{bucket}?versions` | Cucumber + AWS CLI |
+| GetObjectAcl | `GET /{bucket}/{key}?acl` | Cucumber + AWS CLI |
+| PutObjectAcl | `PUT /{bucket}/{key}?acl` | Cucumber + AWS CLI |
+| GetObjectTagging | `GET /{bucket}/{key}?tagging` | Cucumber + AWS CLI |
+| PutObjectTagging | `PUT /{bucket}/{key}?tagging` | Cucumber + AWS CLI |
+| DeleteObjectTagging | `DELETE /{bucket}/{key}?tagging` | Cucumber + AWS CLI |
+| GetObjectAttributes | `GET /{bucket}/{key}?attributes` | Cucumber + AWS CLI |
+| GetBucketAcl | `GET /{bucket}?acl` | Cucumber + AWS CLI |
+| PutBucketAcl | `PUT /{bucket}?acl` | Cucumber + AWS CLI |
+| GetBucketTagging | `GET /{bucket}?tagging` | Cucumber + AWS CLI |
+| PutBucketTagging | `PUT /{bucket}?tagging` | Cucumber + AWS CLI |
+| DeleteBucketTagging | `DELETE /{bucket}?tagging` | Cucumber + AWS CLI |
 
-### Phase A — CLI-Baseline Compatibility (highest priority)
+### Phase A — CLI-Baseline Compatibility (completed)
 
 Goal: support common AWS CLI object workflows beyond current CRUD.
 
-| Operation | Reason |
+| Operation | Status |
 |---|---|
-| ListObjectsV2 | AWS CLI and SDKs commonly prefer V2 listing |
-| CopyObject | Common object copy workflow |
-| DeleteObjects | Batch deletion |
-| GetBucketLocation | Common SDK/CLI discovery operation |
-| GetBucketVersioning | Basic bucket capability discovery |
-| PutBucketVersioning | Enables future version-aware behavior |
-| ListObjectVersions | Required once versioning exists |
+| ListObjectsV2 | Implemented |
+| CopyObject | Implemented |
+| DeleteObjects | Implemented |
+| GetBucketLocation | Implemented |
+| GetBucketVersioning | Implemented |
+| PutBucketVersioning | Implemented |
+| ListObjectVersions | Implemented |
 
-### Phase B — Object Metadata, Tagging, and ACL Compatibility
+### Phase B — Object Metadata, Tagging, and ACL Compatibility (completed)
 
-| Operation |
-|---|
-| GetObjectAcl |
-| PutObjectAcl |
-| GetObjectTagging |
-| PutObjectTagging |
-| DeleteObjectTagging |
-| GetObjectAttributes |
-| GetBucketAcl |
-| PutBucketAcl |
-| GetBucketTagging |
-| PutBucketTagging |
-| DeleteBucketTagging |
+| Operation | Status |
+|---|---|
+| GetObjectAcl | Implemented |
+| PutObjectAcl | Implemented |
+| GetObjectTagging | Implemented |
+| PutObjectTagging | Implemented |
+| DeleteObjectTagging | Implemented |
+| GetObjectAttributes | Implemented |
+| GetBucketAcl | Implemented |
+| PutBucketAcl | Implemented |
+| GetBucketTagging | Implemented |
+| PutBucketTagging | Implemented |
+| DeleteBucketTagging | Implemented |
 
 ### Phase C — Multipart Upload
 

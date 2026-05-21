@@ -21,7 +21,7 @@
 ## Features
 
 - **S3-compatible API only** — no custom internal REST API
-- **Implemented operations** — ListBuckets, CreateBucket, HeadBucket, DeleteBucket, ListObjects, PutObject, GetObject, HeadObject, DeleteObject
+- **Implemented operations** — 27 Amazon S3 actions, including bucket/object CRUD, ListObjectsV2, CopyObject, DeleteObjects, bucket location/versioning, object versions, ACLs, tagging, and object attributes
 - **Pluggable S3 API** — auto-configured when `s3-api` is on the classpath; disabled with `s3.api.enabled=false`
 - **Spring Boot 4 WebFlux** — functional RouterFunction endpoints
 - **Jackson 3 XML** — `tools.jackson.dataformat:jackson-dataformat-xml` with custom WebFlux encoder
@@ -37,7 +37,7 @@
 |---|---|---|
 | `s3-api` | Pluggable AWS S3 HTTP adapter | Auto-configuration, RouterFunction, XML responses, Cucumber tests |
 | `object-storage-domain` | S3 domain model | Zero framework dependencies |
-| `object-storage-application` | Application services and DTOs | Includes `ContentStore` port |
+| `object-storage-application` | Application services and DTOs | Includes `DefaultS3ObjectWrite` carrying `Flux<DataBuffer>` for repository saves |
 | `object-storage-infrastructure` | Repository implementations | No HTTP API, no S3 router |
 | `bootstrap-application` | Spring Boot entry point | Includes `s3-api` to activate S3 endpoints |
 | `persistence-context-*` | Reserved placeholders | Empty by design |
@@ -107,16 +107,14 @@ The implementation plan tracks all Amazon S3 actions from:
 
 <https://docs.aws.amazon.com/AmazonS3/latest/API/API_Operations.md>
 
-Current coverage: **9 / 111 Amazon S3 actions**.
+Current coverage: **27 / 111 Amazon S3 actions**.
 
-Highest priority next operations:
+Phases A and B are complete. Highest priority next operations:
 
-1. `ListObjectsV2`
-2. `CopyObject`
-3. `DeleteObjects`
-4. `GetBucketLocation`
-5. `GetBucketVersioning` / `PutBucketVersioning`
-6. Multipart upload flow
+1. Multipart upload flow
+2. Bucket configuration APIs
+3. Analytics, inventory, metrics, and intelligent-tiering APIs
+4. Advanced/specialized operations
 
 See [`PLAN.md`](PLAN.md) for the full phased inclusion plan.
 

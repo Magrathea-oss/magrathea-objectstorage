@@ -20,7 +20,7 @@ Magrathea ObjectStorage is decomposed into pluggable S3 API, pure domain/applica
 | `object-storage-domain/`
 
 | `object-storage-application`
-| Application services and DTOs. Provides `BucketService`, `ObjectService`, and `ContentStore` port used by S3 API to store/retrieve object bytes without depending on infrastructure classes.
+| Application services and DTOs. Provides `BucketService`, `ObjectService`, `DefaultS3ObjectWrite`, and `DefaultS3ObjectContent`, whose implementations carry `Flux<DataBuffer>` at the application boundary.
 | `object-storage-application/`
 
 | `object-storage-infrastructure`
@@ -41,7 +41,12 @@ Magrathea ObjectStorage is decomposed into pluggable S3 API, pure domain/applica
 [cols="1,3" options="header"]
 |===
 | Component | Responsibility
-| `S3ProxyRouter` | Functional WebFlux RouterFunction implementing the currently supported S3 operations.
+| `S3ProxyRouter` | Functional WebFlux route composition only.
+| `S3BucketOperationsHandler` | Bucket lifecycle, bucket configuration, and bucket-level listing operations.
+| `S3BucketMetadataHandler` | Bucket ACL and tagging operations.
+| `S3ObjectOperationsHandler` | Object CRUD, copy, and multi-delete operations.
+| `S3ObjectMetadataHandler` | Object ACL, tagging, and attributes operations.
+| `S3WebSupport` | Shared request predicates, object lookup, copy-source decoding, and XML error helpers.
 | `S3XmlResponses` | Jackson 3 XML annotated records for S3 XML response bodies.
 | `JacksonXmlCodecConfig` | Registers `JacksonXmlEncoder` for Spring WebFlux XML serialization.
 | `S3ApiConfig` | Spring Boot auto-configuration guarded by `s3.api.enabled`.
@@ -54,8 +59,9 @@ Magrathea ObjectStorage is decomposed into pluggable S3 API, pure domain/applica
 |===
 | Component | Responsibility
 | `BucketService` | Bucket lifecycle operations.
-| `ObjectService` | Object lifecycle operations and content access through `ContentStore`.
-| `ContentStore` | Application port for raw object content. Implemented by infrastructure.
+| `ObjectService` | Object lifecycle operations through `S3ObjectRepository.save(S3ObjectWrite)` and content retrieval through `S3ObjectContent`.
+| `DefaultS3ObjectWrite` | Application implementation of domain `S3ObjectWrite`; carries `Flux<DataBuffer>` content for saves.
+| `DefaultS3ObjectContent` | Application implementation of domain `S3ObjectContent`; carries `Flux<DataBuffer>` content for reads.
 | DTO records | Commands and responses for application-level orchestration.
 |===
 
@@ -65,7 +71,7 @@ Magrathea ObjectStorage is decomposed into pluggable S3 API, pure domain/applica
 |===
 | Component | Responsibility
 | `BucketRepositoryImpl` | In-memory bucket repository.
-| `InMemoryObjectRepository` | In-memory S3 object metadata repository and `ContentStore` implementation.
+| `InMemoryObjectRepository` | In-memory S3 object metadata/content repository. Internally casts `S3ObjectWrite` to `DefaultS3ObjectWrite`.
 | `InfrastructureConfig` | Infrastructure bean configuration.
 |===
 
@@ -75,7 +81,7 @@ Magrathea ObjectStorage is decomposed into pluggable S3 API, pure domain/applica
 |===
 | Interface | Description
 | S3 REST API | Public API surface. Only AWS S3-compatible endpoints are allowed.
-| `ContentStore` | Decouples `s3-api` from concrete infrastructure repository classes.
+| `S3ObjectWrite` / `S3ObjectContent` | Domain-level object content interfaces; keep domain free from reactive/framework types while repository implementations can receive richer application implementations.
 | Spring Boot auto-configuration | `s3-api` is loaded via `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`.
 | AWS CLI compatibility script | `test-aws-cli.sh` validates every implemented S3 operation through AWS CLI.
 |===

@@ -1,18 +1,18 @@
 # Magrathea ObjectStorage Test Report
 
-Generated: 2026-05-21T14:27:47+02:00
+Generated: 2026-05-21T15:37:15+02:00
 
 ## Summary
 
 | Suite | Passed | Failed | Total | Notes |
 |---|---:|---:|---:|---|
-| AWS CLI S3 compatibility | 12 | 0 | 12 | Endpoint: `http://localhost:18083` |
+| AWS CLI S3 compatibility | 33 | 0 | 33 | Endpoint: `http://localhost:18090` |
 | Maven Surefire | See section | See section | See section | Latest reports under `*/target/surefire-reports` |
 | Clover coverage | See section | - | - | Latest report under `target/site/clover` |
 
 ## AWS CLI S3 Compatibility
 
-Bucket: `magrathea-cli-test-1779366462-36159`
+Bucket: `magrathea-cli-test-1779370622-46050`
 
 | Check | Status | Notes |
 |---|---|---|
@@ -21,9 +21,30 @@ Bucket: `magrathea-cli-test-1779366462-36159`
 | HeadBucket existing | ✅ Passed | Expected success |
 | PutObject | ✅ Passed | Expected success |
 | HeadObject existing | ✅ Passed | Expected success |
+| PutObjectAcl | ✅ Passed | Expected success |
+| GetObjectAcl | ✅ Passed | Expected success |
+| PutObjectTagging | ✅ Passed | Expected success |
+| GetObjectTagging | ✅ Passed | Expected success |
+| DeleteObjectTagging | ✅ Passed | Expected success |
+| GetObjectAttributes | ✅ Passed | Expected success |
 | GetObject | ✅ Passed | Expected success |
 | GetObject content matches | ✅ Passed | Expected success |
 | ListObjects | ✅ Passed | Expected success |
+| ListObjectsV2 | ✅ Passed | Expected success |
+| GetBucketLocation | ✅ Passed | Expected success |
+| PutBucketAcl | ✅ Passed | Expected success |
+| GetBucketAcl | ✅ Passed | Expected success |
+| PutBucketTagging | ✅ Passed | Expected success |
+| GetBucketTagging | ✅ Passed | Expected success |
+| DeleteBucketTagging | ✅ Passed | Expected success |
+| GetBucketVersioning initial | ✅ Passed | Expected success |
+| PutBucketVersioning Enabled | ✅ Passed | Expected success |
+| GetBucketVersioning enabled | ✅ Passed | Expected success |
+| ListObjectVersions | ✅ Passed | Expected success |
+| CopyObject | ✅ Passed | Expected success |
+| HeadObject copy existing | ✅ Passed | Expected success |
+| DeleteObjects | ✅ Passed | Expected success |
+| HeadObject copy after DeleteObjects | ✅ Passed | Expected failure |
 | DeleteObject | ✅ Passed | Expected success |
 | HeadObject after DeleteObject | ✅ Passed | Expected failure |
 | DeleteBucket | ✅ Passed | Expected success |
@@ -39,18 +60,18 @@ Bucket: `magrathea-cli-test-1779366462-36159`
 | object-storage-domain | com.example.magrathea.objectstorage.domain.RegionTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
 | object-storage-domain | com.example.magrathea.objectstorage.domain.S3ObjectTest.txt | 8 | 0 | 0 | 0 | ✅ Passed |
 | object-storage-domain | com.example.magrathea.objectstorage.domain.StorageClassTest.txt | 6 | 0 | 0 | 0 | ✅ Passed |
-| s3-api | com.example.magrathea.s3api.cucumber.ObjectStorageCucumberTest.txt | 9 | 0 | 0 | 0 | ✅ Passed |
-| **Total** |  | **50** | **0** | **0** | **0** | **✅ Passed** |
+| s3-api | com.example.magrathea.s3api.cucumber.ObjectStorageCucumberTest.txt | 21 | 0 | 0 | 0 | ✅ Passed |
+| **Total** |  | **62** | **0** | **0** | **0** | **✅ Passed** |
 
 ## Clover Coverage
 
 | Metric | Covered | Total | Coverage |
 |---|---:|---:|---:|
-| Elements | 260 | 344 | 75.58% |
-| Statements | 164 | 213 | 77.00% |
-| Methods | 64 | 77 | 83.12% |
-| Conditionals | 32 | 54 | 59.26% |
-| NCLOC | - | 857 | - |
+| Elements | 503 | 663 | 75.87% |
+| Statements | 315 | 394 | 79.95% |
+| Methods | 110 | 125 | 88.00% |
+| Conditionals | 78 | 144 | 54.17% |
+| NCLOC | - | 1474 | - |
 
 Report HTML: `target/site/clover/index.html`
 
@@ -64,8 +85,26 @@ Report HTML: `target/site/clover/index.html`
 | PutObject | `aws s3api put-object` | ✅ |
 | HeadObject | `aws s3api head-object` | ✅ |
 | GetObject | `aws s3api get-object` | ✅ |
+| GetObjectAcl | `aws s3api get-object-acl` | ✅ |
+| PutObjectAcl | `aws s3api put-object-acl` | ✅ |
+| GetObjectTagging | `aws s3api get-object-tagging` | ✅ |
+| PutObjectTagging | `aws s3api put-object-tagging` | ✅ |
+| DeleteObjectTagging | `aws s3api delete-object-tagging` | ✅ |
+| GetObjectAttributes | `aws s3api get-object-attributes` | ✅ |
 | ListObjects | `aws s3api list-objects` | ✅ |
+| ListObjectsV2 | `aws s3api list-objects-v2` | ✅ |
+| GetBucketLocation | `aws s3api get-bucket-location` | ✅ |
+| GetBucketAcl | `aws s3api get-bucket-acl` | ✅ |
+| PutBucketAcl | `aws s3api put-bucket-acl` | ✅ |
+| GetBucketTagging | `aws s3api get-bucket-tagging` | ✅ |
+| PutBucketTagging | `aws s3api put-bucket-tagging` | ✅ |
+| DeleteBucketTagging | `aws s3api delete-bucket-tagging` | ✅ |
+| GetBucketVersioning | `aws s3api get-bucket-versioning` | ✅ |
+| PutBucketVersioning | `aws s3api put-bucket-versioning` | ✅ |
+| ListObjectVersions | `aws s3api list-object-versions` | ✅ |
+| CopyObject | `aws s3api copy-object` | ✅ |
 | DeleteObject | `aws s3api delete-object` | ✅ |
+| DeleteObjects | `aws s3api delete-objects` | ✅ |
 | DeleteBucket | `aws s3api delete-bucket` | ✅ |
 
 ## Not Implemented Yet

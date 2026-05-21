@@ -23,6 +23,7 @@ public class BucketSteps {
     private CommonSteps commonSteps;
 
     private String bucketName;
+    private String responseBody;
 
     @Given("a bucket name {string}")
     public void aBucketName(String name) {
@@ -67,6 +68,101 @@ public class BucketSteps {
         commonSteps.setResponseStatus(status);
     }
 
+    @When("bucket location is requested for {string}")
+    public void bucketLocationRequested(String name) {
+        var result = webTestClient.get()
+            .uri("/{bucket}?location", name)
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        responseBody = result.getResponseBody();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket versioning is requested for {string}")
+    public void bucketVersioningRequested(String name) {
+        var result = webTestClient.get()
+            .uri("/{bucket}?versioning", name)
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        responseBody = result.getResponseBody();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket versioning is enabled for {string}")
+    public void bucketVersioningEnabled(String name) {
+        var body = "<VersioningConfiguration><Status>Enabled</Status></VersioningConfiguration>";
+        var status = webTestClient.put()
+            .uri("/{bucket}?versioning", name)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket ACL {string} is applied to {string}")
+    public void bucketAclApplied(String acl, String name) {
+        var status = webTestClient.put()
+            .uri("/{bucket}?acl", name)
+            .header("x-amz-acl", acl)
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket ACL is requested for {string}")
+    public void bucketAclRequested(String name) {
+        var result = webTestClient.get()
+            .uri("/{bucket}?acl", name)
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        responseBody = result.getResponseBody();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket tag {string} = {string} is applied to {string}")
+    public void bucketTagApplied(String key, String value, String name) {
+        var body = "<Tagging><TagSet><Tag><Key>" + key + "</Key><Value>" + value + "</Value></Tag></TagSet></Tagging>";
+        var status = webTestClient.put()
+            .uri("/{bucket}?tagging", name)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket tags are requested for {string}")
+    public void bucketTagsRequested(String name) {
+        var result = webTestClient.get()
+            .uri("/{bucket}?tagging", name)
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        responseBody = result.getResponseBody();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket tags are deleted for {string}")
+    public void bucketTagsDeleted(String name) {
+        var status = webTestClient.delete()
+            .uri("/{bucket}?tagging", name)
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
     @When("the bucket is deleted via S3 API")
     public void bucketDeleted() {
         webTestClient.delete()
@@ -91,6 +187,37 @@ public class BucketSteps {
             .getResponseBody();
         assertNotNull(body);
         assertTrue(body.contains(bucketName));
+    }
+
+    @Then("the metadata response contains {string}")
+    public void metadataResponseContains(String expected) {
+        assertNotNull(responseBody);
+        assertTrue(responseBody.contains(expected));
+    }
+
+    @Then("the bucket location response contains {string}")
+    public void bucketLocationResponseContains(String expected) {
+        assertNotNull(responseBody);
+        assertTrue(responseBody.contains(expected));
+    }
+
+    @Then("the bucket versioning response contains {string}")
+    public void bucketVersioningResponseContains(String expected) {
+        assertNotNull(responseBody);
+        assertTrue(responseBody.contains(expected));
+    }
+
+    @Then("bucket versioning for {string} is {string}")
+    public void bucketVersioningIs(String name, String expected) {
+        var body = webTestClient.get()
+            .uri("/{bucket}?versioning", name)
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult()
+            .getResponseBody();
+        assertNotNull(body);
+        assertTrue(body.contains(expected));
     }
 
     @Then("the bucket no longer appears in the bucket list")

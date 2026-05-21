@@ -27,8 +27,9 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 - `object-storage-infrastructure`: repository implementations only; no HTTP API routes
 - `InMemoryObjectRepository`: in-memory S3 object metadata + content store
-- `ContentStore` is an application port implemented by infrastructure
-- byte[] only exists in content storage / adapter boundary, never in domain
+- `ContentStore` is removed; object content is saved through `S3ObjectRepository.save(S3ObjectWrite)`
+- `S3ObjectWrite` and `S3ObjectContent` are domain interfaces without framework types; their application implementations carry `Flux<DataBuffer>`
+- byte[] only exists inside repository content storage internals, never in domain signatures
 
 === Testing Constraints
 

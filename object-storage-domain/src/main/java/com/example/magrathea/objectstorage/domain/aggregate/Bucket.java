@@ -47,6 +47,10 @@ public record Bucket(
         return new Bucket(id, name, region, storageClass, true, encryptionEnabled);
     }
 
+    public Bucket withVersioningSuspended() {
+        return new Bucket(id, name, region, storageClass, false, encryptionEnabled);
+    }
+
     public Bucket withEncryptionEnabled() {
         return new Bucket(id, name, region, storageClass, versioningEnabled, true);
     }
