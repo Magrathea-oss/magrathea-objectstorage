@@ -1,0 +1,38 @@
+ifndef::imagesdir[:imagesdir: ../images]
+
+[[section-architecture-constraints]]
+== Architecture Constraints
+
+=== Technical Constraints
+
+- **Java 21**: latest LTS, records, sealed interfaces, pattern matching
+- **Spring Boot 4 WebFlux**: reactive non-blocking stack
+- **Maven multi-module**: flat sibling modules per bounded context
+- **S3-only HTTP API**: public HTTP endpoints MUST be AWS S3-compatible; non-S3 internal REST APIs are not allowed
+- **Pluggable S3 adapter**: S3 API lives in `s3-api` and is loaded via Spring Boot auto-configuration, not component scanning
+- **S3 API toggle**: `s3.api.enabled=false` disables S3 routes even when the module is present
+- **RouterFunction**: NO `@Controller`, NO `@RequestMapping` — functional WebFlux style only
+- **XML serialization**: Jackson 3 XML annotated record objects (`tools.jackson.dataformat.xml.annotation.*`) with `XmlMapper`, NOT StringBuilder
+- **Jackson 3 XML**: dependency `tools.jackson.dataformat:jackson-dataformat-xml`, NOT `com.fasterxml.jackson.dataformat:jackson-dataformat-xml`
+- **XML codec**: custom `JacksonXmlEncoder` extending `AbstractJacksonEncoder<XmlMapper>` must be registered via `WebFluxConfigurer` or `HandlerStrategies`
+
+=== Domain Constraints
+
+- `object-storage-domain`: uses ONLY AWS S3 native terminology — no custom abstractions like BinaryContent
+- `object-storage-domain`: zero dependencies except test dependencies
+- No `shared-domain` module exists
+- `persistence-context-*` modules are intentionally empty placeholders and are not referenced by S3 implementation
+
+=== Infrastructure Constraints
+
+- `object-storage-infrastructure`: repository implementations only; no HTTP API routes
+- `InMemoryObjectRepository`: in-memory S3 object metadata + content store
+- `ContentStore` is an application port implemented by infrastructure
+- byte[] only exists in content storage / adapter boundary, never in domain
+
+=== Testing Constraints
+
+- Domain tests: pure JUnit, NO Spring context
+- Integration tests: Cucumber BDD with WebTestClient in `s3-api`
+- AWS CLI compatibility tests: `test-aws-cli.sh`, also runnable via Maven profile `aws-cli-tests`
+- Coverage verification: OpenClover profile `coverage`

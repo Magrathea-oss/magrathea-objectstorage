@@ -1,0 +1,81 @@
+ifndef::imagesdir[:imagesdir: ../images]
+
+[[section-building-block-view]]
+== Building Block View
+
+=== Whitebox Overall System
+
+Magrathea ObjectStorage is decomposed into pluggable S3 API, pure domain/application modules, and infrastructure repository implementations.
+
+[cols="1,3,2" options="header"]
+|===
+| Building Block | Responsibility | Location
+
+| `s3-api`
+| AWS S3-compatible HTTP adapter. Provides RouterFunction routes, S3 XML response models, Jackson 3 XML codec auto-configuration, and S3 API Cucumber tests.
+| `s3-api/`
+
+| `object-storage-domain`
+| Pure AWS S3 domain model: Bucket, S3Object, value objects, repository interfaces, domain events. No Spring, no reactive types.
+| `object-storage-domain/`
+
+| `object-storage-application`
+| Application services and DTOs. Provides `BucketService`, `ObjectService`, and `ContentStore` port used by S3 API to store/retrieve object bytes without depending on infrastructure classes.
+| `object-storage-application/`
+
+| `object-storage-infrastructure`
+| Repository implementations only: `BucketRepositoryImpl`, `InMemoryObjectRepository`. No HTTP routes.
+| `object-storage-infrastructure/`
+
+| `bootstrap-application`
+| Spring Boot entry point. S3 API is loaded automatically when `s3-api` is on the classpath and `s3.api.enabled` is not false.
+| `bootstrap-application/`
+
+| `persistence-context-*`
+| Empty placeholder modules reserved for future use. They are not referenced by the current S3 implementation.
+| `persistence-context-domain/`, `persistence-context-application/`, `persistence-context-infrastructure/`
+|===
+
+=== Level 2 — `s3-api`
+
+[cols="1,3" options="header"]
+|===
+| Component | Responsibility
+| `S3ProxyRouter` | Functional WebFlux RouterFunction implementing the currently supported S3 operations.
+| `S3XmlResponses` | Jackson 3 XML annotated records for S3 XML response bodies.
+| `JacksonXmlCodecConfig` | Registers `JacksonXmlEncoder` for Spring WebFlux XML serialization.
+| `S3ApiConfig` | Spring Boot auto-configuration guarded by `s3.api.enabled`.
+| Cucumber tests | S3 endpoint integration tests under `s3-api/src/test/features/object-storage/`.
+|===
+
+=== Level 2 — `object-storage-application`
+
+[cols="1,3" options="header"]
+|===
+| Component | Responsibility
+| `BucketService` | Bucket lifecycle operations.
+| `ObjectService` | Object lifecycle operations and content access through `ContentStore`.
+| `ContentStore` | Application port for raw object content. Implemented by infrastructure.
+| DTO records | Commands and responses for application-level orchestration.
+|===
+
+=== Level 2 — `object-storage-infrastructure`
+
+[cols="1,3" options="header"]
+|===
+| Component | Responsibility
+| `BucketRepositoryImpl` | In-memory bucket repository.
+| `InMemoryObjectRepository` | In-memory S3 object metadata repository and `ContentStore` implementation.
+| `InfrastructureConfig` | Infrastructure bean configuration.
+|===
+
+=== Important Interfaces
+
+[cols="1,3" options="header"]
+|===
+| Interface | Description
+| S3 REST API | Public API surface. Only AWS S3-compatible endpoints are allowed.
+| `ContentStore` | Decouples `s3-api` from concrete infrastructure repository classes.
+| Spring Boot auto-configuration | `s3-api` is loaded via `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`.
+| AWS CLI compatibility script | `test-aws-cli.sh` validates every implemented S3 operation through AWS CLI.
+|===

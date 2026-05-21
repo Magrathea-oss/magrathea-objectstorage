@@ -1,0 +1,2 @@
+com.example.magrathea.s3api.config.JacksonXmlCodecConfig
+com.example.magrathea.s3api.config.S3ApiConfig

@@ -1,0 +1,28 @@
+ifndef::imagesdir[:imagesdir: ../images]
+
+[[section-solution-strategy]]
+== Solution Strategy
+
+=== Architecture Strategy
+
+- **Hexagonal Architecture** (Ports and Adapters): domain is pure business logic, application and infrastructure are adapters
+- **DDD with strategic design**: bounded contexts for ObjectStorage and Persistence, shared-kernel for BinaryContent
+- **Reactive by design**: WebFlux RouterFunction, DataBuffer streaming, CompletableFuture → Mono/Flux bridge
+
+=== Key Technical Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| Maven multi-module per bounded context | Enforces dependency boundaries, domain isolation |
+| Records for aggregates/value objects | Immutability, zero boilerplate, Java 17+ idiomatic |
+| Sealed interfaces for domain events | Exhaustive pattern matching, type safety |
+| CompletableFuture repositories | Standard Java async — no framework coupling |
+| RouterFunction over @Controller | Functional style, precise content negotiation |
+| Jackson XML for S3 responses | Auto-serialization, no StringBuilder XML |
+| DataBuffer for binary streaming | Reactive non-blocking I/O, WebFlux native |
+
+=== Quality Strategy
+
+- **Testability**: domain tested with pure JUnit (no Spring), integration tested with Cucumber BDD, S3 compatibility verified with AWS CLI
+- **Simplicity**: single-node file persistence, in-memory stores for metadata
+- **Traceability**: ADRs document every architectural decision, ARC42 provides full architecture documentation

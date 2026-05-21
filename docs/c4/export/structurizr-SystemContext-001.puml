@@ -1,0 +1,24 @@
+@startuml
+title <size:24>System Context View: Magrathea ObjectStorage</size>
+
+set separator none
+top to bottom direction
+
+<style>
+  root {
+    BackgroundColor: #ffffff
+    FontColor: #444444
+  }
+</style>
+
+!include <C4/C4>
+!include <C4/C4_Context>
+
+Person(User, "User", $descr="End user interacting via HTTP", $tags="", $link="")
+System(MagratheaObjectStorage, "Magrathea ObjectStorage", $descr="Spring Boot 4 reactive S3-compatible object storage", $tags="", $link="")
+
+Rel(User, MagratheaObjectStorage, "Uses HTTPS — S3-compatible API", $techn="", $tags="", $link="")
+
+SHOW_LEGEND(true)
+hide stereotypes
+@enduml
