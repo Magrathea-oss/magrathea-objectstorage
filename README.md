@@ -93,6 +93,27 @@ aws --endpoint-url http://localhost:8080 s3api get-object --bucket test-bucket -
 
 Consolidated Markdown report: [`docs/test-report.md`](docs/test-report.md)
 
+### Automated Coverage on Commit
+
+A **pre-commit git hook** generates Clover coverage before every commit:
+
+```bash
+# Normal commit — coverage auto-generates
+ git commit -m "msg"
+
+# Skip coverage (fast commit)
+ git commit --no-verify -m "msg"
+```
+
+Or use the helper script:
+
+```bash
+bash scripts/commit-with-coverage.sh -m "commit message"
+```
+
+The hook runs `mvn -Pcoverage clover:setup test clover:aggregate clover:clover` and stages
+`target/site/clover/clover.xml` + `docs/test-report.md`.
+
 AWS CLI tests require:
 
 - AWS CLI installed
