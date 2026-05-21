@@ -2,15 +2,18 @@ package com.example.magrathea.objectstorage.application.service;
 
 import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
 import com.example.magrathea.objectstorage.domain.repository.BucketRepository;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketConfiguration;
 import com.example.magrathea.objectstorage.domain.valueobject.Region;
 import com.example.magrathea.objectstorage.domain.valueobject.StorageClass;
 import com.example.magrathea.objectstorage.application.dto.CreateBucketCommand;
 import com.example.magrathea.objectstorage.application.dto.BucketResponse;
+import com.example.magrathea.objectstorage.application.dto.CorsConfigurationCommand;
 
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Application service for bucket operations.
@@ -68,6 +71,28 @@ public class BucketService {
     public void deleteBucket(String id) {
         repository.delete(Bucket.Id.of(id)).join();
     }
+
+    // ── CORS ──
+
+    public Optional<BucketConfiguration> getCorsConfiguration(String bucketName) {
+        return repository.findConfiguration(bucketName).join();
+    }
+
+    public void putCorsConfiguration(CorsConfigurationCommand command) {
+        var rules = command.corsRules().stream()
+            .map(r -> new BucketConfiguration.CorsRule(
+                r.allowedOrigins(), r.allowedMethods(), r.allowedHeaders(),
+                r.maxAgeSeconds(), r.exposeHeaders(), r.id()))
+            .toList();
+        var config = new BucketConfiguration(command.bucketName(), rules);
+        repository.saveConfiguration(config).join();
+    }
+
+    public void deleteCorsConfiguration(String bucketName) {
+        repository.deleteConfiguration(bucketName).join();
+    }
+
+    // ── internal ──
 
     private BucketResponse toResponse(Bucket bucket) {
         return new BucketResponse(

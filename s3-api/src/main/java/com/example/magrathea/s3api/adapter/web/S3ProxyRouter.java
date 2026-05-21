@@ -16,15 +16,18 @@ public class S3ProxyRouter {
     private final S3BucketMetadataHandler bucketMetadata;
     private final S3ObjectOperationsHandler objectOperations;
     private final S3ObjectMetadataHandler objectMetadata;
+    private final S3BucketConfigHandler bucketConfig;
 
     public S3ProxyRouter(S3BucketOperationsHandler bucketOperations,
                          S3BucketMetadataHandler bucketMetadata,
                          S3ObjectOperationsHandler objectOperations,
-                         S3ObjectMetadataHandler objectMetadata) {
+                         S3ObjectMetadataHandler objectMetadata,
+                         S3BucketConfigHandler bucketConfig) {
         this.bucketOperations = bucketOperations;
         this.bucketMetadata = bucketMetadata;
         this.objectOperations = objectOperations;
         this.objectMetadata = objectMetadata;
+        this.bucketConfig = bucketConfig;
     }
 
     public RouterFunction<ServerResponse> s3Routes() {
@@ -39,13 +42,16 @@ public class S3ProxyRouter {
             .GET("/{bucket}", request -> S3WebSupport.hasQuery(request, "versioning"), bucketOperations::getBucketVersioning)
             .GET("/{bucket}", request -> S3WebSupport.hasQuery(request, "versions"), bucketOperations::listObjectVersions)
             .GET("/{bucket}", request -> "2".equals(request.queryParam("list-type").orElse("")), bucketOperations::listObjectsV2Xml)
+            .GET("/{bucket}", request -> S3WebSupport.hasQuery(request, "cors"), bucketConfig::getBucketCors)
             .GET("/{bucket}", S3WebSupport::acceptXml, bucketOperations::listObjectsXml)
             .PUT("/{bucket}", request -> S3WebSupport.hasQuery(request, "acl"), bucketMetadata::putBucketAcl)
             .PUT("/{bucket}", request -> S3WebSupport.hasQuery(request, "tagging"), bucketMetadata::putBucketTagging)
             .PUT("/{bucket}", request -> S3WebSupport.hasQuery(request, "versioning"), bucketOperations::putBucketVersioning)
+            .PUT("/{bucket}", request -> S3WebSupport.hasQuery(request, "cors"), bucketConfig::putBucketCors)
             .PUT("/{bucket}", bucketOperations::createBucket)
             .HEAD("/{bucket}", bucketOperations::headBucket)
             .DELETE("/{bucket}", request -> S3WebSupport.hasQuery(request, "tagging"), bucketMetadata::deleteBucketTagging)
+            .DELETE("/{bucket}", request -> S3WebSupport.hasQuery(request, "cors"), bucketConfig::deleteBucketCors)
             .DELETE("/{bucket}", bucketOperations::deleteBucket)
 
             .POST("/{bucket}", request -> S3WebSupport.hasQuery(request, "delete"), objectOperations::deleteObjects)

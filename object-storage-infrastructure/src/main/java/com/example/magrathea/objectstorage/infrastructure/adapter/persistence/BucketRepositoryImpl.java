@@ -2,6 +2,7 @@ package com.example.magrathea.objectstorage.infrastructure.adapter.persistence;
 
 import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
 import com.example.magrathea.objectstorage.domain.repository.BucketRepository;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketConfiguration;
 
 import org.springframework.stereotype.Repository;
 
@@ -18,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class BucketRepositoryImpl implements BucketRepository {
 
     private final ConcurrentHashMap<String, Bucket> store = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, BucketConfiguration> configStore = new ConcurrentHashMap<>();
 
     @Override
     public CompletableFuture<Optional<Bucket>> findById(Bucket.Id id) {
@@ -49,8 +51,26 @@ public class BucketRepositoryImpl implements BucketRepository {
         return CompletableFuture.completedFuture(null);
     }
 
+    @Override
+    public CompletableFuture<Optional<BucketConfiguration>> findConfiguration(String bucketName) {
+        return CompletableFuture.completedFuture(Optional.ofNullable(configStore.get(bucketName)));
+    }
+
+    @Override
+    public CompletableFuture<Void> saveConfiguration(BucketConfiguration configuration) {
+        configStore.put(configuration.bucketName(), configuration);
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public CompletableFuture<Void> deleteConfiguration(String bucketName) {
+        configStore.remove(bucketName);
+        return CompletableFuture.completedFuture(null);
+    }
+
     /** Reset state — used by test cleanup hooks. */
     public void reset() {
         store.clear();
+        configStore.clear();
     }
 }

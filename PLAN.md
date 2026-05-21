@@ -91,7 +91,7 @@ Source: https://docs.aws.amazon.com/AmazonS3/latest/API/API_Operations.md
 
 Scope: **Amazon S3 actions only**. Amazon S3 Control actions are intentionally out of scope for the object-storage S3 REST API module.
 
-### Current Implemented Operations (27/111)
+### Current Implemented Operations (30/111)
 
 | Operation | Endpoint | Test coverage |
 |---|---|---|
@@ -122,6 +122,9 @@ Scope: **Amazon S3 actions only**. Amazon S3 Control actions are intentionally o
 | GetBucketTagging | `GET /{bucket}?tagging` | Cucumber + AWS CLI |
 | PutBucketTagging | `PUT /{bucket}?tagging` | Cucumber + AWS CLI |
 | DeleteBucketTagging | `DELETE /{bucket}?tagging` | Cucumber + AWS CLI |
+| GetBucketCors | `GET /{bucket}?cors` | Cucumber + AWS CLI |
+| PutBucketCors | `PUT /{bucket}?cors` | Cucumber + AWS CLI |
+| DeleteBucketCors | `DELETE /{bucket}?cors` | Cucumber + AWS CLI |
 
 ### Phase A — CLI-Baseline Compatibility (completed)
 
@@ -169,7 +172,7 @@ Goal: support common AWS CLI object workflows beyond current CRUD.
 
 | Area | Operations |
 |---|---|
-| CORS | GetBucketCors, PutBucketCors, DeleteBucketCors |
+| CORS | GetBucketCors ✅, PutBucketCors ✅, DeleteBucketCors ✅ |
 | Lifecycle | GetBucketLifecycle, GetBucketLifecycleConfiguration, PutBucketLifecycle, PutBucketLifecycleConfiguration, DeleteBucketLifecycle |
 | Policy | GetBucketPolicy, PutBucketPolicy, DeleteBucketPolicy, GetBucketPolicyStatus |
 | Encryption | GetBucketEncryption, PutBucketEncryption, DeleteBucketEncryption |

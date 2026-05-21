@@ -1,18 +1,18 @@
 # Magrathea ObjectStorage Test Report
 
-Generated: 2026-05-21T19:01:09+02:00
+Generated: 2026-05-21T21:01:11+02:00
 
 ## Summary
 
 | Suite | Passed | Failed | Total | Notes |
 |---|---:|---:|---:|---|
-| AWS CLI S3 compatibility | 46 | 0 | 46 | Endpoint: `http://localhost:8081` |
+| AWS CLI S3 compatibility | 51 | 0 | 51 | Endpoint: `http://localhost:8080` |
 | Maven Surefire | See section | See section | See section | Latest reports under `*/target/surefire-reports` |
 | Clover coverage | See section | - | - | Latest report under `target/site/clover` |
 
 ## AWS CLI S3 Compatibility
 
-Bucket: `magrathea-cli-test-1779382852-53235`
+Bucket: `magrathea-cli-test-1779390052-61144`
 
 | Check | Status | Notes |
 |---|---|---|
@@ -51,6 +51,11 @@ Bucket: `magrathea-cli-test-1779382852-53235`
 | DeleteObject PARANOIC_MODE | ✅ Passed | Expected success |
 | DeleteObject | ✅ Passed | Expected success |
 | HeadObject after DeleteObject | ✅ Passed | Expected failure |
+| PutBucketCors | ✅ Passed | Expected success |
+| GetBucketCors | ✅ Passed | Expected success |
+| DeleteBucketCors | ✅ Passed | Expected success |
+| GetBucketCors nonexistent | ✅ Passed | Expected failure |
+| GetBucketCors after delete | ✅ Passed | Expected failure |
 | DeleteBucket | ✅ Passed | Expected success |
 | HeadBucket after DeleteBucket | ✅ Passed | Expected failure |
 | GetObject nonexistent | ✅ Passed | Expected failure |
@@ -68,19 +73,24 @@ Bucket: `magrathea-cli-test-1779382852-53235`
 | Module | Report | Tests | Failures | Errors | Skipped | Status |
 |---|---|---:|---:|---:|---:|---|
 | object-storage-domain | com.example.magrathea.objectstorage.domain.BucketTest.txt | 11 | 0 | 0 | 0 | ✅ Passed |
+| object-storage-domain | com.example.magrathea.objectstorage.domain.CorsConfigurationTest.txt | 7 | 0 | 0 | 0 | ✅ Passed |
 | object-storage-domain | com.example.magrathea.objectstorage.domain.ObjectKeyTest.txt | 6 | 0 | 0 | 0 | ✅ Passed |
 | object-storage-domain | com.example.magrathea.objectstorage.domain.ObjectStorageEventTest.txt | 6 | 0 | 0 | 0 | ✅ Passed |
 | object-storage-domain | com.example.magrathea.objectstorage.domain.RegionTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
 | object-storage-domain | com.example.magrathea.objectstorage.domain.S3ObjectTest.txt | 8 | 0 | 0 | 0 | ✅ Passed |
 | object-storage-domain | com.example.magrathea.objectstorage.domain.StorageClassTest.txt | 7 | 0 | 0 | 0 | ✅ Passed |
-| s3-api | com.example.magrathea.s3api.cucumber.ObjectStorageCucumberTest.txt | 48 | 0 | 0 | 0 | ✅ Passed |
-| **Total** |  | **90** | **0** | **0** | **0** | **✅ Passed** |
+| s3-api | com.example.magrathea.s3api.cucumber.ObjectStorageCucumberTest.txt | 55 | 0 | 0 | 0 | ✅ Passed |
+| **Total** |  | **104** | **0** | **0** | **0** | **✅ Passed** |
 
 ## Clover Coverage
 
 | Metric | Covered | Total | Coverage |
 |---|---:|---:|---:|
-| Clover | - | - | ⚠️ Not generated |
+| Elements | 600 | 719 | 83.45% |
+| Statements | 376 | 435 | 86.44% |
+| Methods | 112 | 128 | 87.50% |
+| Conditionals | 112 | 156 | 71.79% |
+| NCLOC | - | 1586 | - |
 
 Report HTML: `target/site/clover/index.html`
 
@@ -118,9 +128,17 @@ Report HTML: `target/site/clover/index.html`
 | DeleteObject PARANOIC_MODE | `aws s3api delete-object` | ✅ |
 | DeleteObject | `aws s3api delete-object` | ✅ |
 | DeleteObjects | `aws s3api delete-objects` | ✅ |
+| PutBucketCors | `aws s3api put-bucket-cors` | ✅ |
+| GetBucketCors | `aws s3api get-bucket-cors` | ✅ |
+| DeleteBucketCors | `aws s3api delete-bucket-cors` | ✅ |
 | DeleteBucket | `aws s3api delete-bucket` | ✅ |
 
 ### Failure Tests
+
+| Check | Status | Notes |
+|---|---|---|
+| GetBucketCors nonexistent | ✅ | Expected failure |
+| GetBucketCors after delete | ✅ | Expected failure |
 
 | Check | Status | Notes |
 |---|---|---|

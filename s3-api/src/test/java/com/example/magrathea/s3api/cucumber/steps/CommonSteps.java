@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatusCode;
 public class CommonSteps {
 
     private HttpStatusCode responseStatus;
+    private String responseBody;
 
     public void setResponseStatus(HttpStatusCode status) {
         this.responseStatus = status;
@@ -18,7 +19,16 @@ public class CommonSteps {
         return responseStatus;
     }
 
+    public void setResponseBody(String body) {
+        this.responseBody = body;
+    }
+
+    public String getResponseBody() {
+        return responseBody;
+    }
+
     public void reset() {
         this.responseStatus = null;
+        this.responseBody = null;
     }
 }

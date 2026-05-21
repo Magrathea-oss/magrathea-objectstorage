@@ -23,7 +23,6 @@ public class BucketSteps {
     private CommonSteps commonSteps;
 
     private String bucketName;
-    private String responseBody;
 
     @Given("a bucket name {string}")
     public void aBucketName(String name) {
@@ -76,7 +75,7 @@ public class BucketSteps {
             .exchange()
             .expectBody(String.class)
             .returnResult();
-        responseBody = result.getResponseBody();
+        commonSteps.setResponseBody(result.getResponseBody());
         commonSteps.setResponseStatus(result.getStatus());
     }
 
@@ -88,7 +87,7 @@ public class BucketSteps {
             .exchange()
             .expectBody(String.class)
             .returnResult();
-        responseBody = result.getResponseBody();
+        commonSteps.setResponseBody(result.getResponseBody());
         commonSteps.setResponseStatus(result.getStatus());
     }
 
@@ -124,7 +123,7 @@ public class BucketSteps {
             .exchange()
             .expectBody(String.class)
             .returnResult();
-        responseBody = result.getResponseBody();
+        commonSteps.setResponseBody(result.getResponseBody());
         commonSteps.setResponseStatus(result.getStatus());
     }
 
@@ -149,7 +148,7 @@ public class BucketSteps {
             .exchange()
             .expectBody(String.class)
             .returnResult();
-        responseBody = result.getResponseBody();
+        commonSteps.setResponseBody(result.getResponseBody());
         commonSteps.setResponseStatus(result.getStatus());
     }
 
@@ -193,20 +192,23 @@ public class BucketSteps {
 
     @Then("the metadata response contains {string}")
     public void metadataResponseContains(String expected) {
-        assertNotNull(responseBody);
-        assertTrue(responseBody.contains(expected));
+        var body = commonSteps.getResponseBody();
+        assertNotNull(body);
+        assertTrue(body.contains(expected));
     }
 
     @Then("the bucket location response contains {string}")
     public void bucketLocationResponseContains(String expected) {
-        assertNotNull(responseBody);
-        assertTrue(responseBody.contains(expected));
+        var body = commonSteps.getResponseBody();
+        assertNotNull(body);
+        assertTrue(body.contains(expected));
     }
 
     @Then("the bucket versioning response contains {string}")
     public void bucketVersioningResponseContains(String expected) {
-        assertNotNull(responseBody);
-        assertTrue(responseBody.contains(expected));
+        var body = commonSteps.getResponseBody();
+        assertNotNull(body);
+        assertTrue(body.contains(expected));
     }
 
     @Then("bucket versioning for {string} is {string}")

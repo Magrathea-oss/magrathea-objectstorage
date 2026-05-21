@@ -245,6 +245,56 @@ public final class S3XmlResponses {
         }
     }
 
+    // ── CORS ──
+
+    @JacksonXmlRootElement(localName = "CORSConfiguration")
+    public record CORSConfiguration(
+        @JacksonXmlElementWrapper(localName = "CORSRules", useWrapping = true)
+        @JacksonXmlProperty(localName = "CORSRule")
+        List<CORSRule> corsRules
+    ) {
+        public static CORSConfiguration from(String bucketName,
+                java.util.Optional<com.example.magrathea.objectstorage.domain.valueobject.BucketConfiguration> config) {
+            if (config.isEmpty() || !config.get().hasCors()) {
+                throw new java.util.NoSuchElementException("CORS configuration not found");
+            }
+            var rules = config.get().corsRules().stream()
+                .map(CORSRule::from)
+                .toList();
+            return new CORSConfiguration(rules);
+        }
+    }
+
+    public record CORSRule(
+        @JacksonXmlElementWrapper(localName = "AllowedOrigin", useWrapping = false)
+        @JacksonXmlProperty(localName = "AllowedOrigin")
+        List<String> allowedOrigins,
+        @JacksonXmlElementWrapper(localName = "AllowedMethod", useWrapping = false)
+        @JacksonXmlProperty(localName = "AllowedMethod")
+        List<String> allowedMethods,
+        @JacksonXmlElementWrapper(localName = "AllowedHeader", useWrapping = false)
+        @JacksonXmlProperty(localName = "AllowedHeader")
+        List<String> allowedHeaders,
+        @JacksonXmlProperty(localName = "MaxAgeSeconds")
+        int maxAgeSeconds,
+        @JacksonXmlElementWrapper(localName = "ExposeHeader", useWrapping = false)
+        @JacksonXmlProperty(localName = "ExposeHeader")
+        List<String> exposeHeaders,
+        @JacksonXmlProperty(localName = "ID")
+        String id
+    ) {
+        public static CORSRule from(com.example.magrathea.objectstorage.domain.valueobject.BucketConfiguration.CorsRule rule) {
+            return new CORSRule(
+                rule.allowedOrigins(),
+                rule.allowedMethods(),
+                rule.allowedHeaders() != null ? rule.allowedHeaders() : List.of(),
+                rule.maxAgeSeconds(),
+                rule.exposeHeaders() != null ? rule.exposeHeaders() : List.of(),
+                rule.id() != null ? rule.id() : ""
+            );
+        }
+    }
+
     // ── Error ──
 
     @JacksonXmlRootElement(localName = "Error")

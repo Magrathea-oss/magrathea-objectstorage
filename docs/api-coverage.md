@@ -280,14 +280,47 @@ Status legend:
 
 ---
 
+## 28. GetBucketCors `GET /{bucket}?cors` ✅ NEW
+
+| Header / Param | Required | Status | Notes |
+|---|---|---|---|
+| No request headers | — | ✅ Tested | Returns CORS configuration XML |
+
+---
+
+## 29. PutBucketCors `PUT /{bucket}?cors` ✅ NEW
+
+| Header / Param | Required | Status | Notes |
+|---|---|---|---|
+| Body XML `<CORSConfiguration>` | ✅ Required | ✅ Tested | Parsed, stored via domain/application |
+| `x-amz-expected-bucket-owner` | 🟡 Optional | 🔴 Not implemented | — |
+
+---
+
+## 30. DeleteBucketCors `DELETE /{bucket}?cors` ✅ NEW
+
+| Header / Param | Required | Status | Notes |
+|---|---|---|---|
+| No request headers | — | ✅ Tested | Removes CORS configuration |
+
+---
+
 ## Summary
 
 | Category | Count |
 |---|---|
-| ✅ **Tested** (read and used) | 15 |
+| ✅ **Tested** (read and used) | 18 |
 | ⬜ **Not implemented** (hashtable only) | 10 |
-| 🔴 **Not implemented** (ignored) | 52 |
+| 🔴 **Not implemented** (ignored) | 54 |
 | 🟡 **Not tested** | 0 |
+
+### APIs implemented in this session
+
+| API | Domain | Application | Handler | Cucumber tests | AWS CLI |
+|---|---|---|---|---|---|
+| GetBucketCors | `BucketConfiguration` value object | `BucketService.getCorsConfiguration()` | `S3BucketConfigHandler.getBucketCors()` | ✅ success + failure | ✅ |
+| PutBucketCors | `BucketConfiguration` + `CorsRule` records | `BucketService.putCorsConfiguration()` | `S3BucketConfigHandler.putBucketCors()` | ✅ success + failure | ✅ |
+| DeleteBucketCors | — | `BucketService.deleteCorsConfiguration()` | `S3BucketConfigHandler.deleteBucketCors()` | ✅ success + failure | ✅ |
 
 ### APIs yet to implement (Phases C–F)
 

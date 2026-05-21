@@ -139,7 +139,7 @@
                                     <executable>bash</executable>
                                     <arguments>
                                         <argument>-c</argument>
-                                        <argument>cd ${project.basedir} && java -jar bootstrap-application/target/bootstrap-application-1.0.0-SNAPSHOT.jar --server.port=8080 > /tmp/magrathea-aws-cli.log 2>&1 & echo "PID:$$!"</argument>
+                                        <argument>cd ${project.basedir} &amp;&amp; java -jar bootstrap-application/target/bootstrap-application-1.0.0-SNAPSHOT.jar --server.port=8080 &gt; /tmp/magrathea-aws-cli.log 2&gt;&amp;1 &amp; echo &quot;PID:$$!&quot;</argument>
                                     </arguments>
                                 </configuration>
                             </execution>
@@ -166,7 +166,7 @@
                                     <executable>bash</executable>
                                     <arguments>
                                         <argument>-c</argument>
-                                        <argument>fuser -k 8080/tcp 2>/dev/null; echo "Server stopped"</argument>
+                                        <argument>fuser -k 8080/tcp 2&gt;/dev/null; echo &quot;Server stopped&quot;</argument>
                                     </arguments>
                                 </configuration>
                             </execution>

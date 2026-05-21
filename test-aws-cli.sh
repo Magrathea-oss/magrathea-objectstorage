@@ -141,6 +141,11 @@ run_success "GetObjectAttributes PARANOIC_MODE" aws_s3api get-object-attributes 
 run_success "DeleteObject PARANOIC_MODE" aws_s3api delete-object --bucket "$BUCKET" --key "paranoid.txt" --output json
 run_success "DeleteObject" aws_s3api delete-object --bucket "$BUCKET" --key "$KEY" --output json
 run_failure "HeadObject after DeleteObject" aws_s3api head-object --bucket "$BUCKET" --key "$KEY" --output json
+run_success "PutBucketCors" aws_s3api put-bucket-cors --bucket "$BUCKET" --cors-configuration '{"CORSRules":[{"AllowedOrigins":["*"],"AllowedMethods":["GET"]}]}' --output json
+run_success "GetBucketCors" aws_s3api get-bucket-cors --bucket "$BUCKET" --output json
+run_success "DeleteBucketCors" aws_s3api delete-bucket-cors --bucket "$BUCKET" --output json
+run_failure "GetBucketCors nonexistent" aws_s3api get-bucket-cors --bucket "nonexistent-bucket" --output json
+run_failure "GetBucketCors after delete" aws_s3api get-bucket-cors --bucket "$BUCKET" --output json
 run_success "DeleteBucket" aws_s3api delete-bucket --bucket "$BUCKET" --output json
 run_failure "HeadBucket after DeleteBucket" aws_s3api head-bucket --bucket "$BUCKET"
 
@@ -276,9 +281,17 @@ Report HTML: \`target/site/clover/index.html\`
 | DeleteObject PARANOIC_MODE | \`aws s3api delete-object\` | ✅ |
 | DeleteObject | \`aws s3api delete-object\` | ✅ |
 | DeleteObjects | \`aws s3api delete-objects\` | ✅ |
+| PutBucketCors | \`aws s3api put-bucket-cors\` | ✅ |
+| GetBucketCors | \`aws s3api get-bucket-cors\` | ✅ |
+| DeleteBucketCors | \`aws s3api delete-bucket-cors\` | ✅ |
 | DeleteBucket | \`aws s3api delete-bucket\` | ✅ |
 
 ### Failure Tests
+
+| Check | Status | Notes |
+|---|---|---|
+| GetBucketCors nonexistent | ✅ | Expected failure |
+| GetBucketCors after delete | ✅ | Expected failure |
 
 | Check | Status | Notes |
 |---|---|---|

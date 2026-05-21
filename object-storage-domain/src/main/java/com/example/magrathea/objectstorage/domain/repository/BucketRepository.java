@@ -1,6 +1,7 @@
 package com.example.magrathea.objectstorage.domain.repository;
 
 import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketConfiguration;
 
 import java.util.List;
 import java.util.Optional;
@@ -17,4 +18,7 @@ public interface BucketRepository {
     CompletableFuture<List<Bucket>> findAll();
     CompletableFuture<Void> save(Bucket bucket);
     CompletableFuture<Void> delete(Bucket.Id id);
+    CompletableFuture<Optional<BucketConfiguration>> findConfiguration(String bucketName);
+    CompletableFuture<Void> saveConfiguration(BucketConfiguration configuration);
+    CompletableFuture<Void> deleteConfiguration(String bucketName);
 }

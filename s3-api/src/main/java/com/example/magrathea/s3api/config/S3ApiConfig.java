@@ -2,6 +2,7 @@ package com.example.magrathea.s3api.config;
 
 import com.example.magrathea.objectstorage.application.service.BucketService;
 import com.example.magrathea.objectstorage.application.service.ObjectService;
+import com.example.magrathea.s3api.adapter.web.S3BucketConfigHandler;
 import com.example.magrathea.s3api.adapter.web.S3BucketMetadataHandler;
 import com.example.magrathea.s3api.adapter.web.S3BucketOperationsHandler;
 import com.example.magrathea.s3api.adapter.web.S3ObjectMetadataHandler;
@@ -52,11 +53,17 @@ public class S3ApiConfig {
     }
 
     @Bean
+    public S3BucketConfigHandler s3BucketConfigHandler(BucketService bucketService) {
+        return new S3BucketConfigHandler(bucketService);
+    }
+
+    @Bean
     public S3ProxyRouter s3ProxyRouter(S3BucketOperationsHandler bucketOperations,
                                         S3BucketMetadataHandler bucketMetadata,
                                         S3ObjectOperationsHandler objectOperations,
-                                        S3ObjectMetadataHandler objectMetadata) {
-        return new S3ProxyRouter(bucketOperations, bucketMetadata, objectOperations, objectMetadata);
+                                        S3ObjectMetadataHandler objectMetadata,
+                                        S3BucketConfigHandler bucketConfig) {
+        return new S3ProxyRouter(bucketOperations, bucketMetadata, objectOperations, objectMetadata, bucketConfig);
     }
 
     @Bean
