@@ -24,6 +24,8 @@ public class BucketSteps {
 
     private String bucketName;
 
+    public String getBucketName() { return bucketName; }
+
     @Given("a bucket name {string}")
     public void aBucketName(String name) {
         bucketName = name;

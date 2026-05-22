@@ -91,7 +91,7 @@ Source: https://docs.aws.amazon.com/AmazonS3/latest/API/API_Operations.md
 
 Scope: **Amazon S3 actions only**. Amazon S3 Control actions are intentionally out of scope for the object-storage S3 REST API module.
 
-### Current Implemented Operations (36/111)
+### Current Implemented Operations (37/111)
 
 | Operation | Endpoint | Test coverage |
 |---|---|---|
@@ -125,12 +125,13 @@ Scope: **Amazon S3 actions only**. Amazon S3 Control actions are intentionally o
 | GetBucketCors | `GET /{bucket}?cors` | Cucumber + AWS CLI |
 | PutBucketCors | `PUT /{bucket}?cors` | Cucumber + AWS CLI |
 | DeleteBucketCors | `DELETE /{bucket}?cors` | Cucumber + AWS CLI |
-| CreateMultipartUpload | `POST /{bucket}/{key}?uploads` | RouterFunction |
-| UploadPart | `PUT /{bucket}/{key}?uploadId=...&partNumber=...` | RouterFunction |
-| CompleteMultipartUpload | `POST /{bucket}/{key}?uploadId=...` | RouterFunction |
-| AbortMultipartUpload | `DELETE /{bucket}/{key}?uploadId=...` | RouterFunction |
-| ListMultipartUploads | `GET /{bucket}?uploads` | RouterFunction |
-| ListParts | `GET /{bucket}/{key}?uploadId=...` | RouterFunction |
+| CreateMultipartUpload | `POST /{bucket}/{key}?uploads` | Cucumber |
+| UploadPart | `PUT /{bucket}/{key}?uploadId=...&partNumber=...` | Cucumber |
+| UploadPartCopy | `PUT /{bucket}/{key}?uploadId=...&partNumber=...` + `x-amz-copy-source` | RouterFunction |
+| CompleteMultipartUpload | `POST /{bucket}/{key}?uploadId=...` | Cucumber |
+| AbortMultipartUpload | `DELETE /{bucket}/{key}?uploadId=...` | Cucumber |
+| ListMultipartUploads | `GET /{bucket}?uploads` | Cucumber |
+| ListParts | `GET /{bucket}/{key}?uploadId=...` | Cucumber |
 
 ### Phase A — CLI-Baseline Compatibility (completed)
 
@@ -166,13 +167,13 @@ Goal: support common AWS CLI object workflows beyond current CRUD.
 
 | Operation | Endpoint | Test coverage |
 |---|---|---|
-| CreateMultipartUpload | POST /{bucket}/{key}?uploads | RouterFunction |
-| UploadPart | PUT /{bucket}/{key}?uploadId=...&partNumber=... | RouterFunction |
-| UploadPartCopy | PUT /{bucket}/{key}?uploadId=...&partNumber=... + x-amz-copy-source | Not implemented |
-| CompleteMultipartUpload | POST /{bucket}/{key}?uploadId=... | RouterFunction |
-| AbortMultipartUpload | DELETE /{bucket}/{key}?uploadId=... | RouterFunction |
-| ListMultipartUploads | GET /{bucket}?uploads | RouterFunction |
-| ListParts | GET /{bucket}/{key}?uploadId=... | RouterFunction |
+| CreateMultipartUpload | POST /{bucket}/{key}?uploads | Cucumber |
+| UploadPart | PUT /{bucket}/{key}?uploadId=...&partNumber=... | Cucumber |
+| UploadPartCopy | PUT /{bucket}/{key}?uploadId=...&partNumber=... + x-amz-copy-source | Implemented, no test |
+| CompleteMultipartUpload | POST /{bucket}/{key}?uploadId=... | Cucumber |
+| AbortMultipartUpload | DELETE /{bucket}/{key}?uploadId=... | Cucumber |
+| ListMultipartUploads | GET /{bucket}?uploads | Cucumber |
+| ListParts | GET /{bucket}/{key}?uploadId=... | Cucumber |
 
 ### Phase D — Bucket Configuration APIs
 

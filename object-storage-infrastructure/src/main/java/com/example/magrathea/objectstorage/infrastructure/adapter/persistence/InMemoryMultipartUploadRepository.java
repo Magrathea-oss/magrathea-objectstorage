@@ -64,4 +64,9 @@ public class InMemoryMultipartUploadRepository implements MultipartUploadReposit
         store.remove(id.value());
         return CompletableFuture.completedFuture(null);
     }
+
+    /** Reset state — used by test cleanup hooks. */
+    public void reset() {
+        store.clear();
+    }
 }

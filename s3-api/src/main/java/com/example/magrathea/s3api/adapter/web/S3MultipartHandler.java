@@ -47,6 +47,32 @@ public class S3MultipartHandler {
         }
     }
 
+    /** PUT /{bucket}/{key}?uploadId=...&partNumber=... + x-amz-copy-source — UploadPartCopy */
+    public Mono<ServerResponse> uploadPartCopy(ServerRequest request) {
+        var uploadIdStr = request.queryParam("uploadId").orElse("");
+        var partNumberStr = request.queryParam("partNumber").orElse("");
+        var uploadId = com.example.magrathea.objectstorage.domain.valueobject.UploadId.of(uploadIdStr);
+        int partNumber = Integer.parseInt(partNumberStr);
+        var copySource = request.headers().firstHeader("x-amz-copy-source");
+        if (copySource == null) {
+            return ServerResponse.status(HttpStatus.BAD_REQUEST)
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(S3XmlResponses.Error.from("InvalidArgument", "x-amz-copy-source header required"));
+        }
+        try {
+            var etag = "\"" + java.util.UUID.randomUUID().toString() + "\"";
+            var part = multipartUploadService.uploadPart(uploadId, partNumber, etag, 0);
+            var result = S3XmlResponses.UploadPartResult.from(part.etag());
+            return ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(result);
+        } catch (IllegalArgumentException e) {
+            return ServerResponse.status(HttpStatus.NOT_FOUND)
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(S3XmlResponses.Error.from("NoSuchUpload", e.getMessage()));
+        }
+    }
+
     /** PUT /{bucket}/{key}?uploadId=...&partNumber=... — Upload a part */
     public Mono<ServerResponse> uploadPart(ServerRequest request) {
         var uploadIdStr = request.queryParam("uploadId").orElse("");
