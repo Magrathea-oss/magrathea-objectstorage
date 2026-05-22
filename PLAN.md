@@ -91,7 +91,7 @@ Source: https://docs.aws.amazon.com/AmazonS3/latest/API/API_Operations.md
 
 Scope: **Amazon S3 actions only**. Amazon S3 Control actions are intentionally out of scope for the object-storage S3 REST API module.
 
-### Current Implemented Operations (37/111)
+### Current Implemented Operations (49/111)
 
 | Operation | Endpoint | Test coverage |
 |---|---|---|
@@ -125,6 +125,18 @@ Scope: **Amazon S3 actions only**. Amazon S3 Control actions are intentionally o
 | GetBucketCors | `GET /{bucket}?cors` | Cucumber + AWS CLI |
 | PutBucketCors | `PUT /{bucket}?cors` | Cucumber + AWS CLI |
 | DeleteBucketCors | `DELETE /{bucket}?cors` | Cucumber + AWS CLI |
+| GetBucketLifecycleConfiguration | `GET /{bucket}?lifecycle` | Cucumber |
+| PutBucketLifecycleConfiguration | `PUT /{bucket}?lifecycle` | Cucumber |
+| DeleteBucketLifecycleConfiguration | `DELETE /{bucket}?lifecycle` | Cucumber |
+| GetBucketPolicy | `GET /{bucket}?policy` | Cucumber |
+| PutBucketPolicy | `PUT /{bucket}?policy` | Cucumber |
+| DeleteBucketPolicy | `DELETE /{bucket}?policy` | Cucumber |
+| GetBucketEncryption | `GET /{bucket}?encryption` | Cucumber |
+| PutBucketEncryption | `PUT /{bucket}?encryption` | Cucumber |
+| DeleteBucketEncryption | `DELETE /{bucket}?encryption` | Cucumber |
+| GetBucketLogging | `GET /{bucket}?logging` | Cucumber |
+| PutBucketLogging | `PUT /{bucket}?logging` | Cucumber |
+| DeleteBucketLogging | `DELETE /{bucket}?logging` | Cucumber |
 | CreateMultipartUpload | `POST /{bucket}/{key}?uploads` | Cucumber |
 | UploadPart | `PUT /{bucket}/{key}?uploadId=...&partNumber=...` | Cucumber |
 | UploadPartCopy | `PUT /{bucket}/{key}?uploadId=...&partNumber=...` + `x-amz-copy-source` | RouterFunction |
@@ -180,10 +192,10 @@ Goal: support common AWS CLI object workflows beyond current CRUD.
 | Area | Operations |
 |---|---|
 | CORS | GetBucketCors ✅, PutBucketCors ✅, DeleteBucketCors ✅ |
-| Lifecycle | GetBucketLifecycle, GetBucketLifecycleConfiguration, PutBucketLifecycle, PutBucketLifecycleConfiguration, DeleteBucketLifecycle |
-| Policy | GetBucketPolicy, PutBucketPolicy, DeleteBucketPolicy, GetBucketPolicyStatus |
-| Encryption | GetBucketEncryption, PutBucketEncryption, DeleteBucketEncryption |
-| Logging | GetBucketLogging, PutBucketLogging |
+| Lifecycle | GetBucketLifecycle ✅, PutBucketLifecycle ✅, DeleteBucketLifecycle ✅ |
+| Policy | GetBucketPolicy ✅, PutBucketPolicy ✅, DeleteBucketPolicy ✅, GetBucketPolicyStatus ⬜ |
+| Encryption | GetBucketEncryption ✅, PutBucketEncryption ✅, DeleteBucketEncryption ✅ |
+| Logging | GetBucketLogging ✅, PutBucketLogging ✅, DeleteBucketLogging ✅ |
 | Website | GetBucketWebsite, PutBucketWebsite, DeleteBucketWebsite |
 | Notification | GetBucketNotification, GetBucketNotificationConfiguration, PutBucketNotification, PutBucketNotificationConfiguration |
 | Replication | GetBucketReplication, PutBucketReplication, DeleteBucketReplication |

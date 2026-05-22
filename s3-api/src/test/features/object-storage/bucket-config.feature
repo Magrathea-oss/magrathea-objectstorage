@@ -37,3 +37,143 @@ Feature: S3-compatible Bucket Configuration APIs (CORS, Policy, Encryption, etc.
   Scenario: Delete CORS for nonexistent bucket
     When bucket CORS configuration is deleted for "ghost-bucket"
     Then the response status is 404
+
+  # ── Lifecycle Success ──
+
+  Scenario: Put bucket lifecycle configuration
+    When bucket lifecycle is configured with rule "expire-30" and status "Enabled"
+    Then the response status is 200
+
+  Scenario: Get bucket lifecycle configuration
+    Given bucket lifecycle is preset with rule "expire-30" and status "Enabled"
+    When bucket lifecycle configuration is requested
+    Then the response status is 200
+    And the metadata response contains "Status"
+
+  Scenario: Delete bucket lifecycle configuration
+    Given bucket lifecycle is preset with rule "expire-30" and status "Enabled"
+    When bucket lifecycle configuration is deleted
+    Then the response status is 204
+
+  # ── Lifecycle Failure ──
+
+  Scenario: Get lifecycle for nonexistent bucket
+    When bucket lifecycle configuration is requested for "ghost-bucket"
+    Then the response status is 404
+
+  Scenario: Get lifecycle when no configuration exists
+    When bucket lifecycle configuration is requested
+    Then the response status is 404
+
+  Scenario: Put lifecycle for nonexistent bucket
+    When bucket lifecycle is configured for "ghost-bucket" with rule "expire-30" and status "Enabled"
+    Then the response status is 404
+
+  Scenario: Delete lifecycle for nonexistent bucket
+    When bucket lifecycle configuration is deleted for "ghost-bucket"
+    Then the response status is 404
+
+  # ── Policy Success ──
+
+  Scenario: Put bucket policy
+    When bucket policy is set to '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":"s3:GetObject"}]}'
+    Then the response status is 200
+
+  Scenario: Get bucket policy
+    Given bucket policy is preset with '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":"s3:GetObject"}]}'
+    When bucket policy is requested
+    Then the response status is 200
+    And the metadata response contains "s3:GetObject"
+
+  Scenario: Delete bucket policy
+    Given bucket policy is preset with '{"Version":"2012-10-17","Statement":[{"Effect":"Allow"}]}'
+    When bucket policy is deleted
+    Then the response status is 204
+
+  # ── Policy Failure ──
+
+  Scenario: Get policy for nonexistent bucket
+    When bucket policy is requested for "ghost-bucket"
+    Then the response status is 404
+
+  Scenario: Get policy when no policy exists
+    When bucket policy is requested
+    Then the response status is 404
+
+  Scenario: Put policy for nonexistent bucket
+    When bucket policy is set for "ghost-bucket" to '{"Effect":"Allow"}'
+    Then the response status is 404
+
+  Scenario: Delete policy for nonexistent bucket
+    When bucket policy is deleted for "ghost-bucket"
+    Then the response status is 404
+
+  # ── Encryption Success ──
+
+  Scenario: Put bucket encryption configuration
+    When bucket encryption is configured with algorithm "AES256"
+    Then the response status is 200
+
+  Scenario: Get bucket encryption configuration
+    Given bucket encryption is preset with algorithm "AES256"
+    When bucket encryption configuration is requested
+    Then the response status is 200
+    And the metadata response contains "Algorithm"
+
+  Scenario: Delete bucket encryption configuration
+    Given bucket encryption is preset with algorithm "AES256"
+    When bucket encryption configuration is deleted
+    Then the response status is 204
+
+  # ── Encryption Failure ──
+
+  Scenario: Get encryption for nonexistent bucket
+    When bucket encryption configuration is requested for "ghost-bucket"
+    Then the response status is 404
+
+  Scenario: Get encryption when no configuration exists
+    When bucket encryption configuration is requested
+    Then the response status is 404
+
+  Scenario: Put encryption for nonexistent bucket
+    When bucket encryption is configured for "ghost-bucket" with algorithm "AES256"
+    Then the response status is 404
+
+  Scenario: Delete encryption for nonexistent bucket
+    When bucket encryption configuration is deleted for "ghost-bucket"
+    Then the response status is 404
+
+  # ── Logging Success ──
+
+  Scenario: Put bucket logging configuration
+    When bucket logging is configured with target bucket "log-bucket" and prefix "test/"
+    Then the response status is 200
+
+  Scenario: Get bucket logging configuration
+    Given bucket logging is preset with target bucket "log-bucket" and prefix "test/"
+    When bucket logging configuration is requested
+    Then the response status is 200
+    And the metadata response contains "TargetBucket"
+
+  Scenario: Delete bucket logging configuration
+    Given bucket logging is preset with target bucket "log-bucket" and prefix "test/"
+    When bucket logging configuration is deleted
+    Then the response status is 204
+
+  # ── Logging Failure ──
+
+  Scenario: Get logging for nonexistent bucket
+    When bucket logging configuration is requested for "ghost-bucket"
+    Then the response status is 404
+
+  Scenario: Get logging when no configuration exists
+    When bucket logging configuration is requested
+    Then the response status is 404
+
+  Scenario: Put logging for nonexistent bucket
+    When bucket logging is configured for "ghost-bucket" with target bucket "log-bucket" and prefix "test/"
+    Then the response status is 404
+
+  Scenario: Delete logging for nonexistent bucket
+    When bucket logging configuration is deleted for "ghost-bucket"
+    Then the response status is 404

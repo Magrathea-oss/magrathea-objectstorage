@@ -387,6 +387,145 @@ public final class S3XmlResponses {
         }
     }
 
+    // ── Lifecycle Configuration ──
+
+    @JacksonXmlRootElement(localName = "LifecycleConfiguration")
+    public record LifecycleConfiguration(
+        @JacksonXmlElementWrapper(localName = "Rules", useWrapping = true)
+        @JacksonXmlProperty(localName = "Rule")
+        List<LifecycleRule> rules
+    ) {
+        public static LifecycleConfiguration from(
+                java.util.Optional<com.example.magrathea.objectstorage.domain.valueobject.BucketLifecycleConfiguration> config) {
+            if (config.isEmpty() || !config.get().hasRules()) {
+                throw new java.util.NoSuchElementException("Lifecycle configuration not found");
+            }
+            return new LifecycleConfiguration(
+                config.get().rules().stream().map(LifecycleRule::from).toList()
+            );
+        }
+    }
+
+    public record LifecycleRule(
+        @JacksonXmlProperty(localName = "ID")
+        String id,
+        @JacksonXmlProperty(localName = "Status")
+        String status,
+        @JacksonXmlProperty(localName = "Prefix")
+        String prefix,
+        @JacksonXmlProperty(localName = "Expiration")
+        Expiration expiration,
+        @JacksonXmlProperty(localName = "NoncurrentVersionExpiration")
+        NoncurrentVersionExpiration noncurrentVersionExpiration,
+        @JacksonXmlProperty(localName = "AbortIncompleteMultipartUpload")
+        AbortIncompleteMultipartUpload abortIncompleteMultipartUpload
+    ) {
+        public static LifecycleRule from(
+                com.example.magrathea.objectstorage.domain.valueobject.BucketLifecycleConfiguration.LifecycleRule rule) {
+            return new LifecycleRule(
+                rule.id(),
+                rule.status(),
+                rule.prefix(),
+                rule.expiration() != null ? Expiration.from(rule.expiration()) : null,
+                rule.noncurrentVersionExpiration() != null ? NoncurrentVersionExpiration.from(rule.noncurrentVersionExpiration()) : null,
+                rule.abortIncompleteMultipartUpload() != null ? AbortIncompleteMultipartUpload.from(rule.abortIncompleteMultipartUpload()) : null
+            );
+        }
+    }
+
+    public record Expiration(
+        @JacksonXmlProperty(localName = "Days")
+        String days,
+        @JacksonXmlProperty(localName = "Date")
+        String date
+    ) {
+        public static Expiration from(
+                com.example.magrathea.objectstorage.domain.valueobject.BucketLifecycleConfiguration.Expiration e) {
+            return new Expiration(e.days(), e.date());
+        }
+    }
+
+    public record NoncurrentVersionExpiration(
+        @JacksonXmlProperty(localName = "NoncurrentDays")
+        String noncurrentDays
+    ) {
+        public static NoncurrentVersionExpiration from(
+                com.example.magrathea.objectstorage.domain.valueobject.BucketLifecycleConfiguration.NoncurrentVersionExpiration e) {
+            return new NoncurrentVersionExpiration(e.noncurrentDays());
+        }
+    }
+
+    public record AbortIncompleteMultipartUpload(
+        @JacksonXmlProperty(localName = "DaysAfterInitiation")
+        String daysAfterInitiation
+    ) {
+        public static AbortIncompleteMultipartUpload from(
+                com.example.magrathea.objectstorage.domain.valueobject.BucketLifecycleConfiguration.AbortIncompleteMultipartUpload a) {
+            return new AbortIncompleteMultipartUpload(a.daysAfterInitiation());
+        }
+    }
+
+    // ── Bucket Policy ──
+
+    @JacksonXmlRootElement(localName = "BucketPolicy")
+    public record BucketPolicyResponse(
+        @JacksonXmlProperty(localName = "Policy")
+        String policyJson
+    ) {
+        public static BucketPolicyResponse from(
+                java.util.Optional<com.example.magrathea.objectstorage.domain.valueobject.BucketPolicy> policy) {
+            if (policy.isEmpty() || !policy.get().hasPolicy()) {
+                throw new java.util.NoSuchElementException("Bucket policy not found");
+            }
+            return new BucketPolicyResponse(policy.get().policyJson());
+        }
+    }
+
+    // ── Encryption Configuration ──
+
+    @JacksonXmlRootElement(localName = "EncryptionConfiguration")
+    public record EncryptionConfiguration(
+        @JacksonXmlProperty(localName = "RuleId")
+        String ruleId,
+        @JacksonXmlProperty(localName = "Algorithm")
+        String algorithm,
+        @JacksonXmlProperty(localName = "KMSKeyId")
+        String kmsKeyId
+    ) {
+        public static EncryptionConfiguration from(
+                java.util.Optional<com.example.magrathea.objectstorage.domain.valueobject.BucketEncryptionConfiguration> config) {
+            if (config.isEmpty() || !config.get().hasEncryption()) {
+                throw new java.util.NoSuchElementException("Encryption configuration not found");
+            }
+            return new EncryptionConfiguration(
+                config.get().ruleId(),
+                config.get().algorithm(),
+                config.get().kmsKeyId()
+            );
+        }
+    }
+
+    // ── Logging Configuration ──
+
+    @JacksonXmlRootElement(localName = "LoggingConfiguration")
+    public record LoggingConfiguration(
+        @JacksonXmlProperty(localName = "TargetBucket")
+        String targetBucket,
+        @JacksonXmlProperty(localName = "TargetPrefix")
+        String targetPrefix
+    ) {
+        public static LoggingConfiguration from(
+                java.util.Optional<com.example.magrathea.objectstorage.domain.valueobject.BucketLoggingConfiguration> config) {
+            if (config.isEmpty() || !config.get().hasLogging()) {
+                throw new java.util.NoSuchElementException("Logging configuration not found");
+            }
+            return new LoggingConfiguration(
+                config.get().targetBucket(),
+                config.get().targetPrefix()
+            );
+        }
+    }
+
     // ── Error ──
 
     @JacksonXmlRootElement(localName = "Error")

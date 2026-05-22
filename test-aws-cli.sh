@@ -93,7 +93,11 @@ trap cleanup EXIT
 # ListObjects, ListObjectsV2, PutObject, GetObject, HeadObject,
 # GetObjectAcl, PutObjectAcl, GetObjectTagging, PutObjectTagging,
 # DeleteObjectTagging, GetObjectAttributes, CopyObject, ListObjectVersions,
-# DeleteObject, DeleteObjects, DeleteBucket.
+# DeleteObject, DeleteObjects, DeleteBucket, PutBucketCors, GetBucketCors,
+# DeleteBucketCors, PutBucketLifecycleConfiguration, GetBucketLifecycleConfiguration,
+# DeleteBucketLifecycleConfiguration, PutBucketPolicy, GetBucketPolicy,
+# DeleteBucketPolicy, PutBucketEncryption, GetBucketEncryption,
+# DeleteBucketEncryption, PutBucketLogging, GetBucketLogging, DeleteBucketLogging.
 
 echo "=============================================="
 echo "Magrathea ObjectStorage — AWS CLI S3 Test Suite"
@@ -146,6 +150,35 @@ run_success "GetBucketCors" aws_s3api get-bucket-cors --bucket "$BUCKET" --outpu
 run_success "DeleteBucketCors" aws_s3api delete-bucket-cors --bucket "$BUCKET" --output json
 run_failure "GetBucketCors nonexistent" aws_s3api get-bucket-cors --bucket "nonexistent-bucket" --output json
 run_failure "GetBucketCors after delete" aws_s3api get-bucket-cors --bucket "$BUCKET" --output json
+
+# ── Lifecycle Configuration ──
+run_success "PutBucketLifecycleConfiguration" aws_s3api put-bucket-lifecycle-configuration --bucket "$BUCKET" --lifecycle-configuration '{"Rules":[{"ID":"expire-30","Status":"Enabled","Filter":{"Prefix":""},"Expiration":{"Days":30}}]}' --output json
+run_success "GetBucketLifecycleConfiguration" aws_s3api get-bucket-lifecycle-configuration --bucket "$BUCKET" --output json
+run_success "DeleteBucketLifecycleConfiguration" aws_s3api delete-bucket-lifecycle-configuration --bucket "$BUCKET" --output json
+run_failure "GetBucketLifecycleConfiguration nonexistent" aws_s3api get-bucket-lifecycle-configuration --bucket "nonexistent-bucket" --output json
+run_failure "GetBucketLifecycleConfiguration after delete" aws_s3api get-bucket-lifecycle-configuration --bucket "$BUCKET" --output json
+
+# ── Bucket Policy ──
+run_success "PutBucketPolicy" aws_s3api put-bucket-policy --bucket "$BUCKET" --policy '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":"s3:GetObject"}]}' --output json
+run_success "GetBucketPolicy" aws_s3api get-bucket-policy --bucket "$BUCKET" --output json
+run_success "DeleteBucketPolicy" aws_s3api delete-bucket-policy --bucket "$BUCKET" --output json
+run_failure "GetBucketPolicy nonexistent" aws_s3api get-bucket-policy --bucket "nonexistent-bucket" --output json
+run_failure "GetBucketPolicy after delete" aws_s3api get-bucket-policy --bucket "$BUCKET" --output json
+
+# ── Encryption Configuration ──
+run_success "PutBucketEncryption" aws_s3api put-bucket-encryption --bucket "$BUCKET" --encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}' --output json
+run_success "GetBucketEncryption" aws_s3api get-bucket-encryption --bucket "$BUCKET" --output json
+run_success "DeleteBucketEncryption" aws_s3api delete-bucket-encryption --bucket "$BUCKET" --output json
+run_failure "GetBucketEncryption nonexistent" aws_s3api get-bucket-encryption --bucket "nonexistent-bucket" --output json
+run_failure "GetBucketEncryption after delete" aws_s3api get-bucket-encryption --bucket "$BUCKET" --output json
+
+# ── Logging Configuration ──
+run_success "PutBucketLogging" aws_s3api put-bucket-logging --bucket "$BUCKET" --logging-configuration '{"LoggingEnabled":{"TargetBucket":"'"$BUCKET"'","TargetPrefix":"test/"}}' --output json
+run_success "GetBucketLogging" aws_s3api get-bucket-logging --bucket "$BUCKET" --output json
+run_success "DeleteBucketLogging" aws_s3api delete-bucket-logging --bucket "$BUCKET" --output json
+run_failure "GetBucketLogging nonexistent" aws_s3api get-bucket-logging --bucket "nonexistent-bucket" --output json
+run_failure "GetBucketLogging after delete" aws_s3api get-bucket-logging --bucket "$BUCKET" --output json
+
 run_success "DeleteBucket" aws_s3api delete-bucket --bucket "$BUCKET" --output json
 run_failure "HeadBucket after DeleteBucket" aws_s3api head-bucket --bucket "$BUCKET"
 
@@ -284,6 +317,18 @@ Report HTML: \`target/site/clover/index.html\`
 | PutBucketCors | \`aws s3api put-bucket-cors\` | ✅ |
 | GetBucketCors | \`aws s3api get-bucket-cors\` | ✅ |
 | DeleteBucketCors | \`aws s3api delete-bucket-cors\` | ✅ |
+| PutBucketLifecycleConfiguration | \`aws s3api put-bucket-lifecycle-configuration\` | ✅ |
+| GetBucketLifecycleConfiguration | \`aws s3api get-bucket-lifecycle-configuration\` | ✅ |
+| DeleteBucketLifecycleConfiguration | \`aws s3api delete-bucket-lifecycle-configuration\` | ✅ |
+| PutBucketPolicy | \`aws s3api put-bucket-policy\` | ✅ |
+| GetBucketPolicy | \`aws s3api get-bucket-policy\` | ✅ |
+| DeleteBucketPolicy | \`aws s3api delete-bucket-policy\` | ✅ |
+| PutBucketEncryption | \`aws s3api put-bucket-encryption\` | ✅ |
+| GetBucketEncryption | \`aws s3api get-bucket-encryption\` | ✅ |
+| DeleteBucketEncryption | \`aws s3api delete-bucket-encryption\` | ✅ |
+| PutBucketLogging | \`aws s3api put-bucket-logging\` | ✅ |
+| GetBucketLogging | \`aws s3api get-bucket-logging\` | ✅ |
+| DeleteBucketLogging | \`aws s3api delete-bucket-logging\` | ✅ |
 | DeleteBucket | \`aws s3api delete-bucket\` | ✅ |
 
 ### Failure Tests
@@ -292,6 +337,14 @@ Report HTML: \`target/site/clover/index.html\`
 |---|---|---|
 | GetBucketCors nonexistent | ✅ | Expected failure |
 | GetBucketCors after delete | ✅ | Expected failure |
+| GetBucketLifecycleConfiguration nonexistent | ✅ | Expected failure |
+| GetBucketLifecycleConfiguration after delete | ✅ | Expected failure |
+| GetBucketPolicy nonexistent | ✅ | Expected failure |
+| GetBucketPolicy after delete | ✅ | Expected failure |
+| GetBucketEncryption nonexistent | ✅ | Expected failure |
+| GetBucketEncryption after delete | ✅ | Expected failure |
+| GetBucketLogging nonexistent | ✅ | Expected failure |
+| GetBucketLogging after delete | ✅ | Expected failure |
 
 | Check | Status | Notes |
 |---|---|---|

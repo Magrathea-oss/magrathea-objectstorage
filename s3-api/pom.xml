@@ -23,6 +23,11 @@
     </build>
 
     <dependencies>
+        <!-- Domain layer — domain value objects, aggregates, repository interfaces -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>object-storage-domain</artifactId>
+        </dependency>
         <!-- Application layer — BucketService, ObjectService -->
         <dependency>
             <groupId>com.example</groupId>

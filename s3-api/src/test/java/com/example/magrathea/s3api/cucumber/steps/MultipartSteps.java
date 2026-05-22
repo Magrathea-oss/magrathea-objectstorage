@@ -1,6 +1,5 @@
 package com.example.magrathea.s3api.cucumber.steps;
 
-import com.example.magrathea.objectstorage.application.service.MultipartUploadService;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.When;
 import io.cucumber.java.en.Then;
@@ -22,9 +21,6 @@ public class MultipartSteps {
 
     @Autowired
     private BucketSteps bucketSteps;
-
-    @Autowired
-    private MultipartUploadService multipartUploadService;
 
     private String uploadId;
     private String partEtag;
