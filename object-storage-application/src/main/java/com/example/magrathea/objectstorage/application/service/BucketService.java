@@ -2,7 +2,18 @@ package com.example.magrathea.objectstorage.application.service;
 
 import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
 import com.example.magrathea.objectstorage.domain.repository.BucketRepository;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketAccelerateConfiguration;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketConfiguration;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketEncryptionConfiguration;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketLifecycleConfiguration;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketLoggingConfiguration;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketNotificationConfiguration;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketOwnershipControls;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketPolicy;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketReplicationConfiguration;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketRequestPaymentConfiguration;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketWebsiteConfiguration;
+import com.example.magrathea.objectstorage.domain.valueobject.PublicAccessBlockConfiguration;
 import com.example.magrathea.objectstorage.domain.valueobject.Region;
 import com.example.magrathea.objectstorage.domain.valueobject.StorageClass;
 import com.example.magrathea.objectstorage.application.dto.CreateBucketCommand;
@@ -90,6 +101,160 @@ public class BucketService {
 
     public void deleteCorsConfiguration(String bucketName) {
         repository.deleteConfiguration(bucketName).join();
+    }
+
+    // ── Lifecycle ──
+
+    public Optional<BucketLifecycleConfiguration> getLifecycleConfiguration(String bucketName) {
+        return repository.findLifecycleConfiguration(bucketName).join();
+    }
+
+    public void putLifecycleConfiguration(BucketLifecycleConfiguration config) {
+        repository.saveLifecycleConfiguration(config).join();
+    }
+
+    public void deleteLifecycleConfiguration(String bucketName) {
+        repository.deleteLifecycleConfiguration(bucketName).join();
+    }
+
+    // ── Policy ──
+
+    public Optional<BucketPolicy> getPolicy(String bucketName) {
+        return repository.findPolicy(bucketName).join();
+    }
+
+    public void putPolicy(BucketPolicy policy) {
+        repository.savePolicy(policy).join();
+    }
+
+    public void deletePolicy(String bucketName) {
+        repository.deletePolicy(bucketName).join();
+    }
+
+    // ── Encryption ──
+
+    public Optional<BucketEncryptionConfiguration> getEncryptionConfiguration(String bucketName) {
+        return repository.findEncryptionConfiguration(bucketName).join();
+    }
+
+    public void putEncryptionConfiguration(BucketEncryptionConfiguration config) {
+        repository.saveEncryptionConfiguration(config).join();
+    }
+
+    public void deleteEncryptionConfiguration(String bucketName) {
+        repository.deleteEncryptionConfiguration(bucketName).join();
+    }
+
+    // ── Logging ──
+
+    public Optional<BucketLoggingConfiguration> getLoggingConfiguration(String bucketName) {
+        return repository.findLoggingConfiguration(bucketName).join();
+    }
+
+    public void putLoggingConfiguration(BucketLoggingConfiguration config) {
+        repository.saveLoggingConfiguration(config).join();
+    }
+
+    public void deleteLoggingConfiguration(String bucketName) {
+        repository.deleteLoggingConfiguration(bucketName).join();
+    }
+
+    // ── Website ──
+
+    public Optional<BucketWebsiteConfiguration> getWebsiteConfiguration(String bucketName) {
+        return repository.findWebsiteConfiguration(bucketName).join();
+    }
+
+    public void putWebsiteConfiguration(BucketWebsiteConfiguration config) {
+        repository.saveWebsiteConfiguration(config).join();
+    }
+
+    public void deleteWebsiteConfiguration(String bucketName) {
+        repository.deleteWebsiteConfiguration(bucketName).join();
+    }
+
+    // ── Notification ──
+
+    public Optional<BucketNotificationConfiguration> getNotificationConfiguration(String bucketName) {
+        return repository.findNotificationConfiguration(bucketName).join();
+    }
+
+    public void putNotificationConfiguration(BucketNotificationConfiguration config) {
+        repository.saveNotificationConfiguration(config).join();
+    }
+
+    public void deleteNotificationConfiguration(String bucketName) {
+        repository.deleteNotificationConfiguration(bucketName).join();
+    }
+
+    // ── Replication ──
+
+    public Optional<BucketReplicationConfiguration> getReplicationConfiguration(String bucketName) {
+        return repository.findReplicationConfiguration(bucketName).join();
+    }
+
+    public void putReplicationConfiguration(BucketReplicationConfiguration config) {
+        repository.saveReplicationConfiguration(config).join();
+    }
+
+    public void deleteReplicationConfiguration(String bucketName) {
+        repository.deleteReplicationConfiguration(bucketName).join();
+    }
+
+    // ── Request Payment ──
+
+    public Optional<BucketRequestPaymentConfiguration> getRequestPaymentConfiguration(String bucketName) {
+        return repository.findRequestPaymentConfiguration(bucketName).join();
+    }
+
+    public void putRequestPaymentConfiguration(BucketRequestPaymentConfiguration config) {
+        repository.saveRequestPaymentConfiguration(config).join();
+    }
+
+    public void deleteRequestPaymentConfiguration(String bucketName) {
+        repository.deleteRequestPaymentConfiguration(bucketName).join();
+    }
+
+    // ── Ownership Controls ──
+
+    public Optional<BucketOwnershipControls> getOwnershipControls(String bucketName) {
+        return repository.findOwnershipControls(bucketName).join();
+    }
+
+    public void putOwnershipControls(BucketOwnershipControls controls) {
+        repository.saveOwnershipControls(controls).join();
+    }
+
+    public void deleteOwnershipControls(String bucketName) {
+        repository.deleteOwnershipControls(bucketName).join();
+    }
+
+    // ── Public Access Block ──
+
+    public Optional<PublicAccessBlockConfiguration> getPublicAccessBlockConfiguration(String bucketName) {
+        return repository.findPublicAccessBlockConfiguration(bucketName).join();
+    }
+
+    public void putPublicAccessBlockConfiguration(PublicAccessBlockConfiguration config) {
+        repository.savePublicAccessBlockConfiguration(config).join();
+    }
+
+    public void deletePublicAccessBlockConfiguration(String bucketName) {
+        repository.deletePublicAccessBlockConfiguration(bucketName).join();
+    }
+
+    // ── Accelerate ──
+
+    public Optional<BucketAccelerateConfiguration> getAccelerateConfiguration(String bucketName) {
+        return repository.findAccelerateConfiguration(bucketName).join();
+    }
+
+    public void putAccelerateConfiguration(BucketAccelerateConfiguration config) {
+        repository.saveAccelerateConfiguration(config).join();
+    }
+
+    public void deleteAccelerateConfiguration(String bucketName) {
+        repository.deleteAccelerateConfiguration(bucketName).join();
     }
 
     // ── internal ──

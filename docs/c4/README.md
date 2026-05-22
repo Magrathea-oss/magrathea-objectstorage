@@ -95,9 +95,13 @@ Generic export:
 ```bash
 ~/.pi/agent/skills/multi-agent/tools/c4model-export.sh static
 ~/.pi/agent/skills/multi-agent/tools/c4model-export.sh mermaid
-~/.pi/agent/skills/multi-agent/tools/c4model-export.sh plantuml/c4plantuml
+~/.pi/agent/skills/multi-agent/tools/c4model-export.sh plantuml/c4plantuml      # reference only — NOT for PNG generation
 ~/.pi/agent/skills/multi-agent/tools/c4model-export.sh json
 ```
+
+> ⚠️ **Warning:** PlantUML export (`.puml`) is for reference/documentation only.
+> PNGs MUST be generated via the Structurizr browser-based renderer
+> (`c4model-export-images.sh png workspace`), NOT by rendering PlantUML to PNG.
 
 Convenience static-site command:
 
@@ -111,10 +115,10 @@ Default outputs:
 
 ```text
 static                  -> docs/c4/export/static/
-plantuml/c4plantuml    -> docs/c4/export/plantuml-c4plantuml/
+plantuml/c4plantuml    -> docs/c4/export/plantuml-c4plantuml/  (reference only)
 mermaid                 -> docs/c4/export/mermaid/
 json                    -> docs/c4/export/json/
-png/svg                 -> docs/c4/images/
+png/svg                 -> docs/c4/images/  (canonical — Structurizr browser renderer)
 ```
 
 Override the output with:

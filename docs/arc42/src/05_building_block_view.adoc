@@ -8,7 +8,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 Il sistema è composto da quattro container runtime:
 
 .C2 Container Diagram — Magrathea ObjectStorage
-image::../../c4/images/structurizr-Container.png[Container Diagram, width=600]
+image::../../c4/images/Container.png[Container Diagram, width=600]
 
 ==== s3-api-adapter (HTTP adapter)
 
@@ -50,7 +50,7 @@ Implementa i repository di dominio in-memory con ConcurrentHashMap. Non è un da
 === Level 2 — Component Diagram (s3-api-adapter)
 
 .C3 Component — s3-api-adapter
-image::../../c4/images/structurizr-S3ApiAdapterComponents.png[S3 API Adapter Components, width=600]
+image::../../c4/images/S3ApiAdapterComponents.png[S3 API Adapter Components, width=600]
 
 | Component | Responsibility |
 |---|---|
@@ -67,7 +67,7 @@ image::../../c4/images/structurizr-S3ApiAdapterComponents.png[S3 API Adapter Com
 === Level 2 — Component Diagram (object-store)
 
 .C3 Component — object-store
-image::../../c4/images/structurizr-ObjectStoreComponents.png[Object Store Components, width=600]
+image::../../c4/images/ObjectStoreComponents.png[Object Store Components, width=600]
 
 | Component | Responsibility |
 |---|---|
@@ -83,7 +83,7 @@ image::../../c4/images/structurizr-ObjectStoreComponents.png[Object Store Compon
 === Level 2 — Component Diagram (bucket-managment)
 
 .C3 Component — bucket-managment
-image::../../c4/images/structurizr-BucketManagmentComponents.png[Bucket Management Components, width=600]
+image::../../c4/images/BucketManagmentComponents.png[Bucket Management Components, width=600]
 
 | Component | Responsibility |
 |---|---|
@@ -96,7 +96,7 @@ image::../../c4/images/structurizr-BucketManagmentComponents.png[Bucket Manageme
 === Level 2 — Component Diagram (in-memory-repository)
 
 .C3 Component — in-memory-repository
-image::../../c4/images/structurizr-PersistenceComponents.png[Persistence Components, width=600]
+image::../../c4/images/PersistenceComponents.png[Persistence Components, width=600]
 
 | Component | Responsibility |
 |---|---|

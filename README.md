@@ -11,7 +11,7 @@
 ## System Context
 
 <div align="center">
-  <img src="docs/c4/images/structurizr-SystemContext.png" alt="System Context — Magrathea ObjectStorage" width="600">
+  <img src="docs/c4/images/SystemContext.png" alt="System Context — Magrathea ObjectStorage" width="600">
 </div>
 
 *Generated from the Structurizr workspace — see `docs/c4/workspace.dsl` and [`docs/c4/README.md`](docs/c4/README.md).*
