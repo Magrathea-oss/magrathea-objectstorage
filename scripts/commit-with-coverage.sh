@@ -28,6 +28,15 @@ done
 # ── Step 1: Run tests with coverage ──
 echo ""
 echo "=============================================="
+echo "  Cleaning stale build artifacts..."
+echo "=============================================="
+mvn clean -q || {
+    echo "❌ Clean failed — aborting commit"
+    exit 1
+}
+
+echo ""
+echo "=============================================="
 echo "  Running tests with Clover coverage..."
 echo "=============================================="
 mvn -Pcoverage clover:setup test clover:aggregate clover:clover -q || {
