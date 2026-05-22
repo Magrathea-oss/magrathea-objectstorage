@@ -8,7 +8,7 @@ The runtime view describes the key interaction scenarios of the Magrathea Object
 === Scenario 1 — CreateBucket
 
 .Runtime Diagram — CreateBucket
-image::../../c4/images/CreateBucketRuntime.png[CreateBucket Runtime, width=600]
+image::../../c4/images/structurizr-CreateBucketRuntime.png[CreateBucket Runtime, width=600]
 
 **Flusso:**
 1. User → s3-api-adapter: `PUT /{bucket}`
@@ -18,7 +18,7 @@ image::../../c4/images/CreateBucketRuntime.png[CreateBucket Runtime, width=600]
 === Scenario 2 — PutObject
 
 .Runtime Diagram — PutObject
-image::../../c4/images/PutObjectRuntime.png[PutObject Runtime, width=600]
+image::../../c4/images/structurizr-PutObjectRuntime.png[PutObject Runtime, width=600]
 
 **Flusso:**
 1. User → s3-api-adapter: `PUT /{bucket}/{key}`
@@ -30,7 +30,7 @@ image::../../c4/images/PutObjectRuntime.png[PutObject Runtime, width=600]
 === Scenario 3 — GetObject
 
 .Runtime Diagram — GetObject
-image::../../c4/images/GetObjectRuntime.png[GetObject Runtime, width=600]
+image::../../c4/images/structurizr-GetObjectRuntime.png[GetObject Runtime, width=600]
 
 **Flusso:**
 1. User → s3-api-adapter: `GET /{bucket}/{key}`
@@ -42,7 +42,7 @@ image::../../c4/images/GetObjectRuntime.png[GetObject Runtime, width=600]
 === Scenario 4 — Multipart Upload Lifecycle
 
 .Runtime Diagram — Multipart Upload
-image::../../c4/images/MultipartUploadRuntime.png[MultipartUpload Runtime, width=600]
+image::../../c4/images/structurizr-MultipartUploadRuntime.png[MultipartUpload Runtime, width=600]
 
 **Flusso:**
 1. User → s3-api-adapter: POST/PUT/GET/DELETE multipart endpoints

@@ -8,7 +8,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 Magrathea ObjectStorage provides an S3-compatible REST API. Users interact with it via HTTP to store and retrieve objects in buckets.
 
 .System Context — Magrathea ObjectStorage
-image::../../c4/images/SystemContext.png[System Context, width=600]
+image::../../c4/images/structurizr-SystemContext.png[System Context, width=600]
 
 The system context shows:
 - **User**: end user interacting via HTTPS — S3-compatible API
