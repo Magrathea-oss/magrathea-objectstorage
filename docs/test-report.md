@@ -1,6 +1,6 @@
 # Magrathea ObjectStorage Test Report
 
-Generated: 2026-05-21T21:01:11+02:00
+Generated: 2026-05-22T21:15:00+02:00
 
 ## Summary
 
@@ -131,6 +131,18 @@ Report HTML: `target/site/clover/index.html`
 | PutBucketCors | `aws s3api put-bucket-cors` | ✅ |
 | GetBucketCors | `aws s3api get-bucket-cors` | ✅ |
 | DeleteBucketCors | `aws s3api delete-bucket-cors` | ✅ |
+| PutBucketLifecycleConfiguration | `aws s3api put-bucket-lifecycle-configuration` | ✅ |
+| GetBucketLifecycleConfiguration | `aws s3api get-bucket-lifecycle-configuration` | ✅ |
+| DeleteBucketLifecycleConfiguration | `aws s3api delete-bucket-lifecycle-configuration` | ✅ |
+| PutBucketPolicy | `aws s3api put-bucket-policy` | ✅ |
+| GetBucketPolicy | `aws s3api get-bucket-policy` | ✅ |
+| DeleteBucketPolicy | `aws s3api delete-bucket-policy` | ✅ |
+| PutBucketEncryption | `aws s3api put-bucket-encryption` | ✅ |
+| GetBucketEncryption | `aws s3api get-bucket-encryption` | ✅ |
+| DeleteBucketEncryption | `aws s3api delete-bucket-encryption` | ✅ |
+| PutBucketLogging | `aws s3api put-bucket-logging` | ✅ |
+| GetBucketLogging | `aws s3api get-bucket-logging` | ✅ |
+| DeleteBucketLogging | `aws s3api delete-bucket-logging` | ✅ |
 | DeleteBucket | `aws s3api delete-bucket` | ✅ |
 
 ### Failure Tests
@@ -139,6 +151,14 @@ Report HTML: `target/site/clover/index.html`
 |---|---|---|
 | GetBucketCors nonexistent | ✅ | Expected failure |
 | GetBucketCors after delete | ✅ | Expected failure |
+| GetBucketLifecycleConfiguration nonexistent | ✅ | Expected failure |
+| GetBucketLifecycleConfiguration after delete | ✅ | Expected failure |
+| GetBucketPolicy nonexistent | ✅ | Expected failure |
+| GetBucketPolicy after delete | ✅ | Expected failure |
+| GetBucketEncryption nonexistent | ✅ | Expected failure |
+| GetBucketEncryption after delete | ✅ | Expected failure |
+| GetBucketLogging nonexistent | ✅ | Expected failure |
+| GetBucketLogging after delete | ✅ | Expected failure |
 
 | Check | Status | Notes |
 |---|---|---|
