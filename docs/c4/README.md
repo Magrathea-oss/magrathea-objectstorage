@@ -15,7 +15,7 @@ This project uses **Structurizr local** through the official `docker.io/structur
 Preferred command:
 
 ```bash
-bash scripts/c4model-local.sh
+~/.pi/agent/skills/multi-agent/tools/c4model-local.sh
 ```
 
 The script auto-detects the container runtime in this order:
@@ -30,13 +30,13 @@ Examples:
 
 ```bash
 # auto-detect podman/docker
-bash scripts/c4model-local.sh
+~/.pi/agent/skills/multi-agent/tools/c4model-local.sh
 
 # force Podman
-CONTAINER_RUNTIME=podman bash scripts/c4model-local.sh
+CONTAINER_RUNTIME=podman ~/.pi/agent/skills/multi-agent/tools/c4model-local.sh
 
 # force Docker
-CONTAINER_RUNTIME=docker bash scripts/c4model-local.sh
+CONTAINER_RUNTIME=docker ~/.pi/agent/skills/multi-agent/tools/c4model-local.sh
 ```
 
 The scripts run the container as the current host user. With Podman they also add `--userns=keep-id`, so Structurizr can write `workspace.json` and static exports without changing ownership of files under `docs/c4`.
@@ -79,7 +79,7 @@ If `workspace.json` does not exist yet, Structurizr local can still render direc
 Use the Structurizr vNext command syntax through the `docker.io/structurizr/structurizr` container image. The script works with Podman and Docker using the same runtime auto-detection described above:
 
 ```bash
-bash scripts/c4model-validate.sh
+~/.pi/agent/skills/multi-agent/tools/c4model-validate.sh
 ```
 
 Do **not** use the old local `structurizr-cli` syntax (`-w`, DOT export, Graphviz PNG rendering) as the project workflow.
@@ -93,16 +93,16 @@ The project uses the official Structurizr `export` command semantics:
 Generic export:
 
 ```bash
-bash scripts/c4model-export.sh static
-bash scripts/c4model-export.sh mermaid
-bash scripts/c4model-export.sh plantuml/c4plantuml
-bash scripts/c4model-export.sh json
+~/.pi/agent/skills/multi-agent/tools/c4model-export.sh static
+~/.pi/agent/skills/multi-agent/tools/c4model-export.sh mermaid
+~/.pi/agent/skills/multi-agent/tools/c4model-export.sh plantuml/c4plantuml
+~/.pi/agent/skills/multi-agent/tools/c4model-export.sh json
 ```
 
 Convenience static-site command:
 
 ```bash
-bash scripts/c4model-export-static.sh
+~/.pi/agent/skills/multi-agent/tools/c4model-export-static.sh
 ```
 
 The export script uses `workspace.json` when present, because it contains curated diagram layout. Otherwise it falls back to `workspace.dsl`.
@@ -120,7 +120,7 @@ png/svg                 -> docs/c4/images/
 Override the output with:
 
 ```bash
-STRUCTURIZR_EXPORT_OUTPUT=some/path bash scripts/c4model-export.sh mermaid
+STRUCTURIZR_EXPORT_OUTPUT=some/path ~/.pi/agent/skills/multi-agent/tools/c4model-export.sh mermaid
 ```
 
 ## Build Structurizr from source for PNG/SVG export
@@ -128,7 +128,7 @@ STRUCTURIZR_EXPORT_OUTPUT=some/path bash scripts/c4model-export.sh mermaid
 PNG/SVG export requires the Structurizr browser-based renderer. If you don't already have a compatible preview/source WAR, build Structurizr from source:
 
 ```bash
-bash scripts/c4model-build-structurizr.sh
+~/.pi/agent/skills/multi-agent/tools/c4model-build-structurizr.sh
 ```
 
 This clones `https://github.com/structurizr/structurizr.git` under `.cache/structurizr-source`, runs the Maven build, and copies the generated WAR to:
@@ -137,7 +137,7 @@ This clones `https://github.com/structurizr/structurizr.git` under `.cache/struc
 .cache/structurizr/structurizr.war
 ```
 
-`.cache/` is ignored by Git. `scripts/c4model-export-images.sh` automatically uses this WAR when present. You can override it with `STRUCTURIZR_WAR=/path/to/structurizr.war`.
+`.cache/` is ignored by Git. `~/.pi/agent/skills/multi-agent/tools/c4model-export-images.sh` automatically uses this WAR when present. You can override it with `STRUCTURIZR_WAR=/path/to/structurizr.war`.
 
 ## PNG/SVG export policy
 
@@ -145,12 +145,12 @@ PNG/SVG must be generated directly by Structurizr's browser-based renderer, not 
 
 ```bash
 # preferred: export from the running Structurizr local diagrams page
-bash scripts/c4model-export-images.sh png url
-bash scripts/c4model-export-images.sh svg url
+~/.pi/agent/skills/multi-agent/tools/c4model-export-images.sh png url
+~/.pi/agent/skills/multi-agent/tools/c4model-export-images.sh svg url
 
 # alternative: export directly from workspace.dsl/workspace.json
-bash scripts/c4model-export-images.sh png workspace
-bash scripts/c4model-export-images.sh svg workspace
+~/.pi/agent/skills/multi-agent/tools/c4model-export-images.sh png workspace
+~/.pi/agent/skills/multi-agent/tools/c4model-export-images.sh svg workspace
 ```
 
 This follows the official PNG/SVG documentation:
@@ -179,8 +179,8 @@ Therefore:
 When an agent is asked to work on the C4 model:
 
 1. Treat `docs/c4/workspace.dsl` as the source of truth.
-2. Use `scripts/c4model-validate.sh` for validation.
-3. Use `scripts/c4model-local.sh` for visual review; it supports Podman and Docker. Docker users may alternatively use `docker compose up structurizr-local`.
+2. Use `~/.pi/agent/skills/multi-agent/tools/c4model-validate.sh` for validation.
+3. Use `~/.pi/agent/skills/multi-agent/tools/c4model-local.sh` for visual review; it supports Podman and Docker. Docker users may alternatively use `docker compose up structurizr-local`.
 4. Preserve `workspace.json` if present; it contains manual layout.
 5. Do not introduce alternate diagram generation workflows unless explicitly requested.
 6. Do not overwrite PNG documentation artifacts unless using the approved Structurizr PNG/SVG export command.

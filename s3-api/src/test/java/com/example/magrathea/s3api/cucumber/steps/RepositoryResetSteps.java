@@ -1,6 +1,6 @@
 package com.example.magrathea.s3api.cucumber.steps;
 
-import com.example.magrathea.objectstorage.infrastructure.adapter.persistence.BucketRepositoryImpl;
+import com.example.magrathea.objectstorage.infrastructure.adapter.persistence.InMemoryBucketRepository;
 import com.example.magrathea.objectstorage.infrastructure.adapter.persistence.InMemoryObjectRepository;
 import io.cucumber.java.Before;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,7 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 public class RepositoryResetSteps {
 
     @Autowired
-    private BucketRepositoryImpl bucketRepository;
+    private InMemoryBucketRepository bucketRepository;
 
     @Autowired
     private InMemoryObjectRepository objectRepository;

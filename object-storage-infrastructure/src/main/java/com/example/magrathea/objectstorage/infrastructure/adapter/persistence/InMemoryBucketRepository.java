@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Repository interface returns CompletableFuture — implementation fulfills async.
  */
 @Repository
-public class BucketRepositoryImpl implements BucketRepository {
+public class InMemoryBucketRepository implements BucketRepository {
 
     private final ConcurrentHashMap<String, Bucket> store = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, BucketConfiguration> configStore = new ConcurrentHashMap<>();

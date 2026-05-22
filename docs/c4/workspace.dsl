@@ -7,15 +7,12 @@ workspace "Magrathea ObjectStorage" "C4 model for the Magrathea S3-compatible ob
 
     magrathea = softwareSystem "Magrathea ObjectStorage" "AWS S3-compatible object storage built with Spring Boot 4 WebFlux and Java 21." {
       s3ApiAdapter = container "s3-api-adapter" "HTTP adapter that exposes the S3-compatible REST API and translates HTTP/XML/binary requests into application use cases." "Spring Boot 4 WebFlux, RouterFunction, Java 21, Jackson XML" {
-        s3ProxyRouter = component "S3ProxyRouter" "Entry point RouterFunction: defines S3-compatible routes and dispatches requests to specialised handlers." "Spring WebFlux RouterFunction"
         bucketOperationsHandler = component "S3BucketOperationsHandler" "Handles bucket lifecycle endpoints: create, delete, head, list, location and versioning." "Java WebFlux handler"
         bucketMetadataHandler = component "S3BucketMetadataHandler" "Handles bucket metadata endpoints such as ACL and tagging." "Java WebFlux handler"
         bucketConfigHandler = component "S3BucketConfigHandler" "Handles bucket configuration endpoints such as CORS." "Java WebFlux handler"
         objectOperationsHandler = component "S3ObjectOperationsHandler" "Handles object operations: put, get, head, delete, copy and multi-delete." "Java WebFlux handler"
         objectMetadataHandler = component "S3ObjectMetadataHandler" "Handles object metadata endpoints such as ACL, tagging and attributes." "Java WebFlux handler"
         multipartHandler = component "S3MultipartHandler" "Handles multipart upload lifecycle: initiate, upload part, list parts, complete, abort and list uploads." "Java WebFlux handler"
-        webSupport = component "S3WebSupport" "Shared request predicates, request parsing, lookup helpers and S3-compatible error helpers." "Java utility"
-        xmlResponses = component "S3XmlResponses" "S3-compatible XML response and error DTO factory." "Jackson XML records"
       }
 
       objectStore = container "object-store" "Object storage capability: object upload, download, metadata lookup, deletion and multipart object workflows." "Java 21 application/domain services" {
@@ -38,69 +35,53 @@ workspace "Magrathea ObjectStorage" "C4 model for the Magrathea S3-compatible ob
       }
 
       inMemoryRepository = container "in-memory-repository" "In-process repository implementation for bucket metadata, object metadata/content and multipart upload state. It is not an external database and is reset when the process stops." "Java 21, ConcurrentHashMap" "Database" {
-        bucketRepositoryImpl = component "BucketRepositoryImpl" "In-memory implementation of BucketRepository. Internally stores bucket aggregates and bucket configuration in ConcurrentHashMap structures." "Spring @Repository"
+        inMemoryBucketRepository = component "InMemoryBucketRepository" "In-memory implementation of BucketRepository. Internally stores bucket aggregates and bucket configuration in ConcurrentHashMap structures." "Spring @Repository"
         inMemoryObjectRepository = component "InMemoryObjectRepository" "In-memory implementation of S3ObjectRepository. Internally stores object metadata and raw object bytes in ConcurrentHashMap structures." "Spring @Repository"
         inMemoryMultipartUploadRepository = component "InMemoryMultipartUploadRepository" "In-memory implementation of MultipartUploadRepository. Internally stores multipart upload sessions in a ConcurrentHashMap structure." "Spring @Repository"
       }
     }
 
-    user -> magrathea "Uses" "S3-compatible REST API over HTTP"
-    user -> magrathea.s3ApiAdapter "Sends S3 requests" "HTTP"
+    user -> magrathea.s3ApiAdapter.bucketOperationsHandler "Sends S3 bucket operations requests" "HTTP"
+    user -> magrathea.s3ApiAdapter.bucketMetadataHandler "Sends S3 bucket metadata requests" "HTTP"
+    user -> magrathea.s3ApiAdapter.bucketConfigHandler "Sends S3 bucket configuration requests" "HTTP"
+    user -> magrathea.s3ApiAdapter.objectOperationsHandler "Sends S3 object operations requests" "HTTP"
+    user -> magrathea.s3ApiAdapter.objectMetadataHandler "Sends S3 object metadata requests" "HTTP"
+    user -> magrathea.s3ApiAdapter.multipartHandler "Sends S3 multipart upload requests" "HTTP"
 
-    magrathea.s3ApiAdapter -> magrathea.objectStore "Delegates object CRUD, content and multipart use cases" "Java service calls"
-    magrathea.s3ApiAdapter -> magrathea.bucketManagment "Delegates bucket lifecycle, metadata and configuration use cases" "Java service calls"
+    magrathea.s3ApiAdapter.bucketOperationsHandler -> magrathea.bucketManagment.bucketService "Calls bucket lifecycle and listing use cases" "Java service calls"
+    magrathea.s3ApiAdapter.bucketOperationsHandler -> magrathea.objectStore.objectService "Calls object listing use cases" "Java service calls"
+    magrathea.s3ApiAdapter.bucketMetadataHandler -> magrathea.bucketManagment.bucketService "Calls bucket metadata use cases" "Java service calls"
+    magrathea.s3ApiAdapter.bucketConfigHandler -> magrathea.bucketManagment.bucketService "Calls bucket CORS/configuration use cases" "Java service calls"
+    magrathea.s3ApiAdapter.objectOperationsHandler -> magrathea.bucketManagment.bucketService "Checks bucket existence" "Java service calls"
+    magrathea.s3ApiAdapter.objectOperationsHandler -> magrathea.objectStore.objectService "Calls object CRUD/content use cases" "Java service calls"
+    magrathea.s3ApiAdapter.objectMetadataHandler -> magrathea.bucketManagment.bucketService "Checks bucket existence" "Java service calls"
+    magrathea.s3ApiAdapter.objectMetadataHandler -> magrathea.objectStore.objectService "Calls object metadata use cases" "Java service calls"
+    magrathea.s3ApiAdapter.multipartHandler -> magrathea.objectStore.multipartUploadService "Calls multipart upload use cases" "Java service calls"
+
     magrathea.objectStore -> magrathea.bucketManagment "Validates bucket existence" "Bucket lookup/read collaboration"
     magrathea.objectStore -> magrathea.inMemoryRepository "Reads/writes object metadata, bytes and multipart upload state" "Repository interfaces"
     magrathea.bucketManagment -> magrathea.inMemoryRepository "Reads/writes bucket metadata and configuration" "Repository interfaces"
 
-    magrathea.s3ApiAdapter.s3ProxyRouter -> magrathea.s3ApiAdapter.bucketOperationsHandler "Routes bucket lifecycle/listing requests"
-    magrathea.s3ApiAdapter.s3ProxyRouter -> magrathea.s3ApiAdapter.bucketMetadataHandler "Routes bucket metadata requests"
-    magrathea.s3ApiAdapter.s3ProxyRouter -> magrathea.s3ApiAdapter.bucketConfigHandler "Routes bucket configuration requests"
-    magrathea.s3ApiAdapter.s3ProxyRouter -> magrathea.s3ApiAdapter.objectOperationsHandler "Routes object CRUD requests"
-    magrathea.s3ApiAdapter.s3ProxyRouter -> magrathea.s3ApiAdapter.objectMetadataHandler "Routes object metadata requests"
-    magrathea.s3ApiAdapter.s3ProxyRouter -> magrathea.s3ApiAdapter.multipartHandler "Routes multipart upload requests"
+    magrathea.objectStore.objectService -> magrathea.objectStore.bucketRepositoryReadPort "Validates bucket existence" "Java service calls"
+    magrathea.objectStore.objectService -> magrathea.objectStore.s3ObjectRepositoryPort "Persists and loads objects/content" "Repository interfaces"
+    magrathea.objectStore.objectService -> magrathea.objectStore.s3Object "Creates/restores object metadata" "Java calls"
+    magrathea.objectStore.objectService -> magrathea.objectStore.contentBoundary "Wraps upload/download content" "Java calls"
+    magrathea.objectStore.objectService -> magrathea.inMemoryRepository.inMemoryObjectRepository "Persists object metadata and bytes" "Repository interfaces"
+    magrathea.objectStore.multipartUploadService -> magrathea.objectStore.bucketRepositoryReadPort "Resolves bucket by name" "Java service calls"
+    magrathea.objectStore.multipartUploadService -> magrathea.objectStore.multipartUploadRepositoryPort "Persists and loads multipart uploads" "Repository interfaces"
+    magrathea.objectStore.multipartUploadService -> magrathea.objectStore.multipartUpload "Creates/updates multipart upload state" "Java calls"
+    magrathea.objectStore.multipartUploadService -> magrathea.inMemoryRepository.inMemoryMultipartUploadRepository "Persists multipart upload state" "Repository interfaces"
 
-    magrathea.s3ApiAdapter.bucketOperationsHandler -> magrathea.bucketManagment.bucketService "Calls bucket lifecycle and listing use cases"
-    magrathea.s3ApiAdapter.bucketOperationsHandler -> magrathea.objectStore.objectService "Calls object listing use cases"
-    magrathea.s3ApiAdapter.bucketMetadataHandler -> magrathea.bucketManagment.bucketService "Calls bucket metadata use cases"
-    magrathea.s3ApiAdapter.bucketConfigHandler -> magrathea.bucketManagment.bucketService "Calls bucket CORS/configuration use cases"
-    magrathea.s3ApiAdapter.objectOperationsHandler -> magrathea.bucketManagment.bucketService "Checks bucket existence"
-    magrathea.s3ApiAdapter.objectOperationsHandler -> magrathea.objectStore.objectService "Calls object CRUD/content use cases"
-    magrathea.s3ApiAdapter.objectMetadataHandler -> magrathea.bucketManagment.bucketService "Checks bucket existence"
-    magrathea.s3ApiAdapter.objectMetadataHandler -> magrathea.objectStore.objectService "Calls object metadata use cases"
-    magrathea.s3ApiAdapter.multipartHandler -> magrathea.objectStore.multipartUploadService "Calls multipart upload use cases"
+    magrathea.bucketManagment.bucketService -> magrathea.bucketManagment.bucketRepositoryPort "Persists and loads buckets/configuration" "Repository interfaces"
+    magrathea.bucketManagment.bucketService -> magrathea.bucketManagment.bucket "Creates/updates bucket aggregate" "Java calls"
+    magrathea.bucketManagment.bucketService -> magrathea.bucketManagment.bucketConfiguration "Creates/updates bucket configuration" "Java calls"
+    magrathea.bucketManagment.bucketService -> magrathea.bucketManagment.corsConfiguration "Maps CORS commands to domain rules" "Java calls"
+    magrathea.bucketManagment.bucketService -> magrathea.inMemoryRepository.inMemoryBucketRepository "Persists and reads bucket aggregate" "Repository interfaces"
 
-    magrathea.s3ApiAdapter.bucketOperationsHandler -> magrathea.s3ApiAdapter.webSupport "Uses request/error helpers"
-    magrathea.s3ApiAdapter.bucketMetadataHandler -> magrathea.s3ApiAdapter.webSupport "Uses request/error helpers"
-    magrathea.s3ApiAdapter.bucketConfigHandler -> magrathea.s3ApiAdapter.webSupport "Uses request/error helpers"
-    magrathea.s3ApiAdapter.objectOperationsHandler -> magrathea.s3ApiAdapter.webSupport "Uses request/error helpers"
-    magrathea.s3ApiAdapter.objectMetadataHandler -> magrathea.s3ApiAdapter.webSupport "Uses request/error helpers"
-    magrathea.s3ApiAdapter.multipartHandler -> magrathea.s3ApiAdapter.webSupport "Uses request/error helpers"
-
-    magrathea.s3ApiAdapter.bucketOperationsHandler -> magrathea.s3ApiAdapter.xmlResponses "Builds XML responses"
-    magrathea.s3ApiAdapter.bucketMetadataHandler -> magrathea.s3ApiAdapter.xmlResponses "Builds XML responses"
-    magrathea.s3ApiAdapter.bucketConfigHandler -> magrathea.s3ApiAdapter.xmlResponses "Builds XML responses"
-    magrathea.s3ApiAdapter.objectOperationsHandler -> magrathea.s3ApiAdapter.xmlResponses "Builds XML responses"
-    magrathea.s3ApiAdapter.objectMetadataHandler -> magrathea.s3ApiAdapter.xmlResponses "Builds XML responses"
-    magrathea.s3ApiAdapter.multipartHandler -> magrathea.s3ApiAdapter.xmlResponses "Builds XML responses"
-
-    magrathea.objectStore.objectService -> magrathea.objectStore.bucketRepositoryReadPort "Validates bucket existence"
-    magrathea.objectStore.objectService -> magrathea.objectStore.s3ObjectRepositoryPort "Persists and loads objects/content"
-    magrathea.objectStore.objectService -> magrathea.objectStore.s3Object "Creates/restores object metadata"
-    magrathea.objectStore.objectService -> magrathea.objectStore.contentBoundary "Wraps upload/download content"
-    magrathea.objectStore.multipartUploadService -> magrathea.objectStore.bucketRepositoryReadPort "Resolves bucket by name"
-    magrathea.objectStore.multipartUploadService -> magrathea.objectStore.multipartUploadRepositoryPort "Persists and loads multipart uploads"
-    magrathea.objectStore.multipartUploadService -> magrathea.objectStore.multipartUpload "Creates/updates multipart upload state"
-
-    magrathea.bucketManagment.bucketService -> magrathea.bucketManagment.bucketRepositoryPort "Persists and loads buckets/configuration"
-    magrathea.bucketManagment.bucketService -> magrathea.bucketManagment.bucket "Creates/updates bucket aggregate"
-    magrathea.bucketManagment.bucketService -> magrathea.bucketManagment.bucketConfiguration "Creates/updates bucket configuration"
-    magrathea.bucketManagment.bucketService -> magrathea.bucketManagment.corsConfiguration "Maps CORS commands to domain rules"
-
-    magrathea.bucketManagment.bucketRepositoryPort -> magrathea.inMemoryRepository.bucketRepositoryImpl "Implemented by"
-    magrathea.objectStore.bucketRepositoryReadPort -> magrathea.inMemoryRepository.bucketRepositoryImpl "Implemented by"
-    magrathea.objectStore.s3ObjectRepositoryPort -> magrathea.inMemoryRepository.inMemoryObjectRepository "Implemented by"
-    magrathea.objectStore.multipartUploadRepositoryPort -> magrathea.inMemoryRepository.inMemoryMultipartUploadRepository "Implemented by"
+    magrathea.bucketManagment.bucketRepositoryPort -> magrathea.inMemoryRepository.inMemoryBucketRepository "Implemented by" "Implements"
+    magrathea.objectStore.bucketRepositoryReadPort -> magrathea.inMemoryRepository.inMemoryBucketRepository "Implemented by" "Implements"
+    magrathea.objectStore.s3ObjectRepositoryPort -> magrathea.inMemoryRepository.inMemoryObjectRepository "Implemented by" "Implements"
+    magrathea.objectStore.multipartUploadRepositoryPort -> magrathea.inMemoryRepository.inMemoryMultipartUploadRepository "Implemented by" "Implements"
   }
 
   views {
@@ -162,43 +143,43 @@ workspace "Magrathea ObjectStorage" "C4 model for the Magrathea S3-compatible ob
       autolayout lr
     }
 
-    dynamic magrathea "CreateBucketRuntime" {
+    dynamic magrathea.s3ApiAdapter "CreateBucketRuntime" {
       title "Runtime: CreateBucket"
       description "PUT /{bucket} creates a Bucket aggregate and persists it in in-memory-repository."
-      user -> magrathea.s3ApiAdapter "1. PUT /{bucket}" "HTTP"
-      magrathea.s3ApiAdapter -> magrathea.bucketManagment "2. CreateBucket use case" "Java service calls"
-      magrathea.bucketManagment -> magrathea.inMemoryRepository "3. Save Bucket aggregate" "Repository interfaces"
+      user -> magrathea.s3ApiAdapter.bucketOperationsHandler "1. PUT /{bucket}" "HTTP"
+      magrathea.s3ApiAdapter.bucketOperationsHandler -> magrathea.bucketManagment.bucketService "2. CreateBucket use case" "Java service calls"
+      magrathea.bucketManagment.bucketService -> magrathea.inMemoryRepository.inMemoryBucketRepository "3. Save Bucket aggregate" "Repository interfaces"
       autolayout lr
     }
 
-    dynamic magrathea "PutObjectRuntime" {
+    dynamic magrathea.s3ApiAdapter "PutObjectRuntime" {
       title "Runtime: PutObject"
       description "PutObject verifies the bucket, then persists object metadata and content."
-      user -> magrathea.s3ApiAdapter "1. PUT /{bucket}/{key}" "HTTP"
-      magrathea.s3ApiAdapter -> magrathea.bucketManagment "2. Verify bucket exists" "Java service calls"
-      magrathea.bucketManagment -> magrathea.inMemoryRepository "3. Read bucket metadata" "Repository interfaces"
-      magrathea.s3ApiAdapter -> magrathea.objectStore "4. PutObject use case" "Java service calls"
-      magrathea.objectStore -> magrathea.inMemoryRepository "5. Save object metadata and bytes" "Repository interfaces"
+      user -> magrathea.s3ApiAdapter.objectOperationsHandler "1. PUT /{bucket}/{key}" "HTTP"
+      magrathea.s3ApiAdapter.objectOperationsHandler -> magrathea.bucketManagment.bucketService "2. Verify bucket exists" "Java service calls"
+      magrathea.bucketManagment.bucketService -> magrathea.inMemoryRepository.inMemoryBucketRepository "3. Read bucket metadata" "Repository interfaces"
+      magrathea.s3ApiAdapter.objectOperationsHandler -> magrathea.objectStore.objectService "4. PutObject use case" "Java service calls"
+      magrathea.objectStore.objectService -> magrathea.inMemoryRepository.inMemoryObjectRepository "5. Save object metadata and bytes" "Repository interfaces"
       autolayout lr
     }
 
-    dynamic magrathea "GetObjectRuntime" {
+    dynamic magrathea.s3ApiAdapter "GetObjectRuntime" {
       title "Runtime: GetObject"
       description "GetObject verifies the bucket, then loads object metadata and binary content."
-      user -> magrathea.s3ApiAdapter "1. GET /{bucket}/{key}" "HTTP"
-      magrathea.s3ApiAdapter -> magrathea.bucketManagment "2. Verify bucket exists" "Java service calls"
-      magrathea.bucketManagment -> magrathea.inMemoryRepository "3. Read bucket metadata" "Repository interfaces"
-      magrathea.s3ApiAdapter -> magrathea.objectStore "4. GetObject use case" "Java service calls"
-      magrathea.objectStore -> magrathea.inMemoryRepository "5. Read object metadata and bytes" "Repository interfaces"
+      user -> magrathea.s3ApiAdapter.objectOperationsHandler "1. GET /{bucket}/{key}" "HTTP"
+      magrathea.s3ApiAdapter.objectOperationsHandler -> magrathea.bucketManagment.bucketService "2. Verify bucket exists" "Java service calls"
+      magrathea.bucketManagment.bucketService -> magrathea.inMemoryRepository.inMemoryBucketRepository "3. Read bucket metadata" "Repository interfaces"
+      magrathea.s3ApiAdapter.objectOperationsHandler -> magrathea.objectStore.objectService "4. GetObject use case" "Java service calls"
+      magrathea.objectStore.objectService -> magrathea.inMemoryRepository.inMemoryObjectRepository "5. Read object metadata and bytes" "Repository interfaces"
       autolayout lr
     }
 
-    dynamic magrathea "MultipartUploadRuntime" {
+    dynamic magrathea.s3ApiAdapter "MultipartUploadRuntime" {
       title "Runtime: Multipart upload lifecycle"
       description "Multipart endpoints manage upload sessions and uploaded part state."
-      user -> magrathea.s3ApiAdapter "1. POST/PUT/GET/DELETE multipart endpoints" "HTTP"
-      magrathea.s3ApiAdapter -> magrathea.objectStore "2. Multipart upload lifecycle use cases" "Java service calls"
-      magrathea.objectStore -> magrathea.inMemoryRepository "3. Read/write multipart upload state" "Repository interfaces"
+      user -> magrathea.s3ApiAdapter.multipartHandler "1. POST/PUT/GET/DELETE multipart endpoints" "HTTP"
+      magrathea.s3ApiAdapter.multipartHandler -> magrathea.objectStore.multipartUploadService "2. Multipart upload lifecycle use cases" "Java service calls"
+      magrathea.objectStore.multipartUploadService -> magrathea.inMemoryRepository.inMemoryMultipartUploadRepository "3. Read/write multipart upload state" "Repository interfaces"
       autolayout lr
     }
 
