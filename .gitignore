@@ -1,1 +1,7 @@
 target
+
+# Structurizr local/static export artifacts
+/docs/c4/export/
+
+# Local tool builds/downloads
+/.cache/

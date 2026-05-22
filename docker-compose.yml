@@ -12,3 +12,16 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  structurizr-local:
+    image: docker.io/structurizr/structurizr
+    command: local
+    user: "${UID:-1000}:${GID:-1000}"
+    ports:
+      - "9090:9090"
+    environment:
+      - PORT=9090
+      - STRUCTURIZR_AUTOREFRESHINTERVAL=2000
+      - STRUCTURIZR_AUTOSAVEINTERVAL=5000
+    volumes:
+      - ./docs/c4:/usr/local/structurizr

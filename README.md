@@ -11,10 +11,10 @@
 ## System Context
 
 <div align="center">
-  <img src="docs/c4/images/c1-context.png" alt="System Context — Magrathea ObjectStorage" width="600">
+  <img src="docs/c4/images/SystemContext.png" alt="System Context — Magrathea ObjectStorage" width="600">
 </div>
 
-*Generated with Structurizr DSL — see `docs/c4/workspace.dsl`*
+*Generated from the Structurizr workspace — see `docs/c4/workspace.dsl` and [`docs/c4/README.md`](docs/c4/README.md).*
 
 ---
 
@@ -167,6 +167,7 @@ See [`PLAN.md`](PLAN.md) for the full phased inclusion plan.
 | ARC42 architecture docs | [`docs/arc42/`](docs/arc42/) |
 | ADRs | [`docs/adr/`](docs/adr/) |
 | C4 diagrams | [`docs/c4/`](docs/c4/) |
+| C4 workflow | [`docs/c4/README.md`](docs/c4/README.md) |
 
 ---
 

@@ -5,131 +5,110 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 === Level 1 — Container Diagram
 
-The system consists of two runtime containers:
+Il sistema è composto da quattro container runtime:
 
-.S3 Server + File Store — C2 Container Diagram
-image::../../c4/images/c2-container.png[Container Diagram, width=600]
+.C2 Container Diagram — Magrathea ObjectStorage
+image::../../c4/images/Container.png[Container Diagram, width=600]
 
-==== S3 Server (Spring Boot 4 WebFlux JAR)
-
-**Blackbox Description:**
-Il container `s3-server` è un processo Spring Boot 4 WebFlux che espone gli endpoint REST S3-compatible. Riceve richieste HTTP, le instrada via RouterFunction, orchestra le operazioni tramite servizi applicativi, e serializza le risposte in XML S3 con Jackson 3.
-
-- **Provided Interface:** S3 REST API (30 endpoints su 111)
-- **Required Interface:** `S3ObjectRepository` / `BucketRepository` (CompletableFuture) verso File Store
-- **Technology:** Spring Boot 4 WebFlux, Java 21, Jackson 3 XML, RouterFunction
-
-==== File Store (Java 21 in-memory + file persistence)
+==== s3-api-adapter (HTTP adapter)
 
 **Blackbox Description:**
-Il container `file-store` è un archivio in-memory (ConcurrentHashMap) che persiste metadata e contenuto binario degli oggetti S3. Implementa le interfacce repository del dominio puro. Singolo nodo, senza clustering.
+Espone l'API REST S3-compatible via RouterFunction WebFlux. Traduce richieste HTTP/XML/binary in chiamate ai servizi applicativi. Serializza le risposte XML con Jackson 3.
 
-- **Provided Interface:** `BucketRepositoryImpl`, `InMemoryObjectRepository` (CompletableFuture)
-- **Required Interface:** Nessuna (è un leaf container)
-- **Technology:** Java 21, ConcurrentHashMap, byte[] interni
+- **Provided Interface:** S3 REST API (36 endpoints su 111)
+- **Required Interface:** ObjectService, MultipartUploadService, BucketService
+- **Technology:** Spring Boot 4 WebFlux, Java 21, RouterFunction, Jackson 3 XML
 
-=== Level 2 — Component Diagram (S3 Server)
+==== object-store (Object storage capability)
 
-Il container `s3-server` si scompone in componenti logici organizzati per responsabilità:
+**Blackbox Description:**
+Implementa le use case di object CRUD, multipart upload, e content retrieval. Contiene i service application, gli aggregate di dominio (S3Object, MultipartUpload), e i port di repository.
 
-[cols="1,3,2" options="header"]
-|===
-| Component | Responsibility | Note
+- **Provided Interface:** ObjectService, MultipartUploadService
+- **Required Interface:** BucketRepository (read), S3ObjectRepository, MultipartUploadRepository
+- **Technology:** Java 21, Spring @Service, domain aggregates
 
-| `S3ProxyRouter`
-| Composizione delle route RouterFunction
-| Unico punto di ingresso HTTP
+==== bucket-managment (Bucket management capability)
 
-| `S3BucketOperationsHandler`
-| Gestione lifecycle bucket, bucket listing, bucket location, versioning
-| Create/Delete/Head/List bucket
+**Blackbox Description:**
+Implementa le use case di bucket lifecycle, metadata (ACL, tagging), e configurazione (CORS, versioning). Contiene BucketService, gli aggregate di dominio (Bucket, BucketConfiguration, CorsConfiguration), e i port di repository.
 
-| `S3BucketMetadataHandler`
-| Gestione metadata bucket (ACL, tagging, CORS)
-| Get/Put/Delete ACL, tagging, CORS
+- **Provided Interface:** BucketService
+- **Required Interface:** BucketRepository
+- **Technology:** Java 21, Spring @Service, domain aggregates
 
-| `S3ObjectOperationsHandler`
-| Gestione CRUD oggetti, copy, multi-delete
-| Put/Get/Head/Delete object, copy, delete-objects
+==== in-memory-repository (In-process database)
 
-| `S3ObjectMetadataHandler`
-| Gestione metadata oggetti (ACL, tagging, attributes)
-| Get/Put/Delete ACL, tagging; get attributes
+**Blackbox Description:**
+Implementa i repository di dominio in-memory con ConcurrentHashMap. Non è un database esterno — viene resettato quando il processo termina.
 
-| `S3WebSupport`
-| Predicati richiesta, lookup oggetti, error helpers S3-compatible
-| Accept header matching, copy-source decode, S3Error XML
+- **Provided Interface:** BucketRepositoryImpl, InMemoryObjectRepository, InMemoryMultipartUploadRepository
+- **Required Interface:** Domain repository interfaces
+- **Technology:** Java 21, ConcurrentHashMap
+- **Tag:** Database
 
-| `S3XmlResponses`
-| Record XML Jackson 3 per risposte S3
-| ListAllMyBucketsResult, ListBucketResult, Error, ACL, Tagging, ecc.
+=== Level 2 — Component Diagram (s3-api-adapter)
 
-| `JacksonXmlCodecConfig`
-| Registrazione JacksonXmlEncoder in WebFlux
-| Codec per bodyValue() XML
+.C3 Component — s3-api-adapter
+image::../../c4/images/S3ApiAdapterComponents.png[S3 API Adapter Components, width=600]
 
-| `S3ApiConfig`
-| Auto-configuration Spring Boot condizionale
-| `@ConditionalOnClass` + `s3.api.enabled`
+| Component | Responsibility |
+|---|---|
+| `S3ProxyRouter` | Entry point RouterFunction: definisce le route S3 e dispatches richieste agli handler |
+| `S3BucketOperationsHandler` | Bucket lifecycle: create, delete, head, list, location, versioning |
+| `S3BucketMetadataHandler` | Bucket metadata: ACL, tagging |
+| `S3BucketConfigHandler` | Bucket configuration: CORS |
+| `S3ObjectOperationsHandler` | Object CRUD, copy, multi-delete |
+| `S3ObjectMetadataHandler` | Object metadata: ACL, tagging, attributes |
+| `S3MultipartHandler` | Multipart upload lifecycle: initiate, upload, complete, abort, list |
+| `S3WebSupport` | Shared request predicates, parsing, lookup, error helpers |
+| `S3XmlResponses` | S3-compatible XML response/error DTO factory |
 
-| `BucketService`
-| Orchestrazione operazioni bucket
-| Lifecycle, ACL, tagging, CORS, versioning
+=== Level 2 — Component Diagram (object-store)
 
-| `ObjectService`
-| Orchestrazione operazioni oggetti
-| CRUD, copy, multi-delete, ACL, tagging, attributes
+.C3 Component — object-store
+image::../../c4/images/ObjectStoreComponents.png[Object Store Components, width=600]
 
-| `DefaultS3ObjectWrite` / `DefaultS3ObjectContent`
-| Bridge contenuto binario: dominio puro ↔ Flux<DataBuffer>
-| Trasporta Flux<DataBuffer> al confine applicativo
+| Component | Responsibility |
+|---|---|
+| `ObjectService` | Application service: object CRUD, metadata, listing, content retrieval |
+| `MultipartUploadService` | Application service: multipart upload session e part lifecycle |
+| `S3Object` | Domain aggregate: object identity, key, ETag, storage class, metadata |
+| `MultipartUpload` | Domain aggregate: multipart state, uploaded parts, completion/abort |
+| `S3ObjectRepository port` | Repository port: object metadata e binary content persistence |
+| `MultipartUploadRepository port` | Repository port: multipart upload persistence |
+| `BucketRepository read port` | Read-side repository port: validazione esistenza bucket |
+| `DefaultS3ObjectWrite / DefaultS3ObjectContent` | Application-layer content boundary: Flux<DataBuffer> senza leak nel dominio |
 
-| DTO records
-| Comandi e risposte per i servizi applicativi
-| CreateBucketCommand, PutObjectCommand, ecc.
-|===
+=== Level 2 — Component Diagram (bucket-managment)
 
-=== Level 2 — Component Diagram (File Store)
+.C3 Component — bucket-managment
+image::../../c4/images/BucketManagmentComponents.png[Bucket Management Components, width=600]
 
-Il container `file-store` si scompone in:
+| Component | Responsibility |
+|---|---|
+| `BucketService` | Application service: bucket lifecycle, versioning, CORS configuration |
+| `Bucket` | Domain aggregate: bucket identity, name, region, storage class, versioning |
+| `BucketConfiguration` | Domain value object: bucket-level configuration (CORS rules) |
+| `CorsConfiguration` | Domain value object: CORS-related configuration |
+| `BucketRepository port` | Repository port: bucket metadata e configuration persistence |
 
-[cols="1,3" options="header"]
-|===
-| Component | Responsibility
+=== Level 2 — Component Diagram (in-memory-repository)
 
-| `BucketRepositoryImpl`
-| Implementazione in-memory di BucketRepository (ConcurrentHashMap)
+.C3 Component — in-memory-repository
+image::../../c4/images/PersistenceComponents.png[Persistence Components, width=600]
 
-| `InMemoryObjectRepository`
-| Implementazione in-memory di S3ObjectRepository: metadata + content bytes
-
-| `InfrastructureConfig`
-| Configurazione bean infrastruttura
-|===
+| Component | Responsibility |
+|---|---|
+| `BucketRepositoryImpl` | In-memory BucketRepository: ConcurrentHashMap per bucket aggregates e configuration |
+| `InMemoryObjectRepository` | In-memory S3ObjectRepository: ConcurrentHashMap per metadata e raw bytes |
+| `InMemoryMultipartUploadRepository` | In-memory MultipartUploadRepository: ConcurrentHashMap per upload sessions |
 
 === Important Interfaces
 
-[cols="1,3,3" options="header"]
-|===
-| Interface | Description | Connected Components
-
-| S3 REST API
-| Public HTTP API — solo endpoint AWS S3-compatible (XML/JSON + binary)
-| User ↔ S3ProxyRouter
-
-| BucketService / ObjectService
-| Service interface tra HTTP adapter e applicazione
-| S3*Handler ↔ Service
-
-| Domain Repository interfaces
-| Interfacce CompletableFuture: BucketRepository, S3ObjectRepository
-| Service ↔ Domain Model ↔ Infrastructure
-
-| S3ObjectWrite / S3ObjectContent
-| Contratti di contenuto binario senza tipi reattivi nel dominio
-| Service ↔ Domain ↔ InMemoryObjectRepository
-
-| Spring Boot auto-configuration
-| `META-INF/spring/*.imports` per plugin S3 API
-| bootstrap-application ↔ s3-api
-|===
+| Interface | Description | Connected Containers |
+|---|---|---|
+| S3 REST API | Public HTTP API — solo endpoint AWS S3-compatible | User ↔ s3-api-adapter |
+| Service calls | ObjectService, MultipartUploadService, BucketService | s3-api-adapter ↔ object-store/bucket-managment |
+| Repository interfaces | CompletableFuture-based domain ports | object-store/bucket-managment ↔ in-memory-repository |
+| Bucket lookup | Validazione esistenza bucket | object-store → bucket-managment |
