@@ -91,7 +91,7 @@ Source: https://docs.aws.amazon.com/AmazonS3/latest/API/API_Operations.md
 
 Scope: **Amazon S3 actions only**. Amazon S3 Control actions are intentionally out of scope for the object-storage S3 REST API module.
 
-### Current Implemented Operations (49/111)
+### Current Implemented Operations (70/111)
 
 | Operation | Endpoint | Test coverage |
 |---|---|---|
@@ -125,18 +125,39 @@ Scope: **Amazon S3 actions only**. Amazon S3 Control actions are intentionally o
 | GetBucketCors | `GET /{bucket}?cors` | Cucumber + AWS CLI |
 | PutBucketCors | `PUT /{bucket}?cors` | Cucumber + AWS CLI |
 | DeleteBucketCors | `DELETE /{bucket}?cors` | Cucumber + AWS CLI |
-| GetBucketLifecycleConfiguration | `GET /{bucket}?lifecycle` | Cucumber |
-| PutBucketLifecycleConfiguration | `PUT /{bucket}?lifecycle` | Cucumber |
-| DeleteBucketLifecycleConfiguration | `DELETE /{bucket}?lifecycle` | Cucumber |
-| GetBucketPolicy | `GET /{bucket}?policy` | Cucumber |
-| PutBucketPolicy | `PUT /{bucket}?policy` | Cucumber |
-| DeleteBucketPolicy | `DELETE /{bucket}?policy` | Cucumber |
-| GetBucketEncryption | `GET /{bucket}?encryption` | Cucumber |
-| PutBucketEncryption | `PUT /{bucket}?encryption` | Cucumber |
-| DeleteBucketEncryption | `DELETE /{bucket}?encryption` | Cucumber |
-| GetBucketLogging | `GET /{bucket}?logging` | Cucumber |
-| PutBucketLogging | `PUT /{bucket}?logging` | Cucumber |
-| DeleteBucketLogging | `DELETE /{bucket}?logging` | Cucumber |
+| GetBucketLifecycleConfiguration | `GET /{bucket}?lifecycle` | Cucumber + AWS CLI |
+| PutBucketLifecycleConfiguration | `PUT /{bucket}?lifecycle` | Cucumber + AWS CLI |
+| DeleteBucketLifecycleConfiguration | `DELETE /{bucket}?lifecycle` | Cucumber + AWS CLI |
+| GetBucketPolicy | `GET /{bucket}?policy` | Cucumber + AWS CLI |
+| PutBucketPolicy | `PUT /{bucket}?policy` | Cucumber + AWS CLI |
+| DeleteBucketPolicy | `DELETE /{bucket}?policy` | Cucumber + AWS CLI |
+| GetBucketEncryption | `GET /{bucket}?encryption` | Cucumber + AWS CLI |
+| PutBucketEncryption | `PUT /{bucket}?encryption` | Cucumber + AWS CLI |
+| DeleteBucketEncryption | `DELETE /{bucket}?encryption` | Cucumber + AWS CLI |
+| GetBucketLogging | `GET /{bucket}?logging` | Cucumber + AWS CLI |
+| PutBucketLogging | `PUT /{bucket}?logging` | Cucumber + AWS CLI |
+| DeleteBucketLogging | `DELETE /{bucket}?logging` | Cucumber + AWS CLI |
+| GetBucketWebsite | `GET /{bucket}?website` | Cucumber + AWS CLI |
+| PutBucketWebsite | `PUT /{bucket}?website` | Cucumber + AWS CLI |
+| DeleteBucketWebsite | `DELETE /{bucket}?website` | Cucumber + AWS CLI |
+| GetBucketNotification | `GET /{bucket}?notification` | Cucumber + AWS CLI |
+| PutBucketNotification | `PUT /{bucket}?notification` | Cucumber + AWS CLI |
+| DeleteBucketNotification | `DELETE /{bucket}?notification` | Cucumber + AWS CLI |
+| GetBucketReplication | `GET /{bucket}?replication` | Cucumber + AWS CLI |
+| PutBucketReplication | `PUT /{bucket}?replication` | Cucumber + AWS CLI |
+| DeleteBucketReplication | `DELETE /{bucket}?replication` | Cucumber + AWS CLI |
+| GetBucketRequestPayment | `GET /{bucket}?requestPayment` | Cucumber + AWS CLI |
+| PutBucketRequestPayment | `PUT /{bucket}?requestPayment` | Cucumber + AWS CLI |
+| DeleteBucketRequestPayment | `DELETE /{bucket}?requestPayment` | Cucumber + AWS CLI |
+| GetBucketOwnershipControls | `GET /{bucket}?ownershipControls` | Cucumber + AWS CLI |
+| PutBucketOwnershipControls | `PUT /{bucket}?ownershipControls` | Cucumber + AWS CLI |
+| DeleteBucketOwnershipControls | `DELETE /{bucket}?ownershipControls` | Cucumber + AWS CLI |
+| GetPublicAccessBlock | `GET /{bucket}?publicAccessBlock` | Cucumber + AWS CLI |
+| PutPublicAccessBlock | `PUT /{bucket}?publicAccessBlock` | Cucumber + AWS CLI |
+| DeletePublicAccessBlock | `DELETE /{bucket}?publicAccessBlock` | Cucumber + AWS CLI |
+| GetBucketAccelerateConfiguration | `GET /{bucket}?accelerate` | Cucumber + AWS CLI |
+| PutBucketAccelerateConfiguration | `PUT /{bucket}?accelerate` | Cucumber + AWS CLI |
+| DeleteBucketAccelerateConfiguration | `DELETE /{bucket}?accelerate` | Cucumber + AWS CLI |
 | CreateMultipartUpload | `POST /{bucket}/{key}?uploads` | Cucumber |
 | UploadPart | `PUT /{bucket}/{key}?uploadId=...&partNumber=...` | Cucumber |
 | UploadPartCopy | `PUT /{bucket}/{key}?uploadId=...&partNumber=...` + `x-amz-copy-source` | RouterFunction |
@@ -187,7 +208,7 @@ Goal: support common AWS CLI object workflows beyond current CRUD.
 | ListMultipartUploads | GET /{bucket}?uploads | Cucumber |
 | ListParts | GET /{bucket}/{key}?uploadId=... | Cucumber |
 
-### Phase D — Bucket Configuration APIs
+### Phase D — Bucket Configuration APIs (completed)
 
 | Area | Operations |
 |---|---|
@@ -196,13 +217,13 @@ Goal: support common AWS CLI object workflows beyond current CRUD.
 | Policy | GetBucketPolicy ✅, PutBucketPolicy ✅, DeleteBucketPolicy ✅, GetBucketPolicyStatus ⬜ |
 | Encryption | GetBucketEncryption ✅, PutBucketEncryption ✅, DeleteBucketEncryption ✅ |
 | Logging | GetBucketLogging ✅, PutBucketLogging ✅, DeleteBucketLogging ✅ |
-| Website | GetBucketWebsite, PutBucketWebsite, DeleteBucketWebsite |
-| Notification | GetBucketNotification, GetBucketNotificationConfiguration, PutBucketNotification, PutBucketNotificationConfiguration |
-| Replication | GetBucketReplication, PutBucketReplication, DeleteBucketReplication |
-| Request Payment | GetBucketRequestPayment, PutBucketRequestPayment |
-| Ownership Controls | GetBucketOwnershipControls, PutBucketOwnershipControls, DeleteBucketOwnershipControls |
-| Public Access Block | GetPublicAccessBlock, PutPublicAccessBlock, DeletePublicAccessBlock |
-| Accelerate | GetBucketAccelerateConfiguration, PutBucketAccelerateConfiguration |
+| Website | GetBucketWebsite ✅, PutBucketWebsite ✅, DeleteBucketWebsite ✅ |
+| Notification | GetBucketNotification ✅, PutBucketNotification ✅, DeleteBucketNotification ✅ |
+| Replication | GetBucketReplication ✅, PutBucketReplication ✅, DeleteBucketReplication ✅ |
+| Request Payment | GetBucketRequestPayment ✅, PutBucketRequestPayment ✅, DeleteBucketRequestPayment ✅ |
+| Ownership Controls | GetBucketOwnershipControls ✅, PutBucketOwnershipControls ✅, DeleteBucketOwnershipControls ✅ |
+| Public Access Block | GetPublicAccessBlock ✅, PutPublicAccessBlock ✅, DeletePublicAccessBlock ✅ |
+| Accelerate | GetBucketAccelerateConfiguration ✅, PutBucketAccelerateConfiguration ✅, DeleteBucketAccelerateConfiguration ✅ |
 
 ### Phase E — Analytics, Inventory, Metrics, Intelligent-Tiering
 

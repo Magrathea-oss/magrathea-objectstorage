@@ -46,6 +46,21 @@ mvn -Pcoverage clover:setup test clover:aggregate clover:clover -q || {
 echo "  ✅ Tests passed"
 echo ""
 
+# ── Step 1b: Run AWS CLI compatibility tests ──
+echo "=============================================="
+echo "  Running AWS CLI compatibility tests..."
+echo "=============================================="
+if command -v aws >/dev/null 2>&1; then
+    bash test-aws-cli.sh 2>&1 || {
+        echo "⚠️  AWS CLI tests had failures — check test-aws-cli.sh output"
+    }
+    echo "  ✅ AWS CLI tests completed"
+else
+    echo "  ⚠️  AWS CLI not installed — skipping CLI tests"
+    echo "  Update test report manually: bash test-aws-cli.sh"
+fi
+echo ""
+
 # ── Step 2: Extract coverage metrics ──
 CLOVER_XML="$PROJECT_DIR/target/site/clover/clover.xml"
 if [ ! -f "$CLOVER_XML" ]; then

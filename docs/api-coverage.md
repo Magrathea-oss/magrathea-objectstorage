@@ -314,31 +314,60 @@ Status legend:
 | 🔴 **Not implemented** (ignored) | 54 |
 | 🟡 **Not tested** | 0 |
 
-### APIs implemented in this session
+### APIs implemented (Phase D — Bucket Configuration completed)
 
 | API | Domain | Application | Handler | Cucumber tests | AWS CLI |
 |---|---|---|---|---|---|
-| GetBucketCors | `BucketConfiguration` value object | `BucketService.getCorsConfiguration()` | `S3BucketConfigHandler.getBucketCors()` | ✅ success + failure | ✅ |
-| PutBucketCors | `BucketConfiguration` + `CorsRule` records | `BucketService.putCorsConfiguration()` | `S3BucketConfigHandler.putBucketCors()` | ✅ success + failure | ✅ |
-| DeleteBucketCors | — | `BucketService.deleteCorsConfiguration()` | `S3BucketConfigHandler.deleteBucketCors()` | ✅ success + failure | ✅ |
+| GetBucketCors | `BucketConfiguration` | `BucketService.getCorsConfiguration()` | `S3BucketConfigHandler.getBucketCors()` | ✅ | ✅ |
+| PutBucketCors | `BucketConfiguration` + `CorsRule` | `BucketService.putCorsConfiguration()` | `S3BucketConfigHandler.putBucketCors()` | ✅ | ✅ |
+| DeleteBucketCors | — | `BucketService.deleteCorsConfiguration()` | `S3BucketConfigHandler.deleteBucketCors()` | ✅ | ✅ |
+| GetBucketLifecycle | `BucketLifecycleConfiguration` | `BucketService.getLifecycleConfiguration()` | `S3BucketConfigHandler.getBucketLifecycle()` | ✅ | ✅ |
+| PutBucketLifecycle | `BucketLifecycleConfiguration` | `BucketService.putLifecycleConfiguration()` | `S3BucketConfigHandler.putBucketLifecycle()` | ✅ | ✅ |
+| DeleteBucketLifecycle | — | `BucketService.deleteLifecycleConfiguration()` | `S3BucketConfigHandler.deleteBucketLifecycle()` | ✅ | ✅ |
+| GetBucketPolicy | `BucketPolicy` | `BucketService.getPolicy()` | `S3BucketConfigHandler.getBucketPolicy()` | ✅ | ✅ |
+| PutBucketPolicy | `BucketPolicy` | `BucketService.putPolicy()` | `S3BucketConfigHandler.putBucketPolicy()` | ✅ | ✅ |
+| DeleteBucketPolicy | — | `BucketService.deletePolicy()` | `S3BucketConfigHandler.deleteBucketPolicy()` | ✅ | ✅ |
+| GetBucketEncryption | `BucketEncryptionConfiguration` | `BucketService.getEncryptionConfiguration()` | `S3BucketConfigHandler.getBucketEncryption()` | ✅ | ✅ |
+| PutBucketEncryption | `BucketEncryptionConfiguration` | `BucketService.putEncryptionConfiguration()` | `S3BucketConfigHandler.putBucketEncryption()` | ✅ | ✅ |
+| DeleteBucketEncryption | — | `BucketService.deleteEncryptionConfiguration()` | `S3BucketConfigHandler.deleteBucketEncryption()` | ✅ | ✅ |
+| GetBucketLogging | `BucketLoggingConfiguration` | `BucketService.getLoggingConfiguration()` | `S3BucketConfigHandler.getBucketLogging()` | ✅ | ✅ |
+| PutBucketLogging | `BucketLoggingConfiguration` | `BucketService.putLoggingConfiguration()` | `S3BucketConfigHandler.putBucketLogging()` | ✅ | ✅ |
+| DeleteBucketLogging | — | `BucketService.deleteLoggingConfiguration()` | `S3BucketConfigHandler.deleteBucketLogging()` | ✅ | ✅ |
+| GetBucketWebsite | `BucketWebsiteConfiguration` | `BucketService.getWebsiteConfiguration()` | `S3BucketConfigHandler.getBucketWebsite()` | ✅ | ✅ |
+| PutBucketWebsite | `BucketWebsiteConfiguration` | `BucketService.putWebsiteConfiguration()` | `S3BucketConfigHandler.putBucketWebsite()` | ✅ | ✅ |
+| DeleteBucketWebsite | — | `BucketService.deleteWebsiteConfiguration()` | `S3BucketConfigHandler.deleteBucketWebsite()` | ✅ | ✅ |
+| GetBucketNotification | `BucketNotificationConfiguration` | `BucketService.getNotificationConfiguration()` | `S3BucketConfigHandler.getBucketNotification()` | ✅ | ✅ |
+| PutBucketNotification | `BucketNotificationConfiguration` | `BucketService.putNotificationConfiguration()` | `S3BucketConfigHandler.putBucketNotification()` | ✅ | ✅ |
+| DeleteBucketNotification | — | `BucketService.deleteNotificationConfiguration()` | `S3BucketConfigHandler.deleteBucketNotification()` | ✅ | ✅ |
+| GetBucketReplication | `BucketReplicationConfiguration` | `BucketService.getReplicationConfiguration()` | `S3BucketConfigHandler.getBucketReplication()` | ✅ | ✅ |
+| PutBucketReplication | `BucketReplicationConfiguration` | `BucketService.putReplicationConfiguration()` | `S3BucketConfigHandler.putBucketReplication()` | ✅ | ✅ |
+| DeleteBucketReplication | — | `BucketService.deleteReplicationConfiguration()` | `S3BucketConfigHandler.deleteBucketReplication()` | ✅ | ✅ |
+| GetBucketRequestPayment | `BucketRequestPaymentConfiguration` | `BucketService.getRequestPaymentConfiguration()` | `S3BucketConfigHandler.getBucketRequestPayment()` | ✅ | ✅ |
+| PutBucketRequestPayment | `BucketRequestPaymentConfiguration` | `BucketService.putRequestPaymentConfiguration()` | `S3BucketConfigHandler.putBucketRequestPayment()` | ✅ | ✅ |
+| DeleteBucketRequestPayment | — | `BucketService.deleteRequestPaymentConfiguration()` | `S3BucketConfigHandler.deleteBucketRequestPayment()` | ✅ | ✅ |
+| GetBucketOwnershipControls | `BucketOwnershipControls` | `BucketService.getOwnershipControls()` | `S3BucketConfigHandler.getBucketOwnershipControls()` | ✅ | ✅ |
+| PutBucketOwnershipControls | `BucketOwnershipControls` | `BucketService.putOwnershipControls()` | `S3BucketConfigHandler.putBucketOwnershipControls()` | ✅ | ✅ |
+| DeleteBucketOwnershipControls | — | `BucketService.deleteOwnershipControls()` | `S3BucketConfigHandler.deleteBucketOwnershipControls()` | ✅ | ✅ |
+| GetPublicAccessBlock | `PublicAccessBlockConfiguration` | `BucketService.getPublicAccessBlockConfiguration()` | `S3BucketConfigHandler.getPublicAccessBlock()` | ✅ | ✅ |
+| PutPublicAccessBlock | `PublicAccessBlockConfiguration` | `BucketService.putPublicAccessBlockConfiguration()` | `S3BucketConfigHandler.putPublicAccessBlock()` | ✅ | ✅ |
+| DeletePublicAccessBlock | — | `BucketService.deletePublicAccessBlockConfiguration()` | `S3BucketConfigHandler.deletePublicAccessBlock()` | ✅ | ✅ |
+| GetBucketAccelerateConfiguration | `BucketAccelerateConfiguration` | `BucketService.getAccelerateConfiguration()` | `S3BucketConfigHandler.getBucketAccelerate()` | ✅ | ✅ |
+| PutBucketAccelerateConfiguration | `BucketAccelerateConfiguration` | `BucketService.putAccelerateConfiguration()` | `S3BucketConfigHandler.putBucketAccelerate()` | ✅ | ✅ |
+| DeleteBucketAccelerateConfiguration | — | `BucketService.deleteAccelerateConfiguration()` | `S3BucketConfigHandler.deleteBucketAccelerate()` | ✅ | ✅ |
 
-### APIs yet to implement (Phases C–F)
+### APIs yet to implement (Phases E–F)
 
-**Phase C — Multipart Upload** (7 operations):
-- CreateMultipartUpload
-- UploadPart
-- UploadPartCopy
-- CompleteMultipartUpload
-- AbortMultipartUpload
-- ListMultipartUploads
-- ListParts
+**Phase E — Analytics & Inventory** (16 operations):
+- Analytics (4): GetBucketAnalyticsConfiguration, PutBucketAnalyticsConfiguration, DeleteBucketAnalyticsConfiguration, ListBucketAnalyticsConfigurations
+- Inventory (4): GetBucketInventoryConfiguration, PutBucketInventoryConfiguration, DeleteBucketInventoryConfiguration, ListBucketInventoryConfigurations
+- Metrics (4): GetBucketMetricsConfiguration, PutBucketMetricsConfiguration, DeleteBucketMetricsConfiguration, ListBucketMetricsConfigurations
+- Intelligent-Tiering (4): GetBucketIntelligentTieringConfiguration, PutBucketIntelligentTieringConfiguration, DeleteBucketIntelligentTieringConfiguration, ListBucketIntelligentTieringConfigurations
 
-**Phase D — Bucket Configuration** (22 operations):
-- CORS (3), Lifecycle (5), Policy (4), Encryption (3), Logging (2), Website (3), Notification (4), Replication (3), RequestPayment (2), OwnershipControls (3), PublicAccessBlock (3), Accelerate (2)
+**Phase F — Advanced** (22 operations):
+- CreateSession, ListDirectoryBuckets, GetBucketAbac, PutBucketAbac, GetObjectLegalHold, PutObjectLegalHold, GetObjectLockConfiguration, PutObjectLockConfiguration, GetObjectRetention, PutObjectRetention, GetObjectTorrent, RestoreObject, SelectObjectContent, RenameObject, UpdateObjectEncryption, WriteGetObjectResponse, CreateBucketMetadataConfiguration, DeleteBucketMetadataConfiguration, GetBucketMetadataConfiguration, CreateBucketMetadataTableConfiguration, DeleteBucketMetadataTableConfiguration, GetBucketMetadataTableConfiguration, UpdateBucketMetadataInventoryTableConfiguration, UpdateBucketMetadataJournalTableConfiguration
 
-**Phase E — Analytics & Inventory** (16 operations)
-
-**Phase F — Advanced** (22 operations)
+Also remaining in Phase D:
+- GetBucketPolicyStatus
 
 ---
 

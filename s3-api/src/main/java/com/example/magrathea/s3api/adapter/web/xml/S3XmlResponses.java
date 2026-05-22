@@ -526,6 +526,162 @@ public final class S3XmlResponses {
         }
     }
 
+    // ── Website Configuration ──
+
+    @JacksonXmlRootElement(localName = "WebsiteConfiguration")
+    public record WebsiteConfiguration(
+        @JacksonXmlProperty(localName = "IndexDocument") String indexDocument,
+        @JacksonXmlProperty(localName = "ErrorDocument") String errorDocument,
+        @JacksonXmlProperty(localName = "RedirectAllRequestsTo") String redirectAllRequestsTo
+    ) {
+        public static WebsiteConfiguration from(
+                java.util.Optional<com.example.magrathea.objectstorage.domain.valueobject.BucketWebsiteConfiguration> config) {
+            if (config.isEmpty() || !config.get().hasWebsite()) {
+                throw new java.util.NoSuchElementException("Website configuration not found");
+            }
+            var c = config.get();
+            return new WebsiteConfiguration(c.indexDocument(), c.errorDocument(), c.redirectAllRequestsTo());
+        }
+    }
+
+    // ── Notification Configuration ──
+
+    @JacksonXmlRootElement(localName = "NotificationConfiguration")
+    public record NotificationConfiguration(
+        @JacksonXmlElementWrapper(localName = "EventConfigurations", useWrapping = true)
+        @JacksonXmlProperty(localName = "EventConfiguration")
+        List<EventConfiguration> eventConfigurations
+    ) {
+        public static NotificationConfiguration from(
+                java.util.Optional<com.example.magrathea.objectstorage.domain.valueobject.BucketNotificationConfiguration> config) {
+            if (config.isEmpty() || !config.get().hasNotification()) {
+                throw new java.util.NoSuchElementException("Notification configuration not found");
+            }
+            var events = config.get().events().stream()
+                .map(e -> new EventConfiguration(e.event(), e.topicArn(), e.queueArn(), e.lambdaArn()))
+                .toList();
+            return new NotificationConfiguration(events);
+        }
+    }
+
+    public record EventConfiguration(
+        @JacksonXmlProperty(localName = "Event") String event,
+        @JacksonXmlProperty(localName = "TopicArn") String topicArn,
+        @JacksonXmlProperty(localName = "QueueArn") String queueArn,
+        @JacksonXmlProperty(localName = "LambdaArn") String lambdaArn
+    ) {}
+
+    // ── Replication Configuration ──
+
+    @JacksonXmlRootElement(localName = "ReplicationConfiguration")
+    public record ReplicationConfiguration(
+        @JacksonXmlProperty(localName = "Role") String role,
+        @JacksonXmlElementWrapper(localName = "Rules", useWrapping = true)
+        @JacksonXmlProperty(localName = "Rule")
+        List<ReplicationRule> rules
+    ) {
+        public static ReplicationConfiguration from(
+                java.util.Optional<com.example.magrathea.objectstorage.domain.valueobject.BucketReplicationConfiguration> config) {
+            if (config.isEmpty() || !config.get().hasReplication()) {
+                throw new java.util.NoSuchElementException("Replication configuration not found");
+            }
+            var c = config.get();
+            return new ReplicationConfiguration(c.role(), c.rules().stream().map(ReplicationRule::from).toList());
+        }
+    }
+
+    public record ReplicationRule(
+        @JacksonXmlProperty(localName = "ID") String id,
+        @JacksonXmlProperty(localName = "Status") String status,
+        @JacksonXmlProperty(localName = "Prefix") String prefix,
+        @JacksonXmlProperty(localName = "Destination") Destination destination
+    ) {
+        public static ReplicationRule from(
+                com.example.magrathea.objectstorage.domain.valueobject.BucketReplicationConfiguration.ReplicationRule rule) {
+            return new ReplicationRule(
+                rule.id(), rule.status(), rule.prefix(),
+                new Destination(rule.destinationBucket(), rule.destinationStorageClass()));
+        }
+    }
+
+    public record Destination(
+        @JacksonXmlProperty(localName = "Bucket") String bucket,
+        @JacksonXmlProperty(localName = "StorageClass") String storageClass
+    ) {}
+
+    // ── Request Payment Configuration ──
+
+    @JacksonXmlRootElement(localName = "RequestPaymentConfiguration")
+    public record RequestPaymentConfiguration(
+        @JacksonXmlProperty(localName = "Payer") String payer
+    ) {
+        public static RequestPaymentConfiguration from(
+                java.util.Optional<com.example.magrathea.objectstorage.domain.valueobject.BucketRequestPaymentConfiguration> config) {
+            if (config.isEmpty()) {
+                throw new java.util.NoSuchElementException("RequestPayment configuration not found");
+            }
+            return new RequestPaymentConfiguration(config.get().payer());
+        }
+    }
+
+    // ── Ownership Controls ──
+
+    @JacksonXmlRootElement(localName = "OwnershipControls")
+    public record OwnershipControls(
+        @JacksonXmlProperty(localName = "Rule") OwnershipRule rule
+    ) {
+        public static OwnershipControls from(
+                java.util.Optional<com.example.magrathea.objectstorage.domain.valueobject.BucketOwnershipControls> config) {
+            if (config.isEmpty()) {
+                throw new java.util.NoSuchElementException("Ownership controls not found");
+            }
+            return new OwnershipControls(new OwnershipRule(config.get().ruleId(), config.get().ownership()));
+        }
+    }
+
+    public record OwnershipRule(
+        @JacksonXmlProperty(localName = "ID") String id,
+        @JacksonXmlProperty(localName = "Ownership") String ownership
+    ) {}
+
+    // ── Public Access Block Configuration ──
+
+    @JacksonXmlRootElement(localName = "PublicAccessBlockConfiguration")
+    public record PublicAccessBlockConfiguration(
+        @JacksonXmlProperty(localName = "BlockPublicAcls") String blockPublicAcls,
+        @JacksonXmlProperty(localName = "IgnorePublicAcls") String ignorePublicAcls,
+        @JacksonXmlProperty(localName = "BlockPublicPolicy") String blockPublicPolicy,
+        @JacksonXmlProperty(localName = "RestrictPublicBuckets") String restrictPublicBuckets
+    ) {
+        public static PublicAccessBlockConfiguration from(
+                java.util.Optional<com.example.magrathea.objectstorage.domain.valueobject.PublicAccessBlockConfiguration> config) {
+            if (config.isEmpty()) {
+                throw new java.util.NoSuchElementException("Public access block configuration not found");
+            }
+            var c = config.get();
+            return new PublicAccessBlockConfiguration(
+                boolStr(c.blockPublicAcls()), boolStr(c.ignorePublicAcls()),
+                boolStr(c.blockPublicPolicy()), boolStr(c.restrictPublicBuckets()));
+        }
+
+        private static String boolStr(boolean v) { return v ? "true" : "false"; }
+    }
+
+    // ── Accelerate Configuration ──
+
+    @JacksonXmlRootElement(localName = "AccelerateConfiguration")
+    public record AccelerateConfiguration(
+        @JacksonXmlProperty(localName = "Status") String status
+    ) {
+        public static AccelerateConfiguration from(
+                java.util.Optional<com.example.magrathea.objectstorage.domain.valueobject.BucketAccelerateConfiguration> config) {
+            if (config.isEmpty()) {
+                throw new java.util.NoSuchElementException("Accelerate configuration not found");
+            }
+            return new AccelerateConfiguration(config.get().status());
+        }
+    }
+
     // ── Error ──
 
     @JacksonXmlRootElement(localName = "Error")

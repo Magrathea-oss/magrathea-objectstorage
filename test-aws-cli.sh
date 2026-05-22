@@ -179,6 +179,49 @@ run_success "DeleteBucketLogging" aws_s3api delete-bucket-logging --bucket "$BUC
 run_failure "GetBucketLogging nonexistent" aws_s3api get-bucket-logging --bucket "nonexistent-bucket" --output json
 run_failure "GetBucketLogging after delete" aws_s3api get-bucket-logging --bucket "$BUCKET" --output json
 
+# ── Website Configuration ──
+run_success "PutBucketWebsite" aws_s3api put-bucket-website --bucket "$BUCKET" --website-configuration '{"IndexDocument":{"Suffix":"index.html"},"ErrorDocument":{"Key":"error.html"}}' --output json
+run_success "GetBucketWebsite" aws_s3api get-bucket-website --bucket "$BUCKET" --output json
+run_success "DeleteBucketWebsite" aws_s3api delete-bucket-website --bucket "$BUCKET" --output json
+run_failure "GetBucketWebsite nonexistent" aws_s3api get-bucket-website --bucket "nonexistent-bucket" --output json
+run_failure "GetBucketWebsite after delete" aws_s3api get-bucket-website --bucket "$BUCKET" --output json
+
+# ── Notification Configuration ──
+run_success "PutBucketNotification" aws_s3api put-bucket-notification-configuration --bucket "$BUCKET" --notification-configuration '{"TopicConfigurations":[{"Events":["s3:ObjectCreated:*"],"TopicArn":"arn:aws:sns:us-east-1:123:topic"}]}' --output json
+run_success "GetBucketNotification" aws_s3api get-bucket-notification-configuration --bucket "$BUCKET" --output json
+run_failure "GetBucketNotification nonexistent" aws_s3api get-bucket-notification-configuration --bucket "nonexistent-bucket" --output json
+
+# ── Replication Configuration ──
+run_success "PutBucketReplication" aws_s3api put-bucket-replication --bucket "$BUCKET" --replication-configuration '{"Role":"arn:aws:iam::123:role/s3-replication","Rules":[{"Status":"Enabled","Destination":{"Bucket":"arn:aws:s3:::dest-bucket"}}]}' --output json
+run_success "GetBucketReplication" aws_s3api get-bucket-replication --bucket "$BUCKET" --output json
+run_success "DeleteBucketReplication" aws_s3api delete-bucket-replication --bucket "$BUCKET" --output json
+run_failure "GetBucketReplication nonexistent" aws_s3api get-bucket-replication --bucket "nonexistent-bucket" --output json
+run_failure "GetBucketReplication after delete" aws_s3api get-bucket-replication --bucket "$BUCKET" --output json
+
+# ── Request Payment ──
+run_success "PutBucketRequestPayment" aws_s3api put-bucket-request-payment --bucket "$BUCKET" --request-payment-configuration '{"Payer":"Requester"}' --output json
+run_success "GetBucketRequestPayment" aws_s3api get-bucket-request-payment --bucket "$BUCKET" --output json
+run_failure "GetBucketRequestPayment nonexistent" aws_s3api get-bucket-request-payment --bucket "nonexistent-bucket" --output json
+
+# ── Ownership Controls ──
+run_success "PutBucketOwnershipControls" aws_s3api put-bucket-ownership-controls --bucket "$BUCKET" --ownership-controls '{"Rules":[{"ObjectOwnership":"BucketOwnerPreferred"}]}' --output json
+run_success "GetBucketOwnershipControls" aws_s3api get-bucket-ownership-controls --bucket "$BUCKET" --output json
+run_success "DeleteBucketOwnershipControls" aws_s3api delete-bucket-ownership-controls --bucket "$BUCKET" --output json
+run_failure "GetBucketOwnershipControls nonexistent" aws_s3api get-bucket-ownership-controls --bucket "nonexistent-bucket" --output json
+run_failure "GetBucketOwnershipControls after delete" aws_s3api get-bucket-ownership-controls --bucket "$BUCKET" --output json
+
+# ── Public Access Block ──
+run_success "PutPublicAccessBlock" aws_s3api put-public-access-block --bucket "$BUCKET" --public-access-block-configuration '{"BlockPublicAcls":true,"IgnorePublicAcls":false,"BlockPublicPolicy":false,"RestrictPublicBuckets":false}' --output json
+run_success "GetPublicAccessBlock" aws_s3api get-public-access-block --bucket "$BUCKET" --output json
+run_success "DeletePublicAccessBlock" aws_s3api delete-public-access-block --bucket "$BUCKET" --output json
+run_failure "GetPublicAccessBlock nonexistent" aws_s3api get-public-access-block --bucket "nonexistent-bucket" --output json
+run_failure "GetPublicAccessBlock after delete" aws_s3api get-public-access-block --bucket "$BUCKET" --output json
+
+# ── Accelerate Configuration ──
+run_success "PutBucketAccelerateConfiguration" aws_s3api put-bucket-accelerate-configuration --bucket "$BUCKET" --accelerate-configuration '{"Status":"Enabled"}' --output json
+run_success "GetBucketAccelerateConfiguration" aws_s3api get-bucket-accelerate-configuration --bucket "$BUCKET" --output json
+run_failure "GetBucketAccelerateConfiguration nonexistent" aws_s3api get-bucket-accelerate-configuration --bucket "nonexistent-bucket" --output json
+
 run_success "DeleteBucket" aws_s3api delete-bucket --bucket "$BUCKET" --output json
 run_failure "HeadBucket after DeleteBucket" aws_s3api head-bucket --bucket "$BUCKET"
 
@@ -329,6 +372,24 @@ Report HTML: \`target/site/clover/index.html\`
 | PutBucketLogging | \`aws s3api put-bucket-logging\` | ✅ |
 | GetBucketLogging | \`aws s3api get-bucket-logging\` | ✅ |
 | DeleteBucketLogging | \`aws s3api delete-bucket-logging\` | ✅ |
+| PutBucketWebsite | \`aws s3api put-bucket-website\` | ✅ |
+| GetBucketWebsite | \`aws s3api get-bucket-website\` | ✅ |
+| DeleteBucketWebsite | \`aws s3api delete-bucket-website\` | ✅ |
+| PutBucketNotification | \`aws s3api put-bucket-notification-configuration\` | ✅ |
+| GetBucketNotification | \`aws s3api get-bucket-notification-configuration\` | ✅ |
+| PutBucketReplication | \`aws s3api put-bucket-replication\` | ✅ |
+| GetBucketReplication | \`aws s3api get-bucket-replication\` | ✅ |
+| DeleteBucketReplication | \`aws s3api delete-bucket-replication\` | ✅ |
+| PutBucketRequestPayment | \`aws s3api put-bucket-request-payment\` | ✅ |
+| GetBucketRequestPayment | \`aws s3api get-bucket-request-payment\` | ✅ |
+| PutBucketOwnershipControls | \`aws s3api put-bucket-ownership-controls\` | ✅ |
+| GetBucketOwnershipControls | \`aws s3api get-bucket-ownership-controls\` | ✅ |
+| DeleteBucketOwnershipControls | \`aws s3api delete-bucket-ownership-controls\` | ✅ |
+| PutPublicAccessBlock | \`aws s3api put-public-access-block\` | ✅ |
+| GetPublicAccessBlock | \`aws s3api get-public-access-block\` | ✅ |
+| DeletePublicAccessBlock | \`aws s3api delete-public-access-block\` | ✅ |
+| PutBucketAccelerateConfiguration | \`aws s3api put-bucket-accelerate-configuration\` | ✅ |
+| GetBucketAccelerateConfiguration | \`aws s3api get-bucket-accelerate-configuration\` | ✅ |
 | DeleteBucket | \`aws s3api delete-bucket\` | ✅ |
 
 ### Failure Tests

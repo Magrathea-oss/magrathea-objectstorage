@@ -459,5 +459,587 @@ public class ConfigSteps {
         commonSteps.setResponseStatus(result.getStatus());
     }
 
+    // ── Website ──
+
+    @Given("bucket website is preset with index {string}")
+    public void bucketWebsitePreset(String indexDoc) {
+        var body = "<WebsiteConfiguration><IndexDocument>" + indexDoc + "</IndexDocument></WebsiteConfiguration>";
+        webTestClient.put()
+            .uri("/test-bucket?website")
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .expectStatus().isOk();
+    }
+
+    @When("bucket website is configured with index {string}")
+    public void putBucketWebsite(String indexDoc) {
+        var body = "<WebsiteConfiguration><IndexDocument>" + indexDoc + "</IndexDocument></WebsiteConfiguration>";
+        var result = webTestClient.put()
+            .uri("/test-bucket?website")
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .returnResult();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket website configuration is requested")
+    public void getBucketWebsite() {
+        var result = webTestClient.get()
+            .uri("/test-bucket?website")
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket website configuration is requested for {string}")
+    public void getBucketWebsiteFor(String bucket) {
+        var result = webTestClient.get()
+            .uri("/{bucket}?website", bucket)
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket website configuration is deleted")
+    public void deleteBucketWebsite() {
+        var status = webTestClient.delete()
+            .uri("/test-bucket?website")
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket website configuration is deleted for {string}")
+    public void deleteBucketWebsiteFor(String bucket) {
+        var status = webTestClient.delete()
+            .uri("/{bucket}?website", bucket)
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket website is configured for {string} with index {string}")
+    public void putBucketWebsiteFor(String bucket, String indexDoc) {
+        var body = "<WebsiteConfiguration><IndexDocument>" + indexDoc + "</IndexDocument></WebsiteConfiguration>";
+        var result = webTestClient.put()
+            .uri("/{bucket}?website", bucket)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .returnResult();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    // ── Notification ──
+
+    @Given("bucket notification is preset with event {string}")
+    public void bucketNotificationPreset(String event) {
+        var body = "<NotificationConfiguration><EventConfiguration><Event>" + event +
+            "</Event></EventConfiguration></NotificationConfiguration>";
+        webTestClient.put()
+            .uri("/test-bucket?notification")
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .expectStatus().isOk();
+    }
+
+    @When("bucket notification is configured with event {string}")
+    public void putBucketNotification(String event) {
+        var body = "<NotificationConfiguration><EventConfiguration><Event>" + event +
+            "</Event></EventConfiguration></NotificationConfiguration>";
+        var result = webTestClient.put()
+            .uri("/test-bucket?notification")
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .returnResult();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket notification configuration is requested")
+    public void getBucketNotification() {
+        var result = webTestClient.get()
+            .uri("/test-bucket?notification")
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket notification configuration is requested for {string}")
+    public void getBucketNotificationFor(String bucket) {
+        var result = webTestClient.get()
+            .uri("/{bucket}?notification", bucket)
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket notification configuration is deleted")
+    public void deleteBucketNotification() {
+        var status = webTestClient.delete()
+            .uri("/test-bucket?notification")
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket notification configuration is deleted for {string}")
+    public void deleteBucketNotificationFor(String bucket) {
+        var status = webTestClient.delete()
+            .uri("/{bucket}?notification", bucket)
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket notification is configured for {string} with event {string}")
+    public void putBucketNotificationFor(String bucket, String event) {
+        var body = "<NotificationConfiguration><EventConfiguration><Event>" + event +
+            "</Event></EventConfiguration></NotificationConfiguration>";
+        var result = webTestClient.put()
+            .uri("/{bucket}?notification", bucket)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .returnResult();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    // ── Replication ──
+
+    @Given("bucket replication is preset with role {string}")
+    public void bucketReplicationPreset(String role) {
+        var body = "<ReplicationConfiguration><Role>" + role +
+            "</Role><Rule><Status>Enabled</Status></Rule></ReplicationConfiguration>";
+        webTestClient.put()
+            .uri("/test-bucket?replication")
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .expectStatus().isOk();
+    }
+
+    @When("bucket replication is configured with role {string}")
+    public void putBucketReplication(String role) {
+        var body = "<ReplicationConfiguration><Role>" + role +
+            "</Role><Rule><Status>Enabled</Status></Rule></ReplicationConfiguration>";
+        var result = webTestClient.put()
+            .uri("/test-bucket?replication")
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .returnResult();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket replication configuration is requested")
+    public void getBucketReplication() {
+        var result = webTestClient.get()
+            .uri("/test-bucket?replication")
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket replication configuration is requested for {string}")
+    public void getBucketReplicationFor(String bucket) {
+        var result = webTestClient.get()
+            .uri("/{bucket}?replication", bucket)
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket replication configuration is deleted")
+    public void deleteBucketReplication() {
+        var status = webTestClient.delete()
+            .uri("/test-bucket?replication")
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket replication configuration is deleted for {string}")
+    public void deleteBucketReplicationFor(String bucket) {
+        var status = webTestClient.delete()
+            .uri("/{bucket}?replication", bucket)
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket replication is configured for {string} with role {string}")
+    public void putBucketReplicationFor(String bucket, String role) {
+        var body = "<ReplicationConfiguration><Role>" + role +
+            "</Role><Rule><Status>Enabled</Status></Rule></ReplicationConfiguration>";
+        var result = webTestClient.put()
+            .uri("/{bucket}?replication", bucket)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .returnResult();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    // ── Request Payment ──
+
+    @Given("bucket request payment is preset with payer {string}")
+    public void bucketRequestPaymentPreset(String payer) {
+        var body = "<RequestPaymentConfiguration><Payer>" + payer + "</Payer></RequestPaymentConfiguration>";
+        webTestClient.put()
+            .uri("/test-bucket?requestPayment")
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .expectStatus().isOk();
+    }
+
+    @When("bucket request payment is configured with payer {string}")
+    public void putBucketRequestPayment(String payer) {
+        var body = "<RequestPaymentConfiguration><Payer>" + payer + "</Payer></RequestPaymentConfiguration>";
+        var result = webTestClient.put()
+            .uri("/test-bucket?requestPayment")
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .returnResult();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket request payment configuration is requested")
+    public void getBucketRequestPayment() {
+        var result = webTestClient.get()
+            .uri("/test-bucket?requestPayment")
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket request payment configuration is requested for {string}")
+    public void getBucketRequestPaymentFor(String bucket) {
+        var result = webTestClient.get()
+            .uri("/{bucket}?requestPayment", bucket)
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket request payment configuration is deleted")
+    public void deleteBucketRequestPayment() {
+        var status = webTestClient.delete()
+            .uri("/test-bucket?requestPayment")
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket request payment configuration is deleted for {string}")
+    public void deleteBucketRequestPaymentFor(String bucket) {
+        var status = webTestClient.delete()
+            .uri("/{bucket}?requestPayment", bucket)
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket request payment is configured for {string} with payer {string}")
+    public void putBucketRequestPaymentFor(String bucket, String payer) {
+        var body = "<RequestPaymentConfiguration><Payer>" + payer + "</Payer></RequestPaymentConfiguration>";
+        var result = webTestClient.put()
+            .uri("/{bucket}?requestPayment", bucket)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .returnResult();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    // ── Ownership Controls ──
+
+    @Given("bucket ownership controls are preset with ownership {string}")
+    public void bucketOwnershipControlsPreset(String ownership) {
+        var body = "<OwnershipControls><Rule><Ownership>" + ownership + "</Ownership></Rule></OwnershipControls>";
+        webTestClient.put()
+            .uri("/test-bucket?ownershipControls")
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .expectStatus().isOk();
+    }
+
+    @When("bucket ownership controls are configured with ownership {string}")
+    public void putBucketOwnershipControls(String ownership) {
+        var body = "<OwnershipControls><Rule><Ownership>" + ownership + "</Ownership></Rule></OwnershipControls>";
+        var result = webTestClient.put()
+            .uri("/test-bucket?ownershipControls")
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .returnResult();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket ownership controls are requested")
+    public void getBucketOwnershipControls() {
+        var result = webTestClient.get()
+            .uri("/test-bucket?ownershipControls")
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket ownership controls are requested for {string}")
+    public void getBucketOwnershipControlsFor(String bucket) {
+        var result = webTestClient.get()
+            .uri("/{bucket}?ownershipControls", bucket)
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket ownership controls are deleted")
+    public void deleteBucketOwnershipControls() {
+        var status = webTestClient.delete()
+            .uri("/test-bucket?ownershipControls")
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket ownership controls are deleted for {string}")
+    public void deleteBucketOwnershipControlsFor(String bucket) {
+        var status = webTestClient.delete()
+            .uri("/{bucket}?ownershipControls", bucket)
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket ownership controls are configured for {string} with ownership {string}")
+    public void putBucketOwnershipControlsFor(String bucket, String ownership) {
+        var body = "<OwnershipControls><Rule><Ownership>" + ownership + "</Ownership></Rule></OwnershipControls>";
+        var result = webTestClient.put()
+            .uri("/{bucket}?ownershipControls", bucket)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .returnResult();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    // ── Public Access Block ──
+
+    @Given("bucket public access block is preset with blockPublicAcls {string}")
+    public void bucketPublicAccessBlockPreset(String blockAcls) {
+        var body = "<PublicAccessBlockConfiguration><BlockPublicAcls>" + blockAcls +
+            "</BlockPublicAcls><IgnorePublicAcls>false</IgnorePublicAcls>" +
+            "<BlockPublicPolicy>false</BlockPublicPolicy><RestrictPublicBuckets>false</RestrictPublicBuckets>" +
+            "</PublicAccessBlockConfiguration>";
+        webTestClient.put()
+            .uri("/test-bucket?publicAccessBlock")
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .expectStatus().isOk();
+    }
+
+    @When("bucket public access block is configured with blockPublicAcls {string}")
+    public void putBucketPublicAccessBlock(String blockAcls) {
+        var body = "<PublicAccessBlockConfiguration><BlockPublicAcls>" + blockAcls +
+            "</BlockPublicAcls><IgnorePublicAcls>false</IgnorePublicAcls>" +
+            "<BlockPublicPolicy>false</BlockPublicPolicy><RestrictPublicBuckets>false</RestrictPublicBuckets>" +
+            "</PublicAccessBlockConfiguration>";
+        var result = webTestClient.put()
+            .uri("/test-bucket?publicAccessBlock")
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .returnResult();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket public access block configuration is requested")
+    public void getBucketPublicAccessBlock() {
+        var result = webTestClient.get()
+            .uri("/test-bucket?publicAccessBlock")
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket public access block configuration is requested for {string}")
+    public void getBucketPublicAccessBlockFor(String bucket) {
+        var result = webTestClient.get()
+            .uri("/{bucket}?publicAccessBlock", bucket)
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket public access block configuration is deleted")
+    public void deleteBucketPublicAccessBlock() {
+        var status = webTestClient.delete()
+            .uri("/test-bucket?publicAccessBlock")
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket public access block configuration is deleted for {string}")
+    public void deleteBucketPublicAccessBlockFor(String bucket) {
+        var status = webTestClient.delete()
+            .uri("/{bucket}?publicAccessBlock", bucket)
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket public access block is configured for {string} with blockPublicAcls {string}")
+    public void putBucketPublicAccessBlockFor(String bucket, String blockAcls) {
+        var body = "<PublicAccessBlockConfiguration><BlockPublicAcls>" + blockAcls +
+            "</BlockPublicAcls><IgnorePublicAcls>false</IgnorePublicAcls>" +
+            "<BlockPublicPolicy>false</BlockPublicPolicy><RestrictPublicBuckets>false</RestrictPublicBuckets>" +
+            "</PublicAccessBlockConfiguration>";
+        var result = webTestClient.put()
+            .uri("/{bucket}?publicAccessBlock", bucket)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .returnResult();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    // ── Accelerate ──
+
+    @Given("bucket accelerate is preset with status {string}")
+    public void bucketAcceleratePreset(String status) {
+        var body = "<AccelerateConfiguration><Status>" + status + "</Status></AccelerateConfiguration>";
+        webTestClient.put()
+            .uri("/test-bucket?accelerate")
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .expectStatus().isOk();
+    }
+
+    @When("bucket accelerate is configured with status {string}")
+    public void putBucketAccelerate(String status) {
+        var body = "<AccelerateConfiguration><Status>" + status + "</Status></AccelerateConfiguration>";
+        var result = webTestClient.put()
+            .uri("/test-bucket?accelerate")
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .returnResult();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket accelerate configuration is requested")
+    public void getBucketAccelerate() {
+        var result = webTestClient.get()
+            .uri("/test-bucket?accelerate")
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket accelerate configuration is requested for {string}")
+    public void getBucketAccelerateFor(String bucket) {
+        var result = webTestClient.get()
+            .uri("/{bucket}?accelerate", bucket)
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket accelerate configuration is deleted")
+    public void deleteBucketAccelerate() {
+        var status = webTestClient.delete()
+            .uri("/test-bucket?accelerate")
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket accelerate configuration is deleted for {string}")
+    public void deleteBucketAccelerateFor(String bucket) {
+        var status = webTestClient.delete()
+            .uri("/{bucket}?accelerate", bucket)
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket accelerate is configured for {string} with status {string}")
+    public void putBucketAccelerateFor(String bucket, String status) {
+        var body = "<AccelerateConfiguration><Status>" + status + "</Status></AccelerateConfiguration>";
+        var result = webTestClient.put()
+            .uri("/{bucket}?accelerate", bucket)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .returnResult();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
     // ── Then ── (uses BucketSteps.responseStatusIs and BucketSteps.metadataResponseContains)
 }
