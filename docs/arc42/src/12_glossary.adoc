@@ -3,42 +3,25 @@ ifndef::imagesdir[:imagesdir: ../images]
 [[section-glossary]]
 == Glossary
 
-ifdef::arc42help[]
-[role="arc42help"]
-****
-.Contents
-The most important domain and technical terms that your stakeholders use when discussing the system.
-
-You can also see the glossary as source for translations if you work in multi-language teams.
-
-.Motivation
-You should clearly define your terms, so that all stakeholders
-
-* have an identical understanding of these terms
-* do not use synonyms and homonyms
-
-
-.Form
-
-A table with columns <Term> and <Definition>.
-
-Potentially more columns in case you need translations.
-
-
-.Further Information
-
-See https://docs.arc42.org/section-12/[Glossary] in the arc42 documentation.
-
-****
-endif::arc42help[]
-
-[cols="e,2e" options="header"]
-|===
-|Term |Definition
-
-|<Term-1>
-|<definition-1>
-
-|<Term-2>
-|<definition-2>
-|===
+| Term | Definition |
+|---|---|
+| Bucket | Contenitore di oggetti S3. Identificato da nome unico (DNS-compliant, 3-63 caratteri, lowercase) |
+| S3Object | Oggetto S3: key, metadata, versione, ACL, tagging, attributi, contenuto binario |
+| ObjectKey | Chiave univoca di un oggetto all'interno di un bucket |
+| Region | Regione AWS S3 (es. `us-east-1`, `eu-west-1`) |
+| StorageClass | Classe di storage S3: `STANDARD`, `INTELLIGENT_TIERING`, `PARANOIC_MODE` |
+| ETag | Entity tag per optimistic concurrency e content verification |
+| VersionId | Identificatore di versione per oggetti versionati |
+| ACL | Access Control List: `private`, `public-read`, `public-read-write`, `authenticated-read` |
+| Tagging | Coppie key-value per categorizzazione oggetti/bucket |
+| CORS | Cross-Origin Resource Sharing: allowed origins, methods, headers |
+| Multipart Upload | Upload di oggetti grandi in parti (fase C) |
+| RouterFunction | Functional WebFlux pattern per definire route HTTP programmaticamente |
+| CompletableFuture | Standard Java async — bridge tra dominio puro e infrastruttura reattiva |
+| Flux<DataBuffer> | Reactive type per streaming binario in WebFlux |
+| S3ObjectWrite | Interfaccia dominio: contratto di salvataggio oggetto senza tipi reattivi |
+| S3ObjectContent | Interfaccia dominio: contratto di lettura oggetto senza tipi reattivi |
+| ARC42 | Template di documentazione architetturale in 12 sezioni |
+| ADR | Architecture Decision Record (formato Michael Nygard) |
+| C4 Model | Metodo di descrizione architetturale con 4 livelli (Context, Container, Component, Code) |
+| Structurizr DSL | Domain-specific language per modellare C4 diagrams |

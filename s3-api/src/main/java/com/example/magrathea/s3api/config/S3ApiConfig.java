@@ -1,10 +1,12 @@
 package com.example.magrathea.s3api.config;
 
 import com.example.magrathea.objectstorage.application.service.BucketService;
+import com.example.magrathea.objectstorage.application.service.MultipartUploadService;
 import com.example.magrathea.objectstorage.application.service.ObjectService;
 import com.example.magrathea.s3api.adapter.web.S3BucketConfigHandler;
 import com.example.magrathea.s3api.adapter.web.S3BucketMetadataHandler;
 import com.example.magrathea.s3api.adapter.web.S3BucketOperationsHandler;
+import com.example.magrathea.s3api.adapter.web.S3MultipartHandler;
 import com.example.magrathea.s3api.adapter.web.S3ObjectMetadataHandler;
 import com.example.magrathea.s3api.adapter.web.S3ObjectOperationsHandler;
 import com.example.magrathea.s3api.adapter.web.S3ProxyRouter;
@@ -58,12 +60,18 @@ public class S3ApiConfig {
     }
 
     @Bean
+    public S3MultipartHandler s3MultipartHandler(MultipartUploadService multipartUploadService) {
+        return new S3MultipartHandler(multipartUploadService);
+    }
+
+    @Bean
     public S3ProxyRouter s3ProxyRouter(S3BucketOperationsHandler bucketOperations,
                                         S3BucketMetadataHandler bucketMetadata,
                                         S3ObjectOperationsHandler objectOperations,
                                         S3ObjectMetadataHandler objectMetadata,
-                                        S3BucketConfigHandler bucketConfig) {
-        return new S3ProxyRouter(bucketOperations, bucketMetadata, objectOperations, objectMetadata, bucketConfig);
+                                        S3BucketConfigHandler bucketConfig,
+                                        S3MultipartHandler multipartHandler) {
+        return new S3ProxyRouter(bucketOperations, bucketMetadata, objectOperations, objectMetadata, bucketConfig, multipartHandler);
     }
 
     @Bean

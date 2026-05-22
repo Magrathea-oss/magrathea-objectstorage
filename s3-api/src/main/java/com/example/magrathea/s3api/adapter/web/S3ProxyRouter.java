@@ -17,17 +17,20 @@ public class S3ProxyRouter {
     private final S3ObjectOperationsHandler objectOperations;
     private final S3ObjectMetadataHandler objectMetadata;
     private final S3BucketConfigHandler bucketConfig;
+    private final S3MultipartHandler multipartHandler;
 
     public S3ProxyRouter(S3BucketOperationsHandler bucketOperations,
                          S3BucketMetadataHandler bucketMetadata,
                          S3ObjectOperationsHandler objectOperations,
                          S3ObjectMetadataHandler objectMetadata,
-                         S3BucketConfigHandler bucketConfig) {
+                         S3BucketConfigHandler bucketConfig,
+                         S3MultipartHandler multipartHandler) {
         this.bucketOperations = bucketOperations;
         this.bucketMetadata = bucketMetadata;
         this.objectOperations = objectOperations;
         this.objectMetadata = objectMetadata;
         this.bucketConfig = bucketConfig;
+        this.multipartHandler = multipartHandler;
     }
 
     public RouterFunction<ServerResponse> s3Routes() {
@@ -44,6 +47,7 @@ public class S3ProxyRouter {
             .GET("/{bucket}", request -> "2".equals(request.queryParam("list-type").orElse("")), bucketOperations::listObjectsV2Xml)
             .GET("/{bucket}", request -> S3WebSupport.hasQuery(request, "cors"), bucketConfig::getBucketCors)
             .GET("/{bucket}", S3WebSupport::acceptXml, bucketOperations::listObjectsXml)
+            .GET("/{bucket}", request -> S3WebSupport.hasQuery(request, "uploads"), multipartHandler::listMultipartUploads)
             .PUT("/{bucket}", request -> S3WebSupport.hasQuery(request, "acl"), bucketMetadata::putBucketAcl)
             .PUT("/{bucket}", request -> S3WebSupport.hasQuery(request, "tagging"), bucketMetadata::putBucketTagging)
             .PUT("/{bucket}", request -> S3WebSupport.hasQuery(request, "versioning"), bucketOperations::putBucketVersioning)
@@ -55,16 +59,21 @@ public class S3ProxyRouter {
             .DELETE("/{bucket}", bucketOperations::deleteBucket)
 
             .POST("/{bucket}", request -> S3WebSupport.hasQuery(request, "delete"), objectOperations::deleteObjects)
+            .POST("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "uploads"), multipartHandler::initiateMultipartUpload)
+            .POST("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "uploadId"), multipartHandler::completeMultipartUpload)
             .GET("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "acl"), objectMetadata::getObjectAcl)
             .GET("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "tagging"), objectMetadata::getObjectTagging)
             .GET("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "attributes"), objectMetadata::getObjectAttributes)
+            .GET("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "uploadId"), multipartHandler::listParts)
             .PUT("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "acl"), objectMetadata::putObjectAcl)
             .PUT("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "tagging"), objectMetadata::putObjectTagging)
+            .PUT("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "uploadId"), multipartHandler::uploadPart)
             .PUT("/{bucket}/{key}", request -> request.headers().firstHeader("x-amz-copy-source") != null, objectOperations::copyObject)
             .PUT("/{bucket}/{key}", objectOperations::putObject)
             .GET("/{bucket}/{key}", objectOperations::getObject)
             .HEAD("/{bucket}/{key}", objectOperations::headObject)
             .DELETE("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "tagging"), objectMetadata::deleteObjectTagging)
+            .DELETE("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "uploadId"), multipartHandler::abortMultipartUpload)
             .DELETE("/{bucket}/{key}", objectOperations::deleteObject)
             .build();
     }

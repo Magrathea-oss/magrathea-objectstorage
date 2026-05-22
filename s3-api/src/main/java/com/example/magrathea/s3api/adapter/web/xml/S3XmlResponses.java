@@ -295,6 +295,98 @@ public final class S3XmlResponses {
         }
     }
 
+    // ── Multipart Upload ──
+
+    @JacksonXmlRootElement(localName = "InitiateMultipartUploadResult")
+    public record InitiateMultipartUploadResult(
+        @JacksonXmlProperty(localName = "Bucket") String bucket,
+        @JacksonXmlProperty(localName = "Key") String key,
+        @JacksonXmlProperty(localName = "UploadId") String uploadId
+    ) {
+        public static InitiateMultipartUploadResult from(String bucket, String key, String uploadId) {
+            return new InitiateMultipartUploadResult(bucket, key, uploadId);
+        }
+    }
+
+    @JacksonXmlRootElement(localName = "UploadPartResult")
+    public record UploadPartResult(
+        @JacksonXmlProperty(localName = "ETag") String etag
+    ) {
+        public static UploadPartResult from(String etag) {
+            return new UploadPartResult(etag);
+        }
+    }
+
+    @JacksonXmlRootElement(localName = "CompleteMultipartUploadResult")
+    public record CompleteMultipartUploadResult(
+        @JacksonXmlProperty(localName = "Bucket") String bucket,
+        @JacksonXmlProperty(localName = "Key") String key,
+        @JacksonXmlProperty(localName = "ETag") String etag,
+        @JacksonXmlProperty(localName = "Location") String location
+    ) {
+        public static CompleteMultipartUploadResult from(String bucket, String key, String etag) {
+            return new CompleteMultipartUploadResult(
+                bucket, key, etag, "/" + bucket + "/" + key
+            );
+        }
+    }
+
+    @JacksonXmlRootElement(localName = "ListMultipartUploadsResult")
+    public record ListMultipartUploadsResult(
+        @JacksonXmlProperty(localName = "Bucket") String bucket,
+        @JacksonXmlProperty(localName = "KeyMarker") String keyMarker,
+        @JacksonXmlProperty(localName = "UploadIdMarker") String uploadIdMarker,
+        @JacksonXmlProperty(localName = "MaxUploads") int maxUploads,
+        @JacksonXmlProperty(localName = "IsTruncated") boolean isTruncated,
+        @JacksonXmlElementWrapper(useWrapping = false)
+        @JacksonXmlProperty(localName = "Upload")
+        List<UploadEntry> uploads
+    ) {
+        public static ListMultipartUploadsResult from(String bucketName, java.util.List<UploadEntry> uploads) {
+            return new ListMultipartUploadsResult(bucketName, "", "", 1000, false, uploads);
+        }
+    }
+
+    public record UploadEntry(
+        @JacksonXmlProperty(localName = "Key") String key,
+        @JacksonXmlProperty(localName = "UploadId") String uploadId,
+        @JacksonXmlProperty(localName = "Initiated") String initiated
+    ) {
+        public static UploadEntry from(String key, String uploadId, java.time.Instant initiated) {
+            return new UploadEntry(key, uploadId, initiated.toString());
+        }
+    }
+
+    @JacksonXmlRootElement(localName = "ListPartsResult")
+    public record ListPartsResult(
+        @JacksonXmlProperty(localName = "Bucket") String bucket,
+        @JacksonXmlProperty(localName = "Key") String key,
+        @JacksonXmlProperty(localName = "UploadId") String uploadId,
+        @JacksonXmlProperty(localName = "MaxParts") int maxParts,
+        @JacksonXmlProperty(localName = "IsTruncated") boolean isTruncated,
+        @JacksonXmlElementWrapper(useWrapping = false)
+        @JacksonXmlProperty(localName = "Part")
+        List<PartEntry> parts
+    ) {
+        public static ListPartsResult from(String bucketName, String key, String uploadId, java.util.List<PartEntry> parts) {
+            return new ListPartsResult(bucketName, key, uploadId, 1000, false, parts);
+        }
+    }
+
+    public record PartEntry(
+        @JacksonXmlProperty(localName = "PartNumber") int partNumber,
+        @JacksonXmlProperty(localName = "ETag") String etag,
+        @JacksonXmlProperty(localName = "Size") long size
+    ) {
+        public static PartEntry from(com.example.magrathea.objectstorage.domain.valueobject.UploadPart part) {
+            return new PartEntry(
+                part.partNumber().value(),
+                part.etag(),
+                part.size()
+            );
+        }
+    }
+
     // ── Error ──
 
     @JacksonXmlRootElement(localName = "Error")

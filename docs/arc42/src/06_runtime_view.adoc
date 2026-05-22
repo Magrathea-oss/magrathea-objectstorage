@@ -3,51 +3,92 @@ ifndef::imagesdir[:imagesdir: ../images]
 [[section-runtime-view]]
 == Runtime View
 
+The runtime view describes the key interaction scenarios of the Magrathea ObjectStorage system. These scenarios illustrate how the building blocks collaborate to implement S3-compatible operations.
 
-ifdef::arc42help[]
-[role="arc42help"]
-****
-.Contents
-The runtime view describes concrete behavior and interactions of the system’s building blocks in form of scenarios from the following areas:
+=== Scenario 1 — Object Upload (PUT Object)
 
-* important use cases or features: how do building blocks execute them?
-* interactions at critical external interfaces: how do building blocks cooperate with users and neighboring systems?
-* operation and administration: launch, start-up, stop
-* error and exception scenarios
+**Description:** A user uploads a binary object to a bucket.
 
-Remark: The main criterion for the choice of possible scenarios (sequences, workflows) is their *architectural relevance*. It is *not* important to describe a large number of scenarios. You should rather document a representative selection.
+**Flow:**
 
-.Motivation
-You should understand how (instances of) building blocks of your system perform their job and communicate at runtime.
-You will mainly capture scenarios in your documentation to communicate your architecture to stakeholders that are less willing or able to read and understand the static models (building block view, deployment view).
+1. User sends `PUT /{bucket}/{key}` with binary body and optional headers (Content-Type, x-amz-acl, x-amz-tagging, x-amz-copy-source)
+2. `S3ObjectOperationsHandler.handlePutObject()` receives the request
+3. Handler reads request headers, parses optional metadata (ACL, tagging), extracts body as `Flux<DataBuffer>`
+4. Handler calls `ObjectService.putObject()` which:
+   a. Validates bucket existence via `BucketRepository`
+   b. Creates domain `S3ObjectWrite` wrapping the `Flux<DataBuffer>` via `DefaultS3ObjectWrite`
+   c. Calls `S3ObjectRepository.save(S3ObjectWrite)` — this runs on `Schedulers.boundedElastic()` to consume the `Flux<DataBuffer>` into memory
+5. `InMemoryObjectRepository` casts `S3ObjectWrite` to `DefaultS3ObjectWrite`, persists metadata and content bytes
+6. Handler returns `ServerResponse.ok()` with S3 XML `<PutObjectResult>` or `200 OK` for AWS CLI compatibility
 
-.Form
-There are many notations for describing scenarios, e.g.
+**Notable aspects:**
+- Content streaming via `Flux<DataBuffer>` — never `byte[]` in handler or service
+- Repository save consumes the flux off the event loop (bounded elastic scheduler)
+- Domain `S3ObjectWrite` interface exposes no reactive types — only application implementation carries `Flux<DataBuffer>`
 
-* numbered list of steps (in natural language)
-* activity diagrams or flow charts
-* sequence diagrams
-* BPMN or EPCs (event process chains)
-* state machines
-* ...
+=== Scenario 2 — Object Download (GET Object)
 
+**Description:** A user retrieves a binary object.
 
-.Further Information
+**Flow:**
 
-See https://docs.arc42.org/section-6/[Runtime View] in the arc42 documentation.
+1. User sends `GET /{bucket}/{key}` with optional subresource parameters (?acl, ?tagging, ?attributes, ?versionId)
+2. `S3ObjectOperationsHandler.handleGetObject()` or `S3ObjectMetadataHandler` handles the request based on subresource
+3. For simple GET:
+   a. Handler calls `ObjectService.getObject()` which calls `S3ObjectRepository.findById()`
+   b. Repository returns `CompletableFuture<Optional<S3Object>>` → converted to `Mono` via `Mono.fromFuture()`
+   c. If found, handler retrieves content via `S3ObjectContent.getContent()` returning `Flux<DataBuffer>`
+   d. Handler responds with `ServerResponse.ok()` streaming the content via `.body(BodyInserters.fromDataBuffers())`
+   e. Includes headers: Content-Length, Content-Type, ETag, Last-Modified, x-amz-version-id, x-amz-acl, x-amz-tagging
+4. For subresource GET (acl, tagging, attributes):
+   a. `S3ObjectMetadataHandler` retrieves object metadata
+   b. Returns S3 XML response (AccessControlPolicy, Tagging, ObjectAttributes)
 
-****
-endif::arc42help[]
+**Notable aspects:**
+- Binary content streamed directly from repository to HTTP response — no buffering
+- Subresource responses use Jackson 3 XML annotated records for serialization
+- Content-Length is computed from stored content size at write time
 
-=== <Runtime Scenario 1>
+=== Scenario 3 — Bucket Lifecycle (Create, List, Delete)
 
+**Description:** Bucket management operations.
 
-* _<insert runtime diagram or textual description of the scenario>_
-* _<insert description of the notable aspects of the interactions between the
-building block instances depicted in this diagram.>_
+**CreateBucket flow:**
+1. `PUT /{bucket}` → `S3BucketOperationsHandler.handleCreateBucket()`
+2. Validates bucket name (DNS-compliant, 3-63 chars, lowercase)
+3. Calls `BucketService.createBucket()` → `BucketRepository.save(Bucket.create(...))`
+4. Returns `ServerResponse.ok()` with S3 XML `<CreateBucketConfiguration>` or `200 OK`
 
-=== <Runtime Scenario 2>
+**ListBuckets flow:**
+1. `GET /` → `S3BucketOperationsHandler.handleListBuckets()`
+2. Calls `BucketService.listBuckets()` → `BucketRepository.findAll()`
+3. Returns `ServerResponse.ok()` with S3 XML `<ListAllMyBucketsResult>`
 
-=== ...
+**DeleteBucket flow:**
+1. `DELETE /{bucket}` → `S3BucketOperationsHandler.handleDeleteBucket()`
+2. Validates bucket is empty (no objects)
+3. Calls `BucketService.deleteBucket()` → `BucketRepository.deleteById()`
+4. Returns `ServerResponse.ok()` with `204 No Content`
 
-=== <Runtime Scenario n>
+=== Scenario 4 — Object Copy (CopyObject)
+
+**Description:** Server-side copy of an object.
+
+1. User sends `PUT /{bucket}/{key}` with `x-amz-copy-source: /{sourceBucket}/{sourceKey}` header
+2. `S3ObjectOperationsHandler` detects copy-source header → delegates to copy logic
+3. Handler calls `ObjectService.copyObject()` which:
+   a. Reads source object from repository
+   b. Creates new `S3ObjectWrite` with source content + new metadata
+   c. Calls `S3ObjectRepository.save()` with the new object
+4. Returns `ServerResponse.ok()` with S3 XML `<CopyObjectResult>`
+
+=== Scenario 5 — Error Handling
+
+**Description:** System behavior for error conditions.
+
+- **NoSuchBucket:** Handler returns `404 Not Found` with S3 XML `<Error><Code>NoSuchBucket</Code>...`
+- **NoSuchKey:** Handler returns `404 Not Found` with S3 XML `<Error><Code>NoSuchKey</Code>...`
+- **BucketAlreadyExists:** Handler returns `409 Conflict` with S3 XML `<Error><Code>BucketAlreadyExists</Code>...`
+- **InvalidArgument:** Handler returns `400 Bad Request` with S3 XML `<Error><Code>InvalidArgument</Code>...`
+
+All error responses use `S3WebSupport.errorResponse()` which creates a Jackson 3 XML annotated `S3Error` record and serializes it via the registered `JacksonXmlEncoder`.

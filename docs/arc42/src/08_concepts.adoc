@@ -3,63 +3,58 @@ ifndef::imagesdir[:imagesdir: ../images]
 [[section-concepts]]
 == Cross-cutting Concepts
 
+=== Hexagonal Architecture (Ports and Adapters)
 
-ifdef::arc42help[]
-[role="arc42help"]
-****
-.Content
-This section describes crosscutting concepts (practices, patterns, regulations or solution ideas).
-Such concepts are often related to multiple building blocks. 
-They may include many different topics, such as the topics shown in the following diagram:
+Il sistema segue il pattern hexagonal architecture con tre layer:
 
-image::08-concepts-EN.drawio.png["Possible topics for crosscutting concepts"]
+- **Dominio (core):** puro business logic, zero framework dependencies
+- **Applicazione:** orchestrazione, bridge CompletableFuture ↔ Mono/Flux
+- **Infrastruttura:** adapter HTTP (RouterFunction), adapter persistenza (in-memory)
 
-.Motivation
-Concepts form the basis for _conceptual integrity_ (consistency, homogeneity) of the architecture. 
-Thus, they are an important contribution to achieve inner qualities of your system.
+Le dipendenze vanno solo verso l'interno: infrastruttura → applicazione → dominio.
 
-This is the place in the template that we provided for a cohesive specification of such concepts.
+=== Reactive Non-blocking I/O
 
-Many of these concepts relate to or influence several of your building blocks. 
+Tutta la gestione delle richieste HTTP è reattiva:
 
-.Form
-The form can be varied:
+- RouterFunction invece di @Controller
+- Flux<DataBuffer> per upload/download binario (mai byte[] nei handler)
+- Mono.fromFuture() per bridge CompletableFuture → reattivo
+- Schedulers.boundedElastic() solo per operazioni che consumano il flusso in memoria
 
-* concept papers with any kind of structure
-* example implementations,especially for technical concepts
-* cross-cutting model excerpts or scenarios using notations of the architecture views
+=== Domain Purity
 
-.Structure
-Pick **only** the most-needed topics for your system and assign each a level-2 heading in this section (e.g. 8.1, 8.2 etc).
+Il modulo `object-storage-domain` è rigorosamente puro:
 
-DO NOT ATTEMPT to cover all of the topics of the aforementioned diagram.
+- NO Spring imports
+- NO JPA, NO jakarta.validation
+- NO reactive types (Mono, Flux, DataBuffer)
+- Repository interfaces con CompletableFuture (standard Java async)
+- S3ObjectWrite/S3ObjectContent senza tipi framework
 
+=== S3 API Compatibility
 
-.Further Information
+Il sistema espone SOLO endpoint AWS S3-compatible:
 
-Some topics within systems often concern multiple building blocks, hardware elements or development processes.
-It might be easier to communicate or document such _cross-cutting_ topics at a central location, instead of repeating them in the description of the concerned building blocks, hardware elements or development processes.
+- Stessa firma HTTP (metodi, header, query parameters)
+- Stesso formato XML (ListAllMyBucketsResult, ListBucketResult, Error, ecc.)
+- Stessa codifica degli errori (NoSuchBucket, NoSuchKey, BucketAlreadyExists)
+- Pluggable via Spring Boot auto-configuration (s3-api si attacca come modulo opzionale)
+- Toggle con `s3.api.enabled=false`
 
-Certain concepts might concern **all** elements of a system, others might only be relevant for a few.
-In the diagram above, logging concerns all three components, whereas security is relevant only for two components.
+=== Pluggable S3 API Module
 
+`s3-api` è un modulo auto-configurante che si innesta nel contesto Spring Boot:
 
-See https://docs.arc42.org/section-8/[Concepts] in the arc42 documentation.
-****
-endif::arc42help[]
+- `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`
+- `S3ApiConfig` guardato da `@ConditionalOnClass({ BucketService.class, ObjectService.class })`
+- `s3.api.enabled=true` per default
+- Se `s3-api` non è nel classpath, le route S3 non vengono caricate
 
-=== _<Concept 1>_
+=== Testing Strategy
 
-_<explanation>_
+Tre livelli di test:
 
-
-
-=== _<Concept 2>_
-
-_<explanation>_
-
-...
-
-=== _<Concept n>_
-
-_<explanation>_
+1. **Dominio:** JUnit puro, zero Spring — testano invarianti e regole di business
+2. **Integrazione S3:** Cucumber BDD con WebTestClient — verificano endpoint HTTP
+3. **Compatibilità AWS CLI:** `test-aws-cli.sh` script bash + `mvn verify -Paws-cli-tests`

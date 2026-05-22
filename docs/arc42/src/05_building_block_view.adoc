@@ -3,85 +3,133 @@ ifndef::imagesdir[:imagesdir: ../images]
 [[section-building-block-view]]
 == Building Block View
 
-=== Whitebox Overall System
+=== Level 1 — Container Diagram
 
-Magrathea ObjectStorage is decomposed into pluggable S3 API, pure domain/application modules, and infrastructure repository implementations.
+The system consists of two runtime containers:
+
+.S3 Server + File Store — C2 Container Diagram
+image::../../c4/images/c2-container.png[Container Diagram, width=600]
+
+==== S3 Server (Spring Boot 4 WebFlux JAR)
+
+**Blackbox Description:**
+Il container `s3-server` è un processo Spring Boot 4 WebFlux che espone gli endpoint REST S3-compatible. Riceve richieste HTTP, le instrada via RouterFunction, orchestra le operazioni tramite servizi applicativi, e serializza le risposte in XML S3 con Jackson 3.
+
+- **Provided Interface:** S3 REST API (30 endpoints su 111)
+- **Required Interface:** `S3ObjectRepository` / `BucketRepository` (CompletableFuture) verso File Store
+- **Technology:** Spring Boot 4 WebFlux, Java 21, Jackson 3 XML, RouterFunction
+
+==== File Store (Java 21 in-memory + file persistence)
+
+**Blackbox Description:**
+Il container `file-store` è un archivio in-memory (ConcurrentHashMap) che persiste metadata e contenuto binario degli oggetti S3. Implementa le interfacce repository del dominio puro. Singolo nodo, senza clustering.
+
+- **Provided Interface:** `BucketRepositoryImpl`, `InMemoryObjectRepository` (CompletableFuture)
+- **Required Interface:** Nessuna (è un leaf container)
+- **Technology:** Java 21, ConcurrentHashMap, byte[] interni
+
+=== Level 2 — Component Diagram (S3 Server)
+
+Il container `s3-server` si scompone in componenti logici organizzati per responsabilità:
 
 [cols="1,3,2" options="header"]
 |===
-| Building Block | Responsibility | Location
+| Component | Responsibility | Note
 
-| `s3-api`
-| AWS S3-compatible HTTP adapter. Provides RouterFunction routes, S3 XML response models, Jackson 3 XML codec auto-configuration, and S3 API Cucumber tests.
-| `s3-api/`
+| `S3ProxyRouter`
+| Composizione delle route RouterFunction
+| Unico punto di ingresso HTTP
 
-| `object-storage-domain`
-| Pure AWS S3 domain model: Bucket, S3Object, value objects, repository interfaces, domain events. No Spring, no reactive types.
-| `object-storage-domain/`
+| `S3BucketOperationsHandler`
+| Gestione lifecycle bucket, bucket listing, bucket location, versioning
+| Create/Delete/Head/List bucket
 
-| `object-storage-application`
-| Application services and DTOs. Provides `BucketService`, `ObjectService`, `DefaultS3ObjectWrite`, and `DefaultS3ObjectContent`, whose implementations carry `Flux<DataBuffer>` at the application boundary.
-| `object-storage-application/`
+| `S3BucketMetadataHandler`
+| Gestione metadata bucket (ACL, tagging, CORS)
+| Get/Put/Delete ACL, tagging, CORS
 
-| `object-storage-infrastructure`
-| Repository implementations only: `BucketRepositoryImpl`, `InMemoryObjectRepository`. No HTTP routes.
-| `object-storage-infrastructure/`
+| `S3ObjectOperationsHandler`
+| Gestione CRUD oggetti, copy, multi-delete
+| Put/Get/Head/Delete object, copy, delete-objects
 
-| `bootstrap-application`
-| Spring Boot entry point. S3 API is loaded automatically when `s3-api` is on the classpath and `s3.api.enabled` is not false.
-| `bootstrap-application/`
+| `S3ObjectMetadataHandler`
+| Gestione metadata oggetti (ACL, tagging, attributes)
+| Get/Put/Delete ACL, tagging; get attributes
 
-| `persistence-context-*`
-| Empty placeholder modules reserved for future use. They are not referenced by the current S3 implementation.
-| `persistence-context-domain/`, `persistence-context-application/`, `persistence-context-infrastructure/`
+| `S3WebSupport`
+| Predicati richiesta, lookup oggetti, error helpers S3-compatible
+| Accept header matching, copy-source decode, S3Error XML
+
+| `S3XmlResponses`
+| Record XML Jackson 3 per risposte S3
+| ListAllMyBucketsResult, ListBucketResult, Error, ACL, Tagging, ecc.
+
+| `JacksonXmlCodecConfig`
+| Registrazione JacksonXmlEncoder in WebFlux
+| Codec per bodyValue() XML
+
+| `S3ApiConfig`
+| Auto-configuration Spring Boot condizionale
+| `@ConditionalOnClass` + `s3.api.enabled`
+
+| `BucketService`
+| Orchestrazione operazioni bucket
+| Lifecycle, ACL, tagging, CORS, versioning
+
+| `ObjectService`
+| Orchestrazione operazioni oggetti
+| CRUD, copy, multi-delete, ACL, tagging, attributes
+
+| `DefaultS3ObjectWrite` / `DefaultS3ObjectContent`
+| Bridge contenuto binario: dominio puro ↔ Flux<DataBuffer>
+| Trasporta Flux<DataBuffer> al confine applicativo
+
+| DTO records
+| Comandi e risposte per i servizi applicativi
+| CreateBucketCommand, PutObjectCommand, ecc.
 |===
 
-=== Level 2 — `s3-api`
+=== Level 2 — Component Diagram (File Store)
+
+Il container `file-store` si scompone in:
 
 [cols="1,3" options="header"]
 |===
 | Component | Responsibility
-| `S3ProxyRouter` | Functional WebFlux route composition only.
-| `S3BucketOperationsHandler` | Bucket lifecycle, bucket configuration, and bucket-level listing operations.
-| `S3BucketMetadataHandler` | Bucket ACL and tagging operations.
-| `S3ObjectOperationsHandler` | Object CRUD, copy, and multi-delete operations.
-| `S3ObjectMetadataHandler` | Object ACL, tagging, and attributes operations.
-| `S3WebSupport` | Shared request predicates, object lookup, copy-source decoding, and XML error helpers.
-| `S3XmlResponses` | Jackson 3 XML annotated records for S3 XML response bodies.
-| `JacksonXmlCodecConfig` | Registers `JacksonXmlEncoder` for Spring WebFlux XML serialization.
-| `S3ApiConfig` | Spring Boot auto-configuration guarded by `s3.api.enabled`.
-| Cucumber tests | S3 endpoint integration tests under `s3-api/src/test/features/object-storage/`.
-|===
 
-=== Level 2 — `object-storage-application`
+| `BucketRepositoryImpl`
+| Implementazione in-memory di BucketRepository (ConcurrentHashMap)
 
-[cols="1,3" options="header"]
-|===
-| Component | Responsibility
-| `BucketService` | Bucket lifecycle operations.
-| `ObjectService` | Object lifecycle operations through `S3ObjectRepository.save(S3ObjectWrite)` and content retrieval through `S3ObjectContent`.
-| `DefaultS3ObjectWrite` | Application implementation of domain `S3ObjectWrite`; carries `Flux<DataBuffer>` content for saves.
-| `DefaultS3ObjectContent` | Application implementation of domain `S3ObjectContent`; carries `Flux<DataBuffer>` content for reads.
-| DTO records | Commands and responses for application-level orchestration.
-|===
+| `InMemoryObjectRepository`
+| Implementazione in-memory di S3ObjectRepository: metadata + content bytes
 
-=== Level 2 — `object-storage-infrastructure`
-
-[cols="1,3" options="header"]
-|===
-| Component | Responsibility
-| `BucketRepositoryImpl` | In-memory bucket repository.
-| `InMemoryObjectRepository` | In-memory S3 object metadata/content repository. Internally casts `S3ObjectWrite` to `DefaultS3ObjectWrite`.
-| `InfrastructureConfig` | Infrastructure bean configuration.
+| `InfrastructureConfig`
+| Configurazione bean infrastruttura
 |===
 
 === Important Interfaces
 
-[cols="1,3" options="header"]
+[cols="1,3,3" options="header"]
 |===
-| Interface | Description
-| S3 REST API | Public API surface. Only AWS S3-compatible endpoints are allowed.
-| `S3ObjectWrite` / `S3ObjectContent` | Domain-level object content interfaces; keep domain free from reactive/framework types while repository implementations can receive richer application implementations.
-| Spring Boot auto-configuration | `s3-api` is loaded via `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`.
-| AWS CLI compatibility script | `test-aws-cli.sh` validates every implemented S3 operation through AWS CLI.
+| Interface | Description | Connected Components
+
+| S3 REST API
+| Public HTTP API — solo endpoint AWS S3-compatible (XML/JSON + binary)
+| User ↔ S3ProxyRouter
+
+| BucketService / ObjectService
+| Service interface tra HTTP adapter e applicazione
+| S3*Handler ↔ Service
+
+| Domain Repository interfaces
+| Interfacce CompletableFuture: BucketRepository, S3ObjectRepository
+| Service ↔ Domain Model ↔ Infrastructure
+
+| S3ObjectWrite / S3ObjectContent
+| Contratti di contenuto binario senza tipi reattivi nel dominio
+| Service ↔ Domain ↔ InMemoryObjectRepository
+
+| Spring Boot auto-configuration
+| `META-INF/spring/*.imports` per plugin S3 API
+| bootstrap-application ↔ s3-api
 |===
