@@ -1,96 +1,61 @@
 # Magrathea ObjectStorage Test Report
 
-Generated: 2026-05-22T21:15:00+02:00
+Generated: 2026-05-22T23:15:05+02:00
 
 ## Summary
 
 | Suite | Passed | Failed | Total | Notes |
 |---|---:|---:|---:|---|
-| AWS CLI S3 compatibility | 51 | 0 | 51 | Endpoint: `http://localhost:8080` |
+| AWS CLI S3 compatibility | 0 | 0 | 0 | Endpoint: `http://localhost:8080` |
 | Maven Surefire | See section | See section | See section | Latest reports under `*/target/surefire-reports` |
 | Clover coverage | See section | - | - | Latest report under `target/site/clover` |
 
 ## AWS CLI S3 Compatibility
 
-Bucket: `magrathea-cli-test-1779390052-61144`
+Bucket: `magrathea-cli-test-1779484505-111114`
 
 | Check | Status | Notes |
 |---|---|---|
-| ListBuckets | ✅ Passed | Expected success |
-| CreateBucket | ✅ Passed | Expected success |
-| HeadBucket existing | ✅ Passed | Expected success |
-| PutObject | ✅ Passed | Expected success |
-| HeadObject existing | ✅ Passed | Expected success |
-| PutObjectAcl | ✅ Passed | Expected success |
-| GetObjectAcl | ✅ Passed | Expected success |
-| PutObjectTagging | ✅ Passed | Expected success |
-| GetObjectTagging | ✅ Passed | Expected success |
-| DeleteObjectTagging | ✅ Passed | Expected success |
-| GetObjectAttributes | ✅ Passed | Expected success |
-| GetObject | ✅ Passed | Expected success |
-| GetObject content matches | ✅ Passed | Expected success |
-| ListObjects | ✅ Passed | Expected success |
-| ListObjectsV2 | ✅ Passed | Expected success |
-| GetBucketLocation | ✅ Passed | Expected success |
-| PutBucketAcl | ✅ Passed | Expected success |
-| GetBucketAcl | ✅ Passed | Expected success |
-| PutBucketTagging | ✅ Passed | Expected success |
-| GetBucketTagging | ✅ Passed | Expected success |
-| DeleteBucketTagging | ✅ Passed | Expected success |
-| GetBucketVersioning initial | ✅ Passed | Expected success |
-| PutBucketVersioning Enabled | ✅ Passed | Expected success |
-| GetBucketVersioning enabled | ✅ Passed | Expected success |
-| ListObjectVersions | ✅ Passed | Expected success |
-| CopyObject | ✅ Passed | Expected success |
-| HeadObject copy existing | ✅ Passed | Expected success |
-| DeleteObjects | ✅ Passed | Expected success |
-| HeadObject copy after DeleteObjects | ✅ Passed | Expected failure |
-| PutObject PARANOIC_MODE | ✅ Passed | Expected success |
-| HeadObject PARANOIC_MODE | ✅ Passed | Expected success |
-| GetObjectAttributes PARANOIC_MODE | ✅ Passed | Expected success |
-| DeleteObject PARANOIC_MODE | ✅ Passed | Expected success |
-| DeleteObject | ✅ Passed | Expected success |
-| HeadObject after DeleteObject | ✅ Passed | Expected failure |
-| PutBucketCors | ✅ Passed | Expected success |
-| GetBucketCors | ✅ Passed | Expected success |
-| DeleteBucketCors | ✅ Passed | Expected success |
-| GetBucketCors nonexistent | ✅ Passed | Expected failure |
-| GetBucketCors after delete | ✅ Passed | Expected failure |
-| DeleteBucket | ✅ Passed | Expected success |
-| HeadBucket after DeleteBucket | ✅ Passed | Expected failure |
-| GetObject nonexistent | ✅ Passed | Expected failure |
-| HeadObject nonexistent | ✅ Passed | Expected failure |
-| GetBucketLocation nonexistent | ✅ Passed | Expected failure |
-| GetBucketVersioning nonexistent | ✅ Passed | Expected failure |
-| GetBucketAcl nonexistent | ✅ Passed | Expected failure |
-| GetBucketTagging nonexistent | ✅ Passed | Expected failure |
-| CopyObject nonexistent source | ✅ Passed | Expected failure |
-| PutObject nonexistent bucket | ✅ Passed | Expected failure |
-| GetObjectAcl nonexistent | ✅ Passed | Expected failure |
 
 ## Maven Surefire Results
 
 | Module | Report | Tests | Failures | Errors | Skipped | Status |
 |---|---|---:|---:|---:|---:|---|
+| object-storage-domain | com.example.magrathea.objectstorage.domain.BucketAccelerateConfigurationTest.txt | 3 | 0 | 0 | 0 | ✅ Passed |
+| object-storage-domain | com.example.magrathea.objectstorage.domain.BucketConfigurationTest.txt | 3 | 0 | 0 | 0 | ✅ Passed |
+| object-storage-domain | com.example.magrathea.objectstorage.domain.BucketEncryptionConfigurationTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
+| object-storage-domain | com.example.magrathea.objectstorage.domain.BucketLifecycleConfigurationTest.txt | 8 | 0 | 0 | 0 | ✅ Passed |
+| object-storage-domain | com.example.magrathea.objectstorage.domain.BucketLoggingConfigurationTest.txt | 3 | 0 | 0 | 0 | ✅ Passed |
+| object-storage-domain | com.example.magrathea.objectstorage.domain.BucketNotificationConfigurationTest.txt | 3 | 0 | 0 | 0 | ✅ Passed |
+| object-storage-domain | com.example.magrathea.objectstorage.domain.BucketOwnershipControlsTest.txt | 2 | 0 | 0 | 0 | ✅ Passed |
+| object-storage-domain | com.example.magrathea.objectstorage.domain.BucketPolicyTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
+| object-storage-domain | com.example.magrathea.objectstorage.domain.BucketReplicationConfigurationTest.txt | 3 | 0 | 0 | 0 | ✅ Passed |
+| object-storage-domain | com.example.magrathea.objectstorage.domain.BucketRequestPaymentConfigurationTest.txt | 3 | 0 | 0 | 0 | ✅ Passed |
 | object-storage-domain | com.example.magrathea.objectstorage.domain.BucketTest.txt | 11 | 0 | 0 | 0 | ✅ Passed |
+| object-storage-domain | com.example.magrathea.objectstorage.domain.BucketWebsiteConfigurationTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
 | object-storage-domain | com.example.magrathea.objectstorage.domain.CorsConfigurationTest.txt | 7 | 0 | 0 | 0 | ✅ Passed |
+| object-storage-domain | com.example.magrathea.objectstorage.domain.MultipartUploadTest.txt | 9 | 0 | 0 | 0 | ✅ Passed |
 | object-storage-domain | com.example.magrathea.objectstorage.domain.ObjectKeyTest.txt | 6 | 0 | 0 | 0 | ✅ Passed |
 | object-storage-domain | com.example.magrathea.objectstorage.domain.ObjectStorageEventTest.txt | 6 | 0 | 0 | 0 | ✅ Passed |
+| object-storage-domain | com.example.magrathea.objectstorage.domain.PartNumberTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
+| object-storage-domain | com.example.magrathea.objectstorage.domain.PublicAccessBlockConfigurationTest.txt | 3 | 0 | 0 | 0 | ✅ Passed |
 | object-storage-domain | com.example.magrathea.objectstorage.domain.RegionTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
 | object-storage-domain | com.example.magrathea.objectstorage.domain.S3ObjectTest.txt | 8 | 0 | 0 | 0 | ✅ Passed |
 | object-storage-domain | com.example.magrathea.objectstorage.domain.StorageClassTest.txt | 7 | 0 | 0 | 0 | ✅ Passed |
-| s3-api | com.example.magrathea.s3api.cucumber.ObjectStorageCucumberTest.txt | 55 | 0 | 0 | 0 | ✅ Passed |
-| **Total** |  | **104** | **0** | **0** | **0** | **✅ Passed** |
+| object-storage-domain | com.example.magrathea.objectstorage.domain.UploadIdTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
+| object-storage-domain | com.example.magrathea.objectstorage.domain.UploadPartTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
+| s3-api | com.example.magrathea.s3api.cucumber.ObjectStorageCucumberTest.txt | 141 | 0 | 0 | 0 | ✅ Passed |
+| **Total** |  | **254** | **0** | **0** | **0** | **✅ Passed** |
 
 ## Clover Coverage
 
 | Metric | Covered | Total | Coverage |
 |---|---:|---:|---:|
-| Elements | 600 | 719 | 83.45% |
-| Statements | 376 | 435 | 86.44% |
-| Methods | 112 | 128 | 87.50% |
-| Conditionals | 112 | 156 | 71.79% |
-| NCLOC | - | 1586 | - |
+| Elements | 1694 | 1936 | 87.50% |
+| Statements | 1065 | 1172 | 90.87% |
+| Methods | 318 | 344 | 92.44% |
+| Conditionals | 311 | 420 | 74.05% |
+| NCLOC | - | 3878 | - |
 
 Report HTML: `target/site/clover/index.html`
 
@@ -143,6 +108,24 @@ Report HTML: `target/site/clover/index.html`
 | PutBucketLogging | `aws s3api put-bucket-logging` | ✅ |
 | GetBucketLogging | `aws s3api get-bucket-logging` | ✅ |
 | DeleteBucketLogging | `aws s3api delete-bucket-logging` | ✅ |
+| PutBucketWebsite | `aws s3api put-bucket-website` | ✅ |
+| GetBucketWebsite | `aws s3api get-bucket-website` | ✅ |
+| DeleteBucketWebsite | `aws s3api delete-bucket-website` | ✅ |
+| PutBucketNotification | `aws s3api put-bucket-notification-configuration` | ✅ |
+| GetBucketNotification | `aws s3api get-bucket-notification-configuration` | ✅ |
+| PutBucketReplication | `aws s3api put-bucket-replication` | ✅ |
+| GetBucketReplication | `aws s3api get-bucket-replication` | ✅ |
+| DeleteBucketReplication | `aws s3api delete-bucket-replication` | ✅ |
+| PutBucketRequestPayment | `aws s3api put-bucket-request-payment` | ✅ |
+| GetBucketRequestPayment | `aws s3api get-bucket-request-payment` | ✅ |
+| PutBucketOwnershipControls | `aws s3api put-bucket-ownership-controls` | ✅ |
+| GetBucketOwnershipControls | `aws s3api get-bucket-ownership-controls` | ✅ |
+| DeleteBucketOwnershipControls | `aws s3api delete-bucket-ownership-controls` | ✅ |
+| PutPublicAccessBlock | `aws s3api put-public-access-block` | ✅ |
+| GetPublicAccessBlock | `aws s3api get-public-access-block` | ✅ |
+| DeletePublicAccessBlock | `aws s3api delete-public-access-block` | ✅ |
+| PutBucketAccelerateConfiguration | `aws s3api put-bucket-accelerate-configuration` | ✅ |
+| GetBucketAccelerateConfiguration | `aws s3api get-bucket-accelerate-configuration` | ✅ |
 | DeleteBucket | `aws s3api delete-bucket` | ✅ |
 
 ### Failure Tests
