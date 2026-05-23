@@ -4,7 +4,7 @@ import com.example.magrathea.objectstorage.application.dto.BucketResponse;
 import com.example.magrathea.objectstorage.application.dto.ObjectResponse;
 import com.example.magrathea.objectstorage.application.service.BucketService;
 import com.example.magrathea.objectstorage.application.service.ObjectService;
-import com.example.magrathea.s3api.adapter.web.xml.S3XmlResponses;
+import com.example.magrathea.s3api.dto.query.ErrorQuery;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.server.ServerRequest;
@@ -109,6 +109,6 @@ final class S3WebSupport {
     static Mono<ServerResponse> xmlError(HttpStatus status, String code, String message) {
         return ServerResponse.status(status)
             .contentType(MediaType.APPLICATION_XML)
-            .bodyValue(S3XmlResponses.Error.from(code, message));
+            .bodyValue(ErrorQuery.from(code, message));
     }
 }

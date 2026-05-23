@@ -62,7 +62,6 @@ image::../../c4/images/S3ApiAdapterComponents.png[S3 API Adapter Components, wid
 | `S3ObjectMetadataHandler` | Object metadata: ACL, tagging, attributes |
 | `S3MultipartHandler` | Multipart upload lifecycle: initiate, upload, complete, abort, list |
 | `S3WebSupport` | Shared request predicates, parsing, lookup, error helpers |
-| `S3XmlResponses` | S3-compatible XML response/error DTO factory |
 
 === Level 2 — Component Diagram (object-store)
 

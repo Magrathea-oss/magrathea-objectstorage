@@ -51,6 +51,30 @@ Il sistema espone SOLO endpoint AWS S3-compatible:
 - `s3.api.enabled=true` per default
 - Se `s3-api` non è nel classpath, le route S3 non vengono caricate
 
+=== Command/Query DTO Pattern for XML Serialization
+
+Il sistema espone un'API XML S3-compatible dove ogni operazione ha un body XML strutturato. Invece di usare parser custom (regex, XmlMapper esplicito) o DTO generici "request"/"response", il sistema segue il pattern CQS (Command-Query Separation) del DDD:
+
+- **Commands**: rappresentano l'intenzione di cambiare stato (PUT, POST, DELETE). Sono DTO annotati Jackson XML che il framework deserializza direttamente dal body HTTP. Esempi: `CorsConfigurationCommand`, `LifecycleConfigurationCommand`, `DeleteObjectsCommand`
+- **Queries**: rappresentano la risposta a una richiesta di lettura (GET). Sono DTO annotati Jackson XML che il framework serializza direttamente nel body HTTP. Esempi: `ListBucketsQuery`, `GetBucketCorsQuery`, `ErrorResponse`
+
+Vantaggi:
+- Zero parsing custom: Spring Boot 4 WebFlux deserializza/serializza con i codec registrati
+- DTO separati per operazione: ogni Command/Query vive nel proprio file, organizzato per dominio
+- Allineamento DDD: i Command esprimono intento, i Query esprimono lettura — semanticamente chiari
+- Manutenibilità: modificare un XML tag significa modificare un solo DTO, non un parser regex e un mapping separato
+
+=== XML Codec Infrastructure
+
+Spring Boot 4 WebFlux gestisce la serializzazione XML tramite codec registrati in `JacksonXmlCodecConfig`:
+
+- **JacksonXmlEncoder**: serializza response DTO in XML (gia' presente)
+- **JacksonXmlDecoder**: deserializza request body in Command DTO (aggiunto con ADR 0008)
+- Entrambi usano `tools.jackson.dataformat:jackson-dataformat-xml` (Jackson 3, non Jackson 2)
+- I DTO usano annotazioni `tools.jackson.dataformat.xml.annotation.*` (`@JacksonXmlRootElement`, `@JacksonXmlProperty`, `@JacksonXmlElementWrapper`, `@JacksonXmlText`)
+
+Il decoder permette a `request.bodyToMono(CorsConfigurationCommand.class)` di funzionare per XML — il framework legge il body, lo passa al decoder XML, e produce il record annotato. Nessuna chiamata esplicita a `XmlMapper`.
+
 === Testing Strategy
 
 Tre livelli di test:

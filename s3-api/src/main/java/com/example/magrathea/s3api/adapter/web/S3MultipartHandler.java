@@ -1,7 +1,12 @@
 package com.example.magrathea.s3api.adapter.web;
 
 import com.example.magrathea.objectstorage.application.service.MultipartUploadService;
-import com.example.magrathea.s3api.adapter.web.xml.S3XmlResponses;
+import com.example.magrathea.s3api.dto.query.ErrorQuery;
+import com.example.magrathea.s3api.dto.query.InitiateMultipartUploadQuery;
+import com.example.magrathea.s3api.dto.query.UploadPartResultQuery;
+import com.example.magrathea.s3api.dto.query.CompleteMultipartUploadQuery;
+import com.example.magrathea.s3api.dto.query.ListMultipartUploadsQuery;
+import com.example.magrathea.s3api.dto.query.ListPartsQuery;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -34,7 +39,7 @@ public class S3MultipartHandler {
         var key = request.pathVariable("key");
         try {
             var upload = multipartUploadService.createUpload(bucket, key);
-            var result = S3XmlResponses.InitiateMultipartUploadResult.from(
+            var result = InitiateMultipartUploadQuery.from(
                 bucket, key, upload.uploadId().value()
             );
             return ServerResponse.ok()
@@ -43,7 +48,7 @@ public class S3MultipartHandler {
         } catch (IllegalArgumentException e) {
             return ServerResponse.status(HttpStatus.NOT_FOUND)
                 .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(S3XmlResponses.Error.from("NoSuchBucket", e.getMessage()));
+                .bodyValue(ErrorQuery.from("NoSuchBucket", e.getMessage()));
         }
     }
 
@@ -57,19 +62,19 @@ public class S3MultipartHandler {
         if (copySource == null) {
             return ServerResponse.status(HttpStatus.BAD_REQUEST)
                 .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(S3XmlResponses.Error.from("InvalidArgument", "x-amz-copy-source header required"));
+                .bodyValue(ErrorQuery.from("InvalidArgument", "x-amz-copy-source header required"));
         }
         try {
             var etag = "\"" + java.util.UUID.randomUUID().toString() + "\"";
             var part = multipartUploadService.uploadPart(uploadId, partNumber, etag, 0);
-            var result = S3XmlResponses.UploadPartResult.from(part.etag());
+            var result = UploadPartResultQuery.from(part.etag());
             return ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_XML)
                 .bodyValue(result);
         } catch (IllegalArgumentException e) {
             return ServerResponse.status(HttpStatus.NOT_FOUND)
                 .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(S3XmlResponses.Error.from("NoSuchUpload", e.getMessage()));
+                .bodyValue(ErrorQuery.from("NoSuchUpload", e.getMessage()));
         }
     }
 
@@ -86,14 +91,14 @@ public class S3MultipartHandler {
                 try {
                     var etag = "\"" + java.util.UUID.randomUUID().toString() + "\"";
                     var part = multipartUploadService.uploadPart(uploadId, partNumber, etag, size);
-                    var result = S3XmlResponses.UploadPartResult.from(part.etag());
+                    var result = UploadPartResultQuery.from(part.etag());
                     return ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_XML)
                         .bodyValue(result);
                 } catch (IllegalArgumentException e) {
                     return ServerResponse.status(HttpStatus.NOT_FOUND)
                         .contentType(MediaType.APPLICATION_XML)
-                        .bodyValue(S3XmlResponses.Error.from("NoSuchUpload", e.getMessage()));
+                        .bodyValue(ErrorQuery.from("NoSuchUpload", e.getMessage()));
                 }
             });
     }
@@ -110,11 +115,11 @@ public class S3MultipartHandler {
                 if (maybeUpload.isEmpty()) {
                     return ServerResponse.status(HttpStatus.NOT_FOUND)
                         .contentType(MediaType.APPLICATION_XML)
-                        .bodyValue(S3XmlResponses.Error.from("NoSuchUpload", "UploadId not found"));
+                        .bodyValue(ErrorQuery.from("NoSuchUpload", "UploadId not found"));
                 }
                 var upload = maybeUpload.get();
                 var finalEtag = "\"" + java.util.UUID.randomUUID().toString() + "\"";
-                var result = S3XmlResponses.CompleteMultipartUploadResult.from(bucket, key, finalEtag);
+                var result = CompleteMultipartUploadQuery.from(bucket, key, finalEtag);
                 return ServerResponse.ok()
                     .contentType(MediaType.APPLICATION_XML)
                     .bodyValue(result);
@@ -133,7 +138,7 @@ public class S3MultipartHandler {
                 }
                 return ServerResponse.status(HttpStatus.NOT_FOUND)
                     .contentType(MediaType.APPLICATION_XML)
-                    .bodyValue(S3XmlResponses.Error.from("NoSuchUpload", "UploadId not found"));
+                    .bodyValue(ErrorQuery.from("NoSuchUpload", "UploadId not found"));
             });
     }
 
@@ -143,18 +148,18 @@ public class S3MultipartHandler {
         try {
             var uploads = multipartUploadService.listUploads(bucket).join();
             var entries = uploads.stream()
-                .map(u -> S3XmlResponses.UploadEntry.from(
+                .map(u -> ListMultipartUploadsQuery.UploadEntry.from(
                     u.key().value(), u.uploadId().value(), u.initiated()
                 ))
                 .toList();
-            var result = S3XmlResponses.ListMultipartUploadsResult.from(bucket, entries);
+            var result = ListMultipartUploadsQuery.from(bucket, entries);
             return ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_XML)
                 .bodyValue(result);
         } catch (IllegalArgumentException e) {
             return ServerResponse.status(HttpStatus.NOT_FOUND)
                 .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(S3XmlResponses.Error.from("NoSuchBucket", e.getMessage()));
+                .bodyValue(ErrorQuery.from("NoSuchBucket", e.getMessage()));
         }
     }
 
@@ -170,13 +175,13 @@ public class S3MultipartHandler {
                 if (maybeUpload.isEmpty()) {
                     return ServerResponse.status(HttpStatus.NOT_FOUND)
                         .contentType(MediaType.APPLICATION_XML)
-                        .bodyValue(S3XmlResponses.Error.from("NoSuchUpload", "UploadId not found"));
+                        .bodyValue(ErrorQuery.from("NoSuchUpload", "UploadId not found"));
                 }
                 var upload = maybeUpload.get();
                 var partEntries = upload.parts().stream()
-                    .map(S3XmlResponses.PartEntry::from)
+                    .map(p -> ListPartsQuery.PartEntry.from(p.partNumber(), p.etag()))
                     .toList();
-                var result = S3XmlResponses.ListPartsResult.from(
+                var result = ListPartsQuery.from(
                     bucket, key, upload.uploadId().value(), partEntries
                 );
                 return ServerResponse.ok()

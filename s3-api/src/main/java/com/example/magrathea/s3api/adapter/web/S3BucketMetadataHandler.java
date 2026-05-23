@@ -1,7 +1,9 @@
 package com.example.magrathea.s3api.adapter.web;
 
 import com.example.magrathea.objectstorage.application.service.BucketService;
-import com.example.magrathea.s3api.adapter.web.xml.S3XmlResponses;
+import com.example.magrathea.s3api.dto.command.TaggingCommand;
+import com.example.magrathea.s3api.dto.query.AccessControlPolicyQuery;
+import com.example.magrathea.s3api.dto.query.TaggingQuery;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.server.ServerRequest;
@@ -11,21 +13,16 @@ import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Pattern;
 
 /**
  * Bucket metadata-context S3 operations: ACL and tagging.
+ * Uses Jackson XML codec for request body deserialization.
  */
 public class S3BucketMetadataHandler {
 
-    private static final Pattern TAG_PATTERN = Pattern.compile(
-        "<Tag>\\s*<Key>([^<]+)</Key>\\s*<Value>([^<]*)</Value>\\s*</Tag>",
-        Pattern.DOTALL
-    );
-
     private final BucketService bucketService;
     private final ConcurrentHashMap<String, String> bucketAclStore = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, List<S3XmlResponses.Tag>> bucketTagStore = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, List<TaggingQuery.TagEntry>> bucketTagStore = new ConcurrentHashMap<>();
 
     public S3BucketMetadataHandler(BucketService bucketService) {
         this.bucketService = bucketService;
@@ -40,7 +37,7 @@ public class S3BucketMetadataHandler {
             }
             return ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(S3XmlResponses.AccessControlPolicy.canned(bucketAclStore.getOrDefault(bucket, "private")));
+                .bodyValue(AccessControlPolicyQuery.canned(bucketAclStore.getOrDefault(bucket, "private")));
         }).subscribeOn(Schedulers.boundedElastic())
         .flatMap(Mono::from);
     }
@@ -69,7 +66,7 @@ public class S3BucketMetadataHandler {
             }
             return ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(new S3XmlResponses.Tagging(bucketTagStore.getOrDefault(bucket, List.of())));
+                .bodyValue(new TaggingQuery(new TaggingQuery.TagSet(bucketTagStore.getOrDefault(bucket, List.of()))));
         }).subscribeOn(Schedulers.boundedElastic())
         .flatMap(Mono::from);
     }
@@ -77,18 +74,17 @@ public class S3BucketMetadataHandler {
     /** PUT /{bucket}?tagging — PutBucketTagging */
     public Mono<ServerResponse> putBucketTagging(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
-        return Mono.fromCallable(() -> {
-            if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
-                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
-            }
-            return request.bodyToMono(String.class)
-                .defaultIfEmpty("")
-                .flatMap(body -> {
-                    bucketTagStore.put(bucket, parseTags(body));
-                    return ServerResponse.ok().build();
-                });
-        }).subscribeOn(Schedulers.boundedElastic())
-        .flatMap(Mono::from);
+        if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+        }
+        return request.bodyToMono(TaggingCommand.class)
+            .flatMap(cmd -> {
+                bucketTagStore.put(bucket,
+                    cmd.tagSet().tags().stream()
+                        .map(t -> new TaggingQuery.TagEntry(t.key(), t.value()))
+                        .toList());
+                return ServerResponse.ok().build();
+            });
     }
 
     /** DELETE /{bucket}?tagging — DeleteBucketTagging */
@@ -102,11 +98,5 @@ public class S3BucketMetadataHandler {
             return ServerResponse.noContent().build();
         }).subscribeOn(Schedulers.boundedElastic())
         .flatMap(Mono::from);
-    }
-
-    private static List<S3XmlResponses.Tag> parseTags(String body) {
-        return TAG_PATTERN.matcher(body).results()
-            .map(match -> new S3XmlResponses.Tag(match.group(1), match.group(2)))
-            .toList();
     }
 }

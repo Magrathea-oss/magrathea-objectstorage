@@ -4,7 +4,10 @@ import com.example.magrathea.objectstorage.application.dto.PutObjectCommand;
 import com.example.magrathea.objectstorage.application.service.DefaultS3ObjectContent;
 import com.example.magrathea.objectstorage.application.service.BucketService;
 import com.example.magrathea.objectstorage.application.service.ObjectService;
-import com.example.magrathea.s3api.adapter.web.xml.S3XmlResponses;
+import com.example.magrathea.s3api.dto.command.DeleteObjectsCommand;
+import com.example.magrathea.s3api.dto.query.CopyObjectResultQuery;
+import com.example.magrathea.s3api.dto.query.DeleteResultQuery;
+import com.example.magrathea.s3api.dto.query.ErrorQuery;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
@@ -19,15 +22,14 @@ import reactor.core.scheduler.Schedulers;
 
 import java.time.Instant;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 /**
  * Object-context S3 operations.
  * Owns single-object CRUD, object copy, and multi-object deletion.
+ * Uses Jackson XML codec for request body deserialization.
  */
 public class S3ObjectOperationsHandler {
 
-    private static final Pattern DELETE_OBJECT_KEY_PATTERN = Pattern.compile("<Key>([^<]+)</Key>");
     private static final DefaultDataBufferFactory DATA_BUFFER_FACTORY = new DefaultDataBufferFactory();
 
     private final BucketService bucketService;
@@ -48,7 +50,7 @@ public class S3ObjectOperationsHandler {
         var bucketInfo = S3WebSupport.findBucket(bucketService, bucket);
         if (bucketInfo.isEmpty()) {
             return ServerResponse.status(HttpStatus.NOT_FOUND)
-                .bodyValue(S3XmlResponses.Error.from("NoSuchBucket", "Bucket not found"));
+                .bodyValue(ErrorQuery.from("NoSuchBucket", "Bucket not found"));
         }
         var contentLength = request.headers().contentLength().orElse(0L);
         var storageClass = request.headers().firstHeader("x-amz-storage-class");
@@ -103,7 +105,7 @@ public class S3ObjectOperationsHandler {
                                 .flatMap(ignored -> ServerResponse.ok()
                                     .contentType(MediaType.APPLICATION_XML)
                                     .header("ETag", "\"\"")
-                                    .bodyValue(new S3XmlResponses.CopyObjectResult(Instant.now().toString(), "\"\"")));
+                                    .bodyValue(CopyObjectResultQuery.from(Instant.now().toString(), "\"\"")));
                         } finally {
                             DataBufferUtils.release(dataBuffer);
                         }
@@ -118,20 +120,16 @@ public class S3ObjectOperationsHandler {
         if (bucketInfo.isEmpty()) {
             return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
         }
-        return request.bodyToMono(String.class)
-            .defaultIfEmpty("")
-            .flatMap(body -> {
-                var keys = DELETE_OBJECT_KEY_PATTERN.matcher(body).results()
-                    .map(match -> match.group(1))
-                    .toList();
-                var deleted = keys.stream()
+        return request.bodyToMono(DeleteObjectsCommand.class)
+            .flatMap(cmd -> {
+                var deletedKeys = cmd.objects().stream()
+                    .map(obj -> obj.key())
                     .peek(key -> S3WebSupport.findObject(objectService, bucketInfo.get(), key)
                         .ifPresent(object -> objectService.deleteObject(object.id())))
-                    .map(S3XmlResponses.DeletedEntry::new)
                     .toList();
                 return ServerResponse.ok()
                     .contentType(MediaType.APPLICATION_XML)
-                    .bodyValue(new S3XmlResponses.DeleteResult(deleted));
+                    .bodyValue(DeleteResultQuery.from(deletedKeys));
             });
     }
 

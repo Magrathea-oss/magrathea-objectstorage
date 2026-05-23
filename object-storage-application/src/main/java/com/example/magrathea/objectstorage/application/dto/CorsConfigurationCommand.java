@@ -13,7 +13,7 @@ public record CorsConfigurationCommand(
         List<String> allowedOrigins,
         List<String> allowedMethods,
         List<String> allowedHeaders,
-        int maxAgeSeconds,
+        Integer maxAgeSeconds,
         List<String> exposeHeaders,
         String id
     ) {}

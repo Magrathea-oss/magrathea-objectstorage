@@ -3,7 +3,14 @@ package com.example.magrathea.s3api.adapter.web;
 import com.example.magrathea.objectstorage.application.dto.CreateBucketCommand;
 import com.example.magrathea.objectstorage.application.service.BucketService;
 import com.example.magrathea.objectstorage.application.service.ObjectService;
-import com.example.magrathea.s3api.adapter.web.xml.S3XmlResponses;
+import com.example.magrathea.s3api.dto.command.VersioningConfigurationCommand;
+import com.example.magrathea.s3api.dto.query.ErrorQuery;
+import com.example.magrathea.s3api.dto.query.ListAllMyBucketsResultQuery;
+import com.example.magrathea.s3api.dto.query.LocationConstraintQuery;
+import com.example.magrathea.s3api.dto.query.VersioningConfigurationQuery;
+import com.example.magrathea.s3api.dto.query.ListObjectsQuery;
+import com.example.magrathea.s3api.dto.query.ListObjectsV2Query;
+import com.example.magrathea.s3api.dto.query.ListVersionsQuery;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.server.ServerRequest;
@@ -30,7 +37,7 @@ public class S3BucketOperationsHandler {
         return Mono.fromCallable(() -> bucketService.findAll())
             .subscribeOn(Schedulers.boundedElastic())
             .flatMap(buckets -> {
-                var result = S3XmlResponses.ListAllMyBucketsResult.from(buckets);
+                var result = ListAllMyBucketsResultQuery.from(buckets);
                 return ServerResponse.ok()
                     .contentType(MediaType.APPLICATION_XML)
                     .bodyValue(result);
@@ -53,7 +60,7 @@ public class S3BucketOperationsHandler {
             var exists = S3WebSupport.findBucket(bucketService, bucketName).isPresent();
             if (exists) {
                 return ServerResponse.status(HttpStatus.CONFLICT)
-                    .bodyValue(S3XmlResponses.Error.from("BucketAlreadyExists", bucketName));
+                    .bodyValue(ErrorQuery.from("BucketAlreadyExists", bucketName));
             }
             // Validate bucket name before creating
             if (bucketName.length() < 3 || bucketName.length() > 63) {
@@ -92,7 +99,7 @@ public class S3BucketOperationsHandler {
                 var b = bucket.get();
                 return ServerResponse.ok()
                     .contentType(MediaType.APPLICATION_XML)
-                    .bodyValue(new S3XmlResponses.LocationConstraint(b.region()));
+                    .bodyValue(LocationConstraintQuery.from(b.region()));
             } else {
                 return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
             }
@@ -109,7 +116,7 @@ public class S3BucketOperationsHandler {
                 var b = bucket.get();
                 return ServerResponse.ok()
                     .contentType(MediaType.APPLICATION_XML)
-                    .bodyValue(S3XmlResponses.VersioningConfiguration.from(b.versioningEnabled()));
+                    .bodyValue(VersioningConfigurationQuery.from(b.versioningEnabled()));
             } else {
                 return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
             }
@@ -120,19 +127,15 @@ public class S3BucketOperationsHandler {
     /** PUT /{bucket}?versioning — PutBucketVersioning */
     public Mono<ServerResponse> putBucketVersioning(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
-        return Mono.fromCallable(() -> {
-            if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
-                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
-            }
-            return request.bodyToMono(String.class)
-                .defaultIfEmpty("")
-                .flatMap(body -> {
-                    var enabled = body.contains("<Status>Enabled</Status>") || body.contains("Status=Enabled");
-                    bucketService.putBucketVersioning(bucket, enabled);
-                    return ServerResponse.ok().build();
-                });
-        }).subscribeOn(Schedulers.boundedElastic())
-        .flatMap(Mono::from);
+        if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+        }
+        return request.bodyToMono(VersioningConfigurationCommand.class)
+            .flatMap(cmd -> {
+                var enabled = "Enabled".equals(cmd.status());
+                bucketService.putBucketVersioning(bucket, enabled);
+                return ServerResponse.ok().build();
+            });
     }
 
     /** GET /{bucket} — ListObjects (XML) */
@@ -144,7 +147,7 @@ public class S3BucketOperationsHandler {
                 return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
             }
             var objects = objectService.findByBucket(bucketInfo.get().id());
-            var result = S3XmlResponses.ListBucketResult.from(bucket, objects);
+            var result = ListObjectsQuery.from(bucket, objects);
             return ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_XML)
                 .bodyValue(result);
@@ -161,7 +164,7 @@ public class S3BucketOperationsHandler {
                 return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
             }
             var objects = objectService.findByBucket(bucketInfo.get().id());
-            var result = S3XmlResponses.ListBucketV2Result.from(bucket, objects);
+            var result = ListObjectsV2Query.from(bucket, objects);
             return ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_XML)
                 .bodyValue(result);
@@ -178,7 +181,7 @@ public class S3BucketOperationsHandler {
                 return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
             }
             var objects = objectService.findByBucket(bucketInfo.get().id());
-            var result = S3XmlResponses.ListVersionsResult.from(bucket, objects);
+            var result = ListVersionsQuery.from(bucket, objects);
             return ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_XML)
                 .bodyValue(result);

@@ -31,6 +31,16 @@ ifndef::imagesdir[:imagesdir: ../images]
 - `S3ObjectWrite` and `S3ObjectContent` are domain interfaces without framework types; their application implementations carry `Flux<DataBuffer>`
 - byte[] only exists inside repository content storage internals, never in domain signatures
 
+=== XML Serialization Constraints
+
+- **FORBIDDEN: regex XML parsing** — `java.util.regex.Pattern`, `String.contains()`, e `extractXmlValue()` per XML sono vietati. Tutto il parsing XML deve usare Jackson 3 codec
+- **JacksonXmlDecoder obbligatorio**: `JacksonXmlCodecConfig` deve registrare sia l'encoder (response) che il decoder (request) per XML. Senza decoder, `request.bodyToMono(Dto.class)` non funziona
+- **Command/Query DTO pattern**: ogni PUT/POST che riceve XML usa un Command DTO annotato Jackson XML; ogni GET che produce XML usa un Query DTO annotato. Niente DTO generici "request" o "response"
+- **DTO in file separati**: ogni Command/Query DTO vive in un file dedicato nel package `dto/command/` o `dto/query/`. Niente file unici (es. niente `S3Request.java`)
+- **Niente parser custom**: niente classi come `S3XmlParser` che avvolgono `XmlMapper`. Il framework deserializza direttamente — `S3XmlParser` e `S3XmlResponses` rimossi, ADR 0008 implementato e verificato
+- **Application DTO come Command**: i Command DTO XML possono coincidere con gli application DTO (es. `CorsConfigurationCommand`) se hanno le annotazioni Jackson XML necessarie
+- **Mapping nel handler**: la conversione da Command XML a domain value object avviene nell'handler, non in un parser separato
+
 === Testing Constraints
 
 - Domain tests: pure JUnit, NO Spring context

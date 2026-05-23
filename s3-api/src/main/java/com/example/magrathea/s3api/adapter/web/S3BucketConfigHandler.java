@@ -1,6 +1,5 @@
 package com.example.magrathea.s3api.adapter.web;
 
-import com.example.magrathea.objectstorage.application.dto.CorsConfigurationCommand;
 import com.example.magrathea.objectstorage.application.service.BucketService;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketLifecycleConfiguration;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketPolicy;
@@ -13,7 +12,29 @@ import com.example.magrathea.objectstorage.domain.valueobject.BucketRequestPayme
 import com.example.magrathea.objectstorage.domain.valueobject.BucketOwnershipControls;
 import com.example.magrathea.objectstorage.domain.valueobject.PublicAccessBlockConfiguration;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketAccelerateConfiguration;
-import com.example.magrathea.s3api.adapter.web.xml.S3XmlResponses;
+import com.example.magrathea.s3api.dto.command.CorsConfigurationCommand;
+import com.example.magrathea.s3api.dto.command.LifecycleConfigurationCommand;
+import com.example.magrathea.s3api.dto.command.EncryptionConfigurationCommand;
+import com.example.magrathea.s3api.dto.command.LoggingConfigurationCommand;
+import com.example.magrathea.s3api.dto.command.WebsiteConfigurationCommand;
+import com.example.magrathea.s3api.dto.command.NotificationConfigurationCommand;
+import com.example.magrathea.s3api.dto.command.ReplicationConfigurationCommand;
+import com.example.magrathea.s3api.dto.command.RequestPaymentConfigurationCommand;
+import com.example.magrathea.s3api.dto.command.OwnershipControlsCommand;
+import com.example.magrathea.s3api.dto.command.PublicAccessBlockCommand;
+import com.example.magrathea.s3api.dto.command.AccelerateConfigurationCommand;
+import com.example.magrathea.s3api.dto.query.ErrorQuery;
+import com.example.magrathea.s3api.dto.query.BucketCorsQuery;
+import com.example.magrathea.s3api.dto.query.BucketLifecycleQuery;
+import com.example.magrathea.s3api.dto.query.BucketEncryptionQuery;
+import com.example.magrathea.s3api.dto.query.BucketLoggingQuery;
+import com.example.magrathea.s3api.dto.query.BucketWebsiteQuery;
+import com.example.magrathea.s3api.dto.query.BucketNotificationQuery;
+import com.example.magrathea.s3api.dto.query.BucketReplicationQuery;
+import com.example.magrathea.s3api.dto.query.BucketRequestPaymentQuery;
+import com.example.magrathea.s3api.dto.query.BucketOwnershipControlsQuery;
+import com.example.magrathea.s3api.dto.query.PublicAccessBlockQuery;
+import com.example.magrathea.s3api.dto.query.BucketAccelerateQuery;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.server.ServerRequest;
@@ -26,6 +47,7 @@ import java.util.ArrayList;
 
 /**
  * Bucket configuration operations: CORS, policy, encryption, logging, website, notification.
+ * Uses Jackson XML codec for request body deserialization and response serialization.
  */
 public class S3BucketConfigHandler {
 
@@ -49,7 +71,7 @@ public class S3BucketConfigHandler {
             }
             return ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(S3XmlResponses.CORSConfiguration.from(bucket, config));
+                .bodyValue(BucketCorsQuery.from(bucket, config));
         }).subscribeOn(Schedulers.boundedElastic())
         .flatMap(Mono::from);
     }
@@ -57,20 +79,20 @@ public class S3BucketConfigHandler {
     /** PUT /{bucket}?cors — PutBucketCors */
     public Mono<ServerResponse> putBucketCors(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
-        return Mono.fromCallable(() -> {
-            if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
-                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
-            }
-            return request.bodyToMono(String.class)
-                .defaultIfEmpty("")
-                .flatMap(body -> {
-                    var rules = parseCorsXml(body);
-                    var cmd = new CorsConfigurationCommand(bucket, rules);
-                    bucketService.putCorsConfiguration(cmd);
-                    return ServerResponse.ok().build();
-                });
-        }).subscribeOn(Schedulers.boundedElastic())
-        .flatMap(Mono::from);
+        if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+        }
+        return request.bodyToMono(CorsConfigurationCommand.class)
+            .flatMap(xmlCmd -> {
+                var rules = xmlCmd.corsRules().stream()
+                    .map(r -> new com.example.magrathea.objectstorage.application.dto.CorsConfigurationCommand.CorsRuleDto(
+                        r.allowedOrigins(), r.allowedMethods(), r.allowedHeaders(),
+                        r.maxAgeSeconds(), r.exposeHeaders(), r.id()))
+                    .toList();
+                var appCmd = new com.example.magrathea.objectstorage.application.dto.CorsConfigurationCommand(bucket, rules);
+                bucketService.putCorsConfiguration(appCmd);
+                return ServerResponse.ok().build();
+            });
     }
 
     /** DELETE /{bucket}?cors — DeleteBucketCors */
@@ -102,7 +124,7 @@ public class S3BucketConfigHandler {
             }
             return ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(S3XmlResponses.LifecycleConfiguration.from(config));
+                .bodyValue(BucketLifecycleQuery.from(config));
         }).subscribeOn(Schedulers.boundedElastic())
         .flatMap(Mono::from);
     }
@@ -110,19 +132,33 @@ public class S3BucketConfigHandler {
     /** PUT /{bucket}?lifecycle — PutBucketLifecycleConfiguration */
     public Mono<ServerResponse> putBucketLifecycle(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
-        return Mono.fromCallable(() -> {
-            if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
-                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
-            }
-            return request.bodyToMono(String.class)
-                .defaultIfEmpty("")
-                .flatMap(body -> {
-                    var config = parseLifecycleXml(bucket, body);
-                    bucketService.putLifecycleConfiguration(config);
-                    return ServerResponse.ok().build();
-                });
-        }).subscribeOn(Schedulers.boundedElastic())
-        .flatMap(Mono::from);
+        if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+        }
+        return request.bodyToMono(LifecycleConfigurationCommand.class)
+            .flatMap(cmd -> {
+                var rules = new ArrayList<BucketLifecycleConfiguration.LifecycleRule>();
+                for (var rule : cmd.rules()) {
+                    var expiration = rule.expiration() != null
+                        ? new BucketLifecycleConfiguration.Expiration(rule.expiration().days(), rule.expiration().date())
+                        : null;
+                    var noncurrent = rule.noncurrentVersionExpiration() != null
+                        ? new BucketLifecycleConfiguration.NoncurrentVersionExpiration(
+                            rule.noncurrentVersionExpiration().noncurrentDays())
+                        : null;
+                    var abort = rule.abortIncompleteMultipartUpload() != null
+                        ? new BucketLifecycleConfiguration.AbortIncompleteMultipartUpload(
+                            rule.abortIncompleteMultipartUpload().daysAfterInitiation())
+                        : null;
+                    rules.add(new BucketLifecycleConfiguration.LifecycleRule(
+                        rule.id(), rule.status(), rule.prefix(), expiration, noncurrent, abort
+                    ));
+                }
+                bucketService.putLifecycleConfiguration(
+                    new BucketLifecycleConfiguration(bucket, List.copyOf(rules))
+                );
+                return ServerResponse.ok().build();
+            });
     }
 
     /** DELETE /{bucket}?lifecycle — DeleteBucketLifecycleConfiguration */
@@ -163,18 +199,15 @@ public class S3BucketConfigHandler {
     /** PUT /{bucket}?policy — PutBucketPolicy */
     public Mono<ServerResponse> putBucketPolicy(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
-        return Mono.fromCallable(() -> {
-            if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
-                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
-            }
-            return request.bodyToMono(String.class)
-                .defaultIfEmpty("")
-                .flatMap(body -> {
-                    bucketService.putPolicy(new BucketPolicy(bucket, body));
-                    return ServerResponse.ok().build();
-                });
-        }).subscribeOn(Schedulers.boundedElastic())
-        .flatMap(Mono::from);
+        if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+        }
+        return request.bodyToMono(String.class)
+            .defaultIfEmpty("")
+            .flatMap(body -> {
+                bucketService.putPolicy(new BucketPolicy(bucket, body));
+                return ServerResponse.ok().build();
+            });
     }
 
     /** DELETE /{bucket}?policy — DeleteBucketPolicy */
@@ -206,7 +239,7 @@ public class S3BucketConfigHandler {
             }
             return ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(S3XmlResponses.EncryptionConfiguration.from(config));
+                .bodyValue(BucketEncryptionQuery.from(config));
         }).subscribeOn(Schedulers.boundedElastic())
         .flatMap(Mono::from);
     }
@@ -214,19 +247,17 @@ public class S3BucketConfigHandler {
     /** PUT /{bucket}?encryption — PutBucketEncryption */
     public Mono<ServerResponse> putBucketEncryption(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
-        return Mono.fromCallable(() -> {
-            if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
-                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
-            }
-            return request.bodyToMono(String.class)
-                .defaultIfEmpty("")
-                .flatMap(body -> {
-                    var config = parseEncryptionXml(bucket, body);
-                    bucketService.putEncryptionConfiguration(config);
-                    return ServerResponse.ok().build();
-                });
-        }).subscribeOn(Schedulers.boundedElastic())
-        .flatMap(Mono::from);
+        if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+        }
+        return request.bodyToMono(EncryptionConfigurationCommand.class)
+            .flatMap(cmd -> {
+                var config = new BucketEncryptionConfiguration(
+                    bucket, cmd.ruleId(), cmd.algorithm(), cmd.kmsKeyId()
+                );
+                bucketService.putEncryptionConfiguration(config);
+                return ServerResponse.ok().build();
+            });
     }
 
     /** DELETE /{bucket}?encryption — DeleteBucketEncryption */
@@ -258,7 +289,7 @@ public class S3BucketConfigHandler {
             }
             return ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(S3XmlResponses.LoggingConfiguration.from(config));
+                .bodyValue(BucketLoggingQuery.from(config));
         }).subscribeOn(Schedulers.boundedElastic())
         .flatMap(Mono::from);
     }
@@ -266,19 +297,17 @@ public class S3BucketConfigHandler {
     /** PUT /{bucket}?logging — PutBucketLogging */
     public Mono<ServerResponse> putBucketLogging(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
-        return Mono.fromCallable(() -> {
-            if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
-                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
-            }
-            return request.bodyToMono(String.class)
-                .defaultIfEmpty("")
-                .flatMap(body -> {
-                    var config = parseLoggingXml(bucket, body);
-                    bucketService.putLoggingConfiguration(config);
-                    return ServerResponse.ok().build();
-                });
-        }).subscribeOn(Schedulers.boundedElastic())
-        .flatMap(Mono::from);
+        if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+        }
+        return request.bodyToMono(LoggingConfigurationCommand.class)
+            .flatMap(cmd -> {
+                var config = new BucketLoggingConfiguration(
+                    bucket, cmd.targetBucket(), cmd.targetPrefix()
+                );
+                bucketService.putLoggingConfiguration(config);
+                return ServerResponse.ok().build();
+            });
     }
 
     /** DELETE /{bucket}?logging — DeleteBucketLogging */
@@ -310,7 +339,7 @@ public class S3BucketConfigHandler {
             }
             return ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(S3XmlResponses.WebsiteConfiguration.from(config));
+                .bodyValue(BucketWebsiteQuery.from(config));
         }).subscribeOn(Schedulers.boundedElastic())
         .flatMap(Mono::from);
     }
@@ -318,19 +347,18 @@ public class S3BucketConfigHandler {
     /** PUT /{bucket}?website — PutBucketWebsite */
     public Mono<ServerResponse> putBucketWebsite(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
-        return Mono.fromCallable(() -> {
-            if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
-                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
-            }
-            return request.bodyToMono(String.class)
-                .defaultIfEmpty("")
-                .flatMap(body -> {
-                    var config = parseWebsiteXml(bucket, body);
-                    bucketService.putWebsiteConfiguration(config);
-                    return ServerResponse.ok().build();
-                });
-        }).subscribeOn(Schedulers.boundedElastic())
-        .flatMap(Mono::from);
+        if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+        }
+        return request.bodyToMono(WebsiteConfigurationCommand.class)
+            .flatMap(cmd -> {
+                var config = new BucketWebsiteConfiguration(
+                    bucket, cmd.indexDocument(), cmd.errorDocument(),
+                    cmd.redirectAllRequestsTo(), cmd.hostName(), cmd.protocol()
+                );
+                bucketService.putWebsiteConfiguration(config);
+                return ServerResponse.ok().build();
+            });
     }
 
     /** DELETE /{bucket}?website — DeleteBucketWebsite */
@@ -362,7 +390,7 @@ public class S3BucketConfigHandler {
             }
             return ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(S3XmlResponses.NotificationConfiguration.from(config));
+                .bodyValue(BucketNotificationQuery.from(config));
         }).subscribeOn(Schedulers.boundedElastic())
         .flatMap(Mono::from);
     }
@@ -370,19 +398,20 @@ public class S3BucketConfigHandler {
     /** PUT /{bucket}?notification — PutBucketNotification */
     public Mono<ServerResponse> putBucketNotification(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
-        return Mono.fromCallable(() -> {
-            if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
-                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
-            }
-            return request.bodyToMono(String.class)
-                .defaultIfEmpty("")
-                .flatMap(body -> {
-                    var config = parseNotificationXml(bucket, body);
-                    bucketService.putNotificationConfiguration(config);
-                    return ServerResponse.ok().build();
-                });
-        }).subscribeOn(Schedulers.boundedElastic())
-        .flatMap(Mono::from);
+        if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+        }
+        return request.bodyToMono(NotificationConfigurationCommand.class)
+            .flatMap(cmd -> {
+                var events = cmd.eventConfigurations().stream()
+                    .map(e -> new BucketNotificationConfiguration.NotificationEvent(
+                        e.event(), e.topicArn(), e.queueArn(), e.lambdaArn(), e.filterRules()
+                    ))
+                    .toList();
+                var config = new BucketNotificationConfiguration(bucket, events);
+                bucketService.putNotificationConfiguration(config);
+                return ServerResponse.ok().build();
+            });
     }
 
     /** DELETE /{bucket}?notification — DeleteBucketNotification */
@@ -414,7 +443,7 @@ public class S3BucketConfigHandler {
             }
             return ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(S3XmlResponses.ReplicationConfiguration.from(config));
+                .bodyValue(BucketReplicationQuery.from(config));
         }).subscribeOn(Schedulers.boundedElastic())
         .flatMap(Mono::from);
     }
@@ -422,19 +451,22 @@ public class S3BucketConfigHandler {
     /** PUT /{bucket}?replication — PutBucketReplication */
     public Mono<ServerResponse> putBucketReplication(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
-        return Mono.fromCallable(() -> {
-            if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
-                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
-            }
-            return request.bodyToMono(String.class)
-                .defaultIfEmpty("")
-                .flatMap(body -> {
-                    var config = parseReplicationXml(bucket, body);
-                    bucketService.putReplicationConfiguration(config);
-                    return ServerResponse.ok().build();
-                });
-        }).subscribeOn(Schedulers.boundedElastic())
-        .flatMap(Mono::from);
+        if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+        }
+        return request.bodyToMono(ReplicationConfigurationCommand.class)
+            .flatMap(cmd -> {
+                var rules = cmd.rules().stream()
+                    .map(r -> new BucketReplicationConfiguration.ReplicationRule(
+                        r.id(), r.status(), r.prefix(),
+                        r.destinationBucket() != null ? "arn:aws:s3:::" + r.destinationBucket() : null,
+                        r.destinationStorageClass(), false, false
+                    ))
+                    .toList();
+                var config = new BucketReplicationConfiguration(bucket, cmd.role(), rules);
+                bucketService.putReplicationConfiguration(config);
+                return ServerResponse.ok().build();
+            });
     }
 
     /** DELETE /{bucket}?replication — DeleteBucketReplication */
@@ -466,7 +498,7 @@ public class S3BucketConfigHandler {
             }
             return ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(S3XmlResponses.RequestPaymentConfiguration.from(config));
+                .bodyValue(BucketRequestPaymentQuery.from(config));
         }).subscribeOn(Schedulers.boundedElastic())
         .flatMap(Mono::from);
     }
@@ -474,20 +506,17 @@ public class S3BucketConfigHandler {
     /** PUT /{bucket}?requestPayment — PutBucketRequestPayment */
     public Mono<ServerResponse> putBucketRequestPayment(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
-        return Mono.fromCallable(() -> {
-            if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
-                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
-            }
-            return request.bodyToMono(String.class)
-                .defaultIfEmpty("")
-                .flatMap(body -> {
-                    var payer = extractXmlValue(body, "Payer");
-                    var config = new BucketRequestPaymentConfiguration(bucket, payer.isEmpty() ? "BucketOwner" : payer);
-                    bucketService.putRequestPaymentConfiguration(config);
-                    return ServerResponse.ok().build();
-                });
-        }).subscribeOn(Schedulers.boundedElastic())
-        .flatMap(Mono::from);
+        if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+        }
+        return request.bodyToMono(RequestPaymentConfigurationCommand.class)
+            .flatMap(cmd -> {
+                var config = new BucketRequestPaymentConfiguration(
+                    bucket, cmd.payer() != null ? cmd.payer() : "BucketOwner"
+                );
+                bucketService.putRequestPaymentConfiguration(config);
+                return ServerResponse.ok().build();
+            });
     }
 
     /** DELETE /{bucket}?requestPayment — DeleteBucketRequestPayment */
@@ -519,7 +548,7 @@ public class S3BucketConfigHandler {
             }
             return ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(S3XmlResponses.OwnershipControls.from(controls));
+                .bodyValue(BucketOwnershipControlsQuery.from(controls));
         }).subscribeOn(Schedulers.boundedElastic())
         .flatMap(Mono::from);
     }
@@ -527,25 +556,17 @@ public class S3BucketConfigHandler {
     /** PUT /{bucket}?ownershipControls — PutBucketOwnershipControls */
     public Mono<ServerResponse> putBucketOwnershipControls(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
-        return Mono.fromCallable(() -> {
-            if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
-                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
-            }
-            return request.bodyToMono(String.class)
-                .defaultIfEmpty("")
-                .flatMap(body -> {
-                    var ruleId = extractXmlValue(body, "ID");
-                    var ownership = extractXmlValue(body, "Ownership");
-                    var controls = new BucketOwnershipControls(
-                        bucket,
-                        ruleId.isEmpty() ? null : ruleId,
-                        ownership.isEmpty() ? "BucketOwnerPreferred" : ownership
-                    );
-                    bucketService.putOwnershipControls(controls);
-                    return ServerResponse.ok().build();
-                });
-        }).subscribeOn(Schedulers.boundedElastic())
-        .flatMap(Mono::from);
+        if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+        }
+        return request.bodyToMono(OwnershipControlsCommand.class)
+            .flatMap(cmd -> {
+                var controls = new BucketOwnershipControls(
+                    bucket, cmd.id(), cmd.ownership() != null ? cmd.ownership() : "BucketOwnerPreferred"
+                );
+                bucketService.putOwnershipControls(controls);
+                return ServerResponse.ok().build();
+            });
     }
 
     /** DELETE /{bucket}?ownershipControls — DeleteBucketOwnershipControls */
@@ -577,7 +598,7 @@ public class S3BucketConfigHandler {
             }
             return ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(S3XmlResponses.PublicAccessBlockConfiguration.from(config));
+                .bodyValue(PublicAccessBlockQuery.from(config));
         }).subscribeOn(Schedulers.boundedElastic())
         .flatMap(Mono::from);
     }
@@ -585,26 +606,21 @@ public class S3BucketConfigHandler {
     /** PUT /{bucket}?publicAccessBlock — PutPublicAccessBlock */
     public Mono<ServerResponse> putPublicAccessBlock(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
-        return Mono.fromCallable(() -> {
-            if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
-                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
-            }
-            return request.bodyToMono(String.class)
-                .defaultIfEmpty("")
-                .flatMap(body -> {
-                    var blockPublicAcls = "true".equals(extractXmlValue(body, "BlockPublicAcls"));
-                    var ignorePublicAcls = "true".equals(extractXmlValue(body, "IgnorePublicAcls"));
-                    var blockPublicPolicy = "true".equals(extractXmlValue(body, "BlockPublicPolicy"));
-                    var restrictPublicBuckets = "true".equals(extractXmlValue(body, "RestrictPublicBuckets"));
-                    var config = new PublicAccessBlockConfiguration(
-                        bucket, blockPublicAcls, ignorePublicAcls,
-                        blockPublicPolicy, restrictPublicBuckets
-                    );
-                    bucketService.putPublicAccessBlockConfiguration(config);
-                    return ServerResponse.ok().build();
-                });
-        }).subscribeOn(Schedulers.boundedElastic())
-        .flatMap(Mono::from);
+        if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+        }
+        return request.bodyToMono(PublicAccessBlockCommand.class)
+            .flatMap(cmd -> {
+                var config = new PublicAccessBlockConfiguration(
+                    bucket,
+                    "true".equals(cmd.blockPublicAcls()),
+                    "true".equals(cmd.ignorePublicAcls()),
+                    "true".equals(cmd.blockPublicPolicy()),
+                    "true".equals(cmd.restrictPublicBuckets())
+                );
+                bucketService.putPublicAccessBlockConfiguration(config);
+                return ServerResponse.ok().build();
+            });
     }
 
     /** DELETE /{bucket}?publicAccessBlock — DeletePublicAccessBlock */
@@ -636,7 +652,7 @@ public class S3BucketConfigHandler {
             }
             return ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(S3XmlResponses.AccelerateConfiguration.from(config));
+                .bodyValue(BucketAccelerateQuery.from(config));
         }).subscribeOn(Schedulers.boundedElastic())
         .flatMap(Mono::from);
     }
@@ -644,22 +660,17 @@ public class S3BucketConfigHandler {
     /** PUT /{bucket}?accelerate — PutBucketAccelerateConfiguration */
     public Mono<ServerResponse> putBucketAccelerate(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
-        return Mono.fromCallable(() -> {
-            if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
-                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
-            }
-            return request.bodyToMono(String.class)
-                .defaultIfEmpty("")
-                .flatMap(body -> {
-                    var status = extractXmlValue(body, "Status");
-                    var config = new BucketAccelerateConfiguration(
-                        bucket, status.isEmpty() ? "Suspended" : status
-                    );
-                    bucketService.putAccelerateConfiguration(config);
-                    return ServerResponse.ok().build();
-                });
-        }).subscribeOn(Schedulers.boundedElastic())
-        .flatMap(Mono::from);
+        if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+        }
+        return request.bodyToMono(AccelerateConfigurationCommand.class)
+            .flatMap(cmd -> {
+                var config = new BucketAccelerateConfiguration(
+                    bucket, cmd.status() != null ? cmd.status() : "Suspended"
+                );
+                bucketService.putAccelerateConfiguration(config);
+                return ServerResponse.ok().build();
+            });
     }
 
     /** DELETE /{bucket}?accelerate — DeleteBucketAccelerateConfiguration */
@@ -673,173 +684,5 @@ public class S3BucketConfigHandler {
             return ServerResponse.noContent().build();
         }).subscribeOn(Schedulers.boundedElastic())
         .flatMap(Mono::from);
-    }
-
-    private static List<CorsConfigurationCommand.CorsRuleDto> parseCorsXml(String body) {
-        // Minimal CORS XML parser — extracts CORSRule elements
-        var rules = new ArrayList<CorsConfigurationCommand.CorsRuleDto>();
-        var ruleMatcher = java.util.regex.Pattern.compile(
-            "<CORSRule>(.*?)</CORSRule>", java.util.regex.Pattern.DOTALL
-        ).matcher(body);
-        while (ruleMatcher.find()) {
-            var ruleBody = ruleMatcher.group(1);
-            var origins = extractXmlList(ruleBody, "AllowedOrigin");
-            var methods = extractXmlList(ruleBody, "AllowedMethod");
-            var headers = extractXmlList(ruleBody, "AllowedHeader");
-            var exposeHeaders = extractXmlList(ruleBody, "ExposeHeader");
-            var maxAge = extractXmlValue(ruleBody, "MaxAgeSeconds");
-            var id = extractXmlValue(ruleBody, "ID");
-            rules.add(new CorsConfigurationCommand.CorsRuleDto(
-                origins, methods, headers,
-                maxAge.isEmpty() ? 0 : Integer.parseInt(maxAge),
-                exposeHeaders, id.isEmpty() ? null : id
-            ));
-        }
-        return List.copyOf(rules);
-    }
-
-    private static BucketLifecycleConfiguration parseLifecycleXml(String bucketName, String body) {
-        var rules = new ArrayList<BucketLifecycleConfiguration.LifecycleRule>();
-        var ruleMatcher = java.util.regex.Pattern.compile(
-            "<Rule>(.*?)</Rule>", java.util.regex.Pattern.DOTALL
-        ).matcher(body);
-        while (ruleMatcher.find()) {
-            var ruleBody = ruleMatcher.group(1);
-            var id = extractXmlValue(ruleBody, "ID");
-            var status = extractXmlValue(ruleBody, "Status");
-            var prefix = extractXmlValue(ruleBody, "Prefix");
-            var expirationDays = extractXmlValue(ruleBody, "Days");
-            var expirationDate = extractXmlValue(ruleBody, "Date");
-            var noncurrentDays = extractXmlValue(ruleBody, "NoncurrentDays");
-            var daysAfterInitiation = extractXmlValue(ruleBody, "DaysAfterInitiation");
-            var expiration = (expirationDays.isEmpty() && expirationDate.isEmpty())
-                ? null
-                : new BucketLifecycleConfiguration.Expiration(
-                    expirationDays.isEmpty() ? null : expirationDays,
-                    expirationDate.isEmpty() ? null : expirationDate);
-            var noncurrentVersionExpiration = noncurrentDays.isEmpty()
-                ? null
-                : new BucketLifecycleConfiguration.NoncurrentVersionExpiration(noncurrentDays);
-            var abortIncomplete = daysAfterInitiation.isEmpty()
-                ? null
-                : new BucketLifecycleConfiguration.AbortIncompleteMultipartUpload(daysAfterInitiation);
-            rules.add(new BucketLifecycleConfiguration.LifecycleRule(
-                id.isEmpty() ? null : id,
-                status,
-                prefix.isEmpty() ? null : prefix,
-                expiration,
-                noncurrentVersionExpiration,
-                abortIncomplete
-            ));
-        }
-        return new BucketLifecycleConfiguration(bucketName, List.copyOf(rules));
-    }
-
-    private static BucketEncryptionConfiguration parseEncryptionXml(String bucketName, String body) {
-        var ruleId = extractXmlValue(body, "RuleId");
-        var algorithm = extractXmlValue(body, "Algorithm");
-        var kmsKeyId = extractXmlValue(body, "KMSKeyId");
-        return new BucketEncryptionConfiguration(
-            bucketName,
-            ruleId.isEmpty() ? null : ruleId,
-            algorithm.isEmpty() ? null : algorithm,
-            kmsKeyId.isEmpty() ? null : kmsKeyId
-        );
-    }
-
-    private static BucketLoggingConfiguration parseLoggingXml(String bucketName, String body) {
-        var targetBucket = extractXmlValue(body, "TargetBucket");
-        var targetPrefix = extractXmlValue(body, "TargetPrefix");
-        return new BucketLoggingConfiguration(
-            bucketName,
-            targetBucket.isEmpty() ? null : targetBucket,
-            targetPrefix.isEmpty() ? null : targetPrefix
-        );
-    }
-
-    private static BucketWebsiteConfiguration parseWebsiteXml(String bucketName, String body) {
-        var indexDoc = extractXmlValue(body, "IndexDocument");
-        var errorDoc = extractXmlValue(body, "ErrorDocument");
-        var redirectAll = extractXmlValue(body, "RedirectAllRequestsTo");
-        var routingHost = extractXmlValue(body, "HostName");
-        var routingProtocol = extractXmlValue(body, "Protocol");
-        return new BucketWebsiteConfiguration(
-            bucketName,
-            indexDoc.isEmpty() ? null : indexDoc,
-            errorDoc.isEmpty() ? null : errorDoc,
-            redirectAll.isEmpty() ? null : redirectAll,
-            routingHost.isEmpty() ? null : routingHost,
-            routingProtocol.isEmpty() ? null : routingProtocol
-        );
-    }
-
-    private static BucketNotificationConfiguration parseNotificationXml(String bucketName, String body) {
-        var events = new ArrayList<BucketNotificationConfiguration.NotificationEvent>();
-        var eventMatcher = java.util.regex.Pattern.compile(
-            "<EventConfiguration>(.*?)</EventConfiguration>", java.util.regex.Pattern.DOTALL
-        ).matcher(body);
-        while (eventMatcher.find()) {
-            var evBody = eventMatcher.group(1);
-            var event = extractXmlValue(evBody, "Event");
-            var topicArn = extractXmlValue(evBody, "TopicArn");
-            var queueArn = extractXmlValue(evBody, "QueueArn");
-            var lambdaArn = extractXmlValue(evBody, "LambdaArn");
-            var filterRules = extractXmlList(evBody, "FilterRule");
-            events.add(new BucketNotificationConfiguration.NotificationEvent(
-                event.isEmpty() ? "s3:ObjectCreated:*" : event,
-                topicArn.isEmpty() ? null : topicArn,
-                queueArn.isEmpty() ? null : queueArn,
-                lambdaArn.isEmpty() ? null : lambdaArn,
-                filterRules.isEmpty() ? null : List.copyOf(filterRules)
-            ));
-        }
-        return new BucketNotificationConfiguration(bucketName, List.copyOf(events));
-    }
-
-    private static BucketReplicationConfiguration parseReplicationXml(String bucketName, String body) {
-        var role = extractXmlValue(body, "Role");
-        var rules = new ArrayList<BucketReplicationConfiguration.ReplicationRule>();
-        var ruleMatcher = java.util.regex.Pattern.compile(
-            "<Rule>(.*?)</Rule>", java.util.regex.Pattern.DOTALL
-        ).matcher(body);
-        while (ruleMatcher.find()) {
-            var ruleBody = ruleMatcher.group(1);
-            var id = extractXmlValue(ruleBody, "ID");
-            var status = extractXmlValue(ruleBody, "Status");
-            var prefix = extractXmlValue(ruleBody, "Prefix");
-            var destBucket = extractXmlValue(ruleBody, "Bucket");
-            var destStorageClass = extractXmlValue(ruleBody, "StorageClass");
-            rules.add(new BucketReplicationConfiguration.ReplicationRule(
-                id.isEmpty() ? null : id,
-                status.isEmpty() ? "Enabled" : status,
-                prefix.isEmpty() ? null : prefix,
-                destBucket.isEmpty() ? null : "arn:aws:s3:::" + destBucket,
-                destStorageClass.isEmpty() ? null : destStorageClass,
-                false, false
-            ));
-        }
-        return new BucketReplicationConfiguration(
-            bucketName,
-            role.isEmpty() ? null : role,
-            List.copyOf(rules)
-        );
-    }
-
-    private static List<String> extractXmlList(String body, String tag) {
-        var matcher = java.util.regex.Pattern.compile(
-            "<" + tag + ">([^<]+)</" + tag + ">", java.util.regex.Pattern.DOTALL
-        ).matcher(body);
-        var result = new ArrayList<String>();
-        while (matcher.find()) {
-            result.add(matcher.group(1));
-        }
-        return result;
-    }
-
-    private static String extractXmlValue(String body, String tag) {
-        var matcher = java.util.regex.Pattern.compile(
-            "<" + tag + ">([^<]+)</" + tag + ">", java.util.regex.Pattern.DOTALL
-        ).matcher(body);
-        return matcher.find() ? matcher.group(1) : "";
     }
 }

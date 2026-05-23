@@ -327,3 +327,139 @@ bash test-aws-cli.sh
 # or
 mvn -N verify -Paws-cli-tests
 ```
+
+## ✅ Correction Complete — Remove Regex XML Parsing (ADR 0008)
+
+### Problem (resolved)
+All PUT/POST handlers in `s3-api` previously used regex-based XML parsing (`extractXmlValue`, `extractXmlList`, `Pattern.compile`, `String.contains`) instead of Spring Boot 4's Jackson XML codec infrastructure. This violated the `java-infra-coder` FORBIDDEN constraint.
+
+### Root Cause
+`java-domain-coder` wrote handler code (infrastructure) despite its domain isolation constraint. `java-infra-coder` generated `S3XmlParser.java` but no handler integrated it. `java-planner` did not enforce delegation.
+
+### Resolution
+ADR 0008 is now **Implemented** and verified. All 14 phases completed:
+
+| Phase | Description | Status |
+|---|---|---|
+| 1 | JacksonXmlDecoder in `JacksonXmlCodecConfig` | ✅ Complete |
+| 2 | 14 Command DTOs in `dto/command/` | ✅ Complete |
+| 3 | 29 Query DTOs in `dto/query/` | ✅ Complete |
+| 4 | `S3BucketConfigHandler` — no regex, uses `bodyToMono` | ✅ Complete |
+| 5 | `S3BucketMetadataHandler` — no regex, uses `bodyToMono` | ✅ Complete |
+| 6 | `S3ObjectMetadataHandler` — no regex, uses `bodyToMono` | ✅ Complete |
+| 7 | `S3ObjectOperationsHandler` — no regex, uses `bodyToMono` | ✅ Complete |
+| 8 | `S3BucketOperationsHandler` — no regex, uses `bodyToMono` | ✅ Complete |
+| 9 | `S3BucketConfigListHandler` — no regex, uses `bodyToMono` | ✅ Complete |
+| 10 | `S3WebSupport` — references `ErrorQuery` instead of `S3XmlResponses.Error` | ✅ Complete |
+| 11 | `xml/` package deleted | ✅ Complete |
+| 12 | All handler references updated to Query DTOs | ✅ Complete |
+| 13 | Test verification: 141 Cucumber tests pass, 3 CORS scenarios pass | ✅ Complete |
+| 14 | ADR 0008 updated, ARC42 documentation aligned | ✅ Complete |
+
+### Verification
+
+```bash
+# Verification results
+mvn test -pl s3-api                    # 141 tests pass (0 failures)
+bash test-aws-cli.sh                   # CORS scenarios pass
+mvn -N verify -Paws-cli-tests          # AWS CLI tests pass
+```
+
+The `xml/` package is deleted, `S3XmlParser.java` and `S3XmlResponses.java` are removed, and ALL XML parsing now goes through the Spring Boot 4 Jackson XML codec.
+
+## Pre-Existing Issues — S3 XML Element Name Alignment (10 failures) — ✅ Resolved
+
+### Problem
+141 Cucumber tests run, but **10 scenarios fail** due to Jackson XML element name mismatches. Java record fields use `camelCase`, but AWS S3 XML uses `PascalCase`/capitalized element names. Jackson 3 by default serializes fields as `<fieldName>`, producing XML that doesn't match Cucumber test expectations.
+
+### Root Cause
+All `s3-api` Query and Command DTOs were created without `@JacksonXmlProperty(localName = "...")` annotations. Jackson 3 serializes/deserializes field names as-is, breaking S3 XML compatibility.
+
+### Fix Strategy
+Added `@JacksonXmlProperty(localName = "...")` annotations and restructured ACL DTO format to align field names with the AWS S3 XML specification. All fixes were in the **infra layer** (`s3-api/src/main/java/.../dto/`). No domain or application code changes needed.
+
+### Results
+All 6 phases completed. Verification:
+```bash
+mvn test -pl s3-api --also-make   # 141 tests, 0 failures
+```
+
+### Failure Breakdown
+
+| # | Scenario | Root Cause | DTO to Fix |
+|---|---|---|---|
+| 1 | Bucket ACL — no "READ" string | `AccessControlPolicyQuery` uses custom format instead of S3 `<Grant><Permission>READ</Permission></Grant>` | `AccessControlPolicyQuery` |
+| 2 | Object ACL — no "READ" string | Same as #1 | `AccessControlPolicyQuery` |
+| 3 | Object attributes — no "ObjectSize" | `<size>` instead of `<ObjectSize>` | `GetObjectAttributesQuery` |
+| 4 | Initiate multipart upload — no "UploadId" | `<uploadId>` instead of `<UploadId>` | `InitiateMultipartUploadQuery` |
+| 5 | Upload a part | Cascades from #4 — `uploadId` not extracted | Same as #4 |
+| 6 | List parts | Cascades from #4 | Same as #4 |
+| 7 | Complete multipart upload | Cascades from #4 | Same as #4 |
+| 8 | List multipart uploads | Cascades from #4 | Same as #4 |
+| 9 | Abort multipart upload | Cascades from #4 | Same as #4 |
+| 10 | Delete multiple objects — object not deleted | `ObjectEntry.key` missing `@JacksonXmlProperty(localName = "Key")` | `DeleteObjectsCommand` |
+
+### Phases
+
+#### Phase 1 — Multipart Upload DTOs (fixes #4–9) ✅ Completed
+Add `@JacksonXmlProperty(localName = "...")` annotations to align with S3 XML element names:
+
+| DTO | Field → S3 Element |
+|-----|-------------------|
+| `InitiateMultipartUploadQuery.java` | `uploadId` → `UploadId` |
+| `UploadPartResultQuery.java` | `etag` → `ETag` |
+| `CompleteMultipartUploadQuery.java` | `bucket` → `Bucket`, `key` → `Key`, `etag` → `ETag` |
+| `ListPartsQuery.java` | `PartEntry.partNumber` → `PartNumber`, `etag` → `ETag` |
+| `ListMultipartUploadsQuery.java` | `UploadEntry.key` → `Key`, `uploadId` → `UploadId`, `initiated` → `Initiated` |
+
+#### Phase 2 — ObjectAttributes DTO (fixes #3) ✅ Completed
+| DTO | Field → S3 Element |
+|-----|-------------------|
+| `GetObjectAttributesQuery.java` | `size` → `ObjectSize`, `key` → `Key`, `contentType` → `ContentType`, `storageClass` → `StorageClass`, `etag` → `ETag` |
+
+#### Phase 3 — ACL DTO Restructure (fixes #1–2) ✅ Completed
+Restructure `AccessControlPolicyQuery.java` to produce S3-compatible ACL XML:
+- Replace current `<acl><canned>public-read</canned></acl>` format
+- Use `<AccessControlList><Grant><Grantee><Permission>READ</Permission></Grantee></Grant></AccessControlList>`
+- Map canned ACL values (`public-read`, `public-write`, `public-read-write`, `authenticated-read`) to permission strings (`READ`, `WRITE`, `FULL_CONTROL`)
+
+#### Phase 4 — DeleteObjects DTO (fixes #10) ✅ Completed
+| DTO | Field → S3 Element |
+|-----|-------------------|
+| `DeleteObjectsCommand.ObjectEntry.java` | `key` → `Key` |
+| `DeleteResultQuery.DeletedEntry.java` | `key` → `Key` |
+
+#### Phase 5 — Latent S3-Incompatible DTOs (preventive) ✅ Completed
+Apply `@JacksonXmlProperty(localName = "...")` to all remaining DTOs that produce non-S3-compatible XML:
+
+| DTO | Fields needing annotation |
+|-----|--------------------------|
+| `ListObjectsQuery.ObjectEntry` | `key → Key`, `size → Size`, `etag → ETag` |
+| `ListObjectsV2Query.ObjectEntry` | Same as above |
+| `ListAllMyBucketsResultQuery.BucketEntry` | `name → Name`, `creationDate → CreationDate` |
+| `CopyObjectResultQuery` | `lastModified → LastModified`, `etag → ETag` |
+| `LocationConstraintQuery` | `value` → text content (no wrapper) |
+
+#### Phase 6 — Verification ✅ Completed
+```bash
+# Run Cucumber tests after each phase
+mvn test -pl s3-api --also-make
+
+# Result: 141 tests, 0 failures
+```
+
+### Dependency Order
+```
+✅ Phase 1 (Multipart Upload DTOs)
+  ✅ └─ fixes #4 → cascading fixes #5–9
+✅ Phase 2 (ObjectAttributes DTO)
+  ✅ └─ fixes #3
+✅ Phase 3 (ACL DTO restructure)
+  ✅ └─ fixes #1–2
+✅ Phase 4 (DeleteObjects DTO)
+  ✅ └─ fixes #10
+✅ Phase 5 (Latent DTOs)
+  ✅ └─ prevents future failures
+✅ Phase 6 (Verification)
+  ✅ └─ mvn test -pl s3-api
+```

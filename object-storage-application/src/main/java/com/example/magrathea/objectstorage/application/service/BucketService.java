@@ -93,7 +93,7 @@ public class BucketService {
         var rules = command.corsRules().stream()
             .map(r -> new BucketConfiguration.CorsRule(
                 r.allowedOrigins(), r.allowedMethods(), r.allowedHeaders(),
-                r.maxAgeSeconds(), r.exposeHeaders(), r.id()))
+                r.maxAgeSeconds() != null ? r.maxAgeSeconds() : 0, r.exposeHeaders(), r.id()))
             .toList();
         var config = new BucketConfiguration(command.bucketName(), rules);
         repository.saveConfiguration(config).join();

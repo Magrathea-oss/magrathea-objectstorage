@@ -25,9 +25,12 @@ public class ObjectStorageTestApp {
 
     @Bean
     public WebTestClient webTestClient(@Qualifier("s3Routes") RouterFunction<ServerResponse> s3Routes) {
+        var builder = XmlMapper.builder();
         var strategies = HandlerStrategies.builder()
-            .codecs(config -> config.customCodecs().register(
-                new JacksonXmlCodecConfig.JacksonXmlEncoder(XmlMapper.builder())))
+            .codecs(config -> {
+                config.customCodecs().register(new JacksonXmlCodecConfig.JacksonXmlEncoder(builder));
+                config.customCodecs().register(new JacksonXmlCodecConfig.JacksonXmlDecoder(builder));
+            })
             .build();
         return WebTestClient.bindToRouterFunction(s3Routes)
             .handlerStrategies(strategies)
