@@ -1,6 +1,6 @@
 # Magrathea ObjectStorage Test Report
 
-Generated: 2026-05-22T23:33:30+02:00
+Generated: 2026-05-23T18:26:45+02:00
 
 ## Summary
 
@@ -12,7 +12,7 @@ Generated: 2026-05-22T23:33:30+02:00
 
 ## AWS CLI S3 Compatibility
 
-Bucket: `magrathea-cli-test-1779485610-112098`
+Bucket: `magrathea-cli-test-1779553605-176222`
 
 | Check | Status | Notes |
 |---|---|---|
@@ -51,11 +51,11 @@ Bucket: `magrathea-cli-test-1779485610-112098`
 
 | Metric | Covered | Total | Coverage |
 |---|---:|---:|---:|
-| Elements | 1694 | 1936 | 87.50% |
-| Statements | 1065 | 1172 | 90.87% |
-| Methods | 318 | 344 | 92.44% |
-| Conditionals | 311 | 420 | 74.05% |
-| NCLOC | - | 3878 | - |
+| Elements | 1524 | 1857 | 82.07% |
+| Statements | 968 | 1159 | 83.52% |
+| Methods | 305 | 348 | 87.64% |
+| Conditionals | 251 | 350 | 71.71% |
+| NCLOC | - | 4297 | - |
 
 Report HTML: `target/site/clover/index.html`
 
