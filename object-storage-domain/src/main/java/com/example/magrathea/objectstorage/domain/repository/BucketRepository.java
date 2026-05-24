@@ -13,6 +13,10 @@ import com.example.magrathea.objectstorage.domain.valueobject.BucketReplicationC
 import com.example.magrathea.objectstorage.domain.valueobject.BucketRequestPaymentConfiguration;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketWebsiteConfiguration;
 import com.example.magrathea.objectstorage.domain.valueobject.PublicAccessBlockConfiguration;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketAnalyticsConfiguration;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketInventoryConfiguration;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketMetricsConfiguration;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketIntelligentTieringConfiguration;
 
 import java.util.List;
 import java.util.Optional;
@@ -89,4 +93,26 @@ public interface BucketRepository {
     CompletableFuture<Optional<BucketAccelerateConfiguration>> findAccelerateConfiguration(String bucketName);
     CompletableFuture<Void> saveAccelerateConfiguration(BucketAccelerateConfiguration configuration);
     CompletableFuture<Void> deleteAccelerateConfiguration(String bucketName);
+
+    // ── Analytics ──
+    CompletableFuture<Optional<BucketAnalyticsConfiguration>> findAnalyticsConfiguration(String bucketName, String analyticsId);
+    CompletableFuture<Void> saveAnalyticsConfiguration(BucketAnalyticsConfiguration configuration);
+    CompletableFuture<Void> deleteAnalyticsConfiguration(String bucketName, String analyticsId);
+    CompletableFuture<List<BucketAnalyticsConfiguration>> listAnalyticsConfigurations(String bucketName);
+
+    // ── Inventory ──
+    CompletableFuture<Optional<BucketInventoryConfiguration>> findInventoryConfiguration(String bucketName, String inventoryId);
+    CompletableFuture<Void> saveInventoryConfiguration(BucketInventoryConfiguration configuration);
+    CompletableFuture<Void> deleteInventoryConfiguration(String bucketName, String inventoryId);
+    CompletableFuture<List<BucketInventoryConfiguration>> listInventoryConfigurations(String bucketName);
+
+    // ── Metrics ──
+    CompletableFuture<Optional<BucketMetricsConfiguration>> findMetricsConfiguration(String bucketName);
+    CompletableFuture<Void> saveMetricsConfiguration(BucketMetricsConfiguration configuration);
+    CompletableFuture<Void> deleteMetricsConfiguration(String bucketName);
+
+    // ── Intelligent-Tiering ──
+    CompletableFuture<Optional<BucketIntelligentTieringConfiguration>> findIntelligentTieringConfiguration(String bucketName);
+    CompletableFuture<Void> saveIntelligentTieringConfiguration(BucketIntelligentTieringConfiguration configuration);
+    CompletableFuture<Void> deleteIntelligentTieringConfiguration(String bucketName);
 }

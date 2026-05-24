@@ -49,6 +49,37 @@ image::../../c4/images/MultipartUploadRuntime.png[MultipartUpload Runtime, width
 2. s3-api-adapter → object-store: Multipart upload lifecycle use cases
 3. object-store → in-memory-repository: Read/write multipart upload state
 
+=== Scenario 6 — Bucket Configuration (CORS, Lifecycle, Policy, Encryption, Logging, Website, Notification, Replication, Request Payment, Ownership Controls, Public Access Block, Accelerate, Analytics, Inventory, Metrics, Intelligent-Tiering)
+
+.Runtime Diagram — Bucket Configuration
+image::../../c4/images/BucketConfigurationRuntime.png[Bucket Configuration Runtime, width=600]
+
+**Flusso:**
+1. User → s3-api-adapter: `GET/PUT/DELETE /{bucket}?{config}` with query parameter identifying the configuration type
+2. s3-api-adapter → bucket-managment: `S3BucketConfigHandler` dispatches to `BucketService.{get|put|delete}{Config}` based on query parameter
+3. bucket-managment → in-memory-repository: `BucketRepositoryImpl.{find|save|delete}{Config}` reads/writes configuration value objects
+
+**Configuration types and query parameters:**
+
+| Configuration | Query Param | List support | Domain Value Object |
+|---|---|---|---|
+| CORS | `?cors` | No | `CorsConfiguration` |
+| Lifecycle | `?lifecycle` | No | `BucketLifecycleConfiguration` |
+| Policy | `?policy` | No | `BucketPolicy` |
+| Encryption | `?encryption` | No | `BucketEncryptionConfiguration` |
+| Logging | `?logging` | No | `BucketLoggingConfiguration` |
+| Website | `?website` | No | `BucketWebsiteConfiguration` |
+| Notification | `?notification` | No | `BucketNotificationConfiguration` |
+| Replication | `?replication` | No | `BucketReplicationConfiguration` |
+| Request Payment | `?requestPayment` | No | `BucketRequestPaymentConfiguration` |
+| Ownership Controls | `?ownershipControls` | No | `BucketOwnershipControls` |
+| Public Access Block | `?publicAccessBlock` | No | `PublicAccessBlockConfiguration` |
+| Accelerate | `?accelerate` | No | `BucketAccelerateConfiguration` |
+| Analytics | `?analytics` | Yes (`list-type`) | `BucketAnalyticsConfiguration` |
+| Inventory | `?inventory` | Yes (`list-type`) | `BucketInventoryConfiguration` |
+| Metrics | `?metrics` | No | `BucketMetricsConfiguration` |
+| Intelligent-Tiering | `?intelligent-tiering` | No | `BucketIntelligentTieringConfiguration` |
+
 === Scenario 5 — Error Handling
 
 **Description:** System behavior for error conditions.

@@ -3,7 +3,11 @@ package com.example.magrathea.objectstorage.application.service;
 import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
 import com.example.magrathea.objectstorage.domain.repository.BucketRepository;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketAccelerateConfiguration;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketAnalyticsConfiguration;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketConfiguration;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketIntelligentTieringConfiguration;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketInventoryConfiguration;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketMetricsConfiguration;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketEncryptionConfiguration;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketLifecycleConfiguration;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketLoggingConfiguration;
@@ -255,6 +259,70 @@ public class BucketService {
 
     public void deleteAccelerateConfiguration(String bucketName) {
         repository.deleteAccelerateConfiguration(bucketName).join();
+    }
+
+    // ── Analytics ──
+
+    public Optional<BucketAnalyticsConfiguration> getAnalyticsConfiguration(String bucketName, String analyticsId) {
+        return repository.findAnalyticsConfiguration(bucketName, analyticsId).join();
+    }
+
+    public void putAnalyticsConfiguration(BucketAnalyticsConfiguration config) {
+        repository.saveAnalyticsConfiguration(config).join();
+    }
+
+    public void deleteAnalyticsConfiguration(String bucketName, String analyticsId) {
+        repository.deleteAnalyticsConfiguration(bucketName, analyticsId).join();
+    }
+
+    public List<BucketAnalyticsConfiguration> listAnalyticsConfigurations(String bucketName) {
+        return repository.listAnalyticsConfigurations(bucketName).join();
+    }
+
+    // ── Inventory ──
+
+    public Optional<BucketInventoryConfiguration> getInventoryConfiguration(String bucketName, String inventoryId) {
+        return repository.findInventoryConfiguration(bucketName, inventoryId).join();
+    }
+
+    public void putInventoryConfiguration(BucketInventoryConfiguration config) {
+        repository.saveInventoryConfiguration(config).join();
+    }
+
+    public void deleteInventoryConfiguration(String bucketName, String inventoryId) {
+        repository.deleteInventoryConfiguration(bucketName, inventoryId).join();
+    }
+
+    public List<BucketInventoryConfiguration> listInventoryConfigurations(String bucketName) {
+        return repository.listInventoryConfigurations(bucketName).join();
+    }
+
+    // ── Metrics ──
+
+    public Optional<BucketMetricsConfiguration> getMetricsConfiguration(String bucketName) {
+        return repository.findMetricsConfiguration(bucketName).join();
+    }
+
+    public void putMetricsConfiguration(BucketMetricsConfiguration config) {
+        repository.saveMetricsConfiguration(config).join();
+    }
+
+    public void deleteMetricsConfiguration(String bucketName) {
+        repository.deleteMetricsConfiguration(bucketName).join();
+    }
+
+    // ── Intelligent-Tiering ──
+
+    public Optional<BucketIntelligentTieringConfiguration> getIntelligentTieringConfiguration(String bucketName) {
+        return repository.findIntelligentTieringConfiguration(bucketName).join();
+    }
+
+    public void putIntelligentTieringConfiguration(BucketIntelligentTieringConfiguration config) {
+        repository.saveIntelligentTieringConfiguration(config).join();
+    }
+
+    public void deleteIntelligentTieringConfiguration(String bucketName) {
+        repository.deleteIntelligentTieringConfiguration(bucketName).join();
     }
 
     // ── internal ──

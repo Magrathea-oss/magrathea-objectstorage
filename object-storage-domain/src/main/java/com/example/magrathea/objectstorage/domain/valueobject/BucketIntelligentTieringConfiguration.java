@@ -8,15 +8,12 @@ import java.util.Objects;
  */
 public record BucketIntelligentTieringConfiguration(
     String bucketName,
-    String id,
-    String status,
-    String tieringPolicy
+    String tieringId,
+    String tieringPolicy,
+    String autoTieringStatus
 ) {
     public BucketIntelligentTieringConfiguration {
         Objects.requireNonNull(bucketName);
-    }
-
-    public boolean hasIntelligentTiering() {
-        return id != null && !id.isBlank();
+        // tieringId, tieringPolicy, autoTieringStatus are nullable
     }
 }

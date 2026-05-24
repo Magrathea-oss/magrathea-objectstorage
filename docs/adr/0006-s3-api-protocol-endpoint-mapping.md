@@ -40,35 +40,43 @@ AWS S3 provides 111 REST API operations. The implementation is split into phases
 | PutBucketTagging | PUT /{bucket}?tagging | ✅ Implemented |
 | DeleteBucketTagging | DELETE /{bucket}?tagging | ✅ Implemented |
 
-### Phase C — Multipart Upload (not started)
+### Phase C — Multipart Upload (completed)
 
-| Operation | Endpoint |
-|-----------|----------|
-| CreateMultipartUpload | POST /{bucket}/{key}?uploads |
-| UploadPart | PUT /{bucket}/{key}?uploadId=...&partNumber=... |
-| UploadPartCopy | PUT /{bucket}/{key}?uploadId=...&partNumber=... + x-amz-copy-source |
-| CompleteMultipartUpload | POST /{bucket}/{key}?uploadId=... |
-| AbortMultipartUpload | DELETE /{bucket}/{key}?uploadId=... |
-| ListMultipartUploads | GET /{bucket}?uploads |
-| ListParts | GET /{bucket}/{key}?uploadId=... |
+| Operation | Endpoint | Status |
+|-----------|----------|--------|
+| CreateMultipartUpload | POST /{bucket}/{key}?uploads | ✅ Implemented |
+| UploadPart | PUT /{bucket}/{key}?uploadId=...&partNumber=... | ✅ Implemented |
+| UploadPartCopy | PUT /{bucket}/{key}?uploadId=...&partNumber=... + x-amz-copy-source | ✅ Implemented |
+| CompleteMultipartUpload | POST /{bucket}/{key}?uploadId=... | ✅ Implemented |
+| AbortMultipartUpload | DELETE /{bucket}/{key}?uploadId=... | ✅ Implemented |
+| ListMultipartUploads | GET /{bucket}?uploads | ✅ Implemented |
+| ListParts | GET /{bucket}/{key}?uploadId=... | ✅ Implemented |
 
-### Phase D — Bucket Configuration APIs (CORS completed, rest pending)
+### Phase D — Bucket Configuration APIs (completed)
 
 | Area | Status |
 |------|--------|
 | CORS | ✅ GetBucketCors, PutBucketCors, DeleteBucketCors |
-| Lifecycle | ⬜ Not implemented |
-| Policy | ⬜ Not implemented |
-| Encryption | ⬜ Not implemented |
-| Logging | ⬜ Not implemented |
-| Website | ⬜ Not implemented |
-| Notification | ⬜ Not implemented |
-| Replication | ⬜ Not implemented |
-| Ownership Controls | ⬜ Not implemented |
-| Public Access Block | ⬜ Not implemented |
-| Accelerate | ⬜ Not implemented |
+| Lifecycle | ✅ GetBucketLifecycle, PutBucketLifecycle, DeleteBucketLifecycle |
+| Policy | ✅ GetBucketPolicy, PutBucketPolicy, DeleteBucketPolicy |
+| Encryption | ✅ GetBucketEncryption, PutBucketEncryption, DeleteBucketEncryption |
+| Logging | ✅ GetBucketLogging, PutBucketLogging, DeleteBucketLogging |
+| Website | ✅ GetBucketWebsite, PutBucketWebsite, DeleteBucketWebsite |
+| Notification | ✅ GetBucketNotification, PutBucketNotification, DeleteBucketNotification |
+| Replication | ✅ GetBucketReplication, PutBucketReplication, DeleteBucketReplication |
+| Ownership Controls | ✅ GetBucketOwnershipControls, PutBucketOwnershipControls, DeleteBucketOwnershipControls |
+| Public Access Block | ✅ GetPublicAccessBlock, PutPublicAccessBlock, DeletePublicAccessBlock |
+| Accelerate | ✅ GetBucketAccelerateConfiguration, PutBucketAccelerateConfiguration, DeleteBucketAccelerateConfiguration |
+| Request Payment | ✅ GetBucketRequestPayment, PutBucketRequestPayment, DeleteBucketRequestPayment |
 
-### Phase E — Analytics, Inventory, Metrics, Intelligent-Tiering (not started)
+### Phase E — Analytics, Inventory, Metrics, Intelligent-Tiering (completed)
+
+| Area | Operations | Status |
+|---|---|---|
+| Analytics | GetBucketAnalyticsConfiguration, PutBucketAnalyticsConfiguration, DeleteBucketAnalyticsConfiguration, ListBucketAnalyticsConfigurations | ✅ Implemented |
+| Inventory | GetBucketInventoryConfiguration, PutBucketInventoryConfiguration, DeleteBucketInventoryConfiguration, ListBucketInventoryConfigurations | ✅ Implemented |
+| Metrics | GetBucketMetricsConfiguration, PutBucketMetricsConfiguration, DeleteBucketMetricsConfiguration | ✅ Implemented |
+| Intelligent-Tiering | GetBucketIntelligentTieringConfiguration, PutBucketIntelligentTieringConfiguration, DeleteBucketIntelligentTieringConfiguration | ✅ Implemented |
 
 ### Phase F — Advanced / Specialized Operations (not started)
 

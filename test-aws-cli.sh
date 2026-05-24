@@ -235,6 +235,34 @@ run_success "PutBucketAccelerateConfiguration" aws_s3api put-bucket-accelerate-c
 run_success "GetBucketAccelerateConfiguration" aws_s3api get-bucket-accelerate-configuration --bucket "$BUCKET" --output json
 run_failure "GetBucketAccelerateConfiguration nonexistent" aws_s3api get-bucket-accelerate-configuration --bucket "nonexistent-bucket" --output json
 
+
+# ── Analytics Configuration ──
+ANALYTICS_ID="cli-analytics-id"
+ANALYTICS_CONFIG='{"Id":"'"$ANALYTICS_ID"'","Filter":{"Prefix":"cli-test"},"StorageClassAnalysis":{}}'
+run_success "PutBucketAnalyticsConfiguration" aws_s3api put-bucket-analytics-configuration --bucket "$BUCKET" --id "$ANALYTICS_ID" --analytics-configuration "$ANALYTICS_CONFIG" --output json
+run_success "GetBucketAnalyticsConfiguration" aws_s3api get-bucket-analytics-configuration --bucket "$BUCKET" --id "$ANALYTICS_ID" --output json
+run_success "ListBucketAnalyticsConfigurations" aws_s3api list-bucket-analytics-configurations --bucket "$BUCKET" --output json
+run_success "DeleteBucketAnalyticsConfiguration" aws_s3api delete-bucket-analytics-configuration --bucket "$BUCKET" --id "$ANALYTICS_ID" --output json
+run_failure "GetBucketAnalyticsConfiguration nonexistent bucket" aws_s3api get-bucket-analytics-configuration --bucket "nonexistent-bucket" --id "$ANALYTICS_ID" --output json
+run_failure "GetBucketAnalyticsConfiguration missing id" aws_s3api get-bucket-analytics-configuration --bucket "$BUCKET" --id "nonexistent-id" --output json
+run_failure "DeleteBucketAnalyticsConfiguration nonexistent bucket" aws_s3api delete-bucket-analytics-configuration --bucket "nonexistent-bucket" --id "$ANALYTICS_ID" --output json
+run_failure "DeleteBucketAnalyticsConfiguration missing id" aws_s3api delete-bucket-analytics-configuration --bucket "$BUCKET" --id "nonexistent-id" --output json
+run_failure "PutBucketAnalyticsConfiguration nonexistent bucket" aws_s3api put-bucket-analytics-configuration --bucket "nonexistent-bucket" --id "$ANALYTICS_ID" --analytics-configuration "$ANALYTICS_CONFIG" --output json
+run_failure "ListBucketAnalyticsConfigurations nonexistent bucket" aws_s3api list-bucket-analytics-configurations --bucket "nonexistent-bucket" --output json
+
+# ── Inventory Configuration ──
+INVENTORY_ID="cli-inventory-id"
+INVENTORY_CONFIG='{"Id":"'"$INVENTORY_ID"'","IsEnabled":true,"Destination":{"Format":"CSV","Bucket":"arn:aws:s3:::dest-bucket","Prefix":"cli-test"},"ScheduleFrequency":"Daily"}'
+run_success "PutBucketInventoryConfiguration" aws_s3api put-bucket-inventory-configuration --bucket "$BUCKET" --id "$INVENTORY_ID" --inventory-configuration "$INVENTORY_CONFIG" --output json
+run_success "GetBucketInventoryConfiguration" aws_s3api get-bucket-inventory-configuration --bucket "$BUCKET" --id "$INVENTORY_ID" --output json
+run_success "ListBucketInventoryConfigurations" aws_s3api list-bucket-inventory-configurations --bucket "$BUCKET" --output json
+run_success "DeleteBucketInventoryConfiguration" aws_s3api delete-bucket-inventory-configuration --bucket "$BUCKET" --id "$INVENTORY_ID" --output json
+run_failure "GetBucketInventoryConfiguration nonexistent bucket" aws_s3api get-bucket-inventory-configuration --bucket "nonexistent-bucket" --id "$INVENTORY_ID" --output json
+run_failure "GetBucketInventoryConfiguration missing id" aws_s3api get-bucket-inventory-configuration --bucket "$BUCKET" --id "nonexistent-id" --output json
+run_failure "DeleteBucketInventoryConfiguration nonexistent bucket" aws_s3api delete-bucket-inventory-configuration --bucket "nonexistent-bucket" --id "$INVENTORY_ID" --output json
+run_failure "DeleteBucketInventoryConfiguration missing id" aws_s3api delete-bucket-inventory-configuration --bucket "$BUCKET" --id "nonexistent-id" --output json
+run_failure "PutBucketInventoryConfiguration nonexistent bucket" aws_s3api put-bucket-inventory-configuration --bucket "nonexistent-bucket" --id "$INVENTORY_ID" --inventory-configuration "$INVENTORY_CONFIG" --output json
+run_failure "ListBucketInventoryConfigurations nonexistent bucket" aws_s3api list-bucket-inventory-configurations --bucket "nonexistent-bucket" --output json
 run_success "DeleteBucket" aws_s3api delete-bucket --bucket "$BUCKET" --output json
 run_failure "HeadBucket after DeleteBucket" aws_s3api head-bucket --bucket "$BUCKET"
 
@@ -408,6 +436,14 @@ Report HTML: \`target/site/clover/index.html\`
 | DeletePublicAccessBlock | \`aws s3api delete-public-access-block\` | ✅ |
 | PutBucketAccelerateConfiguration | \`aws s3api put-bucket-accelerate-configuration\` | ✅ |
 | GetBucketAccelerateConfiguration | \`aws s3api get-bucket-accelerate-configuration\` | ✅ |
+| PutBucketAnalyticsConfiguration | `aws s3api put-bucket-analytics-configuration` | ✅ |
+| GetBucketAnalyticsConfiguration | `aws s3api get-bucket-analytics-configuration` | ✅ |
+| DeleteBucketAnalyticsConfiguration | `aws s3api delete-bucket-analytics-configuration` | ✅ |
+| ListBucketAnalyticsConfigurations | `aws s3api list-bucket-analytics-configurations` | ✅ |
+| PutBucketInventoryConfiguration | `aws s3api put-bucket-inventory-configuration` | ✅ |
+| GetBucketInventoryConfiguration | `aws s3api get-bucket-inventory-configuration` | ✅ |
+| DeleteBucketInventoryConfiguration | `aws s3api delete-bucket-inventory-configuration` | ✅ |
+| ListBucketInventoryConfigurations | `aws s3api list-bucket-inventory-configurations` | ✅ |
 | DeleteBucket | \`aws s3api delete-bucket\` | ✅ |
 
 ### Failure Tests
@@ -424,6 +460,18 @@ Report HTML: \`target/site/clover/index.html\`
 | GetBucketEncryption after delete | ✅ | Expected failure |
 | GetBucketLogging nonexistent | ✅ | Expected failure |
 | GetBucketLogging after delete | ✅ | Expected failure |
+| GetBucketAnalyticsConfiguration nonexistent bucket | ✅ | Expected failure |
+| GetBucketAnalyticsConfiguration missing id | ✅ | Expected failure |
+| DeleteBucketAnalyticsConfiguration nonexistent bucket | ✅ | Expected failure |
+| DeleteBucketAnalyticsConfiguration missing id | ✅ | Expected failure |
+| PutBucketAnalyticsConfiguration nonexistent bucket | ✅ | Expected failure |
+| ListBucketAnalyticsConfigurations nonexistent bucket | ✅ | Expected failure |
+| GetBucketInventoryConfiguration nonexistent bucket | ✅ | Expected failure |
+| GetBucketInventoryConfiguration missing id | ✅ | Expected failure |
+| DeleteBucketInventoryConfiguration nonexistent bucket | ✅ | Expected failure |
+| DeleteBucketInventoryConfiguration missing id | ✅ | Expected failure |
+| PutBucketInventoryConfiguration nonexistent bucket | ✅ | Expected failure |
+| ListBucketInventoryConfigurations nonexistent bucket | ✅ | Expected failure |
 
 | Check | Status | Notes |
 |---|---|---|

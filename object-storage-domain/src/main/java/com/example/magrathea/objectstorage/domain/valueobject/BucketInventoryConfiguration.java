@@ -1,6 +1,5 @@
 package com.example.magrathea.objectstorage.domain.valueobject;
 
-import java.util.List;
 import java.util.Objects;
 
 /**
@@ -9,21 +8,13 @@ import java.util.Objects;
  */
 public record BucketInventoryConfiguration(
     String bucketName,
-    String id,
-    String destinationBucket,
-    String prefix,
+    String inventoryId,
     String format,
     String frequency,
-    List<String> optionalFields
+    boolean enabled
 ) {
     public BucketInventoryConfiguration {
         Objects.requireNonNull(bucketName);
-        if (optionalFields != null) {
-            optionalFields = List.copyOf(optionalFields);
-        }
-    }
-
-    public boolean hasInventory() {
-        return id != null && !id.isBlank();
+        // inventoryId, format, frequency are nullable
     }
 }

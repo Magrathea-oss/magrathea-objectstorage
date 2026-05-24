@@ -3,10 +3,14 @@ package com.example.magrathea.objectstorage.infrastructure.adapter.persistence;
 import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
 import com.example.magrathea.objectstorage.domain.repository.BucketRepository;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketAccelerateConfiguration;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketAnalyticsConfiguration;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketConfiguration;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketEncryptionConfiguration;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketIntelligentTieringConfiguration;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketInventoryConfiguration;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketLifecycleConfiguration;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketLoggingConfiguration;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketMetricsConfiguration;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketNotificationConfiguration;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketOwnershipControls;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketPolicy;
@@ -42,6 +46,10 @@ public class InMemoryBucketRepository implements BucketRepository {
     private final ConcurrentHashMap<String, BucketOwnershipControls> ownershipControlsStore = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, PublicAccessBlockConfiguration> publicAccessBlockStore = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, BucketAccelerateConfiguration> accelerateStore = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, ConcurrentHashMap<String, BucketAnalyticsConfiguration>> analyticsStore = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, ConcurrentHashMap<String, BucketInventoryConfiguration>> inventoryStore = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, BucketMetricsConfiguration> metricsStore = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, BucketIntelligentTieringConfiguration> intelligentTieringStore = new ConcurrentHashMap<>();
 
     @Override
     public CompletableFuture<Optional<Bucket>> findById(Bucket.Id id) {
@@ -301,6 +309,116 @@ public class InMemoryBucketRepository implements BucketRepository {
         return CompletableFuture.completedFuture(null);
     }
 
+    // ── Analytics ──
+
+    @Override
+    public CompletableFuture<Optional<BucketAnalyticsConfiguration>> findAnalyticsConfiguration(String bucketName, String analyticsId) {
+        var bucketStore = analyticsStore.get(bucketName);
+        if (bucketStore == null) {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
+        return CompletableFuture.completedFuture(Optional.ofNullable(bucketStore.get(analyticsId)));
+    }
+
+    @Override
+    public CompletableFuture<Void> saveAnalyticsConfiguration(BucketAnalyticsConfiguration configuration) {
+        var bucketStore = analyticsStore.computeIfAbsent(configuration.bucketName(), k -> new ConcurrentHashMap<>());
+        bucketStore.put(configuration.analyticsId(), configuration);
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public CompletableFuture<Void> deleteAnalyticsConfiguration(String bucketName, String analyticsId) {
+        var bucketStore = analyticsStore.get(bucketName);
+        if (bucketStore != null) {
+            bucketStore.remove(analyticsId);
+        }
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public CompletableFuture<List<BucketAnalyticsConfiguration>> listAnalyticsConfigurations(String bucketName) {
+        var bucketStore = analyticsStore.get(bucketName);
+        if (bucketStore == null) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+        return CompletableFuture.completedFuture(List.copyOf(bucketStore.values()));
+    }
+
+    // ── Inventory ──
+
+    @Override
+    public CompletableFuture<Optional<BucketInventoryConfiguration>> findInventoryConfiguration(String bucketName, String inventoryId) {
+        var bucketStore = inventoryStore.get(bucketName);
+        if (bucketStore == null) {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
+        return CompletableFuture.completedFuture(Optional.ofNullable(bucketStore.get(inventoryId)));
+    }
+
+    @Override
+    public CompletableFuture<Void> saveInventoryConfiguration(BucketInventoryConfiguration configuration) {
+        var bucketStore = inventoryStore.computeIfAbsent(configuration.bucketName(), k -> new ConcurrentHashMap<>());
+        bucketStore.put(configuration.inventoryId(), configuration);
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public CompletableFuture<Void> deleteInventoryConfiguration(String bucketName, String inventoryId) {
+        var bucketStore = inventoryStore.get(bucketName);
+        if (bucketStore != null) {
+            bucketStore.remove(inventoryId);
+        }
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public CompletableFuture<List<BucketInventoryConfiguration>> listInventoryConfigurations(String bucketName) {
+        var bucketStore = inventoryStore.get(bucketName);
+        if (bucketStore == null) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+        return CompletableFuture.completedFuture(List.copyOf(bucketStore.values()));
+    }
+
+    // ── Metrics ──
+
+    @Override
+    public CompletableFuture<Optional<BucketMetricsConfiguration>> findMetricsConfiguration(String bucketName) {
+        return CompletableFuture.completedFuture(Optional.ofNullable(metricsStore.get(bucketName)));
+    }
+
+    @Override
+    public CompletableFuture<Void> saveMetricsConfiguration(BucketMetricsConfiguration configuration) {
+        metricsStore.put(configuration.bucketName(), configuration);
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public CompletableFuture<Void> deleteMetricsConfiguration(String bucketName) {
+        metricsStore.remove(bucketName);
+        return CompletableFuture.completedFuture(null);
+    }
+
+    // ── Intelligent-Tiering ──
+
+    @Override
+    public CompletableFuture<Optional<BucketIntelligentTieringConfiguration>> findIntelligentTieringConfiguration(String bucketName) {
+        return CompletableFuture.completedFuture(Optional.ofNullable(intelligentTieringStore.get(bucketName)));
+    }
+
+    @Override
+    public CompletableFuture<Void> saveIntelligentTieringConfiguration(BucketIntelligentTieringConfiguration configuration) {
+        intelligentTieringStore.put(configuration.bucketName(), configuration);
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public CompletableFuture<Void> deleteIntelligentTieringConfiguration(String bucketName) {
+        intelligentTieringStore.remove(bucketName);
+        return CompletableFuture.completedFuture(null);
+    }
+
     /** Reset state — used by test cleanup hooks. */
     public void reset() {
         store.clear();
@@ -316,5 +434,9 @@ public class InMemoryBucketRepository implements BucketRepository {
         ownershipControlsStore.clear();
         publicAccessBlockStore.clear();
         accelerateStore.clear();
+        analyticsStore.clear();
+        inventoryStore.clear();
+        metricsStore.clear();
+        intelligentTieringStore.clear();
     }
 }

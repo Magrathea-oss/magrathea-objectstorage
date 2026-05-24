@@ -32,6 +32,8 @@ Il modulo `object-storage-domain` è rigorosamente puro:
 - Repository interfaces con CompletableFuture (standard Java async)
 - S3ObjectWrite/S3ObjectContent senza tipi framework
 
+I value object di configurazione avanzata (BucketAnalyticsConfiguration, BucketInventoryConfiguration, BucketMetricsConfiguration, BucketIntelligentTieringConfiguration) seguono lo stesso pattern: record immutabili, zero dipendenze framework, validation con Objects.requireNonNull.
+
 === S3 API Compatibility
 
 Il sistema espone SOLO endpoint AWS S3-compatible:

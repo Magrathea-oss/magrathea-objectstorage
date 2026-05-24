@@ -12,6 +12,10 @@ import com.example.magrathea.objectstorage.domain.valueobject.BucketRequestPayme
 import com.example.magrathea.objectstorage.domain.valueobject.BucketOwnershipControls;
 import com.example.magrathea.objectstorage.domain.valueobject.PublicAccessBlockConfiguration;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketAccelerateConfiguration;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketAnalyticsConfiguration;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketIntelligentTieringConfiguration;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketInventoryConfiguration;
+import com.example.magrathea.objectstorage.domain.valueobject.BucketMetricsConfiguration;
 import com.example.magrathea.s3api.dto.command.CorsConfigurationCommand;
 import com.example.magrathea.s3api.dto.command.LifecycleConfigurationCommand;
 import com.example.magrathea.s3api.dto.command.EncryptionConfigurationCommand;
@@ -23,6 +27,10 @@ import com.example.magrathea.s3api.dto.command.RequestPaymentConfigurationComman
 import com.example.magrathea.s3api.dto.command.OwnershipControlsCommand;
 import com.example.magrathea.s3api.dto.command.PublicAccessBlockCommand;
 import com.example.magrathea.s3api.dto.command.AccelerateConfigurationCommand;
+import com.example.magrathea.s3api.dto.command.AnalyticsConfigurationCommand;
+import com.example.magrathea.s3api.dto.command.InventoryConfigurationCommand;
+import com.example.magrathea.s3api.dto.command.MetricsConfigurationCommand;
+import com.example.magrathea.s3api.dto.command.IntelligentTieringConfigurationCommand;
 import com.example.magrathea.s3api.dto.query.ErrorQuery;
 import com.example.magrathea.s3api.dto.query.BucketCorsQuery;
 import com.example.magrathea.s3api.dto.query.BucketLifecycleQuery;
@@ -35,6 +43,12 @@ import com.example.magrathea.s3api.dto.query.BucketRequestPaymentQuery;
 import com.example.magrathea.s3api.dto.query.BucketOwnershipControlsQuery;
 import com.example.magrathea.s3api.dto.query.PublicAccessBlockQuery;
 import com.example.magrathea.s3api.dto.query.BucketAccelerateQuery;
+import com.example.magrathea.s3api.dto.query.BucketAnalyticsQuery;
+import com.example.magrathea.s3api.dto.query.BucketInventoryQuery;
+import com.example.magrathea.s3api.dto.query.BucketMetricsQuery;
+import com.example.magrathea.s3api.dto.query.BucketIntelligentTieringQuery;
+import com.example.magrathea.s3api.dto.query.BucketAnalyticsListQuery;
+import com.example.magrathea.s3api.dto.query.BucketInventoryListQuery;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.server.ServerRequest;
@@ -681,6 +695,281 @@ public class S3BucketConfigHandler {
                 return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
             }
             bucketService.deleteAccelerateConfiguration(bucket);
+            return ServerResponse.noContent().build();
+        }).subscribeOn(Schedulers.boundedElastic())
+        .flatMap(Mono::from);
+    }
+
+    // ─────────────────────────────────────────────────────
+    //  Analytics Configuration
+    // ─────────────────────────────────────────────────────
+
+    /** GET /{bucket}?analytics&analyticsId={id} — GetBucketAnalyticsConfiguration */
+    public Mono<ServerResponse> getBucketAnalytics(ServerRequest request) {
+        var bucket = request.pathVariable("bucket");
+        var analyticsId = request.queryParam("analyticsId").orElse(null);
+        return Mono.fromCallable(() -> {
+            if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+            }
+            if (analyticsId == null || analyticsId.isBlank()) {
+                return S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "MissingAnalyticsId",
+                    "The analyticsId query parameter is required");
+            }
+            var config = bucketService.getAnalyticsConfiguration(bucket, analyticsId);
+            if (config.isEmpty()) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchAnalyticsConfiguration",
+                    "The analytics configuration does not exist");
+            }
+            return ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(BucketAnalyticsQuery.from(config));
+        }).subscribeOn(Schedulers.boundedElastic())
+        .flatMap(Mono::from);
+    }
+
+    /** PUT /{bucket}?analytics&analyticsId={id} — PutBucketAnalyticsConfiguration */
+    public Mono<ServerResponse> putBucketAnalytics(ServerRequest request) {
+        var bucket = request.pathVariable("bucket");
+        var analyticsId = request.queryParam("analyticsId").orElse(null);
+        if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+        }
+        if (analyticsId == null || analyticsId.isBlank()) {
+            return S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "MissingAnalyticsId",
+                "The analyticsId query parameter is required");
+        }
+        return request.bodyToMono(AnalyticsConfigurationCommand.class)
+            .flatMap(cmd -> {
+                var filterRule = cmd.filter() != null ? cmd.filter().prefix() : null;
+                var config = new BucketAnalyticsConfiguration(bucket, analyticsId, filterRule);
+                bucketService.putAnalyticsConfiguration(config);
+                return ServerResponse.ok().build();
+            });
+    }
+
+    /** DELETE /{bucket}?analytics&analyticsId={id} — DeleteBucketAnalyticsConfiguration */
+    public Mono<ServerResponse> deleteBucketAnalytics(ServerRequest request) {
+        var bucket = request.pathVariable("bucket");
+        var analyticsId = request.queryParam("analyticsId").orElse(null);
+        return Mono.fromCallable(() -> {
+            if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+            }
+            if (analyticsId == null || analyticsId.isBlank()) {
+                return S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "MissingAnalyticsId",
+                    "The analyticsId query parameter is required");
+            }
+            bucketService.deleteAnalyticsConfiguration(bucket, analyticsId);
+            return ServerResponse.noContent().build();
+        }).subscribeOn(Schedulers.boundedElastic())
+        .flatMap(Mono::from);
+    }
+
+    /** GET /{bucket}?analytics&list-type — ListBucketAnalyticsConfigurations */
+    public Mono<ServerResponse> listBucketAnalyticsConfigurations(ServerRequest request) {
+        var bucket = request.pathVariable("bucket");
+        return Mono.fromCallable(() -> {
+            if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+            }
+            var configs = bucketService.listAnalyticsConfigurations(bucket);
+            // Build list response
+            var analyticsIdList = configs.stream()
+                .map(c -> c.analyticsId())
+                .toList();
+            return ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(BucketAnalyticsListQuery.fromIds(analyticsIdList));
+        }).subscribeOn(Schedulers.boundedElastic())
+        .flatMap(Mono::from);
+    }
+
+    // ─────────────────────────────────────────────────────
+    //  Inventory Configuration
+    // ─────────────────────────────────────────────────────
+
+    /** GET /{bucket}?inventory&inventoryId={id} — GetBucketInventoryConfiguration */
+    public Mono<ServerResponse> getBucketInventory(ServerRequest request) {
+        var bucket = request.pathVariable("bucket");
+        var inventoryId = request.queryParam("inventoryId").orElse(null);
+        return Mono.fromCallable(() -> {
+            if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+            }
+            if (inventoryId == null || inventoryId.isBlank()) {
+                return S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "MissingInventoryId",
+                    "The inventoryId query parameter is required");
+            }
+            var config = bucketService.getInventoryConfiguration(bucket, inventoryId);
+            if (config.isEmpty()) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchInventoryConfiguration",
+                    "The inventory configuration does not exist");
+            }
+            return ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(BucketInventoryQuery.from(config));
+        }).subscribeOn(Schedulers.boundedElastic())
+        .flatMap(Mono::from);
+    }
+
+    /** PUT /{bucket}?inventory&inventoryId={id} — PutBucketInventoryConfiguration */
+    public Mono<ServerResponse> putBucketInventory(ServerRequest request) {
+        var bucket = request.pathVariable("bucket");
+        var inventoryId = request.queryParam("inventoryId").orElse(null);
+        if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+        }
+        if (inventoryId == null || inventoryId.isBlank()) {
+            return S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "MissingInventoryId",
+                "The inventoryId query parameter is required");
+        }
+        return request.bodyToMono(InventoryConfigurationCommand.class)
+            .flatMap(cmd -> {
+                var format = cmd.destination() != null ? cmd.destination().format() : null;
+                var frequency = cmd.schedule() != null ? cmd.schedule().frequency() : null;
+                var enabled = "true".equals(cmd.enabled());
+                var config = new BucketInventoryConfiguration(bucket, inventoryId, format, frequency, enabled);
+                bucketService.putInventoryConfiguration(config);
+                return ServerResponse.ok().build();
+            });
+    }
+
+    /** DELETE /{bucket}?inventory&inventoryId={id} — DeleteBucketInventoryConfiguration */
+    public Mono<ServerResponse> deleteBucketInventory(ServerRequest request) {
+        var bucket = request.pathVariable("bucket");
+        var inventoryId = request.queryParam("inventoryId").orElse(null);
+        return Mono.fromCallable(() -> {
+            if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+            }
+            if (inventoryId == null || inventoryId.isBlank()) {
+                return S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "MissingInventoryId",
+                    "The inventoryId query parameter is required");
+            }
+            bucketService.deleteInventoryConfiguration(bucket, inventoryId);
+            return ServerResponse.noContent().build();
+        }).subscribeOn(Schedulers.boundedElastic())
+        .flatMap(Mono::from);
+    }
+
+    /** GET /{bucket}?inventory&list-type — ListBucketInventoryConfigurations */
+    public Mono<ServerResponse> listBucketInventoryConfigurations(ServerRequest request) {
+        var bucket = request.pathVariable("bucket");
+        return Mono.fromCallable(() -> {
+            if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+            }
+            var configs = bucketService.listInventoryConfigurations(bucket);
+            var inventoryIdList = configs.stream()
+                .map(c -> c.inventoryId())
+                .toList();
+            return ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(BucketInventoryListQuery.fromIds(inventoryIdList));
+        }).subscribeOn(Schedulers.boundedElastic())
+        .flatMap(Mono::from);
+    }
+
+    // ─────────────────────────────────────────────────────
+    //  Metrics Configuration
+    // ─────────────────────────────────────────────────────
+
+    /** GET /{bucket}?metrics — GetBucketMetricsConfiguration */
+    public Mono<ServerResponse> getBucketMetrics(ServerRequest request) {
+        var bucket = request.pathVariable("bucket");
+        return Mono.fromCallable(() -> {
+            if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+            }
+            var config = bucketService.getMetricsConfiguration(bucket);
+            if (config.isEmpty()) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchMetricsConfiguration",
+                    "The metrics configuration does not exist");
+            }
+            return ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(BucketMetricsQuery.from(config));
+        }).subscribeOn(Schedulers.boundedElastic())
+        .flatMap(Mono::from);
+    }
+
+    /** PUT /{bucket}?metrics — PutBucketMetricsConfiguration */
+    public Mono<ServerResponse> putBucketMetrics(ServerRequest request) {
+        var bucket = request.pathVariable("bucket");
+        if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+        }
+        return request.bodyToMono(MetricsConfigurationCommand.class)
+            .flatMap(cmd -> {
+                var filterRule = cmd.filter() != null ? cmd.filter().prefix() : null;
+                var config = new BucketMetricsConfiguration(bucket, cmd.id(), filterRule);
+                bucketService.putMetricsConfiguration(config);
+                return ServerResponse.ok().build();
+            });
+    }
+
+    /** DELETE /{bucket}?metrics — DeleteBucketMetricsConfiguration */
+    public Mono<ServerResponse> deleteBucketMetrics(ServerRequest request) {
+        var bucket = request.pathVariable("bucket");
+        return Mono.fromCallable(() -> {
+            if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+            }
+            bucketService.deleteMetricsConfiguration(bucket);
+            return ServerResponse.noContent().build();
+        }).subscribeOn(Schedulers.boundedElastic())
+        .flatMap(Mono::from);
+    }
+
+    // ─────────────────────────────────────────────────────
+    //  Intelligent-Tiering Configuration
+    // ─────────────────────────────────────────────────────
+
+    /** GET /{bucket}?intelligent-tiering — GetBucketIntelligentTieringConfiguration */
+    public Mono<ServerResponse> getBucketIntelligentTiering(ServerRequest request) {
+        var bucket = request.pathVariable("bucket");
+        return Mono.fromCallable(() -> {
+            if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+            }
+            var config = bucketService.getIntelligentTieringConfiguration(bucket);
+            if (config.isEmpty()) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchIntelligentTieringConfiguration",
+                    "The intelligent-tiering configuration does not exist");
+            }
+            return ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(BucketIntelligentTieringQuery.from(config));
+        }).subscribeOn(Schedulers.boundedElastic())
+        .flatMap(Mono::from);
+    }
+
+    /** PUT /{bucket}?intelligent-tiering — PutBucketIntelligentTieringConfiguration */
+    public Mono<ServerResponse> putBucketIntelligentTiering(ServerRequest request) {
+        var bucket = request.pathVariable("bucket");
+        if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+        }
+        return request.bodyToMono(IntelligentTieringConfigurationCommand.class)
+            .flatMap(cmd -> {
+                var tieringPolicy = cmd.tieringPolicy() != null ? cmd.tieringPolicy().tieringRule() : null;
+                var config = new BucketIntelligentTieringConfiguration(
+                    bucket, cmd.id(), tieringPolicy, cmd.autoTieringStatus()
+                );
+                bucketService.putIntelligentTieringConfiguration(config);
+                return ServerResponse.ok().build();
+            });
+    }
+
+    /** DELETE /{bucket}?intelligent-tiering — DeleteBucketIntelligentTieringConfiguration */
+    public Mono<ServerResponse> deleteBucketIntelligentTiering(ServerRequest request) {
+        var bucket = request.pathVariable("bucket");
+        return Mono.fromCallable(() -> {
+            if (S3WebSupport.findBucket(bucketService, bucket).isEmpty()) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found");
+            }
+            bucketService.deleteIntelligentTieringConfiguration(bucket);
             return ServerResponse.noContent().build();
         }).subscribeOn(Schedulers.boundedElastic())
         .flatMap(Mono::from);

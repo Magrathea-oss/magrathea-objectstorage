@@ -15,7 +15,7 @@ image::../../c4/images/Container.png[Container Diagram, width=600]
 **Blackbox Description:**
 Espone l'API REST S3-compatible via RouterFunction WebFlux. Traduce richieste HTTP/XML/binary in chiamate ai servizi applicativi. Serializza le risposte XML con Jackson 3.
 
-- **Provided Interface:** S3 REST API (36 endpoints su 111)
+- **Provided Interface:** S3 REST API (84 endpoints su 111)
 - **Required Interface:** ObjectService, MultipartUploadService, BucketService
 - **Technology:** Spring Boot 4 WebFlux, Java 21, RouterFunction, Jackson 3 XML
 
@@ -31,7 +31,7 @@ Implementa le use case di object CRUD, multipart upload, e content retrieval. Co
 ==== bucket-managment (Bucket management capability)
 
 **Blackbox Description:**
-Implementa le use case di bucket lifecycle, metadata (ACL, tagging), e configurazione (CORS, versioning). Contiene BucketService, gli aggregate di dominio (Bucket, BucketConfiguration, CorsConfiguration), e i port di repository.
+Implementa le use case di bucket lifecycle, metadata (ACL, tagging), configurazione (CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate), e advanced configuration (analytics, inventory, metrics, intelligent-tiering). Contiene BucketService, gli aggregate di dominio (Bucket, BucketConfiguration, CorsConfiguration, BucketAnalyticsConfiguration, BucketInventoryConfiguration, BucketMetricsConfiguration, BucketIntelligentTieringConfiguration), e i port di repository.
 
 - **Provided Interface:** BucketService
 - **Required Interface:** BucketRepository
@@ -57,7 +57,7 @@ image::../../c4/images/S3ApiAdapterComponents.png[S3 API Adapter Components, wid
 | `S3ProxyRouter` | Entry point RouterFunction: definisce le route S3 e dispatches richieste agli handler |
 | `S3BucketOperationsHandler` | Bucket lifecycle: create, delete, head, list, location, versioning |
 | `S3BucketMetadataHandler` | Bucket metadata: ACL, tagging |
-| `S3BucketConfigHandler` | Bucket configuration: CORS |
+| `S3BucketConfigHandler` | Bucket configuration: CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate, analytics, inventory, metrics, intelligent-tiering |
 | `S3ObjectOperationsHandler` | Object CRUD, copy, multi-delete |
 | `S3ObjectMetadataHandler` | Object metadata: ACL, tagging, attributes |
 | `S3MultipartHandler` | Multipart upload lifecycle: initiate, upload, complete, abort, list |
@@ -86,10 +86,14 @@ image::../../c4/images/BucketManagmentComponents.png[Bucket Management Component
 
 | Component | Responsibility |
 |---|---|
-| `BucketService` | Application service: bucket lifecycle, versioning, CORS configuration |
+| `BucketService` | Application service: bucket lifecycle, versioning, CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate, analytics, inventory, metrics, intelligent-tiering configuration |
 | `Bucket` | Domain aggregate: bucket identity, name, region, storage class, versioning |
 | `BucketConfiguration` | Domain value object: bucket-level configuration (CORS rules) |
 | `CorsConfiguration` | Domain value object: CORS-related configuration |
+| `BucketAnalyticsConfiguration` | Domain value object: analytics configuration with filter rules |
+| `BucketInventoryConfiguration` | Domain value object: inventory configuration with format, frequency, enabled flag |
+| `BucketMetricsConfiguration` | Domain value object: metrics configuration with filter rules |
+| `BucketIntelligentTieringConfiguration` | Domain value object: intelligent-tiering configuration with tiering policy and auto-tiering status |
 | `BucketRepository port` | Repository port: bucket metadata e configuration persistence |
 
 === Level 2 — Component Diagram (in-memory-repository)

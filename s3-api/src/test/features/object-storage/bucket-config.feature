@@ -422,3 +422,153 @@ Feature: S3-compatible Bucket Configuration APIs (CORS, Policy, Encryption, etc.
   Scenario: Delete accelerate for nonexistent bucket
     When bucket accelerate configuration is deleted for "ghost-bucket"
     Then the response status is 404
+
+  # ── Analytics Success ──
+
+  Scenario: Put bucket analytics configuration
+    When bucket analytics is configured with id "my-analytics" and filter "documents/"
+    Then the response status is 200
+
+  Scenario: Get bucket analytics configuration
+    Given bucket analytics is preset with id "my-analytics" and filter "documents/"
+    When bucket analytics configuration is requested for id "my-analytics"
+    Then the response status is 200
+    And the metadata response contains "Id"
+
+  Scenario: Delete bucket analytics configuration
+    Given bucket analytics is preset with id "my-analytics" and filter "documents/"
+    When bucket analytics configuration is deleted for id "my-analytics"
+    Then the response status is 204
+
+  Scenario: List bucket analytics configurations
+    Given bucket analytics is preset with id "my-analytics" and filter "documents/"
+    When bucket analytics configurations are listed
+    Then the response status is 200
+
+  # ── Analytics Failure ──
+
+  Scenario: Get analytics for nonexistent bucket
+    When bucket analytics configuration is requested for "ghost-bucket" with id "x"
+    Then the response status is 404
+
+  Scenario: Get analytics when no configuration exists
+    When bucket analytics configuration is requested for id "missing-id"
+    Then the response status is 404
+
+  Scenario: Put analytics for nonexistent bucket
+    When bucket analytics is configured for "ghost-bucket" with id "x" and filter ""
+    Then the response status is 404
+
+  Scenario: Delete analytics for nonexistent bucket
+    When bucket analytics configuration is deleted for "ghost-bucket" with id "x"
+    Then the response status is 404
+
+  # ── Inventory Success ──
+
+  Scenario: Put bucket inventory configuration
+    When bucket inventory is configured with id "my-inventory" and format "CSV"
+    Then the response status is 200
+
+  Scenario: Get bucket inventory configuration
+    Given bucket inventory is preset with id "my-inventory" and format "CSV"
+    When bucket inventory configuration is requested for id "my-inventory"
+    Then the response status is 200
+    And the metadata response contains "Id"
+
+  Scenario: Delete bucket inventory configuration
+    Given bucket inventory is preset with id "my-inventory" and format "CSV"
+    When bucket inventory configuration is deleted for id "my-inventory"
+    Then the response status is 204
+
+  Scenario: List bucket inventory configurations
+    Given bucket inventory is preset with id "my-inventory" and format "CSV"
+    When bucket inventory configurations are listed
+    Then the response status is 200
+
+  # ── Inventory Failure ──
+
+  Scenario: Get inventory for nonexistent bucket
+    When bucket inventory configuration is requested for "ghost-bucket" with id "x"
+    Then the response status is 404
+
+  Scenario: Get inventory when no configuration exists
+    When bucket inventory configuration is requested for id "missing-id"
+    Then the response status is 404
+
+  Scenario: Put inventory for nonexistent bucket
+    When bucket inventory is configured for "ghost-bucket" with id "x" and format "CSV"
+    Then the response status is 404
+
+  Scenario: Delete inventory for nonexistent bucket
+    When bucket inventory configuration is deleted for "ghost-bucket" with id "x"
+    Then the response status is 404
+
+  # ── Metrics Success ──
+
+  Scenario: Put bucket metrics configuration
+    When bucket metrics is configured with id "my-metrics"
+    Then the response status is 200
+
+  Scenario: Get bucket metrics configuration
+    Given bucket metrics is preset with id "my-metrics"
+    When bucket metrics configuration is requested
+    Then the response status is 200
+    And the metadata response contains "Id"
+
+  Scenario: Delete bucket metrics configuration
+    Given bucket metrics is preset with id "my-metrics"
+    When bucket metrics configuration is deleted
+    Then the response status is 204
+
+  # ── Metrics Failure ──
+
+  Scenario: Get metrics for nonexistent bucket
+    When bucket metrics configuration is requested for "ghost-bucket"
+    Then the response status is 404
+
+  Scenario: Get metrics when no configuration exists
+    When bucket metrics configuration is requested
+    Then the response status is 404
+
+  Scenario: Put metrics for nonexistent bucket
+    When bucket metrics is configured for "ghost-bucket" with id "x"
+    Then the response status is 404
+
+  Scenario: Delete metrics for nonexistent bucket
+    When bucket metrics configuration is deleted for "ghost-bucket"
+    Then the response status is 404
+
+  # ── Intelligent-Tiering Success ──
+
+  Scenario: Put bucket intelligent-tiering configuration
+    When bucket intelligent-tiering is configured with id "my-tiering" and status "ACTIVE"
+    Then the response status is 200
+
+  Scenario: Get bucket intelligent-tiering configuration
+    Given bucket intelligent-tiering is preset with id "my-tiering" and status "ACTIVE"
+    When bucket intelligent-tiering configuration is requested
+    Then the response status is 200
+    And the metadata response contains "Id"
+
+  Scenario: Delete bucket intelligent-tiering configuration
+    Given bucket intelligent-tiering is preset with id "my-tiering" and status "ACTIVE"
+    When bucket intelligent-tiering configuration is deleted
+    Then the response status is 204
+
+  # ── Intelligent-Tiering Failure ──
+
+  Scenario: Get intelligent-tiering for nonexistent bucket
+    When bucket intelligent-tiering configuration is requested for "ghost-bucket"
+    Then the response status is 404
+
+  Scenario: Get intelligent-tiering when no configuration exists
+    When bucket intelligent-tiering configuration is requested
+    Then the response status is 404
+
+  Scenario: Put intelligent-tiering for nonexistent bucket
+    When bucket intelligent-tiering is configured for "ghost-bucket" with id "x" and status "ACTIVE"
+    Then the response status is 404
+
+  Scenario: Delete intelligent-tiering for nonexistent bucket
+    When bucket intelligent-tiering configuration is deleted for "ghost-bucket"
+    Then the response status is 404

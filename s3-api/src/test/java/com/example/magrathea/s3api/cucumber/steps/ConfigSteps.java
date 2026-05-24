@@ -1041,5 +1041,353 @@ public class ConfigSteps {
         commonSteps.setResponseStatus(result.getStatus());
     }
 
+    // ── Analytics ──
+
+    @Given("bucket analytics is preset with id {string} and filter {string}")
+    public void bucketAnalyticsPreset(String id, String filter) {
+        var body = "<AnalyticsConfiguration><Id>" + id + "</Id><Filter><Prefix>" + filter + "</Prefix></Filter></AnalyticsConfiguration>";
+        webTestClient.put()
+            .uri("/test-bucket?analytics&analyticsId=" + id)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .expectStatus().isOk();
+    }
+
+    @When("bucket analytics is configured with id {string} and filter {string}")
+    public void putBucketAnalytics(String id, String filter) {
+        var body = "<AnalyticsConfiguration><Id>" + id + "</Id><Filter><Prefix>" + filter + "</Prefix></Filter></AnalyticsConfiguration>";
+        var result = webTestClient.put()
+            .uri("/test-bucket?analytics&analyticsId=" + id)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .returnResult();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket analytics configuration is requested for id {string}")
+    public void getBucketAnalytics(String id) {
+        var result = webTestClient.get()
+            .uri("/test-bucket?analytics&analyticsId=" + id)
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket analytics configuration is deleted for id {string}")
+    public void deleteBucketAnalytics(String id) {
+        var status = webTestClient.delete()
+            .uri("/test-bucket?analytics&analyticsId=" + id)
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket analytics configurations are listed")
+    public void listBucketAnalytics() {
+        var result = webTestClient.get()
+            .uri("/test-bucket?analytics&list-type")
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket analytics configuration is requested for {string} with id {string}")
+    public void getBucketAnalyticsFor(String bucket, String id) {
+        var result = webTestClient.get()
+            .uri("/{bucket}?analytics&analyticsId={id}", bucket, id)
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket analytics is configured for {string} with id {string} and filter {string}")
+    public void putBucketAnalyticsFor(String bucket, String id, String filter) {
+        var body = "<AnalyticsConfiguration><Id>" + id + "</Id><Filter><Prefix>" + filter + "</Prefix></Filter></AnalyticsConfiguration>";
+        var result = webTestClient.put()
+            .uri("/{bucket}?analytics&analyticsId={id}", bucket, id)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .returnResult();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket analytics configuration is deleted for {string} with id {string}")
+    public void deleteBucketAnalyticsFor(String bucket, String id) {
+        var status = webTestClient.delete()
+            .uri("/{bucket}?analytics&analyticsId={id}", bucket, id)
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    // ── Inventory ──
+
+    @Given("bucket inventory is preset with id {string} and format {string}")
+    public void bucketInventoryPreset(String id, String format) {
+        var body = "<InventoryConfiguration><Id>" + id + "</Id><Destination><Format>" + format + "</Format></Destination><Schedule><Frequency>Daily</Frequency></Schedule><Enabled>true</Enabled></InventoryConfiguration>";
+        webTestClient.put()
+            .uri("/test-bucket?inventory&inventoryId=" + id)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .expectStatus().isOk();
+    }
+
+    @When("bucket inventory is configured with id {string} and format {string}")
+    public void putBucketInventory(String id, String format) {
+        var body = "<InventoryConfiguration><Id>" + id + "</Id><Destination><Format>" + format + "</Format></Destination><Schedule><Frequency>Daily</Frequency></Schedule><Enabled>true</Enabled></InventoryConfiguration>";
+        var result = webTestClient.put()
+            .uri("/test-bucket?inventory&inventoryId=" + id)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .returnResult();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket inventory configuration is requested for id {string}")
+    public void getBucketInventory(String id) {
+        var result = webTestClient.get()
+            .uri("/test-bucket?inventory&inventoryId=" + id)
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket inventory configuration is deleted for id {string}")
+    public void deleteBucketInventory(String id) {
+        var status = webTestClient.delete()
+            .uri("/test-bucket?inventory&inventoryId=" + id)
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket inventory configurations are listed")
+    public void listBucketInventory() {
+        var result = webTestClient.get()
+            .uri("/test-bucket?inventory&list-type")
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket inventory configuration is requested for {string} with id {string}")
+    public void getBucketInventoryFor(String bucket, String id) {
+        var result = webTestClient.get()
+            .uri("/{bucket}?inventory&inventoryId={id}", bucket, id)
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket inventory is configured for {string} with id {string} and format {string}")
+    public void putBucketInventoryFor(String bucket, String id, String format) {
+        var body = "<InventoryConfiguration><Id>" + id + "</Id><Destination><Format>" + format + "</Format></Destination><Schedule><Frequency>Daily</Frequency></Schedule><Enabled>true</Enabled></InventoryConfiguration>";
+        var result = webTestClient.put()
+            .uri("/{bucket}?inventory&inventoryId={id}", bucket, id)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .returnResult();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket inventory configuration is deleted for {string} with id {string}")
+    public void deleteBucketInventoryFor(String bucket, String id) {
+        var status = webTestClient.delete()
+            .uri("/{bucket}?inventory&inventoryId={id}", bucket, id)
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    // ── Metrics ──
+
+    @Given("bucket metrics is preset with id {string}")
+    public void bucketMetricsPreset(String id) {
+        var body = "<MetricsConfiguration><Id>" + id + "</Id></MetricsConfiguration>";
+        webTestClient.put()
+            .uri("/test-bucket?metrics&id=" + id)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .expectStatus().isOk();
+    }
+
+    @When("bucket metrics is configured with id {string}")
+    public void putBucketMetrics(String id) {
+        var body = "<MetricsConfiguration><Id>" + id + "</Id></MetricsConfiguration>";
+        var result = webTestClient.put()
+            .uri("/test-bucket?metrics&id=" + id)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .returnResult();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket metrics configuration is requested")
+    public void getBucketMetrics() {
+        var result = webTestClient.get()
+            .uri("/test-bucket?metrics")
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket metrics configuration is deleted")
+    public void deleteBucketMetrics() {
+        var status = webTestClient.delete()
+            .uri("/test-bucket?metrics")
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket metrics configuration is requested for {string}")
+    public void getBucketMetricsFor(String bucket) {
+        var result = webTestClient.get()
+            .uri("/{bucket}?metrics", bucket)
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket metrics is configured for {string} with id {string}")
+    public void putBucketMetricsFor(String bucket, String id) {
+        var body = "<MetricsConfiguration><Id>" + id + "</Id></MetricsConfiguration>";
+        var result = webTestClient.put()
+            .uri("/{bucket}?metrics&id={id}", bucket, id)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .returnResult();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket metrics configuration is deleted for {string}")
+    public void deleteBucketMetricsFor(String bucket) {
+        var status = webTestClient.delete()
+            .uri("/{bucket}?metrics", bucket)
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    // ── Intelligent-Tiering ──
+
+    @Given("bucket intelligent-tiering is preset with id {string} and status {string}")
+    public void bucketIntelligentTieringPreset(String id, String status) {
+        var body = "<IntelligentTieringConfiguration><Id>" + id + "</Id><AutoTieringStatus>" + status + "</AutoTieringStatus></IntelligentTieringConfiguration>";
+        webTestClient.put()
+            .uri("/test-bucket?intelligent-tiering&id=" + id)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .expectStatus().isOk();
+    }
+
+    @When("bucket intelligent-tiering is configured with id {string} and status {string}")
+    public void putBucketIntelligentTiering(String id, String status) {
+        var body = "<IntelligentTieringConfiguration><Id>" + id + "</Id><AutoTieringStatus>" + status + "</AutoTieringStatus></IntelligentTieringConfiguration>";
+        var result = webTestClient.put()
+            .uri("/test-bucket?intelligent-tiering&id=" + id)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .returnResult();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket intelligent-tiering configuration is requested")
+    public void getBucketIntelligentTiering() {
+        var result = webTestClient.get()
+            .uri("/test-bucket?intelligent-tiering")
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket intelligent-tiering configuration is deleted")
+    public void deleteBucketIntelligentTiering() {
+        var status = webTestClient.delete()
+            .uri("/test-bucket?intelligent-tiering")
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket intelligent-tiering configuration is requested for {string}")
+    public void getBucketIntelligentTieringFor(String bucket) {
+        var result = webTestClient.get()
+            .uri("/{bucket}?intelligent-tiering", bucket)
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket intelligent-tiering is configured for {string} with id {string} and status {string}")
+    public void putBucketIntelligentTieringFor(String bucket, String id, String status) {
+        var body = "<IntelligentTieringConfiguration><Id>" + id + "</Id><AutoTieringStatus>" + status + "</AutoTieringStatus></IntelligentTieringConfiguration>";
+        var result = webTestClient.put()
+            .uri("/{bucket}?intelligent-tiering&id={id}", bucket, id)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(body)
+            .exchange()
+            .returnResult();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket intelligent-tiering configuration is deleted for {string}")
+    public void deleteBucketIntelligentTieringFor(String bucket) {
+        var status = webTestClient.delete()
+            .uri("/{bucket}?intelligent-tiering", bucket)
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
     // ── Then ── (uses BucketSteps.responseStatusIs and BucketSteps.metadataResponseContains)
 }

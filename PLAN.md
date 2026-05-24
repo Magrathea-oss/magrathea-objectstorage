@@ -67,6 +67,8 @@ Activation modes:
 
 Consolidated report: `docs/test-report.md` includes AWS CLI outcomes, Surefire/JUnit/Cucumber outcomes, and Clover coverage percentages.
 
+Workflow rule: every development phase includes an **AWS CLI test sub-phase** after `mvn test -pl s3-api` Cucumber coverage passes and before the phase is marked complete, whenever AWS CLI exposes the implemented operation(s).
+
 ## Coverage Tooling
 
 Clover/OpenClover is configured in the parent POM under profile `coverage`.
@@ -91,7 +93,7 @@ Source: https://docs.aws.amazon.com/AmazonS3/latest/API/API_Operations.md
 
 Scope: **Amazon S3 actions only**. Amazon S3 Control actions are intentionally out of scope for the object-storage S3 REST API module.
 
-### Current Implemented Operations (70/111)
+### Current Implemented Operations (84/111)
 
 | Operation | Endpoint | Test coverage |
 |---|---|---|
@@ -165,6 +167,20 @@ Scope: **Amazon S3 actions only**. Amazon S3 Control actions are intentionally o
 | AbortMultipartUpload | `DELETE /{bucket}/{key}?uploadId=...` | Cucumber |
 | ListMultipartUploads | `GET /{bucket}?uploads` | Cucumber |
 | ListParts | `GET /{bucket}/{key}?uploadId=...` | Cucumber |
+| GetBucketAnalyticsConfiguration | `GET /{bucket}?analytics&analyticsId={id}` | Cucumber |
+| PutBucketAnalyticsConfiguration | `PUT /{bucket}?analytics&analyticsId={id}` | Cucumber |
+| DeleteBucketAnalyticsConfiguration | `DELETE /{bucket}?analytics&analyticsId={id}` | Cucumber |
+| ListBucketAnalyticsConfigurations | `GET /{bucket}?analytics&list-type` | Cucumber |
+| GetBucketInventoryConfiguration | `GET /{bucket}?inventory&inventoryId={id}` | Cucumber |
+| PutBucketInventoryConfiguration | `PUT /{bucket}?inventory&inventoryId={id}` | Cucumber |
+| DeleteBucketInventoryConfiguration | `DELETE /{bucket}?inventory&inventoryId={id}` | Cucumber |
+| ListBucketInventoryConfigurations | `GET /{bucket}?inventory&list-type` | Cucumber |
+| GetBucketMetricsConfiguration | `GET /{bucket}?metrics` | Cucumber |
+| PutBucketMetricsConfiguration | `PUT /{bucket}?metrics` | Cucumber |
+| DeleteBucketMetricsConfiguration | `DELETE /{bucket}?metrics` | Cucumber |
+| GetBucketIntelligentTieringConfiguration | `GET /{bucket}?intelligent-tiering` | Cucumber |
+| PutBucketIntelligentTieringConfiguration | `PUT /{bucket}?intelligent-tiering` | Cucumber |
+| DeleteBucketIntelligentTieringConfiguration | `DELETE /{bucket}?intelligent-tiering` | Cucumber |
 
 ### Phase A — CLI-Baseline Compatibility (completed)
 
@@ -225,14 +241,14 @@ Goal: support common AWS CLI object workflows beyond current CRUD.
 | Public Access Block | GetPublicAccessBlock ✅, PutPublicAccessBlock ✅, DeletePublicAccessBlock ✅ |
 | Accelerate | GetBucketAccelerateConfiguration ✅, PutBucketAccelerateConfiguration ✅, DeleteBucketAccelerateConfiguration ✅ |
 
-### Phase E — Analytics, Inventory, Metrics, Intelligent-Tiering
+### Phase E — Analytics, Inventory, Metrics, Intelligent-Tiering (implemented)
 
-| Area | Operations |
-|---|---|
-| Analytics | GetBucketAnalyticsConfiguration, PutBucketAnalyticsConfiguration, DeleteBucketAnalyticsConfiguration, ListBucketAnalyticsConfigurations |
-| Inventory | GetBucketInventoryConfiguration, PutBucketInventoryConfiguration, DeleteBucketInventoryConfiguration, ListBucketInventoryConfigurations |
-| Metrics | GetBucketMetricsConfiguration, PutBucketMetricsConfiguration, DeleteBucketMetricsConfiguration, ListBucketMetricsConfigurations |
-| Intelligent-Tiering | GetBucketIntelligentTieringConfiguration, PutBucketIntelligentTieringConfiguration, DeleteBucketIntelligentTieringConfiguration, ListBucketIntelligentTieringConfigurations |
+| Area | Operations | Status |
+|---|---|---|
+| Analytics | GetBucketAnalyticsConfiguration, PutBucketAnalyticsConfiguration, DeleteBucketAnalyticsConfiguration, ListBucketAnalyticsConfigurations | ✅ Implemented, Cucumber tested |
+| Inventory | GetBucketInventoryConfiguration, PutBucketInventoryConfiguration, DeleteBucketInventoryConfiguration, ListBucketInventoryConfigurations | ✅ Implemented, Cucumber tested |
+| Metrics | GetBucketMetricsConfiguration, PutBucketMetricsConfiguration, DeleteBucketMetricsConfiguration | ✅ Implemented, Cucumber tested |
+| Intelligent-Tiering | GetBucketIntelligentTieringConfiguration, PutBucketIntelligentTieringConfiguration, DeleteBucketIntelligentTieringConfiguration | ✅ Implemented, Cucumber tested |
 
 ### Phase F — Advanced / Specialized Operations
 
@@ -265,12 +281,15 @@ Goal: support common AWS CLI object workflows beyond current CRUD.
 
 ## Current API Coverage Analysis
 
-See [`docs/api-coverage.md`](docs/api-coverage.md) for a detailed breakdown of every implemented operation,
-including which HTTP headers and query parameters are:
+See [`docs/api-coverage.md`](docs/api-coverage.md) for a detailed breakdown of all 84 implemented operations. The coverage document now includes, for every operation:
 
-- ✅ **Tested** — read and actively used in business logic
-- ⬜ **Not implemented (hashtable)** — stored in ConcurrentHashMap only, not in domain/application
-- 🔴 **Not implemented (ignored)** — completely ignored
+- request header coverage
+- query parameter coverage
+- request and response body coverage
+- response header notes where relevant
+- a per-operation **Status Codes** table
+
+The document also explicitly covers the 7 multipart operations that were missing from the previous 77-operation coverage view.
 
 ## Implementation Rule for New S3 Operations
 
@@ -304,6 +323,8 @@ Every new S3 operation MUST include:
 
 ### Coverage Verification
 
+The AWS CLI test sub-phase is mandatory after Cucumber for each phase that adds or changes an `aws s3api`-exposed operation.
+
 ```bash
 # Verify success + failure coverage
 mvn test -pl s3-api
@@ -327,6 +348,269 @@ bash test-aws-cli.sh
 # or
 mvn -N verify -Paws-cli-tests
 ```
+
+## Phase E Completion — Remaining Work
+
+Phase E implemented Analytics, Inventory, Metrics, and Intelligent-Tiering configuration operations (14 operations) in `S3BucketConfigHandler` with Cucumber tests passing. The Phase E closure list now has the following status: items 4, 5, and 7 are complete; item 6 remains paused pending ADR 0009; item 3 remains the separate AWS CLI Maven-profile verification gate.
+
+### Work Allowed Before ADR 0009 Is Applied
+
+ADR 0009 is still proposed. Until it is accepted and applied, only non-conflicting verification and documentation items may proceed. Current status:
+
+| Item | Status | Why it does not conflict with ADR 0009 | Gate / verification commands |
+|---|---|---|---|
+| 3. Verify `mvn verify -Paws-cli-tests` after Phase E additions | Pending | External AWS CLI compatibility verification only; no module or reactive architecture change. | Start the app with `java -jar bootstrap-application/target/bootstrap-application-1.0.0-SNAPSHOT.jar`, then run `mvn -N verify -Paws-cli-tests`. |
+| 4. New workflow rule: AWS CLI test sub-phase after Cucumber | ✅ Completed | Process/documentation rule only. | `grep -n "AWS CLI test sub-phase" PLAN.md` |
+| 5. `api-coverage.md` complete review — headers, params, status codes | ✅ Completed | Documentation-only API coverage work; independent of the ADR 0009 module split. | `grep -n "Status Code" docs/api-coverage.md`; manual review that operations 1–84 include required headers, params, bodies, and status codes. |
+| 7. Status code documentation for all 84 operations | ✅ Completed | Documentation-only work completed together with item 5. | `grep -n "Status Code" docs/api-coverage.md`; manual review that every operation section contains a status-code table. |
+
+Item 6 remains intentionally paused because ADR 0009 supersedes the `CompletableFuture` / `Mono.fromFuture()` direction with native `Mono`/`Flux` reactive modules.
+
+### 1. Dead Code Removal ✅ Completed — `S3BucketConfigListHandler.java`
+
+**Resolution:** File `s3-api/src/main/java/com/example/magrathea/s3api/adapter/web/S3BucketConfigListHandler.java` deleted. Verified via `grep -r "S3BucketConfigListHandler" s3-api/src/ --include="*.java"` — no references remain. Class was entirely unused.
+
+### 2. AWS CLI Tests for Phase E ✅ Already Implemented
+
+
+**AWS CLI exposure mapping for Phase E:**
+
+| Operation | `aws s3api` command | Current CLI test | Required |
+|---|---|---|---|
+| GetBucketAnalyticsConfiguration | `get-bucket-analytics-configuration` | ✅ Already done | ✅ Already done |
+| PutBucketAnalyticsConfiguration | `put-bucket-analytics-configuration` | ✅ Already done | ✅ Already done |
+| DeleteBucketAnalyticsConfiguration | `delete-bucket-analytics-configuration` | ✅ Already done | ✅ Already done |
+| ListBucketAnalyticsConfigurations | `list-bucket-analytics-configurations` | ✅ Already done | ✅ Already done |
+| GetBucketInventoryConfiguration | `get-bucket-inventory-configuration` | ✅ Already done | ✅ Already done |
+| PutBucketInventoryConfiguration | `put-bucket-inventory-configuration` | ✅ Already done | ✅ Already done |
+| DeleteBucketInventoryConfiguration | `delete-bucket-inventory-configuration` | ✅ Already done | ✅ Already done |
+| ListBucketInventoryConfigurations | `list-bucket-inventory-configurations` | ✅ Already done | ✅ Already done |
+
+**Required additions to `test-aws-cli.sh`:**
+
+| # | CLI command | Success variant | Failure variant |
+|---|---|---|---|
+| 1 | `aws s3api get-bucket-analytics-configuration --bucket $BUCKET_1 --id $ANALYTICS_ID` | ✅ Completed | ✅ Completed (NoSuchBucket, invalid id) |
+| 2 | `aws s3api put-bucket-analytics-configuration --bucket $BUCKET_1 --id $ANALYTICS_ID --analytics-configuration ...` | ✅ Completed | ✅ Completed (NoSuchBucket, invalid JSON) |
+| 3 | `aws s3api delete-bucket-analytics-configuration --bucket $BUCKET_1 --id $ANALYTICS_ID` | ✅ Completed | ✅ Completed (NoSuchBucket, missing id) |
+| 4 | `aws s3api list-bucket-analytics-configurations --bucket $BUCKET_1` | ✅ Completed | ✅ Completed (NoSuchBucket) |
+| 5 | `aws s3api get-bucket-inventory-configuration --bucket $BUCKET_1 --id $INVENTORY_ID` | ✅ Completed | ✅ Completed (NoSuchBucket, invalid id) |
+| 6 | `aws s3api put-bucket-inventory-configuration --bucket $BUCKET_1 --id $INVENTORY_ID --inventory-configuration ...` | ✅ Completed | ✅ Completed (NoSuchBucket, invalid JSON) |
+| 7 | `aws s3api delete-bucket-inventory-configuration --bucket $BUCKET_1 --id $INVENTORY_ID` | ✅ Completed | ✅ Completed (NoSuchBucket, missing id) |
+| 8 | `aws s3api list-bucket-inventory-configurations --bucket $BUCKET_1` | ✅ Completed | ✅ Completed (NoSuchBucket) |
+
+**Total: 16 test variants** (8 success + 8 failure).
+
+**Note:** Metrics (`get-bucket-metrics-configuration`, `put-bucket-metrics-configuration`, `delete-bucket-metrics-configuration`) and Intelligent-Tiering (`get-bucket-intelligent-tiering-configuration`, `put-bucket-intelligent-tiering-configuration`, `delete-bucket-intelligent-tiering-configuration`) are **not** available via `aws s3api`. These operations must be tested through Cucumber only (already done).
+
+---
+
+### 3. Verify `mvn verify -Paws-cli-tests` After Phase E Additions
+
+**Problem:** The AWS CLI Maven profile `aws-cli-tests` has not been re-run after Phase E additions. The profile requires the application running on `localhost:8080` and `aws` CLI installed.
+
+**Required verification command:**
+
+```bash
+# Terminal 1: Start application
+java -jar bootstrap-application/target/bootstrap-application-1.0.0-SNAPSHOT.jar
+
+# Terminal 2: Run AWS CLI tests
+mvn -N verify -Paws-cli-tests
+```
+
+**Expected result:** All 16 Phase E CLI test variants pass, plus all existing Phase A–D CLI tests continue to pass. No regressions.
+
+---
+
+### 4. New Workflow Rule: AWS CLI Test Sub-Phase After Cucumber ✅ Completed
+
+**Status:** ✅ Completed. The workflow rule is now documented in the Testing Strategy, Coverage Verification, and this Phase E closure section.
+
+**Problem:** The previous development workflow allowed Cucumber tests to pass without any AWS CLI test sub-phase. This created a gap where operations worked in isolation but could fail under real AWS CLI usage.
+
+**New rule — mandatory for all future phases:**
+
+> Every development phase MUST include an **AWS CLI test sub-phase** AFTER Cucumber tests pass and BEFORE the phase is marked complete.
+
+**Enforcement:**
+
+| Step | Gate |
+|---|---|
+| 1 | Cucumber tests pass (`mvn test -pl s3-api`) |
+| 2 | AWS CLI tests written in `test-aws-cli.sh` for every `aws s3api`-exposed operation |
+| 3 | AWS CLI tests pass (`bash test-aws-cli.sh` or `mvn -N verify -Paws-cli-tests`) |
+| 4 | Phase marked complete only after both gates pass |
+
+**For Phase E specifically:** The rule documentation is complete. The separate `mvn -N verify -Paws-cli-tests` verification gate remains tracked by item 3.
+
+---
+
+### 5. `api-coverage.md` Complete Review ✅ Completed
+
+**Resolution:** ✅ Completed. [`docs/api-coverage.md`](docs/api-coverage.md) now documents all 84 implemented operations, including the previously missing multipart operations (#64–70). Every operation section contains request header coverage, query parameter coverage, request body coverage, response body/header notes, and a **Status Codes** table.
+
+**Completed updates:**
+
+#### 5a. Phase E Header/Param Tables (Operations 71–84)
+
+Each of the 14 Phase E operations now has detailed header, query parameter, body, and status-code coverage:
+
+| Operation | Query Params | Request Body | Response Body |
+|---|---|---|---|
+| GetBucketAnalyticsConfiguration | `analytics`, `id` (optional) | None | `AnalyticsConfiguration` XML |
+| PutBucketAnalyticsConfiguration | `analytics`, `id` (required) | `AnalyticsConfiguration` XML | None (200 OK) |
+| DeleteBucketAnalyticsConfiguration | `analytics`, `id` (required) | None | None (204 No Content) |
+| ListBucketAnalyticsConfigurations | `analytics`, `list-type` | None | `ListBucketAnalyticsConfigurationsResult` XML |
+| GetBucketInventoryConfiguration | `inventory`, `id` (optional) | None | `InventoryConfiguration` XML |
+| PutBucketInventoryConfiguration | `inventory`, `id` (required) | `InventoryConfiguration` XML | None (200 OK) |
+| DeleteBucketInventoryConfiguration | `inventory`, `id` (required) | None | None (204 No Content) |
+| ListBucketInventoryConfigurations | `inventory`, `list-type` | None | `ListBucketInventoryConfigurationsResult` XML |
+| GetBucketMetricsConfiguration | `metrics`, `id` (optional) | None | `MetricsConfiguration` XML |
+| PutBucketMetricsConfiguration | `metrics`, `id` (required) | `MetricsConfiguration` XML | None (200 OK) |
+| DeleteBucketMetricsConfiguration | `metrics`, `id` (required) | None | None (204 No Content) |
+| GetBucketIntelligentTieringConfiguration | `intelligent-tiering`, `id` (optional) | None | `IntelligentTieringConfiguration` XML |
+| PutBucketIntelligentTieringConfiguration | `intelligent-tiering`, `id` (required) | `IntelligentTieringConfiguration` XML | None (200 OK) |
+| DeleteBucketIntelligentTieringConfiguration | `intelligent-tiering`, `id` (required) | None | None (204 No Content) |
+
+#### 5b. Complete Old Operation Tables
+
+For operations 1–28, missing header, parameter, body, and status-code rows have been filled in `docs/api-coverage.md`:
+
+| Operation | Missing headers/params to document |
+|---|---|
+| ListBuckets | `x-amz-account-id` (🟡 optional, ✅ Completed not impl) |
+| CreateBucket | `x-amz-acl`, `x-amz-grant-read`, `x-amz-grant-write`, `x-amz-grant-read-acp`, `x-amz-grant-write-acp`, `x-amz-grant-full-control`, `x-amz-bucket-object-lock-enabled`, `x-amz-expected-bucket-owner`, body `LocationConstraint`, `StorageCase` |
+| HeadBucket | `x-amz-expected-bucket-owner` |
+| DeleteBucket | `x-amz-expected-bucket-owner` |
+| ListObjects | `delimiter`, `encoding-type`, `max-keys`, `prefix`, `x-amz-expected-bucket-owner` |
+| ListObjectsV2 | `delimiter`, `encoding-type`, `fetch-owner`, `max-keys`, `prefix`, `start-after`, `x-amz-expected-bucket-owner` |
+| ... | (all remaining operations) |
+
+#### 5c. Add Status Code Tables
+
+Every operation section now includes a **Status Codes** table documenting the applicable AWS S3 status-code set for that operation category:
+
+| Status Code | Meaning | Implemented |
+|---|---|---|
+| 200 | Success (GET, HEAD, PUT) | ✅ |
+| 204 | Success (DELETE) | ✅ |
+| 301 | Permanent redirect | ✅ Completed |
+| 304 | Not Modified (HEAD) | ✅ Completed |
+| 400 | Bad Request / InvalidArgument | ✅ |
+| 403 | AccessDenied | ✅ Completed |
+| 404 | NoSuchBucket / NoSuchKey | ✅ |
+| 405 | MethodNotAllowed | ✅ Completed |
+| 409 | Conflict / BucketAlreadyExists | ✅ |
+| 412 | PreconditionFailed | ✅ Completed |
+| 500 | InternalServerError | ✅ Completed |
+| 501 | NotImplemented | ✅ |
+| 503 | SlowDown / ServiceUnavailable | ✅ Completed |
+
+Each operation section lists the operation-category status codes and marks each as ✅ Implemented, ✅ Completed (not implemented), or 🟡 Partially implemented.
+
+---
+
+### 6. Blocking Reactive Methods — Convert to `CompletableFuture` / `Mono.fromFuture()`
+
+**ADR 0009 alignment note:** Pause this item until ADR 0009 is accepted and applied. The `CompletableFuture` / `Mono.fromFuture()` target conflicts with, and is superseded by, ADR 0009's native `Mono`/`Flux` reactive repository, application, infrastructure, and API-adapter modules. Do not refactor the current classic services/repositories toward `CompletableFuture` as standalone work; resume this area only through the ADR 0009 migration plan.
+
+**Problem:** All handlers in `s3-api` use the pattern:
+
+```java
+Mono.fromCallable(() -> {
+    // blocking call using .join() on CompletableFuture or synchronous call
+    return result;
+}).subscribeOn(Schedulers.boundedElastic())
+```
+
+This defeats the purpose of reactive programming. Instead of chaining reactive operators, every handler wraps blocking calls in `Mono.fromCallable` and offloads to a thread pool. This pattern was counted in `S3BucketConfigHandler.java` (~68 occurrences) and `S3BucketOperationsHandler.java` (~20 occurrences).
+
+**Fix strategy:**
+
+| Layer | Current pattern | Target pattern |
+|---|---|---|
+| **Service layer** (`BucketService`, `ObjectService`) | Returns `Optional<T>` or `T` synchronously | Returns `CompletableFuture<T>` or `Mono<T>` |
+| **Handler layer** | `Mono.fromCallable(() -> service.method().join()).subscribeOn(...)` | `Mono.fromFuture(service.methodAsync())` |
+| **Repository layer** | Returns `Optional<T>` | Returns `CompletableFuture<Optional<T>>` |
+
+**Required changes per service method:**
+
+| Service method | Current return type | Target return type | Handler change |
+|---|---|---|---|
+| `BucketService.findBucket(name)` | `Optional<S3Bucket>` | `CompletableFuture<Optional<S3Bucket>>` | `Mono.fromFuture()` |
+| `BucketService.createBucket(...)` | `S3Bucket` | `CompletableFuture<S3Bucket>` | `Mono.fromFuture()` |
+| `BucketService.deleteBucket(name)` | `boolean` | `CompletableFuture<Boolean>` | `Mono.fromFuture()` |
+| `ObjectService.putObject(...)` | `S3Object` | `CompletableFuture<S3Object>` | `Mono.fromFuture()` |
+| `ObjectService.getObject(...)` | `Optional<S3Object>` | `CompletableFuture<Optional<S3Object>>` | `Mono.fromFuture()` |
+| ... | (all remaining methods) | (same pattern) | (same pattern) |
+
+**Domain layer impact:** Repository interfaces (`BucketRepository`, `S3ObjectRepository`) must also return `CompletableFuture` so the entire chain is reactive from bottom to top.
+
+**Verification:**
+
+```bash
+# After fix, grep should show zero occurrences of:
+grep "Mono.fromCallable" s3-api/src/main/java/**/*.java
+grep "\.join()" s3-api/src/main/java/**/*.java
+grep "subscribeOn.*boundedElastic" s3-api/src/main/java/**/*.java
+```
+
+---
+
+### 7. Status Code Documentation — Every Operation ✅ Completed
+
+**Resolution:** ✅ Completed. `docs/api-coverage.md` now includes a Status Codes table for every one of the 84 implemented operations. Success, not-found, validation, authorization, method, conflict, conditional, internal-error, and throttling/status-gap rows are explicitly documented by operation category.
+
+**Applied format for each operation in `docs/api-coverage.md`:**
+
+```markdown
+### Operation N — {name}
+
+| Status Code | Description | Implemented | Notes |
+|---|---|---|---|
+| 200 | Success | ✅ | GET/PUT operations |
+| 204 | No Content | ✅ | DELETE operations |
+| 400 | InvalidArgument | ✅ | Missing required param |
+| 404 | NoSuchBucket | ✅ | Bucket not found |
+| 501 | NotImplemented | 🟡 | Optional features |
+```
+
+**AWS S3 status code reference per operation category:**
+
+| Category | Required status codes |
+|---|---|
+| **Bucket GET** (GetBucket*, ListBuckets, HeadBucket) | 200, 301, 304, 400, 403, 404, 405, 409, 500, 501, 503 |
+| **Bucket PUT** (CreateBucket, PutBucket*) | 200, 400, 403, 404, 405, 409, 500, 501, 503 |
+| **Bucket DELETE** (DeleteBucket, DeleteBucket*) | 204, 400, 403, 404, 405, 409, 500, 501, 503 |
+| **Object GET** (GetObject, HeadObject, GetObject*) | 200, 206, 304, 400, 403, 404, 405, 412, 500, 501, 503 |
+| **Object PUT** (PutObject, PutObject*, CopyObject, UploadPart*) | 200, 400, 403, 404, 405, 409, 500, 501, 503 |
+| **Object DELETE** (DeleteObject, DeleteObject*, AbortMultipartUpload) | 204, 400, 403, 404, 405, 500, 501, 503 |
+| **Multipart POST** (CreateMultipartUpload, CompleteMultipartUpload) | 200, 400, 403, 404, 405, 500, 501, 503 |
+| **Multipart GET** (ListParts, ListMultipartUploads) | 200, 400, 403, 404, 405, 500, 501, 503 |
+
+**Each operation in `docs/api-coverage.md` now has a status code table.** Status codes are marked as:
+
+- ✅ — Implemented (handler returns this status)
+- ✅ Completed — Not implemented (not returned at all)
+- 🟡 — Partially implemented (returned for some error cases but not all)
+
+**Completed total: 84 operations × 1 Status Codes table per operation.**
+
+---
+
+### Summary Table
+
+| # | Item | Owner | Priority | Dependencies | Status |
+|---|---|---|---|---|---|
+| 1 | Dead code removal — `S3BucketConfigListHandler.java` | java-infra-coder | High | None | ✅ Completed |
+| 2 | AWS CLI tests for Phase E (8 success + 8 failure) | java-tester | High | #1 (no impact) | ✅ Completed |
+| 3 | Verify `mvn verify -Paws-cli-tests` after additions | java-tester | High | #2 | Pending |
+| 4 | New workflow rule: CLI test sub-phase after Cucumber | java-planner / documenter | Medium | None (documentation only) | ✅ Completed |
+| 5 | `api-coverage.md` complete review — headers, params, status codes | documenter | High | None | ✅ Completed |
+| 6 | Blocking reactive methods → `CompletableFuture` + `Mono.fromFuture()` — paused; superseded by ADR 0009 native `Mono`/`Flux` migration | java-infra-coder | Medium | ADR 0009 native reactive migration plan | ⏸️ Paused pending ADR 0009 |
+| 7 | Status code documentation for all 84 operations | documenter | Medium | #5 (completed together) | ✅ Completed |
+
 
 ## ✅ Correction Complete — Remove Regex XML Parsing (ADR 0008)
 

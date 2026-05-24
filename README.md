@@ -21,7 +21,7 @@
 ## Features
 
 - **S3-compatible API only** — no custom internal REST API
-- **Implemented operations** — 27 Amazon S3 actions, including bucket/object CRUD, ListObjectsV2, CopyObject, DeleteObjects, bucket location/versioning, object versions, ACLs, tagging, and object attributes
+- **Implemented operations** — 84 Amazon S3 actions, including bucket/object CRUD, ListObjectsV2, CopyObject, DeleteObjects, bucket location/versioning, object versions, ACLs, tagging, object attributes, bucket configuration (CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate), multipart uploads, and analytics, inventory, metrics, intelligent-tiering configuration
 - **Pluggable S3 API** — auto-configured when `s3-api` is on the classpath; disabled with `s3.api.enabled=false`
 - **Spring Boot 4 WebFlux** — functional RouterFunction endpoints
 - **Jackson 3 XML** — `tools.jackson.dataformat:jackson-dataformat-xml` with custom WebFlux encoder
@@ -146,14 +146,11 @@ The implementation plan tracks all Amazon S3 actions from:
 
 <https://docs.aws.amazon.com/AmazonS3/latest/API/API_Operations.md>
 
-Current coverage: **27 / 111 Amazon S3 actions**.
+Current coverage: **84 / 111 Amazon S3 actions**.
 
-Phases A and B are complete. Highest priority next operations:
+Phases A, B, C, D, and E are complete. Next operations:
 
-1. Multipart upload flow
-2. Bucket configuration APIs
-3. Analytics, inventory, metrics, and intelligent-tiering APIs
-4. Advanced/specialized operations
+1. Advanced/specialized operations (Phase F)
 
 See [`PLAN.md`](PLAN.md) for the full phased inclusion plan.
 

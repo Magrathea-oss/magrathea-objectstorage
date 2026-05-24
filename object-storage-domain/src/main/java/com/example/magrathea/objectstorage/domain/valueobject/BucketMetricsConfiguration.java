@@ -8,16 +8,11 @@ import java.util.Objects;
  */
 public record BucketMetricsConfiguration(
     String bucketName,
-    String id,
-    String metricsKey,
-    String prefix,
-    String location
+    String metricsId,
+    String filterRule
 ) {
     public BucketMetricsConfiguration {
         Objects.requireNonNull(bucketName);
-    }
-
-    public boolean hasMetrics() {
-        return id != null && !id.isBlank();
+        // metricsId and filterRule are optional (nullable)
     }
 }

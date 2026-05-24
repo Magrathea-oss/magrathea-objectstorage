@@ -8,17 +8,11 @@ import java.util.Objects;
  */
 public record BucketAnalyticsConfiguration(
     String bucketName,
-    String id,
-    String analyticsKey,
-    String format,
-    String prefix,
-    String location
+    String analyticsId,
+    String filterRule
 ) {
     public BucketAnalyticsConfiguration {
         Objects.requireNonNull(bucketName);
-    }
-
-    public boolean hasAnalytics() {
-        return id != null && !id.isBlank();
+        // analyticsId and filterRule are optional (nullable)
     }
 }

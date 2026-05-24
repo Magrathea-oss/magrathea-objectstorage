@@ -9,7 +9,7 @@ workspace "Magrathea ObjectStorage" "C4 model for the Magrathea S3-compatible ob
       s3ApiAdapter = container "s3-api-adapter" "HTTP adapter that exposes the S3-compatible REST API and translates HTTP/XML/binary requests into application use cases." "Spring Boot 4 WebFlux, RouterFunction, Java 21, Jackson XML" {
         bucketOperationsHandler = component "S3BucketOperationsHandler" "Handles bucket lifecycle endpoints: create, delete, head, list, location and versioning." "Java WebFlux handler"
         bucketMetadataHandler = component "S3BucketMetadataHandler" "Handles bucket metadata endpoints such as ACL and tagging." "Java WebFlux handler"
-        bucketConfigHandler = component "S3BucketConfigHandler" "Handles bucket configuration endpoints such as CORS." "Java WebFlux handler"
+        bucketConfigHandler = component "S3BucketConfigHandler" "Handles bucket configuration endpoints: CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate, analytics, inventory, metrics, intelligent-tiering configuration." "Java WebFlux handler"
         objectOperationsHandler = component "S3ObjectOperationsHandler" "Handles object operations: put, get, head, delete, copy and multi-delete." "Java WebFlux handler"
         objectMetadataHandler = component "S3ObjectMetadataHandler" "Handles object metadata endpoints such as ACL, tagging and attributes." "Java WebFlux handler"
         multipartHandler = component "S3MultipartHandler" "Handles multipart upload lifecycle: initiate, upload part, list parts, complete, abort and list uploads." "Java WebFlux handler"
@@ -27,10 +27,14 @@ workspace "Magrathea ObjectStorage" "C4 model for the Magrathea S3-compatible ob
       }
 
       bucketManagment = container "bucket-managment" "Bucket management capability: bucket lifecycle, metadata, configuration, CORS/versioning and bucket-level operations." "Java 21 application/domain services" {
-        bucketService = component "BucketService" "Application service for bucket lifecycle, versioning and CORS configuration." "Spring @Service"
+        bucketService = component "BucketService" "Application service for bucket lifecycle, versioning, CORS, analytics, inventory, metrics, intelligent-tiering configuration." "Spring @Service"
         bucket = component "Bucket" "Domain aggregate for bucket identity, name, region, storage class and versioning/encryption state." "Domain aggregate"
-        bucketConfiguration = component "BucketConfiguration" "Domain value object representing bucket-level configuration such as CORS rules." "Domain value object"
-        corsConfiguration = component "CorsConfiguration" "Domain value object for CORS-related configuration." "Domain value object"
+        bucketConfiguration = component "BucketConfiguration" "Domain value object representing bucket-level configuration such as CORS rules, lifecycle rules, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate, analytics, inventory, metrics, intelligent-tiering." "Domain value object"
+        corsConfiguration = component "CorsConfiguration" "Domain value object for CORS-related configuration rules." "Domain value object"
+        bucketAnalyticsConfiguration = component "BucketAnalyticsConfiguration" "Domain value object for analytics configuration with filter rules." "Domain value object"
+        bucketInventoryConfiguration = component "BucketInventoryConfiguration" "Domain value object for inventory configuration with format, frequency, enabled flag." "Domain value object"
+        bucketMetricsConfiguration = component "BucketMetricsConfiguration" "Domain value object for metrics configuration with filter rules." "Domain value object"
+        bucketIntelligentTieringConfiguration = component "BucketIntelligentTieringConfiguration" "Domain value object for intelligent-tiering configuration with tiering policy and auto-tiering status." "Domain value object"
         bucketRepositoryPort = component "BucketRepository port" "Repository port for bucket metadata and bucket configuration persistence." "Domain repository interface"
       }
 
@@ -51,7 +55,7 @@ workspace "Magrathea ObjectStorage" "C4 model for the Magrathea S3-compatible ob
     magrathea.s3ApiAdapter.bucketOperationsHandler -> magrathea.bucketManagment.bucketService "Calls bucket lifecycle and listing use cases" "Java service calls"
     magrathea.s3ApiAdapter.bucketOperationsHandler -> magrathea.objectStore.objectService "Calls object listing use cases" "Java service calls"
     magrathea.s3ApiAdapter.bucketMetadataHandler -> magrathea.bucketManagment.bucketService "Calls bucket metadata use cases" "Java service calls"
-    magrathea.s3ApiAdapter.bucketConfigHandler -> magrathea.bucketManagment.bucketService "Calls bucket CORS/configuration use cases" "Java service calls"
+    magrathea.s3ApiAdapter.bucketConfigHandler -> magrathea.bucketManagment.bucketService "Calls bucket CORS/lifecycle/policy/encryption/logging/website/notification/replication/request-payment/ownership-controls/public-access-block/accelerate/analytics/inventory/metrics/intelligent-tiering use cases" "Java service calls"
     magrathea.s3ApiAdapter.objectOperationsHandler -> magrathea.bucketManagment.bucketService "Checks bucket existence" "Java service calls"
     magrathea.s3ApiAdapter.objectOperationsHandler -> magrathea.objectStore.objectService "Calls object CRUD/content use cases" "Java service calls"
     magrathea.s3ApiAdapter.objectMetadataHandler -> magrathea.bucketManagment.bucketService "Checks bucket existence" "Java service calls"
@@ -76,6 +80,10 @@ workspace "Magrathea ObjectStorage" "C4 model for the Magrathea S3-compatible ob
     magrathea.bucketManagment.bucketService -> magrathea.bucketManagment.bucket "Creates/updates bucket aggregate" "Java calls"
     magrathea.bucketManagment.bucketService -> magrathea.bucketManagment.bucketConfiguration "Creates/updates bucket configuration" "Java calls"
     magrathea.bucketManagment.bucketService -> magrathea.bucketManagment.corsConfiguration "Maps CORS commands to domain rules" "Java calls"
+    magrathea.bucketManagment.bucketService -> magrathea.bucketManagment.bucketAnalyticsConfiguration "Creates/updates analytics configuration" "Java calls"
+    magrathea.bucketManagment.bucketService -> magrathea.bucketManagment.bucketInventoryConfiguration "Creates/updates inventory configuration" "Java calls"
+    magrathea.bucketManagment.bucketService -> magrathea.bucketManagment.bucketMetricsConfiguration "Creates/updates metrics configuration" "Java calls"
+    magrathea.bucketManagment.bucketService -> magrathea.bucketManagment.bucketIntelligentTieringConfiguration "Creates/updates intelligent-tiering configuration" "Java calls"
     magrathea.bucketManagment.bucketService -> magrathea.inMemoryRepository.inMemoryBucketRepository "Persists and reads bucket aggregate" "Repository interfaces"
 
     magrathea.bucketManagment.bucketRepositoryPort -> magrathea.inMemoryRepository.inMemoryBucketRepository "Implemented by" "Implements"
