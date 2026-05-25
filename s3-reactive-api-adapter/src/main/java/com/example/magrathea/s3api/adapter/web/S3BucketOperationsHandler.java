@@ -1,7 +1,7 @@
 package com.example.magrathea.s3api.adapter.web;
 
-import com.example.magrathea.objectstorage.domain.model.Bucket;
-import com.example.magrathea.objectstorage.domain.model.S3Object;
+import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
+import com.example.magrathea.objectstorage.domain.aggregate.S3Object;
 import com.example.magrathea.objectstorage.domain.valueobject.ObjectKey;
 import com.example.magrathea.objectstorage.domain.valueobject.Region;
 import com.example.magrathea.objectstorage.domain.valueobject.StorageClass;
@@ -70,7 +70,7 @@ public class S3BucketOperationsHandler {
                     return S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "InvalidBucketName",
                         "Bucket name must be lowercase, no underscores");
                 }
-                var bucketId = Bucket.BucketId.generate();
+                var bucketId = Bucket.Id.generate();
                 var bucket = Bucket.create(bucketId, bucketName, Region.US_EAST_1, StorageClass.STANDARD);
                 return bucketService.createBucket(bucket)
                     .then(ServerResponse.ok()
@@ -151,6 +151,19 @@ public class S3BucketOperationsHandler {
                 .flatMap(result -> ServerResponse.ok()
                     .contentType(MediaType.APPLICATION_XML)
                     .bodyValue(result)))
+            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+    }
+
+    /**
+     * GET /{bucket} — Website hosting routing.
+     * Checks if the bucket has website configuration and handles the request as a website request.
+     * Falls through to listObjectsXml if no website config is found.
+     */
+    public Mono<ServerResponse> websiteRouting(ServerRequest request) {
+        var bucketName = request.pathVariable("bucket");
+        return bucketService.findByName(bucketName)
+            .flatMap(bucket -> S3WebSupport.handleWebsiteRequest(request, bucket)
+                .switchIfEmpty(Mono.defer(() -> listObjectsXml(request))))
             .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
     }
 

@@ -1,6 +1,6 @@
 package com.example.magrathea.s3api.dto.query;
 
-import com.example.magrathea.objectstorage.domain.model.Bucket;
+import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketLoggingConfiguration;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
@@ -22,10 +22,4 @@ public record BucketLoggingQuery(
         return new BucketLoggingQuery(c.targetBucket(), c.targetPrefix());
     }
 
-    public static BucketLoggingQuery from(Bucket.BucketConfiguration config) {
-        if (!config.hasLogging()) {
-            throw new IllegalArgumentException("No logging configuration");
-        }
-        return new BucketLoggingQuery(config.loggingTargetBucket(), config.loggingTargetPrefix());
-    }
 }

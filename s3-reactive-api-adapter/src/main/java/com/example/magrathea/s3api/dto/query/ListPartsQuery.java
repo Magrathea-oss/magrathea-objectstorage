@@ -1,60 +1,48 @@
 package com.example.magrathea.s3api.dto.query;
 
+import tools.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
+import tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;
+import tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
+
 /**
  * Response for GET /{bucket}/{key}?uploadId (ListParts).
- * Builds XML reactively from Flux<PartEntry> without holding the full list in memory.
+ * Uses Jackson XML annotations for serialization via Jackson XML codec.
  */
-public record ListPartsQuery(String xmlContent) {
-
+@JacksonXmlRootElement(localName = "ListPartsResult")
+public record ListPartsQuery(
+    @JacksonXmlProperty(localName = "Bucket")
+    String bucket,
+    @JacksonXmlProperty(localName = "Key")
+    String key,
+    @JacksonXmlProperty(localName = "UploadId")
+    String uploadId,
+    @JacksonXmlElementWrapper(localName = "Part", useWrapping = false)
+    @JacksonXmlProperty(localName = "Part")
+    List<PartEntry> parts
+) {
     /**
-     * Builds the ListPartsResult XML reactively by streaming each PartEntry
-     * into XML fragments and accumulating them in a StringBuilder.
+     * Builds the ListPartsResult reactively by collecting PartEntry flux into a list.
      */
     public static Mono<ListPartsQuery> from(String bucket, String key, String uploadId, Flux<PartEntry> parts) {
-        String escapedBucket = xmlEscape(bucket);
-        String escapedKey = xmlEscape(key);
-        String escapedUploadId = xmlEscape(uploadId);
-        return parts
-            .map(p -> {
-                int partNumber = p.partNumber();
-                String etag = xmlEscape(p.etag());
-                return "<Part><PartNumber>" + partNumber + "</PartNumber><ETag>" + etag + "</ETag></Part>";
-            })
-            .collect(StringBuilder::new, (sb, s) -> sb.append(s), StringBuilder::append)
-            .map(sb -> {
-                String partsXml = sb.toString();
-                return "<ListPartsResult><Bucket>" + escapedBucket + "</Bucket><Key>" + escapedKey + "</Key><UploadId>" + escapedUploadId + "</UploadId>" + partsXml + "</ListPartsResult>";
-            })
-            .map(ListPartsQuery::new);
+        return parts.collectList()
+            .map(list -> new ListPartsQuery(bucket, key, uploadId, list));
     }
 
     /**
-     * Returns the raw XML content for direct response body writing.
-     */
-    public String xmlContent() {
-        return xmlContent;
-    }
-
-    /**
-     * Helper record to hold part entry data for conversion to XML fragments.
+     * Inner record for each part entry in the result.
      */
     public record PartEntry(
+        @JacksonXmlProperty(localName = "PartNumber")
         int partNumber,
+        @JacksonXmlProperty(localName = "ETag")
         String etag
     ) {
         public static PartEntry from(int partNumber, String etag) {
             return new PartEntry(partNumber, etag);
         }
-    }
-
-    private static String xmlEscape(String s) {
-        if (s == null) return "";
-        return s.replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\"", "&quot;");
     }
 }

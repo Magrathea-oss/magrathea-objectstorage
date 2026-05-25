@@ -1,6 +1,6 @@
 package com.example.magrathea.s3api.dto.query;
 
-import com.example.magrathea.objectstorage.domain.model.Bucket;
+import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
 import com.example.magrathea.objectstorage.domain.valueobject.PublicAccessBlockConfiguration;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
@@ -31,15 +31,4 @@ public record PublicAccessBlockQuery(
         );
     }
 
-    public static PublicAccessBlockQuery from(Bucket.BucketConfiguration config) {
-        if (!config.hasPublicAccessBlock()) {
-            throw new IllegalArgumentException("No public access block configuration");
-        }
-        return new PublicAccessBlockQuery(
-            String.valueOf(config.publicAccessBlockBlockPublicAcls()),
-            String.valueOf(config.publicAccessBlockIgnorePublicAcls()),
-            String.valueOf(config.publicAccessBlockBlockPublicPolicy()),
-            String.valueOf(config.publicAccessBlockRestrictPublicBuckets())
-        );
-    }
 }

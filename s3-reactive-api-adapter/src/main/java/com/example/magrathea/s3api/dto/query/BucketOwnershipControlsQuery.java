@@ -1,6 +1,6 @@
 package com.example.magrathea.s3api.dto.query;
 
-import com.example.magrathea.objectstorage.domain.model.Bucket;
+import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketOwnershipControls;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
@@ -22,10 +22,4 @@ public record BucketOwnershipControlsQuery(
         return new BucketOwnershipControlsQuery(c.ruleId(), c.ownership());
     }
 
-    public static BucketOwnershipControlsQuery from(Bucket.BucketConfiguration config) {
-        if (!config.hasOwnershipControls()) {
-            throw new IllegalArgumentException("No ownership controls");
-        }
-        return new BucketOwnershipControlsQuery(config.ownershipControlsRuleId(), config.ownershipControlsOwnership());
-    }
 }

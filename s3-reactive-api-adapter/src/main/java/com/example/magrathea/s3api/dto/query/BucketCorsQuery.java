@@ -1,7 +1,6 @@
 package com.example.magrathea.s3api.dto.query;
 
-import com.example.magrathea.objectstorage.domain.model.Bucket;
-import com.example.magrathea.objectstorage.domain.valueobject.BucketConfiguration;
+import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
@@ -17,7 +16,7 @@ public record BucketCorsQuery(
     @JacksonXmlProperty(localName = "CORSRule")
     List<CorsRuleEntry> corsRules
 ) {
-    public static BucketCorsQuery from(String bucket, Optional<BucketConfiguration> config) {
+    public static BucketCorsQuery from(String bucket, Optional<Bucket.Configuration> config) {
         if (config.isEmpty() || !config.get().hasCors()) {
             throw new IllegalArgumentException("No CORS configuration");
         }
@@ -29,17 +28,6 @@ public record BucketCorsQuery(
         return new BucketCorsQuery(rules);
     }
 
-    public static BucketCorsQuery from(String bucket, Bucket.BucketConfiguration config) {
-        if (!config.hasCors()) {
-            throw new IllegalArgumentException("No CORS configuration");
-        }
-        var rules = config.corsRules().stream()
-            .map(r -> new CorsRuleEntry(
-                r.allowedOrigins(), r.allowedMethods(), r.allowedHeaders(),
-                r.maxAgeSeconds(), r.exposeHeaders(), r.id()))
-            .toList();
-        return new BucketCorsQuery(rules);
-    }
 
     public record CorsRuleEntry(
         @JacksonXmlElementWrapper(localName = "AllowedOrigin", useWrapping = false)

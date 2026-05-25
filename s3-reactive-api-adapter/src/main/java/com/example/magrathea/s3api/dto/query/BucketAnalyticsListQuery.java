@@ -1,44 +1,23 @@
 package com.example.magrathea.s3api.dto.query;
 
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
+import tools.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
+import tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;
+import tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
+
+import java.util.List;
 
 /**
  * Response for GET /{bucket}?analytics&list-type (ListBucketAnalyticsConfigurations).
- * Builds XML reactively from Flux<String> analytics IDs without holding the full list in memory.
+ * Uses Jackson XML annotations for serialization via Jackson XML codec.
  */
-public record BucketAnalyticsListQuery(String xmlContent) {
-
-    /**
-     * Builds the ListAnalyticsConfigurationsResult XML reactively by streaming each analytics ID
-     * into XML fragments and accumulating them in a StringBuilder.
-     */
-    public static Mono<BucketAnalyticsListQuery> fromIds(Flux<String> analyticsIds) {
-        return analyticsIds
-            .map(id -> {
-                String escapedId = xmlEscape(id);
-                return "<AnalyticsConfiguration><Id>" + escapedId + "</Id></AnalyticsConfiguration>";
-            })
-            .collect(StringBuilder::new, (sb, s) -> sb.append(s), StringBuilder::append)
-            .map(sb -> {
-                String configsXml = sb.toString();
-                return "<ListAnalyticsConfigurationsResult>" + configsXml + "</ListAnalyticsConfigurationsResult>";
-            })
-            .map(BucketAnalyticsListQuery::new);
-    }
-
-    /**
-     * Returns the raw XML content for direct response body writing.
-     */
-    public String xmlContent() {
-        return xmlContent;
-    }
-
-    private static String xmlEscape(String s) {
-        if (s == null) return "";
-        return s.replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\"", "&quot;");
-    }
+@JacksonXmlRootElement(localName = "ListAnalyticsConfigurationsResult")
+public record BucketAnalyticsListQuery(
+    @JacksonXmlElementWrapper(localName = "AnalyticsConfiguration", useWrapping = false)
+    @JacksonXmlProperty(localName = "AnalyticsConfiguration")
+    List<AnalyticsConfigurationEntry> configurations
+) {
+    public record AnalyticsConfigurationEntry(
+        @JacksonXmlProperty(localName = "Id")
+        String id
+    ) {}
 }

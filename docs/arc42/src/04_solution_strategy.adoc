@@ -21,6 +21,37 @@ ifndef::imagesdir[:imagesdir: ../images]
 | Jackson XML for S3 responses | Auto-serialization, no StringBuilder XML |
 | DataBuffer for binary streaming | Reactive non-blocking I/O, WebFlux native |
 
+=== Bucket Configuration Redesign (ADR 0011)
+
+ADR 0011 records a course correction for the Bucket aggregate's configuration design.
+
+==== Problem
+
+The Bucket aggregate originally stored all configuration types (CORS, Lifecycle, Encryption, Logging, Website, Notification, Replication, Policy, PublicAccessBlock, OwnershipControls, RequestPayment, Accelerate, Analytics, Inventory, Metrics, Intelligent-Tiering) as nullable fields in a single flat `Bucket.Configuration` record. This approach:
+
+- Lost domain semantics — no invariants, no relationships between config types
+- Used a single generic `BucketConfigurationChanged` event for ALL changes
+- Left value objects floating as disconnected concepts, never properly integrated with the aggregate root
+- Created copypasta handler code (925 lines of identical pattern)
+
+==== Decision
+
+Revert `Bucket.Configuration` to CORS-only (its original scope). Model each remaining configuration feature as a dedicated value object attached to Bucket via specific `with*()` / `without*()` methods. Emit a specific domain event per config type. Study the official AWS S3 API documentation first to understand constraints, state transitions, and proper event semantics.
+
+==== Implementation Plan
+
+| Phase | Config Types | Complexity | Notes |
+|-------|-------------|-----------|-------|
+| 1 | CORS, Accelerate, RequestPayment, OwnershipControls | Simple | Already have value objects; simple XML |
+| 2 | Encryption, Logging, Website, PublicAccessBlock | Medium | Richer XML structures |
+| 3 | Lifecycle, Notification | Medium-High | Complex nested XML with filters |
+| 4 | Replication, Policy | High | Cross-bucket dependencies, JSON policy |
+| 5 | Analytics, Inventory, Metrics, Intelligent-Tiering | Medium | Multi-instance pattern with pagination |
+
+==== Open Design Issues
+
+See `docs/s3-bucket-configuration-design.md#open-design-issues` for a complete list of unresolved action-after-configuration behaviors per feature. These must be resolved before each feature is marked complete.
+
 === Quality Strategy
 
 - **Testability**: domain tested with pure JUnit (no Spring), integration tested with Cucumber BDD, S3 compatibility verified with AWS CLI

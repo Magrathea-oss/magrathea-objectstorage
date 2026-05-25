@@ -1,6 +1,6 @@
 package com.example.magrathea.s3api.dto.query;
 
-import com.example.magrathea.objectstorage.domain.model.Bucket;
+import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketLifecycleConfiguration;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;
@@ -31,21 +31,6 @@ public record BucketLifecycleQuery(
         return new BucketLifecycleQuery(rules);
     }
 
-    public static BucketLifecycleQuery from(Bucket.BucketConfiguration config) {
-        if (!config.hasLifecycle()) {
-            throw new IllegalArgumentException("No lifecycle configuration");
-        }
-        var rules = config.lifecycleRules().stream()
-            .map(r -> new RuleEntry(
-                r.id(), r.status(), r.prefix(),
-                r.expiration() != null ? new ExpirationEntry(r.expiration().days(), r.expiration().date()) : null,
-                r.noncurrentVersionExpiration() != null
-                    ? new NoncurrentVersionExpirationEntry(r.noncurrentVersionExpiration().noncurrentDays()) : null,
-                r.abortIncompleteMultipartUpload() != null
-                    ? new AbortIncompleteMultipartUploadEntry(r.abortIncompleteMultipartUpload().daysAfterInitiation()) : null))
-            .toList();
-        return new BucketLifecycleQuery(rules);
-    }
 
     public record RuleEntry(
         @JacksonXmlProperty(localName = "ID")

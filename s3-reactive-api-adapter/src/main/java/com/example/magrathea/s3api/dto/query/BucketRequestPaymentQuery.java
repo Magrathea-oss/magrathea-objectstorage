@@ -1,6 +1,6 @@
 package com.example.magrathea.s3api.dto.query;
 
-import com.example.magrathea.objectstorage.domain.model.Bucket;
+import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketRequestPaymentConfiguration;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
@@ -20,10 +20,4 @@ public record BucketRequestPaymentQuery(
         return new BucketRequestPaymentQuery(c.payer());
     }
 
-    public static BucketRequestPaymentQuery from(Bucket.BucketConfiguration config) {
-        if (!config.hasRequestPayment()) {
-            throw new IllegalArgumentException("No request payment configuration");
-        }
-        return new BucketRequestPaymentQuery(config.requestPaymentPayer());
-    }
 }

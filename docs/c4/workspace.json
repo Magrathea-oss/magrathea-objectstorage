@@ -1,0 +1,2219 @@
+{
+  "configuration" : { },
+  "description" : "C4 model for the Magrathea S3-compatible object storage service",
+  "documentation" : { },
+  "id" : 1,
+  "lastModifiedDate" : "2026-05-25T19:23:34Z",
+  "model" : {
+    "people" : [ {
+      "description" : "End user or automated client using AWS CLI, SDK, curl, or another S3-compatible HTTP client.",
+      "id" : "1",
+      "name" : "User",
+      "properties" : {
+        "structurizr.dsl.identifier" : "user"
+      },
+      "relationships" : [ {
+        "description" : "Sends S3 bucket operations requests",
+        "destinationId" : "14",
+        "id" : "48",
+        "sourceId" : "1",
+        "tags" : "Relationship",
+        "technology" : "HTTP"
+      }, {
+        "description" : "Sends S3 bucket operations requests",
+        "destinationId" : "13",
+        "id" : "49",
+        "linkedRelationshipId" : "48",
+        "sourceId" : "1",
+        "technology" : "HTTP"
+      }, {
+        "description" : "Sends S3 bucket operations requests",
+        "destinationId" : "12",
+        "id" : "50",
+        "linkedRelationshipId" : "48",
+        "sourceId" : "1",
+        "technology" : "HTTP"
+      }, {
+        "description" : "Sends S3 bucket metadata requests",
+        "destinationId" : "15",
+        "id" : "51",
+        "sourceId" : "1",
+        "tags" : "Relationship",
+        "technology" : "HTTP"
+      }, {
+        "description" : "Sends S3 bucket configuration requests",
+        "destinationId" : "16",
+        "id" : "52",
+        "sourceId" : "1",
+        "tags" : "Relationship",
+        "technology" : "HTTP"
+      }, {
+        "description" : "Sends S3 object operations requests",
+        "destinationId" : "17",
+        "id" : "53",
+        "sourceId" : "1",
+        "tags" : "Relationship",
+        "technology" : "HTTP"
+      }, {
+        "description" : "Sends S3 object metadata requests",
+        "destinationId" : "18",
+        "id" : "54",
+        "sourceId" : "1",
+        "tags" : "Relationship",
+        "technology" : "HTTP"
+      }, {
+        "description" : "Sends S3 multipart upload requests",
+        "destinationId" : "19",
+        "id" : "55",
+        "sourceId" : "1",
+        "tags" : "Relationship",
+        "technology" : "HTTP"
+      } ],
+      "tags" : "Element,Person"
+    } ],
+    "softwareSystems" : [ {
+      "description" : "Event broker for notification events and access log streaming.",
+      "documentation" : { },
+      "id" : "2",
+      "name" : "Kafka",
+      "properties" : {
+        "structurizr.dsl.identifier" : "kafka"
+      },
+      "tags" : "Element,Software System,external-system"
+    }, {
+      "description" : "AWS Simple Notification Service for event notification delivery.",
+      "documentation" : { },
+      "id" : "3",
+      "name" : "AWS SNS",
+      "properties" : {
+        "structurizr.dsl.identifier" : "awsSns"
+      },
+      "tags" : "Element,Software System,external-system"
+    }, {
+      "description" : "AWS Simple Queue Service for event notification delivery.",
+      "documentation" : { },
+      "id" : "4",
+      "name" : "AWS SQS",
+      "properties" : {
+        "structurizr.dsl.identifier" : "awsSqs"
+      },
+      "tags" : "Element,Software System,external-system"
+    }, {
+      "description" : "Search and analytics engine for access log indexing.",
+      "documentation" : { },
+      "id" : "5",
+      "name" : "ElasticSearch",
+      "properties" : {
+        "structurizr.dsl.identifier" : "elasticSearch"
+      },
+      "tags" : "Element,Software System,external-system"
+    }, {
+      "description" : "Local file system for access log output.",
+      "documentation" : { },
+      "id" : "6",
+      "name" : "File System",
+      "properties" : {
+        "structurizr.dsl.identifier" : "fileSystem"
+      },
+      "tags" : "Element,Software System,external-system"
+    }, {
+      "description" : "AWS S3 bucket for log output and analytics data export destination.",
+      "documentation" : { },
+      "id" : "7",
+      "name" : "AWS S3 Target Bucket",
+      "properties" : {
+        "structurizr.dsl.identifier" : "awsS3TargetBucket"
+      },
+      "tags" : "Element,Software System,external-system"
+    }, {
+      "description" : "Monitoring and alerting system for metrics collection.",
+      "documentation" : { },
+      "id" : "8",
+      "name" : "Prometheus",
+      "properties" : {
+        "structurizr.dsl.identifier" : "prometheus"
+      },
+      "tags" : "Element,Software System,external-system"
+    }, {
+      "description" : "AWS monitoring and observability service for metrics and logs.",
+      "documentation" : { },
+      "id" : "9",
+      "name" : "AWS CloudWatch",
+      "properties" : {
+        "structurizr.dsl.identifier" : "awsCloudWatch"
+      },
+      "tags" : "Element,Software System,external-system"
+    }, {
+      "description" : "Metrics instrumentation library facade for collecting measurements.",
+      "documentation" : { },
+      "id" : "10",
+      "name" : "Micrometer",
+      "properties" : {
+        "structurizr.dsl.identifier" : "micrometer"
+      },
+      "tags" : "Element,Software System,external-system"
+    }, {
+      "description" : "CSV or ORC format output destination for analytics data export.",
+      "documentation" : { },
+      "id" : "11",
+      "name" : "CSV/ORC Output",
+      "properties" : {
+        "structurizr.dsl.identifier" : "csvOrcOutput"
+      },
+      "tags" : "Element,Software System,external-system"
+    }, {
+      "containers" : [ {
+        "components" : [ {
+          "description" : "Handles bucket lifecycle endpoints: create, delete, head, list, location and versioning.",
+          "documentation" : { },
+          "id" : "14",
+          "name" : "S3BucketOperationsHandler",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.s3ReactiveApiAdapter.bucketOperationsHandler"
+          },
+          "relationships" : [ {
+            "description" : "Calls bucket lifecycle and listing use cases",
+            "destinationId" : "29",
+            "id" : "56",
+            "sourceId" : "14",
+            "tags" : "Relationship",
+            "technology" : "Java service calls"
+          }, {
+            "description" : "Calls bucket lifecycle and listing use cases",
+            "destinationId" : "28",
+            "id" : "57",
+            "linkedRelationshipId" : "56",
+            "sourceId" : "14",
+            "technology" : "Java service calls"
+          }, {
+            "description" : "Calls object listing use cases",
+            "destinationId" : "21",
+            "id" : "60",
+            "sourceId" : "14",
+            "tags" : "Relationship",
+            "technology" : "Java service calls"
+          }, {
+            "description" : "Calls object listing use cases",
+            "destinationId" : "20",
+            "id" : "61",
+            "linkedRelationshipId" : "60",
+            "sourceId" : "14",
+            "technology" : "Java service calls"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "Java WebFlux handler"
+        }, {
+          "description" : "Handles bucket metadata endpoints such as ACL and tagging.",
+          "documentation" : { },
+          "id" : "15",
+          "name" : "S3BucketMetadataHandler",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.s3ReactiveApiAdapter.bucketMetadataHandler"
+          },
+          "relationships" : [ {
+            "description" : "Calls bucket metadata use cases",
+            "destinationId" : "29",
+            "id" : "64",
+            "sourceId" : "15",
+            "tags" : "Relationship",
+            "technology" : "Java service calls"
+          }, {
+            "description" : "Calls bucket metadata use cases",
+            "destinationId" : "28",
+            "id" : "65",
+            "linkedRelationshipId" : "64",
+            "sourceId" : "15",
+            "technology" : "Java service calls"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "Java WebFlux handler"
+        }, {
+          "description" : "Handles bucket configuration endpoints: CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate, analytics, inventory, metrics, intelligent-tiering configuration.",
+          "documentation" : { },
+          "id" : "16",
+          "name" : "S3BucketConfigHandler",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.s3ReactiveApiAdapter.bucketConfigHandler"
+          },
+          "relationships" : [ {
+            "description" : "Calls bucket CORS/lifecycle/policy/encryption/logging/website/notification/replication/request-payment/ownership-controls/public-access-block/accelerate/analytics/inventory/metrics/intelligent-tiering use cases",
+            "destinationId" : "29",
+            "id" : "66",
+            "sourceId" : "16",
+            "tags" : "Relationship",
+            "technology" : "Java service calls"
+          }, {
+            "description" : "Calls bucket CORS/lifecycle/policy/encryption/logging/website/notification/replication/request-payment/ownership-controls/public-access-block/accelerate/analytics/inventory/metrics/intelligent-tiering use cases",
+            "destinationId" : "28",
+            "id" : "67",
+            "linkedRelationshipId" : "66",
+            "sourceId" : "16",
+            "technology" : "Java service calls"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "Java WebFlux handler"
+        }, {
+          "description" : "Handles object operations: put, get, head, delete, copy and multi-delete.",
+          "documentation" : { },
+          "id" : "17",
+          "name" : "S3ObjectOperationsHandler",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.s3ReactiveApiAdapter.objectOperationsHandler"
+          },
+          "relationships" : [ {
+            "description" : "Checks bucket existence",
+            "destinationId" : "29",
+            "id" : "68",
+            "sourceId" : "17",
+            "tags" : "Relationship",
+            "technology" : "Java service calls"
+          }, {
+            "description" : "Checks bucket existence",
+            "destinationId" : "28",
+            "id" : "69",
+            "linkedRelationshipId" : "68",
+            "sourceId" : "17",
+            "technology" : "Java service calls"
+          }, {
+            "description" : "Calls object CRUD/content use cases",
+            "destinationId" : "21",
+            "id" : "70",
+            "sourceId" : "17",
+            "tags" : "Relationship",
+            "technology" : "Java service calls"
+          }, {
+            "description" : "Calls object CRUD/content use cases",
+            "destinationId" : "20",
+            "id" : "71",
+            "linkedRelationshipId" : "70",
+            "sourceId" : "17",
+            "technology" : "Java service calls"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "Java WebFlux handler"
+        }, {
+          "description" : "Handles object metadata endpoints such as ACL, tagging and attributes.",
+          "documentation" : { },
+          "id" : "18",
+          "name" : "S3ObjectMetadataHandler",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.s3ReactiveApiAdapter.objectMetadataHandler"
+          },
+          "relationships" : [ {
+            "description" : "Checks bucket existence",
+            "destinationId" : "29",
+            "id" : "72",
+            "sourceId" : "18",
+            "tags" : "Relationship",
+            "technology" : "Java service calls"
+          }, {
+            "description" : "Checks bucket existence",
+            "destinationId" : "28",
+            "id" : "73",
+            "linkedRelationshipId" : "72",
+            "sourceId" : "18",
+            "technology" : "Java service calls"
+          }, {
+            "description" : "Calls object metadata use cases",
+            "destinationId" : "21",
+            "id" : "74",
+            "sourceId" : "18",
+            "tags" : "Relationship",
+            "technology" : "Java service calls"
+          }, {
+            "description" : "Calls object metadata use cases",
+            "destinationId" : "20",
+            "id" : "75",
+            "linkedRelationshipId" : "74",
+            "sourceId" : "18",
+            "technology" : "Java service calls"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "Java WebFlux handler"
+        }, {
+          "description" : "Handles multipart upload lifecycle: initiate, upload part, list parts, complete, abort and list uploads.",
+          "documentation" : { },
+          "id" : "19",
+          "name" : "S3MultipartHandler",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.s3ReactiveApiAdapter.multipartHandler"
+          },
+          "relationships" : [ {
+            "description" : "Calls multipart upload use cases",
+            "destinationId" : "22",
+            "id" : "76",
+            "sourceId" : "19",
+            "tags" : "Relationship",
+            "technology" : "Java service calls"
+          }, {
+            "description" : "Calls multipart upload use cases",
+            "destinationId" : "20",
+            "id" : "77",
+            "linkedRelationshipId" : "76",
+            "sourceId" : "19",
+            "technology" : "Java service calls"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "Java WebFlux handler"
+        } ],
+        "description" : "HTTP adapter that exposes the S3-compatible REST API and translates HTTP/XML/binary requests into reactive application use cases.",
+        "documentation" : { },
+        "id" : "13",
+        "name" : "s3-reactive-api-adapter",
+        "properties" : {
+          "structurizr.dsl.identifier" : "magrathea.s3ReactiveApiAdapter"
+        },
+        "relationships" : [ {
+          "description" : "Calls bucket lifecycle and listing use cases",
+          "destinationId" : "29",
+          "id" : "58",
+          "linkedRelationshipId" : "56",
+          "sourceId" : "13",
+          "technology" : "Java service calls"
+        }, {
+          "description" : "Calls bucket lifecycle and listing use cases",
+          "destinationId" : "28",
+          "id" : "59",
+          "linkedRelationshipId" : "56",
+          "sourceId" : "13",
+          "technology" : "Java service calls"
+        }, {
+          "description" : "Calls object listing use cases",
+          "destinationId" : "21",
+          "id" : "62",
+          "linkedRelationshipId" : "60",
+          "sourceId" : "13",
+          "technology" : "Java service calls"
+        }, {
+          "description" : "Calls object listing use cases",
+          "destinationId" : "20",
+          "id" : "63",
+          "linkedRelationshipId" : "60",
+          "sourceId" : "13",
+          "technology" : "Java service calls"
+        }, {
+          "description" : "Calls multipart upload use cases",
+          "destinationId" : "22",
+          "id" : "78",
+          "linkedRelationshipId" : "76",
+          "sourceId" : "13",
+          "technology" : "Java service calls"
+        } ],
+        "tags" : "Element,Container",
+        "technology" : "Spring Boot 4 WebFlux, RouterFunction, Java 21, Jackson XML"
+      }, {
+        "components" : [ {
+          "description" : "Reactive application service for object CRUD, metadata lookup, object listing and binary content retrieval.",
+          "documentation" : { },
+          "id" : "21",
+          "name" : "ReactiveObjectService",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.reactiveObjectStore.reactiveObjectService"
+          },
+          "relationships" : [ {
+            "description" : "Persists and loads objects/content via domain repository port",
+            "destinationId" : "25",
+            "id" : "79",
+            "sourceId" : "21",
+            "tags" : "Relationship",
+            "technology" : "Repository interfaces"
+          }, {
+            "description" : "Creates/restores object metadata",
+            "destinationId" : "23",
+            "id" : "80",
+            "sourceId" : "21",
+            "tags" : "Relationship",
+            "technology" : "Java calls"
+          }, {
+            "description" : "Wraps upload/download content",
+            "destinationId" : "27",
+            "id" : "81",
+            "sourceId" : "21",
+            "tags" : "Relationship",
+            "technology" : "Java calls"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "Spring @Service"
+        }, {
+          "description" : "Reactive application service for multipart upload sessions and part lifecycle.",
+          "documentation" : { },
+          "id" : "22",
+          "name" : "ReactiveMultipartUploadService",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.reactiveObjectStore.reactiveMultipartUploadService"
+          },
+          "relationships" : [ {
+            "description" : "Persists and loads multipart uploads via domain repository port",
+            "destinationId" : "26",
+            "id" : "82",
+            "sourceId" : "22",
+            "tags" : "Relationship",
+            "technology" : "Repository interfaces"
+          }, {
+            "description" : "Creates/updates multipart upload state",
+            "destinationId" : "24",
+            "id" : "83",
+            "sourceId" : "22",
+            "tags" : "Relationship",
+            "technology" : "Java calls"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "Spring @Service"
+        }, {
+          "description" : "Domain aggregate for object identity, bucket id, key, ETag, storage class and content metadata.",
+          "documentation" : { },
+          "id" : "23",
+          "name" : "S3Object",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.reactiveObjectStore.s3Object"
+          },
+          "tags" : "Element,Component",
+          "technology" : "Domain aggregate"
+        }, {
+          "description" : "Domain aggregate for multipart upload state, uploaded parts and completion/abort status.",
+          "documentation" : { },
+          "id" : "24",
+          "name" : "MultipartUpload",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.reactiveObjectStore.multipartUpload"
+          },
+          "tags" : "Element,Component",
+          "technology" : "Domain aggregate"
+        }, {
+          "description" : "Domain repository port for object metadata and binary content persistence.",
+          "documentation" : { },
+          "id" : "25",
+          "name" : "S3ObjectRepository port",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.reactiveObjectStore.s3ObjectRepositoryPort"
+          },
+          "relationships" : [ {
+            "description" : "CQS command interface for S3Object persistence",
+            "destinationId" : "35",
+            "id" : "86",
+            "sourceId" : "25",
+            "tags" : "Relationship",
+            "technology" : "Implemented by"
+          }, {
+            "description" : "CQS command interface for S3Object persistence",
+            "destinationId" : "32",
+            "id" : "87",
+            "linkedRelationshipId" : "86",
+            "sourceId" : "25",
+            "technology" : "Implemented by"
+          }, {
+            "description" : "CQS query interface for S3Object reads",
+            "destinationId" : "36",
+            "id" : "90",
+            "sourceId" : "25",
+            "tags" : "Relationship",
+            "technology" : "Implemented by"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "Domain repository interface"
+        }, {
+          "description" : "Domain repository port for multipart upload persistence.",
+          "documentation" : { },
+          "id" : "26",
+          "name" : "MultipartUploadRepository port",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.reactiveObjectStore.multipartUploadRepositoryPort"
+          },
+          "relationships" : [ {
+            "description" : "CQS command interface for MultipartUpload persistence",
+            "destinationId" : "37",
+            "id" : "92",
+            "sourceId" : "26",
+            "tags" : "Relationship",
+            "technology" : "Implemented by"
+          }, {
+            "description" : "CQS command interface for MultipartUpload persistence",
+            "destinationId" : "32",
+            "id" : "93",
+            "linkedRelationshipId" : "92",
+            "sourceId" : "26",
+            "technology" : "Implemented by"
+          }, {
+            "description" : "CQS query interface for MultipartUpload reads",
+            "destinationId" : "38",
+            "id" : "95",
+            "sourceId" : "26",
+            "tags" : "Relationship",
+            "technology" : "Implemented by"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "Domain repository interface"
+        }, {
+          "description" : "Application-layer content boundary for carrying Flux<DataBuffer> without leaking reactive types into the domain model.",
+          "documentation" : { },
+          "id" : "27",
+          "name" : "DefaultS3ObjectWrite / DefaultS3ObjectContent",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.reactiveObjectStore.contentBoundary"
+          },
+          "tags" : "Element,Component",
+          "technology" : "Java adapter"
+        } ],
+        "description" : "Reactive object storage capability: object upload, download, metadata lookup, deletion and multipart object workflows using reactive services and domain aggregates.",
+        "documentation" : { },
+        "id" : "20",
+        "name" : "reactive-object-store",
+        "properties" : {
+          "structurizr.dsl.identifier" : "magrathea.reactiveObjectStore"
+        },
+        "relationships" : [ {
+          "description" : "CQS command interface for S3Object persistence",
+          "destinationId" : "35",
+          "id" : "88",
+          "linkedRelationshipId" : "86",
+          "sourceId" : "20",
+          "technology" : "Implemented by"
+        }, {
+          "description" : "CQS command interface for S3Object persistence",
+          "destinationId" : "32",
+          "id" : "89",
+          "linkedRelationshipId" : "86",
+          "sourceId" : "20",
+          "technology" : "Implemented by"
+        }, {
+          "description" : "CQS query interface for S3Object reads",
+          "destinationId" : "36",
+          "id" : "91",
+          "linkedRelationshipId" : "90",
+          "sourceId" : "20",
+          "technology" : "Implemented by"
+        }, {
+          "description" : "CQS command interface for MultipartUpload persistence",
+          "destinationId" : "37",
+          "id" : "94",
+          "linkedRelationshipId" : "92",
+          "sourceId" : "20",
+          "technology" : "Implemented by"
+        }, {
+          "description" : "CQS query interface for MultipartUpload reads",
+          "destinationId" : "38",
+          "id" : "96",
+          "linkedRelationshipId" : "95",
+          "sourceId" : "20",
+          "technology" : "Implemented by"
+        } ],
+        "tags" : "Element,Container",
+        "technology" : "Java 21 reactive application/domain services"
+      }, {
+        "components" : [ {
+          "description" : "Reactive application service for bucket lifecycle, versioning, CORS, analytics, inventory, metrics, intelligent-tiering configuration.",
+          "documentation" : { },
+          "id" : "29",
+          "name" : "ReactiveBucketService",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.reactiveBucketManagement.reactiveBucketService"
+          },
+          "relationships" : [ {
+            "description" : "Persists and loads bucket aggregates via domain repository port",
+            "destinationId" : "31",
+            "id" : "84",
+            "sourceId" : "29",
+            "tags" : "Relationship",
+            "technology" : "Repository interfaces"
+          }, {
+            "description" : "Creates/updates bucket aggregate root (emits ObjectStorageEvent on state transitions)",
+            "destinationId" : "30",
+            "id" : "85",
+            "sourceId" : "29",
+            "tags" : "Relationship",
+            "technology" : "Java calls"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "Spring @Service"
+        }, {
+          "description" : "Domain aggregate root for bucket identity, name, region, storage class, versioning/encryption state and inline Configuration. Emits ObjectStorageEvent domain events on state transitions (withVersioningEnabled, withVersioningSuspended, withEncryptionEnabled, withConfiguration).",
+          "documentation" : { },
+          "id" : "30",
+          "name" : "Bucket",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.reactiveBucketManagement.bucket"
+          },
+          "tags" : "Element,Component",
+          "technology" : "Domain aggregate root"
+        }, {
+          "description" : "Domain repository port for bucket aggregate persistence.",
+          "documentation" : { },
+          "id" : "31",
+          "name" : "BucketRepository port",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.reactiveBucketManagement.bucketRepositoryPort"
+          },
+          "relationships" : [ {
+            "description" : "CQS command interface for Bucket persistence",
+            "destinationId" : "33",
+            "id" : "97",
+            "sourceId" : "31",
+            "tags" : "Relationship",
+            "technology" : "Implemented by"
+          }, {
+            "description" : "CQS command interface for Bucket persistence",
+            "destinationId" : "32",
+            "id" : "98",
+            "linkedRelationshipId" : "97",
+            "sourceId" : "31",
+            "technology" : "Implemented by"
+          }, {
+            "description" : "CQS query interface for Bucket reads",
+            "destinationId" : "34",
+            "id" : "101",
+            "sourceId" : "31",
+            "tags" : "Relationship",
+            "technology" : "Implemented by"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "Domain repository interface"
+        } ],
+        "description" : "Reactive bucket management capability: bucket lifecycle, metadata, configuration, CORS/versioning and bucket-level operations.",
+        "documentation" : { },
+        "id" : "28",
+        "name" : "reactive-bucket-management",
+        "properties" : {
+          "structurizr.dsl.identifier" : "magrathea.reactiveBucketManagement"
+        },
+        "relationships" : [ {
+          "description" : "CQS command interface for Bucket persistence",
+          "destinationId" : "33",
+          "id" : "99",
+          "linkedRelationshipId" : "97",
+          "sourceId" : "28",
+          "technology" : "Implemented by"
+        }, {
+          "description" : "CQS command interface for Bucket persistence",
+          "destinationId" : "32",
+          "id" : "100",
+          "linkedRelationshipId" : "97",
+          "sourceId" : "28",
+          "technology" : "Implemented by"
+        }, {
+          "description" : "CQS query interface for Bucket reads",
+          "destinationId" : "34",
+          "id" : "102",
+          "linkedRelationshipId" : "101",
+          "sourceId" : "28",
+          "technology" : "Implemented by"
+        } ],
+        "tags" : "Element,Container",
+        "technology" : "Java 21 reactive application/domain services"
+      }, {
+        "components" : [ {
+          "description" : "Write-side repository interface for bucket aggregate persistence.",
+          "documentation" : { },
+          "id" : "33",
+          "name" : "BucketCommandRepository",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.reactiveRepositoryApplication.bucketCommandRepository"
+          },
+          "relationships" : [ {
+            "description" : "Implemented by",
+            "destinationId" : "40",
+            "id" : "103",
+            "sourceId" : "33",
+            "tags" : "Relationship",
+            "technology" : "Implements"
+          }, {
+            "description" : "Implemented by",
+            "destinationId" : "39",
+            "id" : "104",
+            "linkedRelationshipId" : "103",
+            "sourceId" : "33",
+            "technology" : "Implements"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "CQS command interface"
+        }, {
+          "description" : "Read-side repository interface for bucket aggregate queries.",
+          "documentation" : { },
+          "id" : "34",
+          "name" : "BucketQueryRepository",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.reactiveRepositoryApplication.bucketQueryRepository"
+          },
+          "relationships" : [ {
+            "description" : "Implemented by",
+            "destinationId" : "40",
+            "id" : "107",
+            "sourceId" : "34",
+            "tags" : "Relationship",
+            "technology" : "Implements"
+          }, {
+            "description" : "Implemented by",
+            "destinationId" : "39",
+            "id" : "108",
+            "linkedRelationshipId" : "107",
+            "sourceId" : "34",
+            "technology" : "Implements"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "CQS query interface"
+        }, {
+          "description" : "Write-side repository interface for S3Object aggregate persistence.",
+          "documentation" : { },
+          "id" : "35",
+          "name" : "S3ObjectCommandRepository",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.reactiveRepositoryApplication.s3ObjectCommandRepository"
+          },
+          "relationships" : [ {
+            "description" : "Implemented by",
+            "destinationId" : "41",
+            "id" : "109",
+            "sourceId" : "35",
+            "tags" : "Relationship",
+            "technology" : "Implements"
+          }, {
+            "description" : "Implemented by",
+            "destinationId" : "39",
+            "id" : "110",
+            "linkedRelationshipId" : "109",
+            "sourceId" : "35",
+            "technology" : "Implements"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "CQS command interface"
+        }, {
+          "description" : "Read-side repository interface for S3Object aggregate queries.",
+          "documentation" : { },
+          "id" : "36",
+          "name" : "S3ObjectQueryRepository",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.reactiveRepositoryApplication.s3ObjectQueryRepository"
+          },
+          "relationships" : [ {
+            "description" : "Implemented by",
+            "destinationId" : "41",
+            "id" : "112",
+            "sourceId" : "36",
+            "tags" : "Relationship",
+            "technology" : "Implements"
+          }, {
+            "description" : "Implemented by",
+            "destinationId" : "39",
+            "id" : "113",
+            "linkedRelationshipId" : "112",
+            "sourceId" : "36",
+            "technology" : "Implements"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "CQS query interface"
+        }, {
+          "description" : "Write-side repository interface for MultipartUpload aggregate persistence.",
+          "documentation" : { },
+          "id" : "37",
+          "name" : "MultipartUploadCommandRepository",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.reactiveRepositoryApplication.multipartUploadCommandRepository"
+          },
+          "relationships" : [ {
+            "description" : "Implemented by",
+            "destinationId" : "42",
+            "id" : "114",
+            "sourceId" : "37",
+            "tags" : "Relationship",
+            "technology" : "Implements"
+          }, {
+            "description" : "Implemented by",
+            "destinationId" : "39",
+            "id" : "115",
+            "linkedRelationshipId" : "114",
+            "sourceId" : "37",
+            "technology" : "Implements"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "CQS command interface"
+        }, {
+          "description" : "Read-side repository interface for MultipartUpload aggregate queries.",
+          "documentation" : { },
+          "id" : "38",
+          "name" : "MultipartUploadQueryRepository",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.reactiveRepositoryApplication.multipartUploadQueryRepository"
+          },
+          "relationships" : [ {
+            "description" : "Implemented by",
+            "destinationId" : "42",
+            "id" : "117",
+            "sourceId" : "38",
+            "tags" : "Relationship",
+            "technology" : "Implements"
+          }, {
+            "description" : "Implemented by",
+            "destinationId" : "39",
+            "id" : "118",
+            "linkedRelationshipId" : "117",
+            "sourceId" : "38",
+            "technology" : "Implements"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "CQS query interface"
+        } ],
+        "description" : "Command/Query repository interfaces: BucketCommandRepository, BucketQueryRepository, S3ObjectCommandRepository, S3ObjectQueryRepository, MultipartUploadCommandRepository, MultipartUploadQueryRepository.",
+        "documentation" : { },
+        "id" : "32",
+        "name" : "reactive-repository-application",
+        "properties" : {
+          "structurizr.dsl.identifier" : "magrathea.reactiveRepositoryApplication"
+        },
+        "relationships" : [ {
+          "description" : "Implemented by",
+          "destinationId" : "40",
+          "id" : "105",
+          "linkedRelationshipId" : "103",
+          "sourceId" : "32",
+          "technology" : "Implements"
+        }, {
+          "description" : "Implemented by",
+          "destinationId" : "39",
+          "id" : "106",
+          "linkedRelationshipId" : "103",
+          "sourceId" : "32",
+          "technology" : "Implements"
+        }, {
+          "description" : "Implemented by",
+          "destinationId" : "41",
+          "id" : "111",
+          "linkedRelationshipId" : "109",
+          "sourceId" : "32",
+          "technology" : "Implements"
+        }, {
+          "description" : "Implemented by",
+          "destinationId" : "42",
+          "id" : "116",
+          "linkedRelationshipId" : "114",
+          "sourceId" : "32",
+          "technology" : "Implements"
+        } ],
+        "tags" : "Element,Container",
+        "technology" : "Java 21 CQS interfaces"
+      }, {
+        "components" : [ {
+          "description" : "In-memory reactive implementation of BucketCommandRepository and BucketQueryRepository. Internally stores bucket aggregates in ConcurrentHashMap structures.",
+          "documentation" : { },
+          "id" : "40",
+          "name" : "InMemoryReactiveBucketRepository",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.reactiveInfrastructure.inMemoryReactiveBucketRepository"
+          },
+          "tags" : "Element,Component",
+          "technology" : "Spring @Repository"
+        }, {
+          "description" : "In-memory reactive implementation of S3ObjectCommandRepository and S3ObjectQueryRepository. Internally stores object metadata and raw object bytes in ConcurrentHashMap structures.",
+          "documentation" : { },
+          "id" : "41",
+          "name" : "InMemoryReactiveS3ObjectRepository",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.reactiveInfrastructure.inMemoryReactiveS3ObjectRepository"
+          },
+          "tags" : "Element,Component",
+          "technology" : "Spring @Repository"
+        }, {
+          "description" : "In-memory reactive implementation of MultipartUploadCommandRepository and MultipartUploadQueryRepository. Internally stores multipart upload sessions in a ConcurrentHashMap structure.",
+          "documentation" : { },
+          "id" : "42",
+          "name" : "InMemoryReactiveMultipartUploadRepository",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.reactiveInfrastructure.inMemoryReactiveMultipartUploadRepository"
+          },
+          "tags" : "Element,Component",
+          "technology" : "Spring @Repository"
+        } ],
+        "description" : "Reactive in-memory persistence: InMemoryReactiveBucketRepository, InMemoryReactiveS3ObjectRepository, InMemoryReactiveMultipartUploadRepository.",
+        "documentation" : { },
+        "id" : "39",
+        "name" : "reactive-infrastructure",
+        "properties" : {
+          "structurizr.dsl.identifier" : "magrathea.reactiveInfrastructure"
+        },
+        "tags" : "Element,Container,Database",
+        "technology" : "Java 21, Reactor, ConcurrentHashMap"
+      }, {
+        "components" : [ {
+          "description" : "Extensible event publishing interface for S3 event notifications (s3:ObjectCreated, s3:ObjectRemoved). Publishes to TopicConfiguration, QueueConfiguration, CloudFunctionConfiguration destinations.",
+          "documentation" : { },
+          "id" : "44",
+          "name" : "NotificationEventPublisher",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.storageEngine.notificationEventPublisher"
+          },
+          "relationships" : [ {
+            "description" : "Publishes S3 events (s3:ObjectCreated, s3:ObjectRemoved)",
+            "destinationId" : "2",
+            "id" : "119",
+            "sourceId" : "44",
+            "tags" : "Relationship",
+            "technology" : "Event topic"
+          }, {
+            "description" : "Publishes S3 events to SNS topics",
+            "destinationId" : "3",
+            "id" : "122",
+            "sourceId" : "44",
+            "tags" : "Relationship",
+            "technology" : "TopicConfiguration"
+          }, {
+            "description" : "Publishes S3 events to SQS queues",
+            "destinationId" : "4",
+            "id" : "125",
+            "sourceId" : "44",
+            "tags" : "Relationship",
+            "technology" : "QueueConfiguration"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "Domain interface"
+        }, {
+          "description" : "Extensible interface for writing S3 access logs to external destinations (Kafka, ElasticSearch, file system, S3 target bucket).",
+          "documentation" : { },
+          "id" : "45",
+          "name" : "AccessLogWriter",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.storageEngine.accessLogWriter"
+          },
+          "relationships" : [ {
+            "description" : "Writes access logs",
+            "destinationId" : "2",
+            "id" : "128",
+            "sourceId" : "45",
+            "tags" : "Relationship",
+            "technology" : "Log topic"
+          }, {
+            "description" : "Writes access logs",
+            "destinationId" : "5",
+            "id" : "129",
+            "sourceId" : "45",
+            "tags" : "Relationship",
+            "technology" : "Index"
+          }, {
+            "description" : "Writes access logs",
+            "destinationId" : "6",
+            "id" : "132",
+            "sourceId" : "45",
+            "tags" : "Relationship",
+            "technology" : "File output"
+          }, {
+            "description" : "Writes access logs",
+            "destinationId" : "7",
+            "id" : "135",
+            "sourceId" : "45",
+            "tags" : "Relationship",
+            "technology" : "Target bucket"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "Domain interface"
+        }, {
+          "description" : "Extensible interface for recording metrics to CloudWatch, Prometheus, or Micrometer backends.",
+          "documentation" : { },
+          "id" : "46",
+          "name" : "MetricsCollector",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.storageEngine.metricsCollector"
+          },
+          "relationships" : [ {
+            "description" : "Records metrics",
+            "destinationId" : "8",
+            "id" : "138",
+            "sourceId" : "46",
+            "tags" : "Relationship",
+            "technology" : "Prometheus format"
+          }, {
+            "description" : "Records metrics",
+            "destinationId" : "9",
+            "id" : "141",
+            "sourceId" : "46",
+            "tags" : "Relationship",
+            "technology" : "CloudWatch API"
+          }, {
+            "description" : "Records metrics",
+            "destinationId" : "10",
+            "id" : "144",
+            "sourceId" : "46",
+            "tags" : "Relationship",
+            "technology" : "Micrometer facade"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "Domain interface"
+        }, {
+          "description" : "Extensible interface for exporting analytics data snapshots to destination buckets (S3 target, CSV/ORC output).",
+          "documentation" : { },
+          "id" : "47",
+          "name" : "AnalyticsDataExporter",
+          "properties" : {
+            "structurizr.dsl.identifier" : "magrathea.storageEngine.analyticsDataExporter"
+          },
+          "relationships" : [ {
+            "description" : "Exports analytics data",
+            "destinationId" : "7",
+            "id" : "147",
+            "sourceId" : "47",
+            "tags" : "Relationship",
+            "technology" : "Target bucket"
+          }, {
+            "description" : "Exports analytics data",
+            "destinationId" : "11",
+            "id" : "148",
+            "sourceId" : "47",
+            "tags" : "Relationship",
+            "technology" : "CSV/ORC format"
+          } ],
+          "tags" : "Element,Component",
+          "technology" : "Domain interface"
+        } ],
+        "description" : "Future implementation module for extensible interfaces: event notification publishing, access log writing, metrics collection, and analytics data export. These interfaces are defined in object-storage-domain and will be implemented here.",
+        "documentation" : { },
+        "id" : "43",
+        "name" : "storage-engine",
+        "properties" : {
+          "structurizr.dsl.identifier" : "magrathea.storageEngine"
+        },
+        "relationships" : [ {
+          "description" : "Publishes S3 events (s3:ObjectCreated, s3:ObjectRemoved)",
+          "destinationId" : "2",
+          "id" : "120",
+          "linkedRelationshipId" : "119",
+          "sourceId" : "43",
+          "technology" : "Event topic"
+        }, {
+          "description" : "Publishes S3 events to SNS topics",
+          "destinationId" : "3",
+          "id" : "123",
+          "linkedRelationshipId" : "122",
+          "sourceId" : "43",
+          "technology" : "TopicConfiguration"
+        }, {
+          "description" : "Publishes S3 events to SQS queues",
+          "destinationId" : "4",
+          "id" : "126",
+          "linkedRelationshipId" : "125",
+          "sourceId" : "43",
+          "technology" : "QueueConfiguration"
+        }, {
+          "description" : "Writes access logs",
+          "destinationId" : "5",
+          "id" : "130",
+          "linkedRelationshipId" : "129",
+          "sourceId" : "43",
+          "technology" : "Index"
+        }, {
+          "description" : "Writes access logs",
+          "destinationId" : "6",
+          "id" : "133",
+          "linkedRelationshipId" : "132",
+          "sourceId" : "43",
+          "technology" : "File output"
+        }, {
+          "description" : "Writes access logs",
+          "destinationId" : "7",
+          "id" : "136",
+          "linkedRelationshipId" : "135",
+          "sourceId" : "43",
+          "technology" : "Target bucket"
+        }, {
+          "description" : "Records metrics",
+          "destinationId" : "8",
+          "id" : "139",
+          "linkedRelationshipId" : "138",
+          "sourceId" : "43",
+          "technology" : "Prometheus format"
+        }, {
+          "description" : "Records metrics",
+          "destinationId" : "9",
+          "id" : "142",
+          "linkedRelationshipId" : "141",
+          "sourceId" : "43",
+          "technology" : "CloudWatch API"
+        }, {
+          "description" : "Records metrics",
+          "destinationId" : "10",
+          "id" : "145",
+          "linkedRelationshipId" : "144",
+          "sourceId" : "43",
+          "technology" : "Micrometer facade"
+        }, {
+          "description" : "Exports analytics data",
+          "destinationId" : "11",
+          "id" : "149",
+          "linkedRelationshipId" : "148",
+          "sourceId" : "43",
+          "technology" : "CSV/ORC format"
+        } ],
+        "tags" : "Element,Container",
+        "technology" : "Java 21, domain interfaces"
+      } ],
+      "description" : "AWS S3-compatible object storage built with Spring Boot 4 WebFlux and Java 21.",
+      "documentation" : { },
+      "id" : "12",
+      "name" : "Magrathea ObjectStorage",
+      "properties" : {
+        "structurizr.dsl.identifier" : "magrathea"
+      },
+      "relationships" : [ {
+        "description" : "Publishes S3 events (s3:ObjectCreated, s3:ObjectRemoved)",
+        "destinationId" : "2",
+        "id" : "121",
+        "linkedRelationshipId" : "119",
+        "sourceId" : "12",
+        "technology" : "Event topic"
+      }, {
+        "description" : "Publishes S3 events to SNS topics",
+        "destinationId" : "3",
+        "id" : "124",
+        "linkedRelationshipId" : "122",
+        "sourceId" : "12",
+        "technology" : "TopicConfiguration"
+      }, {
+        "description" : "Publishes S3 events to SQS queues",
+        "destinationId" : "4",
+        "id" : "127",
+        "linkedRelationshipId" : "125",
+        "sourceId" : "12",
+        "technology" : "QueueConfiguration"
+      }, {
+        "description" : "Writes access logs",
+        "destinationId" : "5",
+        "id" : "131",
+        "linkedRelationshipId" : "129",
+        "sourceId" : "12",
+        "technology" : "Index"
+      }, {
+        "description" : "Writes access logs",
+        "destinationId" : "6",
+        "id" : "134",
+        "linkedRelationshipId" : "132",
+        "sourceId" : "12",
+        "technology" : "File output"
+      }, {
+        "description" : "Writes access logs",
+        "destinationId" : "7",
+        "id" : "137",
+        "linkedRelationshipId" : "135",
+        "sourceId" : "12",
+        "technology" : "Target bucket"
+      }, {
+        "description" : "Records metrics",
+        "destinationId" : "8",
+        "id" : "140",
+        "linkedRelationshipId" : "138",
+        "sourceId" : "12",
+        "technology" : "Prometheus format"
+      }, {
+        "description" : "Records metrics",
+        "destinationId" : "9",
+        "id" : "143",
+        "linkedRelationshipId" : "141",
+        "sourceId" : "12",
+        "technology" : "CloudWatch API"
+      }, {
+        "description" : "Records metrics",
+        "destinationId" : "10",
+        "id" : "146",
+        "linkedRelationshipId" : "144",
+        "sourceId" : "12",
+        "technology" : "Micrometer facade"
+      }, {
+        "description" : "Exports analytics data",
+        "destinationId" : "11",
+        "id" : "150",
+        "linkedRelationshipId" : "148",
+        "sourceId" : "12",
+        "technology" : "CSV/ORC format"
+      } ],
+      "tags" : "Element,Software System"
+    } ]
+  },
+  "name" : "Magrathea ObjectStorage",
+  "properties" : {
+    "structurizr.inspection.error" : "3",
+    "structurizr.dsl" : "d29ya3NwYWNlICJNYWdyYXRoZWEgT2JqZWN0U3RvcmFnZSIgIkM0IG1vZGVsIGZvciB0aGUgTWFncmF0aGVhIFMzLWNvbXBhdGlibGUgb2JqZWN0IHN0b3JhZ2Ugc2VydmljZSIgewoKICAhaWRlbnRpZmllcnMgaGllcmFyY2hpY2FsCgogIG1vZGVsIHsKICAgIHVzZXIgPSBwZXJzb24gIlVzZXIiICJFbmQgdXNlciBvciBhdXRvbWF0ZWQgY2xpZW50IHVzaW5nIEFXUyBDTEksIFNESywgY3VybCwgb3IgYW5vdGhlciBTMy1jb21wYXRpYmxlIEhUVFAgY2xpZW50LiIKCiAgICBrYWZrYSA9IHNvZnR3YXJlU3lzdGVtICJLYWZrYSIgIkV2ZW50IGJyb2tlciBmb3Igbm90aWZpY2F0aW9uIGV2ZW50cyBhbmQgYWNjZXNzIGxvZyBzdHJlYW1pbmcuIiB7CiAgICAgIHRhZ3MgImV4dGVybmFsLXN5c3RlbSIKICAgIH0KICAgIGF3c1NucyA9IHNvZnR3YXJlU3lzdGVtICJBV1MgU05TIiAiQVdTIFNpbXBsZSBOb3RpZmljYXRpb24gU2VydmljZSBmb3IgZXZlbnQgbm90aWZpY2F0aW9uIGRlbGl2ZXJ5LiIgewogICAgICB0YWdzICJleHRlcm5hbC1zeXN0ZW0iCiAgICB9CiAgICBhd3NTcXMgPSBzb2Z0d2FyZVN5c3RlbSAiQVdTIFNRUyIgIkFXUyBTaW1wbGUgUXVldWUgU2VydmljZSBmb3IgZXZlbnQgbm90aWZpY2F0aW9uIGRlbGl2ZXJ5LiIgewogICAgICB0YWdzICJleHRlcm5hbC1zeXN0ZW0iCiAgICB9CiAgICBlbGFzdGljU2VhcmNoID0gc29mdHdhcmVTeXN0ZW0gIkVsYXN0aWNTZWFyY2giICJTZWFyY2ggYW5kIGFuYWx5dGljcyBlbmdpbmUgZm9yIGFjY2VzcyBsb2cgaW5kZXhpbmcuIiB7CiAgICAgIHRhZ3MgImV4dGVybmFsLXN5c3RlbSIKICAgIH0KICAgIGZpbGVTeXN0ZW0gPSBzb2Z0d2FyZVN5c3RlbSAiRmlsZSBTeXN0ZW0iICJMb2NhbCBmaWxlIHN5c3RlbSBmb3IgYWNjZXNzIGxvZyBvdXRwdXQuIiB7CiAgICAgIHRhZ3MgImV4dGVybmFsLXN5c3RlbSIKICAgIH0KICAgIGF3c1MzVGFyZ2V0QnVja2V0ID0gc29mdHdhcmVTeXN0ZW0gIkFXUyBTMyBUYXJnZXQgQnVja2V0IiAiQVdTIFMzIGJ1Y2tldCBmb3IgbG9nIG91dHB1dCBhbmQgYW5hbHl0aWNzIGRhdGEgZXhwb3J0IGRlc3RpbmF0aW9uLiIgewogICAgICB0YWdzICJleHRlcm5hbC1zeXN0ZW0iCiAgICB9CiAgICBwcm9tZXRoZXVzID0gc29mdHdhcmVTeXN0ZW0gIlByb21ldGhldXMiICJNb25pdG9yaW5nIGFuZCBhbGVydGluZyBzeXN0ZW0gZm9yIG1ldHJpY3MgY29sbGVjdGlvbi4iIHsKICAgICAgdGFncyAiZXh0ZXJuYWwtc3lzdGVtIgogICAgfQogICAgYXdzQ2xvdWRXYXRjaCA9IHNvZnR3YXJlU3lzdGVtICJBV1MgQ2xvdWRXYXRjaCIgIkFXUyBtb25pdG9yaW5nIGFuZCBvYnNlcnZhYmlsaXR5IHNlcnZpY2UgZm9yIG1ldHJpY3MgYW5kIGxvZ3MuIiB7CiAgICAgIHRhZ3MgImV4dGVybmFsLXN5c3RlbSIKICAgIH0KICAgIG1pY3JvbWV0ZXIgPSBzb2Z0d2FyZVN5c3RlbSAiTWljcm9tZXRlciIgIk1ldHJpY3MgaW5zdHJ1bWVudGF0aW9uIGxpYnJhcnkgZmFjYWRlIGZvciBjb2xsZWN0aW5nIG1lYXN1cmVtZW50cy4iIHsKICAgICAgdGFncyAiZXh0ZXJuYWwtc3lzdGVtIgogICAgfQogICAgY3N2T3JjT3V0cHV0ID0gc29mdHdhcmVTeXN0ZW0gIkNTVi9PUkMgT3V0cHV0IiAiQ1NWIG9yIE9SQyBmb3JtYXQgb3V0cHV0IGRlc3RpbmF0aW9uIGZvciBhbmFseXRpY3MgZGF0YSBleHBvcnQuIiB7CiAgICAgIHRhZ3MgImV4dGVybmFsLXN5c3RlbSIKICAgIH0KCiAgICBtYWdyYXRoZWEgPSBzb2Z0d2FyZVN5c3RlbSAiTWFncmF0aGVhIE9iamVjdFN0b3JhZ2UiICJBV1MgUzMtY29tcGF0aWJsZSBvYmplY3Qgc3RvcmFnZSBidWlsdCB3aXRoIFNwcmluZyBCb290IDQgV2ViRmx1eCBhbmQgSmF2YSAyMS4iIHsKICAgICAgczNSZWFjdGl2ZUFwaUFkYXB0ZXIgPSBjb250YWluZXIgInMzLXJlYWN0aXZlLWFwaS1hZGFwdGVyIiAiSFRUUCBhZGFwdGVyIHRoYXQgZXhwb3NlcyB0aGUgUzMtY29tcGF0aWJsZSBSRVNUIEFQSSBhbmQgdHJhbnNsYXRlcyBIVFRQL1hNTC9iaW5hcnkgcmVxdWVzdHMgaW50byByZWFjdGl2ZSBhcHBsaWNhdGlvbiB1c2UgY2FzZXMuIiAiU3ByaW5nIEJvb3QgNCBXZWJGbHV4LCBSb3V0ZXJGdW5jdGlvbiwgSmF2YSAyMSwgSmFja3NvbiBYTUwiIHsKICAgICAgICBidWNrZXRPcGVyYXRpb25zSGFuZGxlciA9IGNvbXBvbmVudCAiUzNCdWNrZXRPcGVyYXRpb25zSGFuZGxlciIgIkhhbmRsZXMgYnVja2V0IGxpZmVjeWNsZSBlbmRwb2ludHM6IGNyZWF0ZSwgZGVsZXRlLCBoZWFkLCBsaXN0LCBsb2NhdGlvbiBhbmQgdmVyc2lvbmluZy4iICJKYXZhIFdlYkZsdXggaGFuZGxlciIKICAgICAgICBidWNrZXRNZXRhZGF0YUhhbmRsZXIgPSBjb21wb25lbnQgIlMzQnVja2V0TWV0YWRhdGFIYW5kbGVyIiAiSGFuZGxlcyBidWNrZXQgbWV0YWRhdGEgZW5kcG9pbnRzIHN1Y2ggYXMgQUNMIGFuZCB0YWdnaW5nLiIgIkphdmEgV2ViRmx1eCBoYW5kbGVyIgogICAgICAgIGJ1Y2tldENvbmZpZ0hhbmRsZXIgPSBjb21wb25lbnQgIlMzQnVja2V0Q29uZmlnSGFuZGxlciIgIkhhbmRsZXMgYnVja2V0IGNvbmZpZ3VyYXRpb24gZW5kcG9pbnRzOiBDT1JTLCBsaWZlY3ljbGUsIHBvbGljeSwgZW5jcnlwdGlvbiwgbG9nZ2luZywgd2Vic2l0ZSwgbm90aWZpY2F0aW9uLCByZXBsaWNhdGlvbiwgcmVxdWVzdCBwYXltZW50LCBvd25lcnNoaXAgY29udHJvbHMsIHB1YmxpYyBhY2Nlc3MgYmxvY2ssIGFjY2VsZXJhdGUsIGFuYWx5dGljcywgaW52ZW50b3J5LCBtZXRyaWNzLCBpbnRlbGxpZ2VudC10aWVyaW5nIGNvbmZpZ3VyYXRpb24uIiAiSmF2YSBXZWJGbHV4IGhhbmRsZXIiCiAgICAgICAgb2JqZWN0T3BlcmF0aW9uc0hhbmRsZXIgPSBjb21wb25lbnQgIlMzT2JqZWN0T3BlcmF0aW9uc0hhbmRsZXIiICJIYW5kbGVzIG9iamVjdCBvcGVyYXRpb25zOiBwdXQsIGdldCwgaGVhZCwgZGVsZXRlLCBjb3B5IGFuZCBtdWx0aS1kZWxldGUuIiAiSmF2YSBXZWJGbHV4IGhhbmRsZXIiCiAgICAgICAgb2JqZWN0TWV0YWRhdGFIYW5kbGVyID0gY29tcG9uZW50ICJTM09iamVjdE1ldGFkYXRhSGFuZGxlciIgIkhhbmRsZXMgb2JqZWN0IG1ldGFkYXRhIGVuZHBvaW50cyBzdWNoIGFzIEFDTCwgdGFnZ2luZyBhbmQgYXR0cmlidXRlcy4iICJKYXZhIFdlYkZsdXggaGFuZGxlciIKICAgICAgICBtdWx0aXBhcnRIYW5kbGVyID0gY29tcG9uZW50ICJTM011bHRpcGFydEhhbmRsZXIiICJIYW5kbGVzIG11bHRpcGFydCB1cGxvYWQgbGlmZWN5Y2xlOiBpbml0aWF0ZSwgdXBsb2FkIHBhcnQsIGxpc3QgcGFydHMsIGNvbXBsZXRlLCBhYm9ydCBhbmQgbGlzdCB1cGxvYWRzLiIgIkphdmEgV2ViRmx1eCBoYW5kbGVyIgogICAgICB9CgogICAgICByZWFjdGl2ZU9iamVjdFN0b3JlID0gY29udGFpbmVyICJyZWFjdGl2ZS1vYmplY3Qtc3RvcmUiICJSZWFjdGl2ZSBvYmplY3Qgc3RvcmFnZSBjYXBhYmlsaXR5OiBvYmplY3QgdXBsb2FkLCBkb3dubG9hZCwgbWV0YWRhdGEgbG9va3VwLCBkZWxldGlvbiBhbmQgbXVsdGlwYXJ0IG9iamVjdCB3b3JrZmxvd3MgdXNpbmcgcmVhY3RpdmUgc2VydmljZXMgYW5kIGRvbWFpbiBhZ2dyZWdhdGVzLiIgIkphdmEgMjEgcmVhY3RpdmUgYXBwbGljYXRpb24vZG9tYWluIHNlcnZpY2VzIiB7CiAgICAgICAgcmVhY3RpdmVPYmplY3RTZXJ2aWNlID0gY29tcG9uZW50ICJSZWFjdGl2ZU9iamVjdFNlcnZpY2UiICJSZWFjdGl2ZSBhcHBsaWNhdGlvbiBzZXJ2aWNlIGZvciBvYmplY3QgQ1JVRCwgbWV0YWRhdGEgbG9va3VwLCBvYmplY3QgbGlzdGluZyBhbmQgYmluYXJ5IGNvbnRlbnQgcmV0cmlldmFsLiIgIlNwcmluZyBAU2VydmljZSIKICAgICAgICByZWFjdGl2ZU11bHRpcGFydFVwbG9hZFNlcnZpY2UgPSBjb21wb25lbnQgIlJlYWN0aXZlTXVsdGlwYXJ0VXBsb2FkU2VydmljZSIgIlJlYWN0aXZlIGFwcGxpY2F0aW9uIHNlcnZpY2UgZm9yIG11bHRpcGFydCB1cGxvYWQgc2Vzc2lvbnMgYW5kIHBhcnQgbGlmZWN5Y2xlLiIgIlNwcmluZyBAU2VydmljZSIKICAgICAgICBzM09iamVjdCA9IGNvbXBvbmVudCAiUzNPYmplY3QiICJEb21haW4gYWdncmVnYXRlIGZvciBvYmplY3QgaWRlbnRpdHksIGJ1Y2tldCBpZCwga2V5LCBFVGFnLCBzdG9yYWdlIGNsYXNzIGFuZCBjb250ZW50IG1ldGFkYXRhLiIgIkRvbWFpbiBhZ2dyZWdhdGUiCiAgICAgICAgbXVsdGlwYXJ0VXBsb2FkID0gY29tcG9uZW50ICJNdWx0aXBhcnRVcGxvYWQiICJEb21haW4gYWdncmVnYXRlIGZvciBtdWx0aXBhcnQgdXBsb2FkIHN0YXRlLCB1cGxvYWRlZCBwYXJ0cyBhbmQgY29tcGxldGlvbi9hYm9ydCBzdGF0dXMuIiAiRG9tYWluIGFnZ3JlZ2F0ZSIKICAgICAgICBzM09iamVjdFJlcG9zaXRvcnlQb3J0ID0gY29tcG9uZW50ICJTM09iamVjdFJlcG9zaXRvcnkgcG9ydCIgIkRvbWFpbiByZXBvc2l0b3J5IHBvcnQgZm9yIG9iamVjdCBtZXRhZGF0YSBhbmQgYmluYXJ5IGNvbnRlbnQgcGVyc2lzdGVuY2UuIiAiRG9tYWluIHJlcG9zaXRvcnkgaW50ZXJmYWNlIgogICAgICAgIG11bHRpcGFydFVwbG9hZFJlcG9zaXRvcnlQb3J0ID0gY29tcG9uZW50ICJNdWx0aXBhcnRVcGxvYWRSZXBvc2l0b3J5IHBvcnQiICJEb21haW4gcmVwb3NpdG9yeSBwb3J0IGZvciBtdWx0aXBhcnQgdXBsb2FkIHBlcnNpc3RlbmNlLiIgIkRvbWFpbiByZXBvc2l0b3J5IGludGVyZmFjZSIKICAgICAgICBjb250ZW50Qm91bmRhcnkgPSBjb21wb25lbnQgIkRlZmF1bHRTM09iamVjdFdyaXRlIC8gRGVmYXVsdFMzT2JqZWN0Q29udGVudCIgIkFwcGxpY2F0aW9uLWxheWVyIGNvbnRlbnQgYm91bmRhcnkgZm9yIGNhcnJ5aW5nIEZsdXg8RGF0YUJ1ZmZlcj4gd2l0aG91dCBsZWFraW5nIHJlYWN0aXZlIHR5cGVzIGludG8gdGhlIGRvbWFpbiBtb2RlbC4iICJKYXZhIGFkYXB0ZXIiCiAgICAgIH0KCiAgICAgIHJlYWN0aXZlQnVja2V0TWFuYWdlbWVudCA9IGNvbnRhaW5lciAicmVhY3RpdmUtYnVja2V0LW1hbmFnZW1lbnQiICJSZWFjdGl2ZSBidWNrZXQgbWFuYWdlbWVudCBjYXBhYmlsaXR5OiBidWNrZXQgbGlmZWN5Y2xlLCBtZXRhZGF0YSwgY29uZmlndXJhdGlvbiwgQ09SUy92ZXJzaW9uaW5nIGFuZCBidWNrZXQtbGV2ZWwgb3BlcmF0aW9ucy4iICJKYXZhIDIxIHJlYWN0aXZlIGFwcGxpY2F0aW9uL2RvbWFpbiBzZXJ2aWNlcyIgewogICAgICAgIHJlYWN0aXZlQnVja2V0U2VydmljZSA9IGNvbXBvbmVudCAiUmVhY3RpdmVCdWNrZXRTZXJ2aWNlIiAiUmVhY3RpdmUgYXBwbGljYXRpb24gc2VydmljZSBmb3IgYnVja2V0IGxpZmVjeWNsZSwgdmVyc2lvbmluZywgQ09SUywgYW5hbHl0aWNzLCBpbnZlbnRvcnksIG1ldHJpY3MsIGludGVsbGlnZW50LXRpZXJpbmcgY29uZmlndXJhdGlvbi4iICJTcHJpbmcgQFNlcnZpY2UiCiAgICAgICAgYnVja2V0ID0gY29tcG9uZW50ICJCdWNrZXQiICJEb21haW4gYWdncmVnYXRlIHJvb3QgZm9yIGJ1Y2tldCBpZGVudGl0eSwgbmFtZSwgcmVnaW9uLCBzdG9yYWdlIGNsYXNzLCB2ZXJzaW9uaW5nL2VuY3J5cHRpb24gc3RhdGUgYW5kIGlubGluZSBDb25maWd1cmF0aW9uLiBFbWl0cyBPYmplY3RTdG9yYWdlRXZlbnQgZG9tYWluIGV2ZW50cyBvbiBzdGF0ZSB0cmFuc2l0aW9ucyAod2l0aFZlcnNpb25pbmdFbmFibGVkLCB3aXRoVmVyc2lvbmluZ1N1c3BlbmRlZCwgd2l0aEVuY3J5cHRpb25FbmFibGVkLCB3aXRoQ29uZmlndXJhdGlvbikuIiAiRG9tYWluIGFnZ3JlZ2F0ZSByb290IgogICAgICAgIGJ1Y2tldFJlcG9zaXRvcnlQb3J0ID0gY29tcG9uZW50ICJCdWNrZXRSZXBvc2l0b3J5IHBvcnQiICJEb21haW4gcmVwb3NpdG9yeSBwb3J0IGZvciBidWNrZXQgYWdncmVnYXRlIHBlcnNpc3RlbmNlLiIgIkRvbWFpbiByZXBvc2l0b3J5IGludGVyZmFjZSIKICAgICAgfQoKICAgICAgcmVhY3RpdmVSZXBvc2l0b3J5QXBwbGljYXRpb24gPSBjb250YWluZXIgInJlYWN0aXZlLXJlcG9zaXRvcnktYXBwbGljYXRpb24iICJDb21tYW5kL1F1ZXJ5IHJlcG9zaXRvcnkgaW50ZXJmYWNlczogQnVja2V0Q29tbWFuZFJlcG9zaXRvcnksIEJ1Y2tldFF1ZXJ5UmVwb3NpdG9yeSwgUzNPYmplY3RDb21tYW5kUmVwb3NpdG9yeSwgUzNPYmplY3RRdWVyeVJlcG9zaXRvcnksIE11bHRpcGFydFVwbG9hZENvbW1hbmRSZXBvc2l0b3J5LCBNdWx0aXBhcnRVcGxvYWRRdWVyeVJlcG9zaXRvcnkuIiAiSmF2YSAyMSBDUVMgaW50ZXJmYWNlcyIgewogICAgICAgIGJ1Y2tldENvbW1hbmRSZXBvc2l0b3J5ID0gY29tcG9uZW50ICJCdWNrZXRDb21tYW5kUmVwb3NpdG9yeSIgIldyaXRlLXNpZGUgcmVwb3NpdG9yeSBpbnRlcmZhY2UgZm9yIGJ1Y2tldCBhZ2dyZWdhdGUgcGVyc2lzdGVuY2UuIiAiQ1FTIGNvbW1hbmQgaW50ZXJmYWNlIgogICAgICAgIGJ1Y2tldFF1ZXJ5UmVwb3NpdG9yeSA9IGNvbXBvbmVudCAiQnVja2V0UXVlcnlSZXBvc2l0b3J5IiAiUmVhZC1zaWRlIHJlcG9zaXRvcnkgaW50ZXJmYWNlIGZvciBidWNrZXQgYWdncmVnYXRlIHF1ZXJpZXMuIiAiQ1FTIHF1ZXJ5IGludGVyZmFjZSIKICAgICAgICBzM09iamVjdENvbW1hbmRSZXBvc2l0b3J5ID0gY29tcG9uZW50ICJTM09iamVjdENvbW1hbmRSZXBvc2l0b3J5IiAiV3JpdGUtc2lkZSByZXBvc2l0b3J5IGludGVyZmFjZSBmb3IgUzNPYmplY3QgYWdncmVnYXRlIHBlcnNpc3RlbmNlLiIgIkNRUyBjb21tYW5kIGludGVyZmFjZSIKICAgICAgICBzM09iamVjdFF1ZXJ5UmVwb3NpdG9yeSA9IGNvbXBvbmVudCAiUzNPYmplY3RRdWVyeVJlcG9zaXRvcnkiICJSZWFkLXNpZGUgcmVwb3NpdG9yeSBpbnRlcmZhY2UgZm9yIFMzT2JqZWN0IGFnZ3JlZ2F0ZSBxdWVyaWVzLiIgIkNRUyBxdWVyeSBpbnRlcmZhY2UiCiAgICAgICAgbXVsdGlwYXJ0VXBsb2FkQ29tbWFuZFJlcG9zaXRvcnkgPSBjb21wb25lbnQgIk11bHRpcGFydFVwbG9hZENvbW1hbmRSZXBvc2l0b3J5IiAiV3JpdGUtc2lkZSByZXBvc2l0b3J5IGludGVyZmFjZSBmb3IgTXVsdGlwYXJ0VXBsb2FkIGFnZ3JlZ2F0ZSBwZXJzaXN0ZW5jZS4iICJDUVMgY29tbWFuZCBpbnRlcmZhY2UiCiAgICAgICAgbXVsdGlwYXJ0VXBsb2FkUXVlcnlSZXBvc2l0b3J5ID0gY29tcG9uZW50ICJNdWx0aXBhcnRVcGxvYWRRdWVyeVJlcG9zaXRvcnkiICJSZWFkLXNpZGUgcmVwb3NpdG9yeSBpbnRlcmZhY2UgZm9yIE11bHRpcGFydFVwbG9hZCBhZ2dyZWdhdGUgcXVlcmllcy4iICJDUVMgcXVlcnkgaW50ZXJmYWNlIgogICAgICB9CgogICAgICByZWFjdGl2ZUluZnJhc3RydWN0dXJlID0gY29udGFpbmVyICJyZWFjdGl2ZS1pbmZyYXN0cnVjdHVyZSIgIlJlYWN0aXZlIGluLW1lbW9yeSBwZXJzaXN0ZW5jZTogSW5NZW1vcnlSZWFjdGl2ZUJ1Y2tldFJlcG9zaXRvcnksIEluTWVtb3J5UmVhY3RpdmVTM09iamVjdFJlcG9zaXRvcnksIEluTWVtb3J5UmVhY3RpdmVNdWx0aXBhcnRVcGxvYWRSZXBvc2l0b3J5LiIgIkphdmEgMjEsIFJlYWN0b3IsIENvbmN1cnJlbnRIYXNoTWFwIiAiRGF0YWJhc2UiIHsKICAgICAgICBpbk1lbW9yeVJlYWN0aXZlQnVja2V0UmVwb3NpdG9yeSA9IGNvbXBvbmVudCAiSW5NZW1vcnlSZWFjdGl2ZUJ1Y2tldFJlcG9zaXRvcnkiICJJbi1tZW1vcnkgcmVhY3RpdmUgaW1wbGVtZW50YXRpb24gb2YgQnVja2V0Q29tbWFuZFJlcG9zaXRvcnkgYW5kIEJ1Y2tldFF1ZXJ5UmVwb3NpdG9yeS4gSW50ZXJuYWxseSBzdG9yZXMgYnVja2V0IGFnZ3JlZ2F0ZXMgaW4gQ29uY3VycmVudEhhc2hNYXAgc3RydWN0dXJlcy4iICJTcHJpbmcgQFJlcG9zaXRvcnkiCiAgICAgICAgaW5NZW1vcnlSZWFjdGl2ZVMzT2JqZWN0UmVwb3NpdG9yeSA9IGNvbXBvbmVudCAiSW5NZW1vcnlSZWFjdGl2ZVMzT2JqZWN0UmVwb3NpdG9yeSIgIkluLW1lbW9yeSByZWFjdGl2ZSBpbXBsZW1lbnRhdGlvbiBvZiBTM09iamVjdENvbW1hbmRSZXBvc2l0b3J5IGFuZCBTM09iamVjdFF1ZXJ5UmVwb3NpdG9yeS4gSW50ZXJuYWxseSBzdG9yZXMgb2JqZWN0IG1ldGFkYXRhIGFuZCByYXcgb2JqZWN0IGJ5dGVzIGluIENvbmN1cnJlbnRIYXNoTWFwIHN0cnVjdHVyZXMuIiAiU3ByaW5nIEBSZXBvc2l0b3J5IgogICAgICAgIGluTWVtb3J5UmVhY3RpdmVNdWx0aXBhcnRVcGxvYWRSZXBvc2l0b3J5ID0gY29tcG9uZW50ICJJbk1lbW9yeVJlYWN0aXZlTXVsdGlwYXJ0VXBsb2FkUmVwb3NpdG9yeSIgIkluLW1lbW9yeSByZWFjdGl2ZSBpbXBsZW1lbnRhdGlvbiBvZiBNdWx0aXBhcnRVcGxvYWRDb21tYW5kUmVwb3NpdG9yeSBhbmQgTXVsdGlwYXJ0VXBsb2FkUXVlcnlSZXBvc2l0b3J5LiBJbnRlcm5hbGx5IHN0b3JlcyBtdWx0aXBhcnQgdXBsb2FkIHNlc3Npb25zIGluIGEgQ29uY3VycmVudEhhc2hNYXAgc3RydWN0dXJlLiIgIlNwcmluZyBAUmVwb3NpdG9yeSIKICAgICAgfQoKICAgICAgc3RvcmFnZUVuZ2luZSA9IGNvbnRhaW5lciAic3RvcmFnZS1lbmdpbmUiICJGdXR1cmUgaW1wbGVtZW50YXRpb24gbW9kdWxlIGZvciBleHRlbnNpYmxlIGludGVyZmFjZXM6IGV2ZW50IG5vdGlmaWNhdGlvbiBwdWJsaXNoaW5nLCBhY2Nlc3MgbG9nIHdyaXRpbmcsIG1ldHJpY3MgY29sbGVjdGlvbiwgYW5kIGFuYWx5dGljcyBkYXRhIGV4cG9ydC4gVGhlc2UgaW50ZXJmYWNlcyBhcmUgZGVmaW5lZCBpbiBvYmplY3Qtc3RvcmFnZS1kb21haW4gYW5kIHdpbGwgYmUgaW1wbGVtZW50ZWQgaGVyZS4iICJKYXZhIDIxLCBkb21haW4gaW50ZXJmYWNlcyIgewogICAgICAgIG5vdGlmaWNhdGlvbkV2ZW50UHVibGlzaGVyID0gY29tcG9uZW50ICJOb3RpZmljYXRpb25FdmVudFB1Ymxpc2hlciIgIkV4dGVuc2libGUgZXZlbnQgcHVibGlzaGluZyBpbnRlcmZhY2UgZm9yIFMzIGV2ZW50IG5vdGlmaWNhdGlvbnMgKHMzOk9iamVjdENyZWF0ZWQsIHMzOk9iamVjdFJlbW92ZWQpLiBQdWJsaXNoZXMgdG8gVG9waWNDb25maWd1cmF0aW9uLCBRdWV1ZUNvbmZpZ3VyYXRpb24sIENsb3VkRnVuY3Rpb25Db25maWd1cmF0aW9uIGRlc3RpbmF0aW9ucy4iICJEb21haW4gaW50ZXJmYWNlIgogICAgICAgIGFjY2Vzc0xvZ1dyaXRlciA9IGNvbXBvbmVudCAiQWNjZXNzTG9nV3JpdGVyIiAiRXh0ZW5zaWJsZSBpbnRlcmZhY2UgZm9yIHdyaXRpbmcgUzMgYWNjZXNzIGxvZ3MgdG8gZXh0ZXJuYWwgZGVzdGluYXRpb25zIChLYWZrYSwgRWxhc3RpY1NlYXJjaCwgZmlsZSBzeXN0ZW0sIFMzIHRhcmdldCBidWNrZXQpLiIgIkRvbWFpbiBpbnRlcmZhY2UiCiAgICAgICAgbWV0cmljc0NvbGxlY3RvciA9IGNvbXBvbmVudCAiTWV0cmljc0NvbGxlY3RvciIgIkV4dGVuc2libGUgaW50ZXJmYWNlIGZvciByZWNvcmRpbmcgbWV0cmljcyB0byBDbG91ZFdhdGNoLCBQcm9tZXRoZXVzLCBvciBNaWNyb21ldGVyIGJhY2tlbmRzLiIgIkRvbWFpbiBpbnRlcmZhY2UiCiAgICAgICAgYW5hbHl0aWNzRGF0YUV4cG9ydGVyID0gY29tcG9uZW50ICJBbmFseXRpY3NEYXRhRXhwb3J0ZXIiICJFeHRlbnNpYmxlIGludGVyZmFjZSBmb3IgZXhwb3J0aW5nIGFuYWx5dGljcyBkYXRhIHNuYXBzaG90cyB0byBkZXN0aW5hdGlvbiBidWNrZXRzIChTMyB0YXJnZXQsIENTVi9PUkMgb3V0cHV0KS4iICJEb21haW4gaW50ZXJmYWNlIgogICAgICB9CiAgICB9CgogICAgdXNlciAtPiBtYWdyYXRoZWEuczNSZWFjdGl2ZUFwaUFkYXB0ZXIuYnVja2V0T3BlcmF0aW9uc0hhbmRsZXIgIlNlbmRzIFMzIGJ1Y2tldCBvcGVyYXRpb25zIHJlcXVlc3RzIiAiSFRUUCIKICAgIHVzZXIgLT4gbWFncmF0aGVhLnMzUmVhY3RpdmVBcGlBZGFwdGVyLmJ1Y2tldE1ldGFkYXRhSGFuZGxlciAiU2VuZHMgUzMgYnVja2V0IG1ldGFkYXRhIHJlcXVlc3RzIiAiSFRUUCIKICAgIHVzZXIgLT4gbWFncmF0aGVhLnMzUmVhY3RpdmVBcGlBZGFwdGVyLmJ1Y2tldENvbmZpZ0hhbmRsZXIgIlNlbmRzIFMzIGJ1Y2tldCBjb25maWd1cmF0aW9uIHJlcXVlc3RzIiAiSFRUUCIKICAgIHVzZXIgLT4gbWFncmF0aGVhLnMzUmVhY3RpdmVBcGlBZGFwdGVyLm9iamVjdE9wZXJhdGlvbnNIYW5kbGVyICJTZW5kcyBTMyBvYmplY3Qgb3BlcmF0aW9ucyByZXF1ZXN0cyIgIkhUVFAiCiAgICB1c2VyIC0+IG1hZ3JhdGhlYS5zM1JlYWN0aXZlQXBpQWRhcHRlci5vYmplY3RNZXRhZGF0YUhhbmRsZXIgIlNlbmRzIFMzIG9iamVjdCBtZXRhZGF0YSByZXF1ZXN0cyIgIkhUVFAiCiAgICB1c2VyIC0+IG1hZ3JhdGhlYS5zM1JlYWN0aXZlQXBpQWRhcHRlci5tdWx0aXBhcnRIYW5kbGVyICJTZW5kcyBTMyBtdWx0aXBhcnQgdXBsb2FkIHJlcXVlc3RzIiAiSFRUUCIKCiAgICBtYWdyYXRoZWEuczNSZWFjdGl2ZUFwaUFkYXB0ZXIuYnVja2V0T3BlcmF0aW9uc0hhbmRsZXIgLT4gbWFncmF0aGVhLnJlYWN0aXZlQnVja2V0TWFuYWdlbWVudC5yZWFjdGl2ZUJ1Y2tldFNlcnZpY2UgIkNhbGxzIGJ1Y2tldCBsaWZlY3ljbGUgYW5kIGxpc3RpbmcgdXNlIGNhc2VzIiAiSmF2YSBzZXJ2aWNlIGNhbGxzIgogICAgbWFncmF0aGVhLnMzUmVhY3RpdmVBcGlBZGFwdGVyLmJ1Y2tldE9wZXJhdGlvbnNIYW5kbGVyIC0+IG1hZ3JhdGhlYS5yZWFjdGl2ZU9iamVjdFN0b3JlLnJlYWN0aXZlT2JqZWN0U2VydmljZSAiQ2FsbHMgb2JqZWN0IGxpc3RpbmcgdXNlIGNhc2VzIiAiSmF2YSBzZXJ2aWNlIGNhbGxzIgogICAgbWFncmF0aGVhLnMzUmVhY3RpdmVBcGlBZGFwdGVyLmJ1Y2tldE1ldGFkYXRhSGFuZGxlciAtPiBtYWdyYXRoZWEucmVhY3RpdmVCdWNrZXRNYW5hZ2VtZW50LnJlYWN0aXZlQnVja2V0U2VydmljZSAiQ2FsbHMgYnVja2V0IG1ldGFkYXRhIHVzZSBjYXNlcyIgIkphdmEgc2VydmljZSBjYWxscyIKICAgIG1hZ3JhdGhlYS5zM1JlYWN0aXZlQXBpQWRhcHRlci5idWNrZXRDb25maWdIYW5kbGVyIC0+IG1hZ3JhdGhlYS5yZWFjdGl2ZUJ1Y2tldE1hbmFnZW1lbnQucmVhY3RpdmVCdWNrZXRTZXJ2aWNlICJDYWxscyBidWNrZXQgQ09SUy9saWZlY3ljbGUvcG9saWN5L2VuY3J5cHRpb24vbG9nZ2luZy93ZWJzaXRlL25vdGlmaWNhdGlvbi9yZXBsaWNhdGlvbi9yZXF1ZXN0LXBheW1lbnQvb3duZXJzaGlwLWNvbnRyb2xzL3B1YmxpYy1hY2Nlc3MtYmxvY2svYWNjZWxlcmF0ZS9hbmFseXRpY3MvaW52ZW50b3J5L21ldHJpY3MvaW50ZWxsaWdlbnQtdGllcmluZyB1c2UgY2FzZXMiICJKYXZhIHNlcnZpY2UgY2FsbHMiCiAgICBtYWdyYXRoZWEuczNSZWFjdGl2ZUFwaUFkYXB0ZXIub2JqZWN0T3BlcmF0aW9uc0hhbmRsZXIgLT4gbWFncmF0aGVhLnJlYWN0aXZlQnVja2V0TWFuYWdlbWVudC5yZWFjdGl2ZUJ1Y2tldFNlcnZpY2UgIkNoZWNrcyBidWNrZXQgZXhpc3RlbmNlIiAiSmF2YSBzZXJ2aWNlIGNhbGxzIgogICAgbWFncmF0aGVhLnMzUmVhY3RpdmVBcGlBZGFwdGVyLm9iamVjdE9wZXJhdGlvbnNIYW5kbGVyIC0+IG1hZ3JhdGhlYS5yZWFjdGl2ZU9iamVjdFN0b3JlLnJlYWN0aXZlT2JqZWN0U2VydmljZSAiQ2FsbHMgb2JqZWN0IENSVUQvY29udGVudCB1c2UgY2FzZXMiICJKYXZhIHNlcnZpY2UgY2FsbHMiCiAgICBtYWdyYXRoZWEuczNSZWFjdGl2ZUFwaUFkYXB0ZXIub2JqZWN0TWV0YWRhdGFIYW5kbGVyIC0+IG1hZ3JhdGhlYS5yZWFjdGl2ZUJ1Y2tldE1hbmFnZW1lbnQucmVhY3RpdmVCdWNrZXRTZXJ2aWNlICJDaGVja3MgYnVja2V0IGV4aXN0ZW5jZSIgIkphdmEgc2VydmljZSBjYWxscyIKICAgIG1hZ3JhdGhlYS5zM1JlYWN0aXZlQXBpQWRhcHRlci5vYmplY3RNZXRhZGF0YUhhbmRsZXIgLT4gbWFncmF0aGVhLnJlYWN0aXZlT2JqZWN0U3RvcmUucmVhY3RpdmVPYmplY3RTZXJ2aWNlICJDYWxscyBvYmplY3QgbWV0YWRhdGEgdXNlIGNhc2VzIiAiSmF2YSBzZXJ2aWNlIGNhbGxzIgogICAgbWFncmF0aGVhLnMzUmVhY3RpdmVBcGlBZGFwdGVyLm11bHRpcGFydEhhbmRsZXIgLT4gbWFncmF0aGVhLnJlYWN0aXZlT2JqZWN0U3RvcmUucmVhY3RpdmVNdWx0aXBhcnRVcGxvYWRTZXJ2aWNlICJDYWxscyBtdWx0aXBhcnQgdXBsb2FkIHVzZSBjYXNlcyIgIkphdmEgc2VydmljZSBjYWxscyIKCiAgICBtYWdyYXRoZWEucmVhY3RpdmVPYmplY3RTdG9yZS5yZWFjdGl2ZU9iamVjdFNlcnZpY2UgLT4gbWFncmF0aGVhLnJlYWN0aXZlT2JqZWN0U3RvcmUuczNPYmplY3RSZXBvc2l0b3J5UG9ydCAiUGVyc2lzdHMgYW5kIGxvYWRzIG9iamVjdHMvY29udGVudCB2aWEgZG9tYWluIHJlcG9zaXRvcnkgcG9ydCIgIlJlcG9zaXRvcnkgaW50ZXJmYWNlcyIKICAgIG1hZ3JhdGhlYS5yZWFjdGl2ZU9iamVjdFN0b3JlLnJlYWN0aXZlT2JqZWN0U2VydmljZSAtPiBtYWdyYXRoZWEucmVhY3RpdmVPYmplY3RTdG9yZS5zM09iamVjdCAiQ3JlYXRlcy9yZXN0b3JlcyBvYmplY3QgbWV0YWRhdGEiICJKYXZhIGNhbGxzIgogICAgbWFncmF0aGVhLnJlYWN0aXZlT2JqZWN0U3RvcmUucmVhY3RpdmVPYmplY3RTZXJ2aWNlIC0+IG1hZ3JhdGhlYS5yZWFjdGl2ZU9iamVjdFN0b3JlLmNvbnRlbnRCb3VuZGFyeSAiV3JhcHMgdXBsb2FkL2Rvd25sb2FkIGNvbnRlbnQiICJKYXZhIGNhbGxzIgogICAgbWFncmF0aGVhLnJlYWN0aXZlT2JqZWN0U3RvcmUucmVhY3RpdmVNdWx0aXBhcnRVcGxvYWRTZXJ2aWNlIC0+IG1hZ3JhdGhlYS5yZWFjdGl2ZU9iamVjdFN0b3JlLm11bHRpcGFydFVwbG9hZFJlcG9zaXRvcnlQb3J0ICJQZXJzaXN0cyBhbmQgbG9hZHMgbXVsdGlwYXJ0IHVwbG9hZHMgdmlhIGRvbWFpbiByZXBvc2l0b3J5IHBvcnQiICJSZXBvc2l0b3J5IGludGVyZmFjZXMiCiAgICBtYWdyYXRoZWEucmVhY3RpdmVPYmplY3RTdG9yZS5yZWFjdGl2ZU11bHRpcGFydFVwbG9hZFNlcnZpY2UgLT4gbWFncmF0aGVhLnJlYWN0aXZlT2JqZWN0U3RvcmUubXVsdGlwYXJ0VXBsb2FkICJDcmVhdGVzL3VwZGF0ZXMgbXVsdGlwYXJ0IHVwbG9hZCBzdGF0ZSIgIkphdmEgY2FsbHMiCgogICAgbWFncmF0aGVhLnJlYWN0aXZlQnVja2V0TWFuYWdlbWVudC5yZWFjdGl2ZUJ1Y2tldFNlcnZpY2UgLT4gbWFncmF0aGVhLnJlYWN0aXZlQnVja2V0TWFuYWdlbWVudC5idWNrZXRSZXBvc2l0b3J5UG9ydCAiUGVyc2lzdHMgYW5kIGxvYWRzIGJ1Y2tldCBhZ2dyZWdhdGVzIHZpYSBkb21haW4gcmVwb3NpdG9yeSBwb3J0IiAiUmVwb3NpdG9yeSBpbnRlcmZhY2VzIgogICAgbWFncmF0aGVhLnJlYWN0aXZlQnVja2V0TWFuYWdlbWVudC5yZWFjdGl2ZUJ1Y2tldFNlcnZpY2UgLT4gbWFncmF0aGVhLnJlYWN0aXZlQnVja2V0TWFuYWdlbWVudC5idWNrZXQgIkNyZWF0ZXMvdXBkYXRlcyBidWNrZXQgYWdncmVnYXRlIHJvb3QgKGVtaXRzIE9iamVjdFN0b3JhZ2VFdmVudCBvbiBzdGF0ZSB0cmFuc2l0aW9ucykiICJKYXZhIGNhbGxzIgoKICAgIG1hZ3JhdGhlYS5yZWFjdGl2ZU9iamVjdFN0b3JlLnMzT2JqZWN0UmVwb3NpdG9yeVBvcnQgLT4gbWFncmF0aGVhLnJlYWN0aXZlUmVwb3NpdG9yeUFwcGxpY2F0aW9uLnMzT2JqZWN0Q29tbWFuZFJlcG9zaXRvcnkgIkNRUyBjb21tYW5kIGludGVyZmFjZSBmb3IgUzNPYmplY3QgcGVyc2lzdGVuY2UiICJJbXBsZW1lbnRlZCBieSIKICAgIG1hZ3JhdGhlYS5yZWFjdGl2ZU9iamVjdFN0b3JlLnMzT2JqZWN0UmVwb3NpdG9yeVBvcnQgLT4gbWFncmF0aGVhLnJlYWN0aXZlUmVwb3NpdG9yeUFwcGxpY2F0aW9uLnMzT2JqZWN0UXVlcnlSZXBvc2l0b3J5ICJDUVMgcXVlcnkgaW50ZXJmYWNlIGZvciBTM09iamVjdCByZWFkcyIgIkltcGxlbWVudGVkIGJ5IgogICAgbWFncmF0aGVhLnJlYWN0aXZlT2JqZWN0U3RvcmUubXVsdGlwYXJ0VXBsb2FkUmVwb3NpdG9yeVBvcnQgLT4gbWFncmF0aGVhLnJlYWN0aXZlUmVwb3NpdG9yeUFwcGxpY2F0aW9uLm11bHRpcGFydFVwbG9hZENvbW1hbmRSZXBvc2l0b3J5ICJDUVMgY29tbWFuZCBpbnRlcmZhY2UgZm9yIE11bHRpcGFydFVwbG9hZCBwZXJzaXN0ZW5jZSIgIkltcGxlbWVudGVkIGJ5IgogICAgbWFncmF0aGVhLnJlYWN0aXZlT2JqZWN0U3RvcmUubXVsdGlwYXJ0VXBsb2FkUmVwb3NpdG9yeVBvcnQgLT4gbWFncmF0aGVhLnJlYWN0aXZlUmVwb3NpdG9yeUFwcGxpY2F0aW9uLm11bHRpcGFydFVwbG9hZFF1ZXJ5UmVwb3NpdG9yeSAiQ1FTIHF1ZXJ5IGludGVyZmFjZSBmb3IgTXVsdGlwYXJ0VXBsb2FkIHJlYWRzIiAiSW1wbGVtZW50ZWQgYnkiCgogICAgbWFncmF0aGVhLnJlYWN0aXZlQnVja2V0TWFuYWdlbWVudC5idWNrZXRSZXBvc2l0b3J5UG9ydCAtPiBtYWdyYXRoZWEucmVhY3RpdmVSZXBvc2l0b3J5QXBwbGljYXRpb24uYnVja2V0Q29tbWFuZFJlcG9zaXRvcnkgIkNRUyBjb21tYW5kIGludGVyZmFjZSBmb3IgQnVja2V0IHBlcnNpc3RlbmNlIiAiSW1wbGVtZW50ZWQgYnkiCiAgICBtYWdyYXRoZWEucmVhY3RpdmVCdWNrZXRNYW5hZ2VtZW50LmJ1Y2tldFJlcG9zaXRvcnlQb3J0IC0+IG1hZ3JhdGhlYS5yZWFjdGl2ZVJlcG9zaXRvcnlBcHBsaWNhdGlvbi5idWNrZXRRdWVyeVJlcG9zaXRvcnkgIkNRUyBxdWVyeSBpbnRlcmZhY2UgZm9yIEJ1Y2tldCByZWFkcyIgIkltcGxlbWVudGVkIGJ5IgoKICAgIG1hZ3JhdGhlYS5yZWFjdGl2ZVJlcG9zaXRvcnlBcHBsaWNhdGlvbi5idWNrZXRDb21tYW5kUmVwb3NpdG9yeSAtPiBtYWdyYXRoZWEucmVhY3RpdmVJbmZyYXN0cnVjdHVyZS5pbk1lbW9yeVJlYWN0aXZlQnVja2V0UmVwb3NpdG9yeSAiSW1wbGVtZW50ZWQgYnkiICJJbXBsZW1lbnRzIgogICAgbWFncmF0aGVhLnJlYWN0aXZlUmVwb3NpdG9yeUFwcGxpY2F0aW9uLmJ1Y2tldFF1ZXJ5UmVwb3NpdG9yeSAtPiBtYWdyYXRoZWEucmVhY3RpdmVJbmZyYXN0cnVjdHVyZS5pbk1lbW9yeVJlYWN0aXZlQnVja2V0UmVwb3NpdG9yeSAiSW1wbGVtZW50ZWQgYnkiICJJbXBsZW1lbnRzIgogICAgbWFncmF0aGVhLnJlYWN0aXZlUmVwb3NpdG9yeUFwcGxpY2F0aW9uLnMzT2JqZWN0Q29tbWFuZFJlcG9zaXRvcnkgLT4gbWFncmF0aGVhLnJlYWN0aXZlSW5mcmFzdHJ1Y3R1cmUuaW5NZW1vcnlSZWFjdGl2ZVMzT2JqZWN0UmVwb3NpdG9yeSAiSW1wbGVtZW50ZWQgYnkiICJJbXBsZW1lbnRzIgogICAgbWFncmF0aGVhLnJlYWN0aXZlUmVwb3NpdG9yeUFwcGxpY2F0aW9uLnMzT2JqZWN0UXVlcnlSZXBvc2l0b3J5IC0+IG1hZ3JhdGhlYS5yZWFjdGl2ZUluZnJhc3RydWN0dXJlLmluTWVtb3J5UmVhY3RpdmVTM09iamVjdFJlcG9zaXRvcnkgIkltcGxlbWVudGVkIGJ5IiAiSW1wbGVtZW50cyIKICAgIG1hZ3JhdGhlYS5yZWFjdGl2ZVJlcG9zaXRvcnlBcHBsaWNhdGlvbi5tdWx0aXBhcnRVcGxvYWRDb21tYW5kUmVwb3NpdG9yeSAtPiBtYWdyYXRoZWEucmVhY3RpdmVJbmZyYXN0cnVjdHVyZS5pbk1lbW9yeVJlYWN0aXZlTXVsdGlwYXJ0VXBsb2FkUmVwb3NpdG9yeSAiSW1wbGVtZW50ZWQgYnkiICJJbXBsZW1lbnRzIgogICAgbWFncmF0aGVhLnJlYWN0aXZlUmVwb3NpdG9yeUFwcGxpY2F0aW9uLm11bHRpcGFydFVwbG9hZFF1ZXJ5UmVwb3NpdG9yeSAtPiBtYWdyYXRoZWEucmVhY3RpdmVJbmZyYXN0cnVjdHVyZS5pbk1lbW9yeVJlYWN0aXZlTXVsdGlwYXJ0VXBsb2FkUmVwb3NpdG9yeSAiSW1wbGVtZW50ZWQgYnkiICJJbXBsZW1lbnRzIgoKICAgIG1hZ3JhdGhlYS5zdG9yYWdlRW5naW5lLm5vdGlmaWNhdGlvbkV2ZW50UHVibGlzaGVyIC0+IGthZmthICJQdWJsaXNoZXMgUzMgZXZlbnRzIChzMzpPYmplY3RDcmVhdGVkLCBzMzpPYmplY3RSZW1vdmVkKSIgIkV2ZW50IHRvcGljIgogICAgbWFncmF0aGVhLnN0b3JhZ2VFbmdpbmUubm90aWZpY2F0aW9uRXZlbnRQdWJsaXNoZXIgLT4gYXdzU25zICJQdWJsaXNoZXMgUzMgZXZlbnRzIHRvIFNOUyB0b3BpY3MiICJUb3BpY0NvbmZpZ3VyYXRpb24iCiAgICBtYWdyYXRoZWEuc3RvcmFnZUVuZ2luZS5ub3RpZmljYXRpb25FdmVudFB1Ymxpc2hlciAtPiBhd3NTcXMgIlB1Ymxpc2hlcyBTMyBldmVudHMgdG8gU1FTIHF1ZXVlcyIgIlF1ZXVlQ29uZmlndXJhdGlvbiIKCiAgICBtYWdyYXRoZWEuc3RvcmFnZUVuZ2luZS5hY2Nlc3NMb2dXcml0ZXIgLT4ga2Fma2EgIldyaXRlcyBhY2Nlc3MgbG9ncyIgIkxvZyB0b3BpYyIKICAgIG1hZ3JhdGhlYS5zdG9yYWdlRW5naW5lLmFjY2Vzc0xvZ1dyaXRlciAtPiBlbGFzdGljU2VhcmNoICJXcml0ZXMgYWNjZXNzIGxvZ3MiICJJbmRleCIKICAgIG1hZ3JhdGhlYS5zdG9yYWdlRW5naW5lLmFjY2Vzc0xvZ1dyaXRlciAtPiBmaWxlU3lzdGVtICJXcml0ZXMgYWNjZXNzIGxvZ3MiICJGaWxlIG91dHB1dCIKICAgIG1hZ3JhdGhlYS5zdG9yYWdlRW5naW5lLmFjY2Vzc0xvZ1dyaXRlciAtPiBhd3NTM1RhcmdldEJ1Y2tldCAiV3JpdGVzIGFjY2VzcyBsb2dzIiAiVGFyZ2V0IGJ1Y2tldCIKCiAgICBtYWdyYXRoZWEuc3RvcmFnZUVuZ2luZS5tZXRyaWNzQ29sbGVjdG9yIC0+IHByb21ldGhldXMgIlJlY29yZHMgbWV0cmljcyIgIlByb21ldGhldXMgZm9ybWF0IgogICAgbWFncmF0aGVhLnN0b3JhZ2VFbmdpbmUubWV0cmljc0NvbGxlY3RvciAtPiBhd3NDbG91ZFdhdGNoICJSZWNvcmRzIG1ldHJpY3MiICJDbG91ZFdhdGNoIEFQSSIKICAgIG1hZ3JhdGhlYS5zdG9yYWdlRW5naW5lLm1ldHJpY3NDb2xsZWN0b3IgLT4gbWljcm9tZXRlciAiUmVjb3JkcyBtZXRyaWNzIiAiTWljcm9tZXRlciBmYWNhZGUiCgogICAgbWFncmF0aGVhLnN0b3JhZ2VFbmdpbmUuYW5hbHl0aWNzRGF0YUV4cG9ydGVyIC0+IGF3c1MzVGFyZ2V0QnVja2V0ICJFeHBvcnRzIGFuYWx5dGljcyBkYXRhIiAiVGFyZ2V0IGJ1Y2tldCIKICAgIG1hZ3JhdGhlYS5zdG9yYWdlRW5naW5lLmFuYWx5dGljc0RhdGFFeHBvcnRlciAtPiBjc3ZPcmNPdXRwdXQgIkV4cG9ydHMgYW5hbHl0aWNzIGRhdGEiICJDU1YvT1JDIGZvcm1hdCIKICB9CgogIHZpZXdzIHsKICAgIHN5c3RlbUNvbnRleHQgbWFncmF0aGVhICJTeXN0ZW1Db250ZXh0IiB7CiAgICAgIHRpdGxlICJDMSBTeXN0ZW0gQ29udGV4dDogTWFncmF0aGVhIE9iamVjdFN0b3JhZ2UiCiAgICAgIGRlc2NyaXB0aW9uICJFeHRlcm5hbCBTMy1jb21wYXRpYmxlIGNsaWVudHMgaW50ZXJhY3Qgd2l0aCBNYWdyYXRoZWEgT2JqZWN0U3RvcmFnZSBhcyBhIHNpbmdsZSBzb2Z0d2FyZSBzeXN0ZW0uIgogICAgICBpbmNsdWRlIHVzZXIKICAgICAgaW5jbHVkZSBtYWdyYXRoZWEKICAgICAgYXV0b2xheW91dCBscgogICAgfQoKICAgIGNvbnRhaW5lciBtYWdyYXRoZWEgIkNvbnRhaW5lciIgewogICAgICB0aXRsZSAiQzIgQ29udGFpbmVyOiBNYWdyYXRoZWEgT2JqZWN0U3RvcmFnZSIKICAgICAgZGVzY3JpcHRpb24gInMzLXJlYWN0aXZlLWFwaS1hZGFwdGVyIGV4cG9zZXMgdGhlIFMzIEFQSSwgcmVhY3RpdmUtb2JqZWN0LXN0b3JlIGFuZCByZWFjdGl2ZS1idWNrZXQtbWFuYWdlbWVudCBpbXBsZW1lbnQgY29yZSByZWFjdGl2ZSBjYXBhYmlsaXRpZXMsIHJlYWN0aXZlLXJlcG9zaXRvcnktYXBwbGljYXRpb24gcHJvdmlkZXMgQ1FTIGludGVyZmFjZXMsIHJlYWN0aXZlLWluZnJhc3RydWN0dXJlIHBlcnNpc3RzIHN0YXRlIHJlYWN0aXZlbHkgaW4tcHJvY2VzcywgYW5kIHN0b3JhZ2UtZW5naW5lIHByb3ZpZGVzIGV4dGVuc2libGUgaW50ZXJmYWNlcyBmb3Igbm90aWZpY2F0aW9uLCBsb2dnaW5nLCBtZXRyaWNzLCBhbmQgYW5hbHl0aWNzLiIKICAgICAgaW5jbHVkZSB1c2VyCiAgICAgIGluY2x1ZGUgbWFncmF0aGVhLnMzUmVhY3RpdmVBcGlBZGFwdGVyCiAgICAgIGluY2x1ZGUgbWFncmF0aGVhLnJlYWN0aXZlT2JqZWN0U3RvcmUKICAgICAgaW5jbHVkZSBtYWdyYXRoZWEucmVhY3RpdmVCdWNrZXRNYW5hZ2VtZW50CiAgICAgIGluY2x1ZGUgbWFncmF0aGVhLnJlYWN0aXZlUmVwb3NpdG9yeUFwcGxpY2F0aW9uCiAgICAgIGluY2x1ZGUgbWFncmF0aGVhLnJlYWN0aXZlSW5mcmFzdHJ1Y3R1cmUKICAgICAgaW5jbHVkZSBtYWdyYXRoZWEuc3RvcmFnZUVuZ2luZQogICAgICBpbmNsdWRlIGthZmthCiAgICAgIGluY2x1ZGUgYXdzU25zCiAgICAgIGluY2x1ZGUgYXdzU3FzCiAgICAgIGluY2x1ZGUgZWxhc3RpY1NlYXJjaAogICAgICBpbmNsdWRlIGZpbGVTeXN0ZW0KICAgICAgaW5jbHVkZSBhd3NTM1RhcmdldEJ1Y2tldAogICAgICBpbmNsdWRlIHByb21ldGhldXMKICAgICAgaW5jbHVkZSBhd3NDbG91ZFdhdGNoCiAgICAgIGluY2x1ZGUgbWljcm9tZXRlcgogICAgICBpbmNsdWRlIGNzdk9yY091dHB1dAogICAgICBhdXRvbGF5b3V0IGxyCiAgICB9CgogICAgY29tcG9uZW50IG1hZ3JhdGhlYS5zM1JlYWN0aXZlQXBpQWRhcHRlciAiUzNSZWFjdGl2ZUFwaUFkYXB0ZXJDb21wb25lbnRzIiB7CiAgICAgIHRpdGxlICJDMyBDb21wb25lbnQ6IHMzLXJlYWN0aXZlLWFwaS1hZGFwdGVyIgogICAgICBkZXNjcmlwdGlvbiAiUm91dGVyRnVuY3Rpb24gYW5kIGhhbmRsZXIgY29tcG9uZW50cyB0aGF0IGV4cG9zZSB0aGUgUzMtY29tcGF0aWJsZSBIVFRQIHByb3RvY29sLiIKICAgICAgaW5jbHVkZSB1c2VyCiAgICAgIGluY2x1ZGUgKgogICAgICBpbmNsdWRlIG1hZ3JhdGhlYS5yZWFjdGl2ZU9iamVjdFN0b3JlCiAgICAgIGluY2x1ZGUgbWFncmF0aGVhLnJlYWN0aXZlQnVja2V0TWFuYWdlbWVudAogICAgICBhdXRvbGF5b3V0IGxyCiAgICB9CgogICAgY29tcG9uZW50IG1hZ3JhdGhlYS5yZWFjdGl2ZU9iamVjdFN0b3JlICJSZWFjdGl2ZU9iamVjdFN0b3JlQ29tcG9uZW50cyIgewogICAgICB0aXRsZSAiQzMgQ29tcG9uZW50OiByZWFjdGl2ZS1vYmplY3Qtc3RvcmUiCiAgICAgIGRlc2NyaXB0aW9uICJSZWFjdGl2ZSBvYmplY3QgYW5kIG11bHRpcGFydCB1cGxvYWQgYXBwbGljYXRpb24gc2VydmljZXMsIGRvbWFpbiBhZ2dyZWdhdGVzIGFuZCByZXBvc2l0b3J5IHBvcnRzLiIKICAgICAgaW5jbHVkZSBtYWdyYXRoZWEuczNSZWFjdGl2ZUFwaUFkYXB0ZXIKICAgICAgaW5jbHVkZSAqCiAgICAgIGluY2x1ZGUgbWFncmF0aGVhLnJlYWN0aXZlQnVja2V0TWFuYWdlbWVudAogICAgICBpbmNsdWRlIG1hZ3JhdGhlYS5yZWFjdGl2ZVJlcG9zaXRvcnlBcHBsaWNhdGlvbgogICAgICBpbmNsdWRlIG1hZ3JhdGhlYS5yZWFjdGl2ZUluZnJhc3RydWN0dXJlCiAgICAgIGF1dG9sYXlvdXQgbHIKICAgIH0KCiAgICBjb21wb25lbnQgbWFncmF0aGVhLnJlYWN0aXZlQnVja2V0TWFuYWdlbWVudCAiUmVhY3RpdmVCdWNrZXRNYW5hZ2VtZW50Q29tcG9uZW50cyIgewogICAgICB0aXRsZSAiQzMgQ29tcG9uZW50OiByZWFjdGl2ZS1idWNrZXQtbWFuYWdlbWVudCIKICAgICAgZGVzY3JpcHRpb24gIlJlYWN0aXZlIGJ1Y2tldCBtYW5hZ2VtZW50IHNlcnZpY2UsIGJ1Y2tldCBhZ2dyZWdhdGUgcm9vdCB3aXRoIGRvbWFpbiBldmVudHMgYW5kIGlubGluZSBDb25maWd1cmF0aW9uLCBhbmQgcmVwb3NpdG9yeSBwb3J0LiIKICAgICAgaW5jbHVkZSBtYWdyYXRoZWEuczNSZWFjdGl2ZUFwaUFkYXB0ZXIKICAgICAgaW5jbHVkZSBtYWdyYXRoZWEucmVhY3RpdmVPYmplY3RTdG9yZQogICAgICBpbmNsdWRlICoKICAgICAgaW5jbHVkZSBtYWdyYXRoZWEucmVhY3RpdmVSZXBvc2l0b3J5QXBwbGljYXRpb24KICAgICAgaW5jbHVkZSBtYWdyYXRoZWEucmVhY3RpdmVJbmZyYXN0cnVjdHVyZQogICAgICBhdXRvbGF5b3V0IGxyCiAgICB9CgogICAgY29tcG9uZW50IG1hZ3JhdGhlYS5yZWFjdGl2ZVJlcG9zaXRvcnlBcHBsaWNhdGlvbiAiUmVhY3RpdmVSZXBvc2l0b3J5QXBwbGljYXRpb25Db21wb25lbnRzIiB7CiAgICAgIHRpdGxlICJDMyBDb21wb25lbnQ6IHJlYWN0aXZlLXJlcG9zaXRvcnktYXBwbGljYXRpb24iCiAgICAgIGRlc2NyaXB0aW9uICJDb21tYW5kL1F1ZXJ5IHJlcG9zaXRvcnkgaW50ZXJmYWNlcyBmb3IgYnVja2V0LCBTM09iamVjdCBhbmQgbXVsdGlwYXJ0IHVwbG9hZCBhZ2dyZWdhdGVzLiIKICAgICAgaW5jbHVkZSBtYWdyYXRoZWEucmVhY3RpdmVPYmplY3RTdG9yZQogICAgICBpbmNsdWRlIG1hZ3JhdGhlYS5yZWFjdGl2ZUJ1Y2tldE1hbmFnZW1lbnQKICAgICAgaW5jbHVkZSAqCiAgICAgIGluY2x1ZGUgbWFncmF0aGVhLnJlYWN0aXZlSW5mcmFzdHJ1Y3R1cmUKICAgICAgYXV0b2xheW91dCBscgogICAgfQoKICAgIGNvbXBvbmVudCBtYWdyYXRoZWEucmVhY3RpdmVJbmZyYXN0cnVjdHVyZSAiUmVhY3RpdmVJbmZyYXN0cnVjdHVyZUNvbXBvbmVudHMiIHsKICAgICAgdGl0bGUgIkMzIENvbXBvbmVudDogcmVhY3RpdmUtaW5mcmFzdHJ1Y3R1cmUiCiAgICAgIGRlc2NyaXB0aW9uICJSZWFjdGl2ZSByZXBvc2l0b3J5IGFkYXB0ZXJzIHVzZWQgYnkgdGhlIGFwcGxpY2F0aW9uIGNhcGFiaWxpdGllcy4gSW50ZXJuYWwgQ29uY3VycmVudEhhc2hNYXAgc3RydWN0dXJlcyBhcmUgaW50ZW50aW9uYWxseSBub3Qgc2hvd24gYXMgQzQgY29tcG9uZW50cy4iCiAgICAgIGluY2x1ZGUgbWFncmF0aGVhLnJlYWN0aXZlT2JqZWN0U3RvcmUKICAgICAgaW5jbHVkZSBtYWdyYXRoZWEucmVhY3RpdmVCdWNrZXRNYW5hZ2VtZW50CiAgICAgIGluY2x1ZGUgbWFncmF0aGVhLnJlYWN0aXZlUmVwb3NpdG9yeUFwcGxpY2F0aW9uCiAgICAgIGluY2x1ZGUgKgogICAgICBhdXRvbGF5b3V0IGxyCiAgICB9CgogICAgY29tcG9uZW50IG1hZ3JhdGhlYS5zdG9yYWdlRW5naW5lICJTdG9yYWdlRW5naW5lQ29tcG9uZW50cyIgewogICAgICB0aXRsZSAiQzMgQ29tcG9uZW50OiBzdG9yYWdlLWVuZ2luZSIKICAgICAgZGVzY3JpcHRpb24gIkV4dGVuc2libGUgZG9tYWluIGludGVyZmFjZXMgZm9yIGV2ZW50IG5vdGlmaWNhdGlvbiBwdWJsaXNoaW5nLCBhY2Nlc3MgbG9nIHdyaXRpbmcsIG1ldHJpY3MgY29sbGVjdGlvbiwgYW5kIGFuYWx5dGljcyBkYXRhIGV4cG9ydC4gSW1wbGVtZW50YXRpb24gaXMgUE9TVFBPTkVEIOKAlCBvbmx5IGludGVyZmFjZXMgYXJlIGRlZmluZWQgbm93IGluIG9iamVjdC1zdG9yYWdlLWRvbWFpbi4iCiAgICAgIGluY2x1ZGUgKgogICAgICBpbmNsdWRlIGthZmthCiAgICAgIGluY2x1ZGUgYXdzU25zCiAgICAgIGluY2x1ZGUgYXdzU3FzCiAgICAgIGluY2x1ZGUgZWxhc3RpY1NlYXJjaAogICAgICBpbmNsdWRlIGZpbGVTeXN0ZW0KICAgICAgaW5jbHVkZSBhd3NTM1RhcmdldEJ1Y2tldAogICAgICBpbmNsdWRlIHByb21ldGhldXMKICAgICAgaW5jbHVkZSBhd3NDbG91ZFdhdGNoCiAgICAgIGluY2x1ZGUgbWljcm9tZXRlcgogICAgICBpbmNsdWRlIGNzdk9yY091dHB1dAogICAgICBhdXRvbGF5b3V0IGxyCiAgICB9CgogICAgZHluYW1pYyBtYWdyYXRoZWEuczNSZWFjdGl2ZUFwaUFkYXB0ZXIgIkNyZWF0ZUJ1Y2tldFJ1bnRpbWUiIHsKICAgICAgdGl0bGUgIlJ1bnRpbWU6IENyZWF0ZUJ1Y2tldCIKICAgICAgZGVzY3JpcHRpb24gIlBVVCAve2J1Y2tldH0gY3JlYXRlcyBhIEJ1Y2tldCBhZ2dyZWdhdGUgcm9vdCBhbmQgcGVyc2lzdHMgaXQgaW4gcmVhY3RpdmUtaW5mcmFzdHJ1Y3R1cmUuIgogICAgICB1c2VyIC0+IG1hZ3JhdGhlYS5zM1JlYWN0aXZlQXBpQWRhcHRlci5idWNrZXRPcGVyYXRpb25zSGFuZGxlciAiMS4gUFVUIC97YnVja2V0fSIgIkhUVFAiCiAgICAgIG1hZ3JhdGhlYS5zM1JlYWN0aXZlQXBpQWRhcHRlci5idWNrZXRPcGVyYXRpb25zSGFuZGxlciAtPiBtYWdyYXRoZWEucmVhY3RpdmVCdWNrZXRNYW5hZ2VtZW50LnJlYWN0aXZlQnVja2V0U2VydmljZSAiMi4gQ3JlYXRlQnVja2V0IHVzZSBjYXNlIiAiSmF2YSBzZXJ2aWNlIGNhbGxzIgogICAgICBtYWdyYXRoZWEucmVhY3RpdmVCdWNrZXRNYW5hZ2VtZW50LnJlYWN0aXZlQnVja2V0U2VydmljZSAtPiBtYWdyYXRoZWEucmVhY3RpdmVCdWNrZXRNYW5hZ2VtZW50LmJ1Y2tldFJlcG9zaXRvcnlQb3J0ICIzLiBQZXJzaXN0IEJ1Y2tldCBhZ2dyZWdhdGUgdmlhIGRvbWFpbiByZXBvc2l0b3J5IHBvcnQiICJSZXBvc2l0b3J5IGludGVyZmFjZXMiCiAgICAgIG1hZ3JhdGhlYS5yZWFjdGl2ZUJ1Y2tldE1hbmFnZW1lbnQuYnVja2V0UmVwb3NpdG9yeVBvcnQgLT4gbWFncmF0aGVhLnJlYWN0aXZlUmVwb3NpdG9yeUFwcGxpY2F0aW9uLmJ1Y2tldENvbW1hbmRSZXBvc2l0b3J5ICI0LiBDUVMgY29tbWFuZCBpbnRlcmZhY2UiICJJbXBsZW1lbnRlZCBieSIKICAgICAgbWFncmF0aGVhLnJlYWN0aXZlUmVwb3NpdG9yeUFwcGxpY2F0aW9uLmJ1Y2tldENvbW1hbmRSZXBvc2l0b3J5IC0+IG1hZ3JhdGhlYS5yZWFjdGl2ZUluZnJhc3RydWN0dXJlLmluTWVtb3J5UmVhY3RpdmVCdWNrZXRSZXBvc2l0b3J5ICI1LiBQZXJzaXN0IEJ1Y2tldCBhZ2dyZWdhdGUiICJJbXBsZW1lbnRzIgogICAgICBhdXRvbGF5b3V0IGxyCiAgICB9CgogICAgZHluYW1pYyBtYWdyYXRoZWEuczNSZWFjdGl2ZUFwaUFkYXB0ZXIgIlB1dE9iamVjdFJ1bnRpbWUiIHsKICAgICAgdGl0bGUgIlJ1bnRpbWU6IFB1dE9iamVjdCIKICAgICAgZGVzY3JpcHRpb24gIlB1dE9iamVjdCB2ZXJpZmllcyB0aGUgYnVja2V0LCB0aGVuIHBlcnNpc3RzIG9iamVjdCBtZXRhZGF0YSBhbmQgY29udGVudC4iCiAgICAgIHVzZXIgLT4gbWFncmF0aGVhLnMzUmVhY3RpdmVBcGlBZGFwdGVyLm9iamVjdE9wZXJhdGlvbnNIYW5kbGVyICIxLiBQVVQgL3tidWNrZXR9L3trZXl9IiAiSFRUUCIKICAgICAgbWFncmF0aGVhLnMzUmVhY3RpdmVBcGlBZGFwdGVyLm9iamVjdE9wZXJhdGlvbnNIYW5kbGVyIC0+IG1hZ3JhdGhlYS5yZWFjdGl2ZUJ1Y2tldE1hbmFnZW1lbnQucmVhY3RpdmVCdWNrZXRTZXJ2aWNlICIyLiBWZXJpZnkgYnVja2V0IGV4aXN0cyIgIkphdmEgc2VydmljZSBjYWxscyIKICAgICAgbWFncmF0aGVhLnJlYWN0aXZlQnVja2V0TWFuYWdlbWVudC5yZWFjdGl2ZUJ1Y2tldFNlcnZpY2UgLT4gbWFncmF0aGVhLnJlYWN0aXZlQnVja2V0TWFuYWdlbWVudC5idWNrZXRSZXBvc2l0b3J5UG9ydCAiMy4gUmVhZCBidWNrZXQgYWdncmVnYXRlIHZpYSBkb21haW4gcmVwb3NpdG9yeSBwb3J0IiAiUmVwb3NpdG9yeSBpbnRlcmZhY2VzIgogICAgICBtYWdyYXRoZWEucmVhY3RpdmVCdWNrZXRNYW5hZ2VtZW50LmJ1Y2tldFJlcG9zaXRvcnlQb3J0IC0+IG1hZ3JhdGhlYS5yZWFjdGl2ZVJlcG9zaXRvcnlBcHBsaWNhdGlvbi5idWNrZXRRdWVyeVJlcG9zaXRvcnkgIjQuIENRUyBxdWVyeSBpbnRlcmZhY2UiICJJbXBsZW1lbnRlZCBieSIKICAgICAgbWFncmF0aGVhLnJlYWN0aXZlUmVwb3NpdG9yeUFwcGxpY2F0aW9uLmJ1Y2tldFF1ZXJ5UmVwb3NpdG9yeSAtPiBtYWdyYXRoZWEucmVhY3RpdmVJbmZyYXN0cnVjdHVyZS5pbk1lbW9yeVJlYWN0aXZlQnVja2V0UmVwb3NpdG9yeSAiNS4gUmVhZCBidWNrZXQgYWdncmVnYXRlIiAiSW1wbGVtZW50cyIKICAgICAgbWFncmF0aGVhLnMzUmVhY3RpdmVBcGlBZGFwdGVyLm9iamVjdE9wZXJhdGlvbnNIYW5kbGVyIC0+IG1hZ3JhdGhlYS5yZWFjdGl2ZU9iamVjdFN0b3JlLnJlYWN0aXZlT2JqZWN0U2VydmljZSAiNi4gUHV0T2JqZWN0IHVzZSBjYXNlIiAiSmF2YSBzZXJ2aWNlIGNhbGxzIgogICAgICBtYWdyYXRoZWEucmVhY3RpdmVPYmplY3RTdG9yZS5yZWFjdGl2ZU9iamVjdFNlcnZpY2UgLT4gbWFncmF0aGVhLnJlYWN0aXZlT2JqZWN0U3RvcmUuczNPYmplY3RSZXBvc2l0b3J5UG9ydCAiNy4gUGVyc2lzdCBvYmplY3QgbWV0YWRhdGEgYW5kIGNvbnRlbnQgdmlhIGRvbWFpbiByZXBvc2l0b3J5IHBvcnQiICJSZXBvc2l0b3J5IGludGVyZmFjZXMiCiAgICAgIG1hZ3JhdGhlYS5yZWFjdGl2ZU9iamVjdFN0b3JlLnMzT2JqZWN0UmVwb3NpdG9yeVBvcnQgLT4gbWFncmF0aGVhLnJlYWN0aXZlUmVwb3NpdG9yeUFwcGxpY2F0aW9uLnMzT2JqZWN0Q29tbWFuZFJlcG9zaXRvcnkgIjguIENRUyBjb21tYW5kIGludGVyZmFjZSIgIkltcGxlbWVudGVkIGJ5IgogICAgICBtYWdyYXRoZWEucmVhY3RpdmVSZXBvc2l0b3J5QXBwbGljYXRpb24uczNPYmplY3RDb21tYW5kUmVwb3NpdG9yeSAtPiBtYWdyYXRoZWEucmVhY3RpdmVJbmZyYXN0cnVjdHVyZS5pbk1lbW9yeVJlYWN0aXZlUzNPYmplY3RSZXBvc2l0b3J5ICI5LiBQZXJzaXN0IG9iamVjdCBtZXRhZGF0YSBhbmQgYnl0ZXMiICJJbXBsZW1lbnRzIgogICAgICBhdXRvbGF5b3V0IGxyCiAgICB9CgogICAgZHluYW1pYyBtYWdyYXRoZWEuczNSZWFjdGl2ZUFwaUFkYXB0ZXIgIkdldE9iamVjdFJ1bnRpbWUiIHsKICAgICAgdGl0bGUgIlJ1bnRpbWU6IEdldE9iamVjdCIKICAgICAgZGVzY3JpcHRpb24gIkdldE9iamVjdCB2ZXJpZmllcyB0aGUgYnVja2V0LCB0aGVuIGxvYWRzIG9iamVjdCBtZXRhZGF0YSBhbmQgYmluYXJ5IGNvbnRlbnQuIgogICAgICB1c2VyIC0+IG1hZ3JhdGhlYS5zM1JlYWN0aXZlQXBpQWRhcHRlci5vYmplY3RPcGVyYXRpb25zSGFuZGxlciAiMS4gR0VUIC97YnVja2V0fS97a2V5fSIgIkhUVFAiCiAgICAgIG1hZ3JhdGhlYS5zM1JlYWN0aXZlQXBpQWRhcHRlci5vYmplY3RPcGVyYXRpb25zSGFuZGxlciAtPiBtYWdyYXRoZWEucmVhY3RpdmVCdWNrZXRNYW5hZ2VtZW50LnJlYWN0aXZlQnVja2V0U2VydmljZSAiMi4gVmVyaWZ5IGJ1Y2tldCBleGlzdHMiICJKYXZhIHNlcnZpY2UgY2FsbHMiCiAgICAgIG1hZ3JhdGhlYS5yZWFjdGl2ZUJ1Y2tldE1hbmFnZW1lbnQucmVhY3RpdmVCdWNrZXRTZXJ2aWNlIC0+IG1hZ3JhdGhlYS5yZWFjdGl2ZUJ1Y2tldE1hbmFnZW1lbnQuYnVja2V0UmVwb3NpdG9yeVBvcnQgIjMuIFJlYWQgYnVja2V0IGFnZ3JlZ2F0ZSB2aWEgZG9tYWluIHJlcG9zaXRvcnkgcG9ydCIgIlJlcG9zaXRvcnkgaW50ZXJmYWNlcyIKICAgICAgbWFncmF0aGVhLnJlYWN0aXZlQnVja2V0TWFuYWdlbWVudC5idWNrZXRSZXBvc2l0b3J5UG9ydCAtPiBtYWdyYXRoZWEucmVhY3RpdmVSZXBvc2l0b3J5QXBwbGljYXRpb24uYnVja2V0UXVlcnlSZXBvc2l0b3J5ICI0LiBDUVMgcXVlcnkgaW50ZXJmYWNlIiAiSW1wbGVtZW50ZWQgYnkiCiAgICAgIG1hZ3JhdGhlYS5yZWFjdGl2ZVJlcG9zaXRvcnlBcHBsaWNhdGlvbi5idWNrZXRRdWVyeVJlcG9zaXRvcnkgLT4gbWFncmF0aGVhLnJlYWN0aXZlSW5mcmFzdHJ1Y3R1cmUuaW5NZW1vcnlSZWFjdGl2ZUJ1Y2tldFJlcG9zaXRvcnkgIjUuIFJlYWQgYnVja2V0IGFnZ3JlZ2F0ZSIgIkltcGxlbWVudHMiCiAgICAgIG1hZ3JhdGhlYS5zM1JlYWN0aXZlQXBpQWRhcHRlci5vYmplY3RPcGVyYXRpb25zSGFuZGxlciAtPiBtYWdyYXRoZWEucmVhY3RpdmVPYmplY3RTdG9yZS5yZWFjdGl2ZU9iamVjdFNlcnZpY2UgIjYuIEdldE9iamVjdCB1c2UgY2FzZSIgIkphdmEgc2VydmljZSBjYWxscyIKICAgICAgbWFncmF0aGVhLnJlYWN0aXZlT2JqZWN0U3RvcmUucmVhY3RpdmVPYmplY3RTZXJ2aWNlIC0+IG1hZ3JhdGhlYS5yZWFjdGl2ZU9iamVjdFN0b3JlLnMzT2JqZWN0UmVwb3NpdG9yeVBvcnQgIjcuIFJlYWQgb2JqZWN0IG1ldGFkYXRhIGFuZCBjb250ZW50IHZpYSBkb21haW4gcmVwb3NpdG9yeSBwb3J0IiAiUmVwb3NpdG9yeSBpbnRlcmZhY2VzIgogICAgICBtYWdyYXRoZWEucmVhY3RpdmVPYmplY3RTdG9yZS5zM09iamVjdFJlcG9zaXRvcnlQb3J0IC0+IG1hZ3JhdGhlYS5yZWFjdGl2ZVJlcG9zaXRvcnlBcHBsaWNhdGlvbi5zM09iamVjdFF1ZXJ5UmVwb3NpdG9yeSAiOC4gQ1FTIHF1ZXJ5IGludGVyZmFjZSIgIkltcGxlbWVudGVkIGJ5IgogICAgICBtYWdyYXRoZWEucmVhY3RpdmVSZXBvc2l0b3J5QXBwbGljYXRpb24uczNPYmplY3RRdWVyeVJlcG9zaXRvcnkgLT4gbWFncmF0aGVhLnJlYWN0aXZlSW5mcmFzdHJ1Y3R1cmUuaW5NZW1vcnlSZWFjdGl2ZVMzT2JqZWN0UmVwb3NpdG9yeSAiOS4gUmVhZCBvYmplY3QgbWV0YWRhdGEgYW5kIGJ5dGVzIiAiSW1wbGVtZW50cyIKICAgICAgYXV0b2xheW91dCBscgogICAgfQoKICAgIGR5bmFtaWMgbWFncmF0aGVhLnMzUmVhY3RpdmVBcGlBZGFwdGVyICJNdWx0aXBhcnRVcGxvYWRSdW50aW1lIiB7CiAgICAgIHRpdGxlICJSdW50aW1lOiBNdWx0aXBhcnQgdXBsb2FkIGxpZmVjeWNsZSIKICAgICAgZGVzY3JpcHRpb24gIk11bHRpcGFydCBlbmRwb2ludHMgbWFuYWdlIHVwbG9hZCBzZXNzaW9ucyBhbmQgdXBsb2FkZWQgcGFydCBzdGF0ZS4iCiAgICAgIHVzZXIgLT4gbWFncmF0aGVhLnMzUmVhY3RpdmVBcGlBZGFwdGVyLm11bHRpcGFydEhhbmRsZXIgIjEuIFBPU1QvUFVUL0dFVC9ERUxFVEUgbXVsdGlwYXJ0IGVuZHBvaW50cyIgIkhUVFAiCiAgICAgIG1hZ3JhdGhlYS5zM1JlYWN0aXZlQXBpQWRhcHRlci5tdWx0aXBhcnRIYW5kbGVyIC0+IG1hZ3JhdGhlYS5yZWFjdGl2ZU9iamVjdFN0b3JlLnJlYWN0aXZlTXVsdGlwYXJ0VXBsb2FkU2VydmljZSAiMi4gTXVsdGlwYXJ0IHVwbG9hZCBsaWZlY3ljbGUgdXNlIGNhc2VzIiAiSmF2YSBzZXJ2aWNlIGNhbGxzIgogICAgICBtYWdyYXRoZWEucmVhY3RpdmVPYmplY3RTdG9yZS5yZWFjdGl2ZU11bHRpcGFydFVwbG9hZFNlcnZpY2UgLT4gbWFncmF0aGVhLnJlYWN0aXZlT2JqZWN0U3RvcmUubXVsdGlwYXJ0VXBsb2FkUmVwb3NpdG9yeVBvcnQgIjMuIFBlcnNpc3QvbG9hZCBtdWx0aXBhcnQgdXBsb2FkIHN0YXRlIHZpYSBkb21haW4gcmVwb3NpdG9yeSBwb3J0IiAiUmVwb3NpdG9yeSBpbnRlcmZhY2VzIgogICAgICBtYWdyYXRoZWEucmVhY3RpdmVPYmplY3RTdG9yZS5tdWx0aXBhcnRVcGxvYWRSZXBvc2l0b3J5UG9ydCAtPiBtYWdyYXRoZWEucmVhY3RpdmVSZXBvc2l0b3J5QXBwbGljYXRpb24ubXVsdGlwYXJ0VXBsb2FkQ29tbWFuZFJlcG9zaXRvcnkgIjQuIENRUyBjb21tYW5kIGludGVyZmFjZSIgIkltcGxlbWVudGVkIGJ5IgogICAgICBtYWdyYXRoZWEucmVhY3RpdmVPYmplY3RTdG9yZS5tdWx0aXBhcnRVcGxvYWRSZXBvc2l0b3J5UG9ydCAtPiBtYWdyYXRoZWEucmVhY3RpdmVSZXBvc2l0b3J5QXBwbGljYXRpb24ubXVsdGlwYXJ0VXBsb2FkUXVlcnlSZXBvc2l0b3J5ICI1LiBDUVMgcXVlcnkgaW50ZXJmYWNlIiAiSW1wbGVtZW50ZWQgYnkiCiAgICAgIG1hZ3JhdGhlYS5yZWFjdGl2ZVJlcG9zaXRvcnlBcHBsaWNhdGlvbi5tdWx0aXBhcnRVcGxvYWRDb21tYW5kUmVwb3NpdG9yeSAtPiBtYWdyYXRoZWEucmVhY3RpdmVJbmZyYXN0cnVjdHVyZS5pbk1lbW9yeVJlYWN0aXZlTXVsdGlwYXJ0VXBsb2FkUmVwb3NpdG9yeSAiNi4gUGVyc2lzdCBtdWx0aXBhcnQgdXBsb2FkIHN0YXRlIiAiSW1wbGVtZW50cyIKICAgICAgbWFncmF0aGVhLnJlYWN0aXZlUmVwb3NpdG9yeUFwcGxpY2F0aW9uLm11bHRpcGFydFVwbG9hZFF1ZXJ5UmVwb3NpdG9yeSAtPiBtYWdyYXRoZWEucmVhY3RpdmVJbmZyYXN0cnVjdHVyZS5pbk1lbW9yeVJlYWN0aXZlTXVsdGlwYXJ0VXBsb2FkUmVwb3NpdG9yeSAiNy4gUmVhZCBtdWx0aXBhcnQgdXBsb2FkIHN0YXRlIiAiSW1wbGVtZW50cyIKICAgICAgYXV0b2xheW91dCBscgogICAgfQoKICAgIHN0eWxlcyB7CiAgICAgIGVsZW1lbnQgIlBlcnNvbiIgewogICAgICAgIHNoYXBlIHBlcnNvbgogICAgICAgIGJhY2tncm91bmQgI2ZmZmZmZgogICAgICAgIGNvbG9yICM0NDQ0NDQKICAgICAgfQogICAgICBlbGVtZW50ICJTb2Z0d2FyZSBTeXN0ZW0iIHsKICAgICAgICBiYWNrZ3JvdW5kICMxMTY4YmQKICAgICAgICBjb2xvciAjZmZmZmZmCiAgICAgIH0KICAgICAgZWxlbWVudCAiZXh0ZXJuYWwtc3lzdGVtIiB7CiAgICAgICAgYmFja2dyb3VuZCAjNmI3YjhmCiAgICAgICAgY29sb3IgI2ZmZmZmZgogICAgICAgIHNoYXBlIHJvdW5kZWRCb3gKICAgICAgfQogICAgICBlbGVtZW50ICJDb250YWluZXIiIHsKICAgICAgICBiYWNrZ3JvdW5kICM0MzhkZDUKICAgICAgICBjb2xvciAjZmZmZmZmCiAgICAgIH0KICAgICAgZWxlbWVudCAiRGF0YWJhc2UiIHsKICAgICAgICBzaGFwZSBjeWxpbmRlcgogICAgICAgIGJhY2tncm91bmQgIzQzOGRkNQogICAgICAgIGNvbG9yICNmZmZmZmYKICAgICAgfQogICAgICBlbGVtZW50ICJDb21wb25lbnQiIHsKICAgICAgICBiYWNrZ3JvdW5kICM4NWJiZjAKICAgICAgICBjb2xvciAjMDAwMDAwCiAgICAgIH0KICAgIH0KCiAgICB0aGVtZSBkZWZhdWx0CiAgfQp9",
+    "structurizr.inspection.info" : "0",
+    "structurizr.inspection.ignore" : "0",
+    "structurizr.inspection.warning" : "0"
+  },
+  "views" : {
+    "componentViews" : [ {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "containerId" : "13",
+      "description" : "RouterFunction and handler components that expose the S3-compatible HTTP protocol.",
+      "elements" : [ {
+        "id" : "1",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "14",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "15",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "16",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "17",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "18",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "19",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "20",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "28",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "externalContainerBoundariesVisible" : false,
+      "key" : "S3ReactiveApiAdapterComponents",
+      "name" : "Component View: Magrathea ObjectStorage - s3-reactive-api-adapter",
+      "order" : 3,
+      "relationships" : [ {
+        "id" : "48"
+      }, {
+        "id" : "51"
+      }, {
+        "id" : "52"
+      }, {
+        "id" : "53"
+      }, {
+        "id" : "54"
+      }, {
+        "id" : "55"
+      }, {
+        "id" : "57"
+      }, {
+        "id" : "61"
+      }, {
+        "id" : "65"
+      }, {
+        "id" : "67"
+      }, {
+        "id" : "69"
+      }, {
+        "id" : "71"
+      }, {
+        "id" : "73"
+      }, {
+        "id" : "75"
+      }, {
+        "id" : "77"
+      } ],
+      "title" : "C3 Component: s3-reactive-api-adapter"
+    }, {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "containerId" : "20",
+      "description" : "Reactive object and multipart upload application services, domain aggregates and repository ports.",
+      "elements" : [ {
+        "id" : "13",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "21",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "22",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "23",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "24",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "25",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "26",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "27",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "28",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "32",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "39",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "externalContainerBoundariesVisible" : false,
+      "key" : "ReactiveObjectStoreComponents",
+      "name" : "Component View: Magrathea ObjectStorage - reactive-object-store",
+      "order" : 4,
+      "relationships" : [ {
+        "id" : "100"
+      }, {
+        "id" : "106"
+      }, {
+        "id" : "59"
+      }, {
+        "id" : "62"
+      }, {
+        "id" : "78"
+      }, {
+        "id" : "79"
+      }, {
+        "id" : "80"
+      }, {
+        "id" : "81"
+      }, {
+        "id" : "82"
+      }, {
+        "id" : "83"
+      }, {
+        "id" : "87"
+      }, {
+        "id" : "93"
+      } ],
+      "title" : "C3 Component: reactive-object-store"
+    }, {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "containerId" : "28",
+      "description" : "Reactive bucket management service, bucket aggregate root with domain events and inline Configuration, and repository port.",
+      "elements" : [ {
+        "id" : "13",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "20",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "29",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "30",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "31",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "32",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "39",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "externalContainerBoundariesVisible" : false,
+      "key" : "ReactiveBucketManagementComponents",
+      "name" : "Component View: Magrathea ObjectStorage - reactive-bucket-management",
+      "order" : 5,
+      "relationships" : [ {
+        "id" : "106"
+      }, {
+        "id" : "58"
+      }, {
+        "id" : "63"
+      }, {
+        "id" : "84"
+      }, {
+        "id" : "85"
+      }, {
+        "id" : "89"
+      }, {
+        "id" : "98"
+      } ],
+      "title" : "C3 Component: reactive-bucket-management"
+    }, {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "containerId" : "32",
+      "description" : "Command/Query repository interfaces for bucket, S3Object and multipart upload aggregates.",
+      "elements" : [ {
+        "id" : "20",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "28",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "33",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "34",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "35",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "36",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "37",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "38",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "39",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "externalContainerBoundariesVisible" : false,
+      "key" : "ReactiveRepositoryApplicationComponents",
+      "name" : "Component View: Magrathea ObjectStorage - reactive-repository-application",
+      "order" : 6,
+      "relationships" : [ {
+        "id" : "102"
+      }, {
+        "id" : "104"
+      }, {
+        "id" : "108"
+      }, {
+        "id" : "110"
+      }, {
+        "id" : "113"
+      }, {
+        "id" : "115"
+      }, {
+        "id" : "118"
+      }, {
+        "id" : "88"
+      }, {
+        "id" : "91"
+      }, {
+        "id" : "94"
+      }, {
+        "id" : "96"
+      }, {
+        "id" : "99"
+      } ],
+      "title" : "C3 Component: reactive-repository-application"
+    }, {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "containerId" : "39",
+      "description" : "Reactive repository adapters used by the application capabilities. Internal ConcurrentHashMap structures are intentionally not shown as C4 components.",
+      "elements" : [ {
+        "id" : "20",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "28",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "32",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "40",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "41",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "42",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "externalContainerBoundariesVisible" : false,
+      "key" : "ReactiveInfrastructureComponents",
+      "name" : "Component View: Magrathea ObjectStorage - reactive-infrastructure",
+      "order" : 7,
+      "relationships" : [ {
+        "id" : "100"
+      }, {
+        "id" : "105"
+      }, {
+        "id" : "111"
+      }, {
+        "id" : "116"
+      }, {
+        "id" : "89"
+      } ],
+      "title" : "C3 Component: reactive-infrastructure"
+    }, {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "containerId" : "43",
+      "description" : "Extensible domain interfaces for event notification publishing, access log writing, metrics collection, and analytics data export. Implementation is POSTPONED — only interfaces are defined now in object-storage-domain.",
+      "elements" : [ {
+        "id" : "2",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "3",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "4",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "5",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "6",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "7",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "8",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "9",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "10",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "11",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "44",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "45",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "46",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "47",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "externalContainerBoundariesVisible" : false,
+      "key" : "StorageEngineComponents",
+      "name" : "Component View: Magrathea ObjectStorage - storage-engine",
+      "order" : 8,
+      "relationships" : [ {
+        "id" : "119"
+      }, {
+        "id" : "122"
+      }, {
+        "id" : "125"
+      }, {
+        "id" : "128"
+      }, {
+        "id" : "129"
+      }, {
+        "id" : "132"
+      }, {
+        "id" : "135"
+      }, {
+        "id" : "138"
+      }, {
+        "id" : "141"
+      }, {
+        "id" : "144"
+      }, {
+        "id" : "147"
+      }, {
+        "id" : "148"
+      } ],
+      "title" : "C3 Component: storage-engine"
+    } ],
+    "configuration" : {
+      "styles" : {
+        "elements" : [ {
+          "background" : "#85bbf0",
+          "color" : "#000000",
+          "tag" : "Component"
+        }, {
+          "background" : "#438dd5",
+          "color" : "#ffffff",
+          "tag" : "Container"
+        }, {
+          "background" : "#438dd5",
+          "color" : "#ffffff",
+          "shape" : "Cylinder",
+          "tag" : "Database"
+        }, {
+          "background" : "#ffffff",
+          "color" : "#444444",
+          "shape" : "Person",
+          "tag" : "Person"
+        }, {
+          "background" : "#1168bd",
+          "color" : "#ffffff",
+          "tag" : "Software System"
+        }, {
+          "background" : "#6b7b8f",
+          "color" : "#ffffff",
+          "shape" : "RoundedBox",
+          "tag" : "external-system"
+        } ]
+      },
+      "terminology" : { },
+      "themes" : [ "https://static.structurizr.com/themes/default/theme.json" ]
+    },
+    "containerViews" : [ {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "description" : "s3-reactive-api-adapter exposes the S3 API, reactive-object-store and reactive-bucket-management implement core reactive capabilities, reactive-repository-application provides CQS interfaces, reactive-infrastructure persists state reactively in-process, and storage-engine provides extensible interfaces for notification, logging, metrics, and analytics.",
+      "elements" : [ {
+        "id" : "1",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "2",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "3",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "4",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "5",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "6",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "7",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "8",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "9",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "10",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "11",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "13",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "20",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "28",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "32",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "39",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "43",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "externalSoftwareSystemBoundariesVisible" : false,
+      "key" : "Container",
+      "name" : "Container View: Magrathea ObjectStorage",
+      "order" : 2,
+      "relationships" : [ {
+        "id" : "100"
+      }, {
+        "id" : "106"
+      }, {
+        "id" : "120"
+      }, {
+        "id" : "123"
+      }, {
+        "id" : "126"
+      }, {
+        "id" : "130"
+      }, {
+        "id" : "133"
+      }, {
+        "id" : "136"
+      }, {
+        "id" : "139"
+      }, {
+        "id" : "142"
+      }, {
+        "id" : "145"
+      }, {
+        "id" : "149"
+      }, {
+        "id" : "49"
+      }, {
+        "id" : "59"
+      }, {
+        "id" : "63"
+      }, {
+        "id" : "89"
+      } ],
+      "softwareSystemId" : "12",
+      "title" : "C2 Container: Magrathea ObjectStorage"
+    } ],
+    "dynamicViews" : [ {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "description" : "PUT /{bucket} creates a Bucket aggregate root and persists it in reactive-infrastructure.",
+      "elementId" : "13",
+      "elements" : [ {
+        "id" : "1",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "14",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "29",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "31",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "33",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "40",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "externalBoundariesVisible" : false,
+      "key" : "CreateBucketRuntime",
+      "name" : "Dynamic View: Magrathea ObjectStorage - s3-reactive-api-adapter",
+      "order" : 9,
+      "relationships" : [ {
+        "description" : "1. PUT /{bucket}",
+        "id" : "48",
+        "order" : "1",
+        "response" : false
+      }, {
+        "description" : "2. CreateBucket use case",
+        "id" : "56",
+        "order" : "2",
+        "response" : false
+      }, {
+        "description" : "3. Persist Bucket aggregate via domain repository port",
+        "id" : "84",
+        "order" : "3",
+        "response" : false
+      }, {
+        "description" : "4. CQS command interface",
+        "id" : "97",
+        "order" : "4",
+        "response" : false
+      }, {
+        "description" : "5. Persist Bucket aggregate",
+        "id" : "103",
+        "order" : "5",
+        "response" : false
+      } ],
+      "title" : "Runtime: CreateBucket"
+    }, {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "description" : "PutObject verifies the bucket, then persists object metadata and content.",
+      "elementId" : "13",
+      "elements" : [ {
+        "id" : "1",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "17",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "21",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "25",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "29",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "31",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "34",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "35",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "40",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "41",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "externalBoundariesVisible" : false,
+      "key" : "PutObjectRuntime",
+      "name" : "Dynamic View: Magrathea ObjectStorage - s3-reactive-api-adapter",
+      "order" : 10,
+      "relationships" : [ {
+        "description" : "1. PUT /{bucket}/{key}",
+        "id" : "53",
+        "order" : "1",
+        "response" : false
+      }, {
+        "description" : "2. Verify bucket exists",
+        "id" : "68",
+        "order" : "2",
+        "response" : false
+      }, {
+        "description" : "3. Read bucket aggregate via domain repository port",
+        "id" : "84",
+        "order" : "3",
+        "response" : false
+      }, {
+        "description" : "4. CQS query interface",
+        "id" : "101",
+        "order" : "4",
+        "response" : false
+      }, {
+        "description" : "5. Read bucket aggregate",
+        "id" : "107",
+        "order" : "5",
+        "response" : false
+      }, {
+        "description" : "6. PutObject use case",
+        "id" : "70",
+        "order" : "6",
+        "response" : false
+      }, {
+        "description" : "7. Persist object metadata and content via domain repository port",
+        "id" : "79",
+        "order" : "7",
+        "response" : false
+      }, {
+        "description" : "8. CQS command interface",
+        "id" : "86",
+        "order" : "8",
+        "response" : false
+      }, {
+        "description" : "9. Persist object metadata and bytes",
+        "id" : "109",
+        "order" : "9",
+        "response" : false
+      } ],
+      "title" : "Runtime: PutObject"
+    }, {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "description" : "GetObject verifies the bucket, then loads object metadata and binary content.",
+      "elementId" : "13",
+      "elements" : [ {
+        "id" : "1",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "17",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "21",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "25",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "29",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "31",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "34",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "36",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "40",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "41",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "externalBoundariesVisible" : false,
+      "key" : "GetObjectRuntime",
+      "name" : "Dynamic View: Magrathea ObjectStorage - s3-reactive-api-adapter",
+      "order" : 11,
+      "relationships" : [ {
+        "description" : "1. GET /{bucket}/{key}",
+        "id" : "53",
+        "order" : "1",
+        "response" : false
+      }, {
+        "description" : "2. Verify bucket exists",
+        "id" : "68",
+        "order" : "2",
+        "response" : false
+      }, {
+        "description" : "3. Read bucket aggregate via domain repository port",
+        "id" : "84",
+        "order" : "3",
+        "response" : false
+      }, {
+        "description" : "4. CQS query interface",
+        "id" : "101",
+        "order" : "4",
+        "response" : false
+      }, {
+        "description" : "5. Read bucket aggregate",
+        "id" : "107",
+        "order" : "5",
+        "response" : false
+      }, {
+        "description" : "6. GetObject use case",
+        "id" : "70",
+        "order" : "6",
+        "response" : false
+      }, {
+        "description" : "7. Read object metadata and content via domain repository port",
+        "id" : "79",
+        "order" : "7",
+        "response" : false
+      }, {
+        "description" : "8. CQS query interface",
+        "id" : "90",
+        "order" : "8",
+        "response" : false
+      }, {
+        "description" : "9. Read object metadata and bytes",
+        "id" : "112",
+        "order" : "9",
+        "response" : false
+      } ],
+      "title" : "Runtime: GetObject"
+    }, {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "description" : "Multipart endpoints manage upload sessions and uploaded part state.",
+      "elementId" : "13",
+      "elements" : [ {
+        "id" : "1",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "19",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "22",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "26",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "37",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "38",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "42",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "externalBoundariesVisible" : false,
+      "key" : "MultipartUploadRuntime",
+      "name" : "Dynamic View: Magrathea ObjectStorage - s3-reactive-api-adapter",
+      "order" : 12,
+      "relationships" : [ {
+        "description" : "1. POST/PUT/GET/DELETE multipart endpoints",
+        "id" : "55",
+        "order" : "1",
+        "response" : false
+      }, {
+        "description" : "2. Multipart upload lifecycle use cases",
+        "id" : "76",
+        "order" : "2",
+        "response" : false
+      }, {
+        "description" : "3. Persist/load multipart upload state via domain repository port",
+        "id" : "82",
+        "order" : "3",
+        "response" : false
+      }, {
+        "description" : "4. CQS command interface",
+        "id" : "92",
+        "order" : "4",
+        "response" : false
+      }, {
+        "description" : "5. CQS query interface",
+        "id" : "95",
+        "order" : "5",
+        "response" : false
+      }, {
+        "description" : "6. Persist multipart upload state",
+        "id" : "114",
+        "order" : "6",
+        "response" : false
+      }, {
+        "description" : "7. Read multipart upload state",
+        "id" : "117",
+        "order" : "7",
+        "response" : false
+      } ],
+      "title" : "Runtime: Multipart upload lifecycle"
+    } ],
+    "systemContextViews" : [ {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "description" : "External S3-compatible clients interact with Magrathea ObjectStorage as a single software system.",
+      "elements" : [ {
+        "id" : "1",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "12",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "enterpriseBoundaryVisible" : true,
+      "key" : "SystemContext",
+      "name" : "System Context View: Magrathea ObjectStorage",
+      "order" : 1,
+      "relationships" : [ {
+        "id" : "50"
+      } ],
+      "softwareSystemId" : "12",
+      "title" : "C1 System Context: Magrathea ObjectStorage"
+    } ]
+  }
+}

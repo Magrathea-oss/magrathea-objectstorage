@@ -1,7 +1,7 @@
 package com.example.magrathea.s3api.adapter.web;
 
-import com.example.magrathea.objectstorage.domain.model.Bucket;
-import com.example.magrathea.objectstorage.domain.model.S3Object;
+import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
+import com.example.magrathea.objectstorage.domain.aggregate.S3Object;
 import com.example.magrathea.objectstorage.domain.valueobject.ObjectKey;
 import com.example.magrathea.reactive.application.service.ReactiveBucketService;
 import com.example.magrathea.reactive.application.service.ReactiveObjectService;
@@ -41,8 +41,7 @@ public class S3ObjectMetadataHandler {
         var key = request.pathVariable("key");
         return bucketService.findByName(bucketName)
             .flatMap(b -> {
-                var bucketKey = S3Object.ObjectId.BucketKey.of(b.id(), ObjectKey.of(key));
-                return objectService.findByBucketAndKey(bucketKey)
+                return objectService.findByBucketAndKey(b.id(), ObjectKey.of(key))
                     .flatMap(obj -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_XML)
                         .bodyValue(AccessControlPolicyQuery.canned(
@@ -58,8 +57,7 @@ public class S3ObjectMetadataHandler {
         var key = request.pathVariable("key");
         return bucketService.findByName(bucketName)
             .flatMap(b -> {
-                var bucketKey = S3Object.ObjectId.BucketKey.of(b.id(), ObjectKey.of(key));
-                return objectService.findByBucketAndKey(bucketKey)
+                return objectService.findByBucketAndKey(b.id(), ObjectKey.of(key))
                     .flatMap(obj -> {
                         objectAclStore.put(objectStoreKey(bucketName, key),
                             request.headers().firstHeader("x-amz-acl") != null
@@ -78,8 +76,7 @@ public class S3ObjectMetadataHandler {
         var key = request.pathVariable("key");
         return bucketService.findByName(bucketName)
             .flatMap(b -> {
-                var bucketKey = S3Object.ObjectId.BucketKey.of(b.id(), ObjectKey.of(key));
-                return objectService.findByBucketAndKey(bucketKey)
+                return objectService.findByBucketAndKey(b.id(), ObjectKey.of(key))
                     .flatMap(obj -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_XML)
                         .bodyValue(new TaggingQuery(new TaggingQuery.TagSet(
@@ -95,8 +92,7 @@ public class S3ObjectMetadataHandler {
         var key = request.pathVariable("key");
         return bucketService.findByName(bucketName)
             .flatMap(b -> {
-                var bucketKey = S3Object.ObjectId.BucketKey.of(b.id(), ObjectKey.of(key));
-                return objectService.findByBucketAndKey(bucketKey)
+                return objectService.findByBucketAndKey(b.id(), ObjectKey.of(key))
                     .flatMap(obj -> request.bodyToMono(TaggingCommand.class)
                         .flatMap(cmd -> {
                             objectTagStore.put(objectStoreKey(bucketName, key),
@@ -116,8 +112,7 @@ public class S3ObjectMetadataHandler {
         var key = request.pathVariable("key");
         return bucketService.findByName(bucketName)
             .flatMap(b -> {
-                var bucketKey = S3Object.ObjectId.BucketKey.of(b.id(), ObjectKey.of(key));
-                return objectService.findByBucketAndKey(bucketKey)
+                return objectService.findByBucketAndKey(b.id(), ObjectKey.of(key))
                     .flatMap(obj -> {
                         objectTagStore.remove(objectStoreKey(bucketName, key));
                         return ServerResponse.noContent().build();
@@ -133,8 +128,7 @@ public class S3ObjectMetadataHandler {
         var key = request.pathVariable("key");
         return bucketService.findByName(bucketName)
             .flatMap(b -> {
-                var bucketKey = S3Object.ObjectId.BucketKey.of(b.id(), ObjectKey.of(key));
-                return objectService.findByBucketAndKey(bucketKey)
+                return objectService.findByBucketAndKey(b.id(), ObjectKey.of(key))
                     .flatMap(obj -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_XML)
                         .bodyValue(GetObjectAttributesQuery.from(obj)))

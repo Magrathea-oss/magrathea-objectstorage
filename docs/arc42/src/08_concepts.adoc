@@ -39,11 +39,82 @@ Advanced configuration value objects (BucketAnalyticsConfiguration, BucketInvent
 The Bucket aggregate root emits sealed `ObjectStorageEvent` records on every state transition:
 
 - `BucketCreated`, `BucketDeleted`, `BucketVersioningEnabled`, `BucketVersioningSuspended`
-- `BucketEncryptionEnabled`, `BucketConfigurationChanged`
+- `BucketEncryptionEnabled` (separate from encryption configuration!)
+
+==== Bucket Configuration Events
+
+Instead of a single generic `BucketConfigurationChanged`, each configuration feature emits a specific event subtype:
+
+```
+ObjectStorageEvent
+├── BucketCreated
+├── BucketDeleted
+├── BucketVersioningEnabled
+├── BucketVersioningSuspended
+├── BucketEncryptionEnabled
+├── BucketCorsConfigurationChanged
+├── BucketLifecycleConfigurationChanged
+├── BucketEncryptionConfigurationChanged
+├── BucketLoggingConfigurationChanged
+├── BucketWebsiteConfigurationChanged
+├── BucketNotificationConfigurationChanged
+├── BucketReplicationConfigurationChanged
+├── BucketPolicyChanged
+├── BucketPublicAccessBlockChanged
+├── BucketOwnershipControlsChanged
+├── BucketRequestPaymentChanged
+├── BucketAccelerateConfigurationChanged
+├── BucketAnalyticsConfigurationAdded
+├── BucketAnalyticsConfigurationRemoved
+├── BucketInventoryConfigurationAdded
+├── BucketInventoryConfigurationRemoved
+├── BucketMetricsConfigurationAdded
+├── BucketMetricsConfigurationRemoved
+├── BucketIntelligentTieringConfigurationAdded
+├── BucketIntelligentTieringConfigurationRemoved
+```
+
+Each event carries the specific value object type (e.g., `BucketLifecycleConfiguration`, `BucketNotificationConfiguration`) so consumers can react to precise changes.
+
+==== State Transition Rules
+
 - State transitions return NEW immutable instances with accumulated events
 - `domainEvents()` retrieves pending events; `clearEvents()` returns a clean instance for persistence
 
 S3Object and MultipartUpload aggregates follow the same pattern with `ObjectCreated`, `ObjectDeleted`, `ObjectEtagUpdated`, `ObjectStorageClassChanged`, `ContentDescriptorCreated`, `PartUploaded`, `MultipartUploadCreated`, `MultipartUploadCompleted`, `MultipartUploadAborted`.
+
+=== Registry-based Handler Integration
+
+The `S3BucketConfigHandler` is refactored into a registry-based design to eliminate copypasta (previously 925 lines of identical pattern).
+
+==== Components
+
+| Component | Responsibility |
+|-----------|---------------|
+| `ConfigType` | Enum or sealed interface identifying the configuration type (e.g., CORS, Lifecycle, Encryption) |
+| `ConfigHandlerStrategy` | Interface with methods for: extracting config from Bucket aggregate, applying config change (creating proper event), serializing to Query DTO, deserializing from Command DTO |
+| `ConfigHandlerRegistry` | A `Map<ConfigType, ConfigHandlerStrategy>` populated at startup |
+
+==== How it works
+
+1. `S3ProxyRouter` dispatches a config request to `S3BucketConfigHandler` with a `ConfigType`
+2. The handler looks up the matching `ConfigHandlerStrategy` from the registry
+3. The strategy performs the GET/PUT/DELETE operation using its typed methods
+4. No switch/if-else chains — each config type is a few lines of strategy registration
+
+==== Benefits
+
+- Adding a new config type = write one strategy class + register it
+- No copypasta — every config type uses the same delegation pattern
+- Each strategy is independently testable
+- The Bucket aggregate stays decoupled from handler concerns
+
+==== Config Type Categorization
+
+| Category | Types | Pattern |
+|----------|-------|---------|
+| **Singleton** | CORS, Lifecycle, Encryption, Logging, Website, Notification, Replication, Policy, PublicAccessBlock, OwnershipControls, RequestPayment, Accelerate | Single value object, `with*()` / `without*()` methods |
+| **Multi-instance** | Analytics, Inventory, Metrics, Intelligent-Tiering | Map<String, ValueObject>, `add*()` / `remove*()` / `list*()` methods |
 
 === S3 API Compatibility
 

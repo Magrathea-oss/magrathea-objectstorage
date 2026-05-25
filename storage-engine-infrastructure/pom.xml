@@ -9,7 +9,7 @@
         <version>1.0.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
-    <artifactId>persistence-context-infrastructure</artifactId>
+    <artifactId>storage-engine-infrastructure</artifactId>
 
     <!-- EMPTY — reserved for future use -->
     <dependencies>

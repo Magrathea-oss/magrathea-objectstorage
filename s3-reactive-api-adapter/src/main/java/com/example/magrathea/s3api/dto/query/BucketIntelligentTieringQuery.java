@@ -1,6 +1,6 @@
 package com.example.magrathea.s3api.dto.query;
 
-import com.example.magrathea.objectstorage.domain.model.Bucket;
+import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketIntelligentTieringConfiguration;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
@@ -32,13 +32,4 @@ public record BucketIntelligentTieringQuery(
         return new BucketIntelligentTieringQuery(c.tieringId(), policy, c.autoTieringStatus());
     }
 
-    public static BucketIntelligentTieringQuery from(Bucket.BucketConfiguration config) {
-        if (!config.hasIntelligentTiering()) {
-            throw new IllegalArgumentException("No intelligent-tiering configuration");
-        }
-        var policy = config.intelligentTieringTieringPolicy() != null
-            ? new IntelligentTieringPolicy(config.intelligentTieringTieringPolicy())
-            : null;
-        return new BucketIntelligentTieringQuery(config.intelligentTieringId(), policy, config.intelligentTieringAutoTieringStatus());
-    }
 }

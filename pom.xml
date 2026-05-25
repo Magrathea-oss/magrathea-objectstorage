@@ -12,9 +12,9 @@
         <module>s3-reactive-api-adapter</module>
 
         <module>object-storage-domain</module>
-        <module>persistence-context-domain</module>
-        <module>persistence-context-application</module>
-        <module>persistence-context-infrastructure</module>
+        <module>storage-engine-domain</module>
+        <module>storage-engine-application</module>
+        <module>storage-engine-infrastructure</module>
         <module>bootstrap-application</module>
 
         <module>object-storage-reactive-repository-application</module>

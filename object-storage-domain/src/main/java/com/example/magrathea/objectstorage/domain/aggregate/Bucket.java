@@ -171,7 +171,7 @@ public record Bucket(
 
     /**
      * Bucket configuration — value object inside the Bucket aggregate.
-     * Holds CORS rules and other bucket-level settings.
+     * Holds CORS rules.
      * Immutable, equality by fields.
      */
     public record Configuration(

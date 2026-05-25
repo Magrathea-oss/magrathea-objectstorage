@@ -1,6 +1,6 @@
 package com.example.magrathea.s3api.dto.query;
 
-import com.example.magrathea.objectstorage.domain.model.Bucket;
+import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketWebsiteConfiguration;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
@@ -31,13 +31,4 @@ public record BucketWebsiteQuery(
         );
     }
 
-    public static BucketWebsiteQuery from(Bucket.BucketConfiguration config) {
-        if (!config.hasWebsite()) {
-            throw new IllegalArgumentException("No website configuration");
-        }
-        return new BucketWebsiteQuery(
-            config.websiteIndexDocument(), config.websiteErrorDocument(), config.websiteRedirectAllRequestsTo(),
-            config.websiteRoutingRuleRedirectHost(), config.websiteRoutingRuleRedirectProtocol()
-        );
-    }
 }

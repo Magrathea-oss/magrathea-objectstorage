@@ -1,6 +1,6 @@
 package com.example.magrathea.s3api.dto.query;
 
-import com.example.magrathea.objectstorage.domain.model.Bucket;
+import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketMetricsConfiguration;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
@@ -30,13 +30,4 @@ public record BucketMetricsQuery(
         return new BucketMetricsQuery(c.metricsId(), filter);
     }
 
-    public static BucketMetricsQuery from(Bucket.BucketConfiguration config) {
-        if (!config.hasMetrics()) {
-            throw new IllegalArgumentException("No metrics configuration");
-        }
-        var filter = config.metricsFilterRule() != null
-            ? new MetricsFilter(config.metricsFilterRule())
-            : null;
-        return new BucketMetricsQuery(config.metricsId(), filter);
-    }
 }

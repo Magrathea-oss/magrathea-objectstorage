@@ -1,6 +1,6 @@
 package com.example.magrathea.s3api.dto.query;
 
-import com.example.magrathea.objectstorage.domain.model.Bucket;
+import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketReplicationConfiguration;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
@@ -25,14 +25,6 @@ public record BucketReplicationQuery(
             .toList());
     }
 
-    public static BucketReplicationQuery from(Bucket.BucketConfiguration config) {
-        if (!config.hasReplication()) {
-            throw new IllegalArgumentException("No replication configuration");
-        }
-        return new BucketReplicationQuery(config.replicationRole(), config.replicationRules().stream()
-            .map(r -> new RuleEntry(r.id(), r.status(), r.prefix(), r.destinationBucket(), r.destinationStorageClass()))
-            .toList());
-    }
 
     public record RuleEntry(
         @JacksonXmlProperty(localName = "ID")

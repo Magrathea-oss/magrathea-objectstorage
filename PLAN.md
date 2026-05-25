@@ -13,9 +13,9 @@ magrathea-objectstorage/
 ├── object-storage-domain/          # Pure S3 domain: Bucket, S3Object, repository interfaces
 ├── object-storage-application/     # Application services, DTOs, S3ObjectWrite implementation with Flux<DataBuffer>
 ├── object-storage-infrastructure/  # Repository implementations only (BucketRepositoryImpl, InMemoryObjectRepository)
-├── persistence-context-domain/     # EMPTY — reserved for future use
-├── persistence-context-application/# EMPTY — reserved for future use
-├── persistence-context-infrastructure/ # EMPTY — reserved for future use
+├── storage-engine-domain/     # EMPTY — reserved for future use
+├── storage-engine-application/# EMPTY — reserved for future use
+├── storage-engine-infrastructure/ # EMPTY — reserved for future use
 ├── bootstrap-application/          # Spring Boot entry point
 ├── docs/                           # ARC42, ADR, C4
 └── test-aws-cli.sh                 # AWS CLI compatibility tests for implemented S3 operations
@@ -792,3 +792,85 @@ mvn test -pl s3-api --also-make
 ✅ Phase 6 (Verification)
   ✅ └─ mvn test -pl s3-api
 ```
+
+---
+
+## Fix Plan — Codebase Cleanup (Current Phase)
+
+### Course Correction: ADR 0011 — Bucket.Configuration Redesign
+
+ADR: `docs/adr/0011-course-correction-bucket-configuration-redesign.md`
+Status: Proposed — requires AWS S3 API documentation study before implementation.
+
+#### Open Design Issues
+
+The AWS S3 API study document (`docs/s3-bucket-configuration-design.md`) now includes:
+1. An **Open Design Issues** section that identifies 11+ config features with unspecified action-after-configuration behavior.
+2. An **Actions After Configuration — Design** section that resolves each open issue by specifying concrete runtime actions, required services, and integration points.
+3. A **Priority & Feasibility** section that ranks each action by priority (P0–P2), feasibility (easy–hard), and required code category (handler change, new domain code, new infrastructure).
+
+These must be consulted before each feature can be marked complete.
+
+| Config Feature | Open Issue Count | Key Unresolved Questions | Action Design Resolved? |
+|----------------|-----------------|--------------------------|-------------------------|
+| Lifecycle | 6 | When does rule evaluation happen? On schedule? On object write? | ✅ Designed: periodic scan via `LifecycleEvaluationService` + `LifecycleRuleEvaluator` |
+| Notification | 6 | How is event bridge wired? How are destinations resolved? | ✅ Designed: `NotificationEventBridge` + destination adapters |
+| Replication | 6 | Does existing data get replicated? What triggers replication? | ✅ Designed: `ReplicationCoordinator` on object create/delete |
+| Encryption | 5 | Are existing objects re-encrypted? How is KMS key resolved? | ✅ Designed: creation-time default encryption wiring |
+| Logging | 5 | Does logging start immediately? What format? How is target written? | ✅ Designed: `S3AccessLogService` with intercept + buffer/flush |
+| Website | 5 | Does serving start immediately? How are routing rules evaluated? | ✅ Designed: request-routing in handler layer |
+| CORS | 3 | How is preflight handled? How are origins validated? | ✅ Designed: runtime check on each request (already implemented) |
+| Bucket Policy | 3 | How is IAM policy evaluation wired? | ✅ Designed: `PolicyEvaluationService` on every request |
+| PublicAccessBlock | 3 | How are existing ACLs/policies re-evaluated? | ✅ Designed: request-time `PublicAccessBlockEvaluator` |
+| OwnershipControls | 2 | How is irreversibility enforced? | ✅ Designed: creation-time ownership enforcement |
+| Multi-instance (4 types) | 4 per type | When is first export triggered? How does schedule work? | ✅ Designed: scheduled export services |
+| Cross-cutting | 4 | Registry wiring, background processing, event bridge, persistence | ✅ Designed: registry-based handler, scheduler framework, event bridge |
+
+See:
+- `docs/s3-bucket-configuration-design.md#open-design-issues` for the full breakdown
+- `docs/s3-bucket-configuration-design.md#actions-after-configuration--design` for the action design
+- `docs/s3-bucket-configuration-design.md#priority--feasibility` for prioritization
+
+### Issues completed
+
+| # | Issue | Status | Agent |
+|---|-------|--------|-------|
+| 1 | Coverage — Build config per application module | ✅ DONE | java-infra-coder |
+| 2 | Stale domain files (S3ObjectContent, S3ObjectWrite) | ✅ DONE | java-domain-coder |
+| 3 | Bucket.Configuration — Revert to CORS-only | ✅ DONE | java-domain-coder |
+| 4 | ETag fake & Content-Type hardcoded | ✅ DONE | java-infra-coder |
+| 5 | DTO → Jackson XML (5 files) | ✅ DONE | java-infra-coder |
+
+### Issues remaining
+
+#### 6. Fix pre-existing compilation errors
+**Agent: java-infra-coder** | Files:
+- `S3ObjectMetadataHandler.java` — `S3Object.ObjectId` → `S3Object.Id`
+- `S3BucketOperationsHandler.java` — package `Bucket` → import fix
+- `BucketLifecycleQuery.java` — `Bucket.BucketConfiguration` → `Bucket.Configuration`, `hasLifecycle()` → `hasCors()`, `lifecycleRules()` → remove
+
+#### 7. Study AWS S3 API documentation (ADR 0011 prerequisite) — ✅ DONE
+**Output**: `docs/s3-bucket-configuration-design.md`
+- Studied all 16 bucket configuration features from official AWS docs
+- Document covers: feature semantics, actual XML structures, domain events, domain model recommendations, handler integration patterns
+- Key corrections identified vs the old naive approach (see document for details)
+
+#### 8. Bucket Configuration Redesign (ADR 0011 implementation) — IN PROGRESS
+**Agent: java-domain-coder + java-infra-coder** | After study document is approved
+- Implement dedicated `with*` methods on Bucket per config type
+- Add specific domain events per config type
+- Implement handler code that properly stores/retrieves config data
+- Refactor S3BucketConfigHandler to eliminate copypasta
+- Resolve each open design issue per `docs/s3-bucket-configuration-design.md#open-design-issues`
+- Implement action-after-configuration behavior per `docs/s3-bucket-configuration-design.md#actions-after-configuration--design`
+- Follow priority order from `docs/s3-bucket-configuration-design.md#priority--feasibility`
+
+**Notes:**
+- Encryption → moved to storage-engine module (postponed)
+- Currently implementing: CORS (runtime Origin check) + Website (request routing)
+- Next after completion: OwnershipControls, PublicAccessBlock, Accelerate
+- Module rename completed: `persistence-context-*` → `storage-engine-*` (empty modules, reserved for future storage engine design)
+- Notification, Logging, Metrics, Analytics: implementation POSTPONED — extensible interfaces designed in `docs/s3-bucket-configuration-design.md#extensible-interfaces-design`
+- RequestPayment, Inventory: implementation POSTPONED — low priority
+- Security (IAM Policy, PublicAccessBlock): deferred to Spring Security integration
+- All persistence-related actions: postponed to storage-engine module design phase

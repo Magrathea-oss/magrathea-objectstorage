@@ -5,6 +5,35 @@ workspace "Magrathea ObjectStorage" "C4 model for the Magrathea S3-compatible ob
   model {
     user = person "User" "End user or automated client using AWS CLI, SDK, curl, or another S3-compatible HTTP client."
 
+    kafka = softwareSystem "Kafka" "Event broker for notification events and access log streaming." {
+      tags "external-system"
+    }
+    awsSns = softwareSystem "AWS SNS" "AWS Simple Notification Service for event notification delivery." {
+      tags "external-system"
+    }
+    awsSqs = softwareSystem "AWS SQS" "AWS Simple Queue Service for event notification delivery." {
+      tags "external-system"
+    }
+    elasticSearch = softwareSystem "ElasticSearch" "Search and analytics engine for access log indexing." {
+      tags "external-system"
+    }
+    fileSystem = softwareSystem "File System" "Local file system or CSV/ORC format output for analytics data export destination." {
+      tags "external-system"
+    }
+    awsS3TargetBucket = softwareSystem "AWS S3 Target Bucket" "AWS S3 bucket for log output and analytics data export destination." {
+      tags "external-system"
+    }
+    prometheus = softwareSystem "Prometheus" "Monitoring and alerting system for metrics collection." {
+      tags "external-system"
+    }
+    awsCloudWatch = softwareSystem "AWS CloudWatch" "AWS monitoring and observability service for metrics and logs." {
+      tags "external-system"
+    }
+    micrometer = softwareSystem "Micrometer" "Metrics instrumentation library facade for collecting measurements." {
+      tags "external-system"
+    }
+
+
     magrathea = softwareSystem "Magrathea ObjectStorage" "AWS S3-compatible object storage built with Spring Boot 4 WebFlux and Java 21." {
       s3ReactiveApiAdapter = container "s3-reactive-api-adapter" "HTTP adapter that exposes the S3-compatible REST API and translates HTTP/XML/binary requests into reactive application use cases." "Spring Boot 4 WebFlux, RouterFunction, Java 21, Jackson XML" {
         bucketOperationsHandler = component "S3BucketOperationsHandler" "Handles bucket lifecycle endpoints: create, delete, head, list, location and versioning." "Java WebFlux handler"
@@ -44,6 +73,14 @@ workspace "Magrathea ObjectStorage" "C4 model for the Magrathea S3-compatible ob
         inMemoryReactiveBucketRepository = component "InMemoryReactiveBucketRepository" "In-memory reactive implementation of BucketCommandRepository and BucketQueryRepository. Internally stores bucket aggregates in ConcurrentHashMap structures." "Spring @Repository"
         inMemoryReactiveS3ObjectRepository = component "InMemoryReactiveS3ObjectRepository" "In-memory reactive implementation of S3ObjectCommandRepository and S3ObjectQueryRepository. Internally stores object metadata and raw object bytes in ConcurrentHashMap structures." "Spring @Repository"
         inMemoryReactiveMultipartUploadRepository = component "InMemoryReactiveMultipartUploadRepository" "In-memory reactive implementation of MultipartUploadCommandRepository and MultipartUploadQueryRepository. Internally stores multipart upload sessions in a ConcurrentHashMap structure." "Spring @Repository"
+      }
+
+      storageEngine = container "storage-engine" "Future implementation module for extensible interfaces: event notification publishing, access log writing, metrics collection, and analytics data export. These interfaces are defined in object-storage-domain and will be implemented here." "Java 21, domain interfaces" {
+      tags "planned"
+        notificationEventPublisher = component "NotificationEventPublisher" "Extensible event publishing interface for S3 event notifications (s3:ObjectCreated, s3:ObjectRemoved). Publishes to TopicConfiguration, QueueConfiguration, CloudFunctionConfiguration destinations." "Domain interface"
+        accessLogWriter = component "AccessLogWriter" "Extensible interface for writing S3 access logs to external destinations (Kafka, ElasticSearch, file system, S3 target bucket)." "Domain interface"
+        metricsCollector = component "MetricsCollector" "Extensible interface for recording metrics to CloudWatch, Prometheus, or Micrometer backends." "Domain interface"
+        analyticsDataExporter = component "AnalyticsDataExporter" "Extensible interface for exporting analytics data snapshots to destination buckets (S3 target, CSV/ORC output)." "Domain interface"
       }
     }
 
@@ -87,6 +124,26 @@ workspace "Magrathea ObjectStorage" "C4 model for the Magrathea S3-compatible ob
     magrathea.reactiveRepositoryApplication.s3ObjectQueryRepository -> magrathea.reactiveInfrastructure.inMemoryReactiveS3ObjectRepository "Implemented by" "Implements"
     magrathea.reactiveRepositoryApplication.multipartUploadCommandRepository -> magrathea.reactiveInfrastructure.inMemoryReactiveMultipartUploadRepository "Implemented by" "Implements"
     magrathea.reactiveRepositoryApplication.multipartUploadQueryRepository -> magrathea.reactiveInfrastructure.inMemoryReactiveMultipartUploadRepository "Implemented by" "Implements"
+
+    magrathea.storageEngine.notificationEventPublisher -> kafka "Publishes S3 events (s3:ObjectCreated, s3:ObjectRemoved)" "Event topic"
+    magrathea.storageEngine.notificationEventPublisher -> awsSns "Publishes S3 events to SNS topics" "TopicConfiguration"
+    magrathea.storageEngine.notificationEventPublisher -> awsSqs "Publishes S3 events to SQS queues" "QueueConfiguration"
+
+    magrathea.storageEngine.accessLogWriter -> kafka "Writes access logs" "Log topic"
+    magrathea.storageEngine.accessLogWriter -> elasticSearch "Writes access logs" "Index"
+    magrathea.storageEngine.accessLogWriter -> fileSystem "Writes access logs" "File output"
+    magrathea.storageEngine.accessLogWriter -> awsS3TargetBucket "Writes access logs" "Target bucket"
+
+    magrathea.storageEngine.metricsCollector -> prometheus "Records metrics" "Prometheus format"
+    magrathea.storageEngine.metricsCollector -> awsCloudWatch "Records metrics" "CloudWatch API"
+    magrathea.storageEngine.metricsCollector -> micrometer "Records metrics" "Micrometer facade"
+
+    magrathea.storageEngine.analyticsDataExporter -> awsS3TargetBucket "Exports analytics data" "Target bucket"
+    magrathea.storageEngine.analyticsDataExporter -> fileSystem "Exports analytics data" "CSV/ORC format output"
+    magrathea.reactiveObjectStore -> magrathea.storageEngine.notificationEventPublisher "Emits domain events (s3:ObjectCreated, s3:ObjectRemoved)" "Domain events"
+    magrathea.s3ReactiveApiAdapter -> magrathea.storageEngine.accessLogWriter "Sends HTTP request/response log entries" "Access log"
+    magrathea.reactiveObjectStore -> magrathea.storageEngine.metricsCollector "Records operation metrics (count, size, latency)" "Metrics"
+    magrathea.reactiveBucketManagement -> magrathea.storageEngine.analyticsDataExporter "Triggers analytics data export snapshots" "Export trigger"
   }
 
   views {
@@ -100,13 +157,23 @@ workspace "Magrathea ObjectStorage" "C4 model for the Magrathea S3-compatible ob
 
     container magrathea "Container" {
       title "C2 Container: Magrathea ObjectStorage"
-      description "s3-reactive-api-adapter exposes the S3 API, reactive-object-store and reactive-bucket-management implement core reactive capabilities, reactive-repository-application provides CQS interfaces, and reactive-infrastructure persists state reactively in-process."
+      description "s3-reactive-api-adapter exposes the S3 API, reactive-object-store and reactive-bucket-management implement core reactive capabilities, reactive-repository-application provides CQS interfaces, reactive-infrastructure persists state reactively in-process, and storage-engine provides extensible interfaces for notification, logging, metrics, and analytics."
       include user
       include magrathea.s3ReactiveApiAdapter
       include magrathea.reactiveObjectStore
       include magrathea.reactiveBucketManagement
       include magrathea.reactiveRepositoryApplication
       include magrathea.reactiveInfrastructure
+      include magrathea.storageEngine
+      include kafka
+      include awsSns
+      include awsSqs
+      include elasticSearch
+      include fileSystem
+      include awsS3TargetBucket
+      include prometheus
+      include awsCloudWatch
+      include micrometer
       autolayout lr
     }
 
@@ -159,6 +226,22 @@ workspace "Magrathea ObjectStorage" "C4 model for the Magrathea S3-compatible ob
       include magrathea.reactiveBucketManagement
       include magrathea.reactiveRepositoryApplication
       include *
+      autolayout lr
+    }
+
+    component magrathea.storageEngine "StorageEngineComponents" {
+      title "C3 Component: storage-engine"
+      description "Extensible domain interfaces for event notification publishing, access log writing, metrics collection, and analytics data export. Implementation is POSTPONED — only interfaces are defined now in object-storage-domain."
+      include *
+      include kafka
+      include awsSns
+      include awsSqs
+      include elasticSearch
+      include fileSystem
+      include awsS3TargetBucket
+      include prometheus
+      include awsCloudWatch
+      include micrometer
       autolayout lr
     }
 
@@ -226,6 +309,11 @@ workspace "Magrathea ObjectStorage" "C4 model for the Magrathea S3-compatible ob
         background #1168bd
         color #ffffff
       }
+      element "external-system" {
+        background #6b7b8f
+        color #ffffff
+        shape roundedBox
+      }
       element "Container" {
         background #438dd5
         color #ffffff
@@ -237,6 +325,11 @@ workspace "Magrathea ObjectStorage" "C4 model for the Magrathea S3-compatible ob
       }
       element "Component" {
         background #85bbf0
+        color #000000
+      }
+      element "planned" {
+        stroke dashed
+        background #b8cce4
         color #000000
       }
     }

@@ -1,6 +1,6 @@
 package com.example.magrathea.s3api.dto.query;
 
-import com.example.magrathea.objectstorage.domain.model.Bucket;
+import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketInventoryConfiguration;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
@@ -44,18 +44,4 @@ public record BucketInventoryQuery(
         );
     }
 
-    public static BucketInventoryQuery from(Bucket.BucketConfiguration config) {
-        if (!config.hasInventory()) {
-            throw new IllegalArgumentException("No inventory configuration");
-        }
-        var dest = config.inventoryFormat() != null
-            ? new InventoryDestination(config.inventoryFormat())
-            : null;
-        var schedule = config.inventoryFrequency() != null
-            ? new InventorySchedule(config.inventoryFrequency())
-            : null;
-        return new BucketInventoryQuery(
-            config.inventoryId(), dest, schedule, String.valueOf(config.inventoryEnabled())
-        );
-    }
 }

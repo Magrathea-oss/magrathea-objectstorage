@@ -96,7 +96,7 @@ image::../../c4/images/ReactiveBucketManagementComponents.png[Reactive Bucket Ma
 | Component | Responsibility |
 |---|---|
 | `ReactiveBucketService` | Reactive application service: bucket lifecycle, versioning, CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate, analytics, inventory, metrics, intelligent-tiering configuration via Mono/Flux |
-| `Bucket` | Domain aggregate root: bucket identity, name, region, storage class, versioning, encryption, inline Configuration. Emits ObjectStorageEvent domain events on state transitions |
+| `Bucket` | Domain aggregate root: bucket identity, name, region, storage class, versioning, encryption, and dedicated configuration fields per config type (CORS, Lifecycle, Encryption, Logging, Website, Notification, Replication, Policy, PublicAccessBlock, OwnershipControls, RequestPayment, Accelerate, plus multi-instance maps for Analytics, Inventory, Metrics, Intelligent-Tiering). Emits specific ObjectStorageEvent subtypes per config change (e.g., `BucketLifecycleConfigurationChanged`, `BucketNotificationConfigurationChanged`). Each config feature has a dedicated `with*()` / `without*()` method — no generic `withConfiguration()` / flat `Configuration` record. |
 | `BucketRepository port` | Repository port: bucket metadata and configuration persistence |
 
 === Level 2 — Component Diagram (reactive-repository-application)

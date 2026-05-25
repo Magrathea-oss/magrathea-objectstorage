@@ -1,9 +1,10 @@
 package com.example.magrathea.s3api.adapter.web;
 
-import com.example.magrathea.objectstorage.domain.model.Bucket;
-import com.example.magrathea.objectstorage.domain.model.MultipartUpload;
+import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
+import com.example.magrathea.objectstorage.domain.aggregate.MultipartUpload;
 import com.example.magrathea.objectstorage.domain.valueobject.ObjectKey;
 import com.example.magrathea.objectstorage.domain.valueobject.PartNumber;
+import com.example.magrathea.objectstorage.domain.valueobject.UploadId;
 import com.example.magrathea.reactive.application.service.ReactiveBucketService;
 import com.example.magrathea.reactive.application.service.ReactiveMultipartUploadService;
 import com.example.magrathea.s3api.dto.query.ErrorQuery;
@@ -12,18 +13,14 @@ import com.example.magrathea.s3api.dto.query.UploadPartResultQuery;
 import com.example.magrathea.s3api.dto.query.CompleteMultipartUploadQuery;
 import com.example.magrathea.s3api.dto.query.ListMultipartUploadsQuery;
 import com.example.magrathea.s3api.dto.query.ListPartsQuery;
-import org.springframework.core.io.buffer.DataBuffer;
-import org.springframework.core.io.buffer.DataBufferFactory;
-import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.util.DigestUtils;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 /**
@@ -37,8 +34,6 @@ import java.util.UUID;
  * GET /{bucket}/{key}?uploadId=... — ListParts
  */
 public class S3MultipartHandler {
-
-    private static final DataBufferFactory DATA_BUFFER_FACTORY = new DefaultDataBufferFactory();
 
     private final ReactiveMultipartUploadService multipartUploadService;
     private final ReactiveBucketService bucketService;
@@ -55,7 +50,7 @@ public class S3MultipartHandler {
         var key = request.pathVariable("key");
         return bucketService.findByName(bucket)
             .flatMap(b -> {
-                var uploadId = MultipartUpload.UploadId.generate();
+                var uploadId = UploadId.generate();
                 var upload = MultipartUpload.create(
                     MultipartUpload.Id.generate(), b.id(), ObjectKey.of(key), uploadId
                 );
@@ -74,7 +69,7 @@ public class S3MultipartHandler {
     public Mono<ServerResponse> uploadPartCopy(ServerRequest request) {
         var uploadIdStr = request.queryParam("uploadId").orElse("");
         var partNumberStr = request.queryParam("partNumber").orElse("");
-        var uploadId = MultipartUpload.UploadId.of(uploadIdStr);
+        var uploadId = UploadId.of(uploadIdStr);
         int partNumber = Integer.parseInt(partNumberStr);
         var copySource = request.headers().firstHeader("x-amz-copy-source");
         if (copySource == null) {
@@ -84,7 +79,7 @@ public class S3MultipartHandler {
         }
         return multipartUploadService.findById(uploadId)
             .flatMap(upload -> {
-                var etag = "\"" + UUID.randomUUID().toString() + "\"";
+                var etag = "\"" + DigestUtils.md5DigestAsHex((uploadIdStr + "-" + partNumberStr).getBytes()) + "\"";
                 var part = com.example.magrathea.objectstorage.domain.valueobject.UploadPart.create(
                     PartNumber.of(partNumber), etag, 0
                 );
@@ -103,13 +98,13 @@ public class S3MultipartHandler {
     public Mono<ServerResponse> uploadPart(ServerRequest request) {
         var uploadIdStr = request.queryParam("uploadId").orElse("");
         var partNumberStr = request.queryParam("partNumber").orElse("");
-        var uploadId = MultipartUpload.UploadId.of(uploadIdStr);
+        var uploadId = UploadId.of(uploadIdStr);
         int partNumber = Integer.parseInt(partNumberStr);
         var size = request.headers().contentLength().orElse(0L);
 
         return multipartUploadService.findById(uploadId)
             .flatMap(upload -> {
-                var etag = "\"" + UUID.randomUUID().toString() + "\"";
+                var etag = "\"" + DigestUtils.md5DigestAsHex((uploadIdStr + "-" + partNumberStr).getBytes()) + "\"";
                 var part = com.example.magrathea.objectstorage.domain.valueobject.UploadPart.create(
                     PartNumber.of(partNumber), etag, size
                 );
@@ -129,14 +124,14 @@ public class S3MultipartHandler {
         var bucket = request.pathVariable("bucket");
         var key = request.pathVariable("key");
         var uploadIdStr = request.queryParam("uploadId").orElse("");
-        var uploadId = MultipartUpload.UploadId.of(uploadIdStr);
+        var uploadId = UploadId.of(uploadIdStr);
 
         return multipartUploadService.findById(uploadId)
             .flatMap(upload -> {
                 var completed = upload.withCompleted();
                 return multipartUploadService.saveUpload(completed)
                     .then(Mono.defer(() -> {
-                        var finalEtag = "\"" + UUID.randomUUID().toString() + "\"";
+                        var finalEtag = "\"" + DigestUtils.md5DigestAsHex(uploadIdStr.getBytes()) + "\"";
                         var result = CompleteMultipartUploadQuery.from(bucket, key, finalEtag);
                         return ServerResponse.ok()
                             .contentType(MediaType.APPLICATION_XML)
@@ -151,7 +146,7 @@ public class S3MultipartHandler {
     /** DELETE /{bucket}/{key}?uploadId=... — Abort multipart upload */
     public Mono<ServerResponse> abortMultipartUpload(ServerRequest request) {
         var uploadIdStr = request.queryParam("uploadId").orElse("");
-        var uploadId = MultipartUpload.UploadId.of(uploadIdStr);
+        var uploadId = UploadId.of(uploadIdStr);
 
         return multipartUploadService.findById(uploadId)
             .flatMap(upload -> {
@@ -174,13 +169,9 @@ public class S3MultipartHandler {
                         u.key().value(), u.uploadId().value(), u.initiated()
                     ));
                 return ListMultipartUploadsQuery.from(bucket, entries)
-                    .flatMap(result -> {
-                        DataBuffer buf = DATA_BUFFER_FACTORY.wrap(
-                            result.xmlContent().getBytes(StandardCharsets.UTF_8));
-                        return ServerResponse.ok()
-                            .contentType(MediaType.APPLICATION_XML)
-                            .body(BodyInserters.fromDataBuffers(Flux.just(buf)));
-                    });
+                    .flatMap(result -> ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_XML)
+                        .bodyValue(result));
             })
             .switchIfEmpty(ServerResponse.status(HttpStatus.NOT_FOUND)
                 .contentType(MediaType.APPLICATION_XML)
@@ -192,7 +183,7 @@ public class S3MultipartHandler {
         var bucket = request.pathVariable("bucket");
         var key = request.pathVariable("key");
         var uploadIdStr = request.queryParam("uploadId").orElse("");
-        var uploadId = MultipartUpload.UploadId.of(uploadIdStr);
+        var uploadId = UploadId.of(uploadIdStr);
 
         return multipartUploadService.findById(uploadId)
             .flatMap(upload -> {
@@ -201,13 +192,9 @@ public class S3MultipartHandler {
                 return ListPartsQuery.from(
                     bucket, key, upload.uploadId().value(), partEntries
                 )
-                .flatMap(result -> {
-                    DataBuffer buf = DATA_BUFFER_FACTORY.wrap(
-                        result.xmlContent().getBytes(StandardCharsets.UTF_8));
-                    return ServerResponse.ok()
-                        .contentType(MediaType.APPLICATION_XML)
-                        .body(BodyInserters.fromDataBuffers(Flux.just(buf)));
-                });
+                .flatMap(result -> ServerResponse.ok()
+                    .contentType(MediaType.APPLICATION_XML)
+                    .bodyValue(result));
             })
             .switchIfEmpty(ServerResponse.status(HttpStatus.NOT_FOUND)
                 .contentType(MediaType.APPLICATION_XML)

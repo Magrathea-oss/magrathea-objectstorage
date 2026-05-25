@@ -64,6 +64,7 @@ public class S3ProxyRouter {
             .GET("/{bucket}", request -> S3WebSupport.hasQuery(request, "metrics"), bucketConfig::getBucketMetrics)
             .GET("/{bucket}", request -> S3WebSupport.hasQuery(request, "intelligent-tiering"), bucketConfig::getBucketIntelligentTiering)
             .GET("/{bucket}", request -> S3WebSupport.hasQuery(request, "uploads"), multipartHandler::listMultipartUploads)
+            .GET("/{bucket}", S3WebSupport::isPlainGet, bucketOperations::websiteRouting)
             .GET("/{bucket}", S3WebSupport::acceptXml, bucketOperations::listObjectsXml)
             .PUT("/{bucket}", request -> S3WebSupport.hasQuery(request, "acl"), bucketMetadata::putBucketAcl)
             .PUT("/{bucket}", request -> S3WebSupport.hasQuery(request, "tagging"), bucketMetadata::putBucketTagging)

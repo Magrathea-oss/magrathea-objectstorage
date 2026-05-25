@@ -1,6 +1,6 @@
 package com.example.magrathea.s3api.dto.query;
 
-import com.example.magrathea.objectstorage.domain.model.Bucket;
+import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketNotificationConfiguration;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;
@@ -25,16 +25,6 @@ public record BucketNotificationQuery(
         return new BucketNotificationQuery(events);
     }
 
-    public static BucketNotificationQuery from(Bucket.BucketConfiguration config) {
-        if (!config.hasNotification()) {
-            throw new IllegalArgumentException("No notification configuration");
-        }
-        var events = config.notificationEvents().stream()
-            .map(e -> new EventConfigurationEntry(
-                e.event(), e.topicArn(), e.queueArn(), e.lambdaArn(), e.filterRules()))
-            .toList();
-        return new BucketNotificationQuery(events);
-    }
 
     public record EventConfigurationEntry(
         @JacksonXmlProperty(localName = "Event")

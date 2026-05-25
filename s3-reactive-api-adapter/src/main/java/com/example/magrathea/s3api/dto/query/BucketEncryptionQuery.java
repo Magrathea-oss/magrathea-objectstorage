@@ -1,6 +1,6 @@
 package com.example.magrathea.s3api.dto.query;
 
-import com.example.magrathea.objectstorage.domain.model.Bucket;
+import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
 import com.example.magrathea.objectstorage.domain.valueobject.BucketEncryptionConfiguration;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
@@ -24,10 +24,4 @@ public record BucketEncryptionQuery(
         return new BucketEncryptionQuery(c.ruleId(), c.algorithm(), c.kmsKeyId());
     }
 
-    public static BucketEncryptionQuery from(Bucket.BucketConfiguration config) {
-        if (!config.hasEncryption()) {
-            throw new IllegalArgumentException("No encryption configuration");
-        }
-        return new BucketEncryptionQuery(config.encryptionRuleId(), config.encryptionAlgorithm(), config.encryptionKmsKeyId());
-    }
 }

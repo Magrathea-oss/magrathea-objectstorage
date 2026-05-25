@@ -1,44 +1,33 @@
 package com.example.magrathea.s3api.dto.query;
 
+import tools.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
+import tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;
+import tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
+
 /**
  * Response for POST /{bucket}?delete (DeleteObjects).
- * Builds XML reactively from Flux<String> keys without holding the full list in memory.
+ * Uses Jackson XML annotations for serialization via Jackson XML codec.
  */
-public record DeleteResultQuery(String xmlContent) {
-
+@JacksonXmlRootElement(localName = "DeleteResult")
+public record DeleteResultQuery(
+    @JacksonXmlElementWrapper(localName = "Deleted", useWrapping = false)
+    @JacksonXmlProperty(localName = "Deleted")
+    List<DeletedEntry> deleted
+) {
     /**
-     * Builds the DeleteResult XML reactively by streaming each key
-     * into XML fragments and accumulating them in a StringBuilder.
+     * Builds the DeleteResult reactively by collecting keys flux into a list.
      */
     public static Mono<DeleteResultQuery> from(Flux<String> keys) {
-        return keys
-            .map(key -> {
-                String escapedKey = xmlEscape(key);
-                return "<Deleted><Key>" + escapedKey + "</Key></Deleted>";
-            })
-            .collect(StringBuilder::new, (sb, s) -> sb.append(s), StringBuilder::append)
-            .map(sb -> {
-                String deletedXml = sb.toString();
-                return "<DeleteResult>" + deletedXml + "</DeleteResult>";
-            })
+        return keys.map(DeletedEntry::new).collectList()
             .map(DeleteResultQuery::new);
     }
 
-    /**
-     * Returns the raw XML content for direct response body writing.
-     */
-    public String xmlContent() {
-        return xmlContent;
-    }
-
-    private static String xmlEscape(String s) {
-        if (s == null) return "";
-        return s.replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\"", "&quot;");
-    }
+    public record DeletedEntry(
+        @JacksonXmlProperty(localName = "Key")
+        String key
+    ) {}
 }

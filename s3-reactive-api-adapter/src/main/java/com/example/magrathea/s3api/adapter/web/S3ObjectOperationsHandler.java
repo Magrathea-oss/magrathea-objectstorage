@@ -1,7 +1,7 @@
 package com.example.magrathea.s3api.adapter.web;
 
-import com.example.magrathea.objectstorage.domain.model.Bucket;
-import com.example.magrathea.objectstorage.domain.model.S3Object;
+import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
+import com.example.magrathea.objectstorage.domain.aggregate.S3Object;
 import com.example.magrathea.objectstorage.domain.valueobject.ContentDescriptor;
 import com.example.magrathea.objectstorage.domain.valueobject.ObjectKey;
 import com.example.magrathea.reactive.application.service.ReactiveBucketService;
@@ -25,7 +25,7 @@ import reactor.core.scheduler.Schedulers;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Map;
-import java.util.UUID;
+import org.springframework.util.DigestUtils;
 
 /**
  * Object-context S3 operations.
@@ -58,7 +58,7 @@ public class S3ObjectOperationsHandler {
 
         return bucketService.findByName(bucket)
             .flatMap(b -> {
-                var objectId = S3Object.ObjectId.generate();
+                var objectId = S3Object.Id.generate();
                 var objectKey = ObjectKey.of(key);
                 var s3Object = S3Object.create(objectId, b.id(), objectKey,
                     contentType, null, null, contentLength, Map.of());
@@ -77,11 +77,12 @@ public class S3ObjectOperationsHandler {
                     )
                     .subscribeOn(Schedulers.boundedElastic())
                     .flatMap(bytes -> {
-                        var descriptor = ContentDescriptor.of(bytes.length, "", UUID.randomUUID().toString());
+                        var md5Hash = DigestUtils.md5DigestAsHex(bytes);
+                        var descriptor = ContentDescriptor.of(bytes.length, "", md5Hash);
                         var withContent = s3Object.withContent(descriptor);
                         return objectService.saveObject(withContent)
                             .then(ServerResponse.ok()
-                                .header("ETag", "\"\"")
+                                .header("ETag", "\"" + md5Hash + "\"")
                                 .build());
                     });
             })
@@ -107,21 +108,23 @@ public class S3ObjectOperationsHandler {
             .flatMap(tuple -> {
                 var sourceBucket = tuple.getT1();
                 var targetBucketInfo = tuple.getT2();
-                var bucketKey = S3Object.ObjectId.BucketKey.of(sourceBucket.id(), ObjectKey.of(sourceKey));
-                return objectService.findByBucketAndKey(bucketKey)
+                return objectService.findByBucketAndKey(sourceBucket.id(), ObjectKey.of(sourceKey))
                     .flatMap(sourceObject -> {
                         var contentDescriptor = sourceObject.content();
                         var srcStorageClass = sourceObject.storageClass();
-                        var targetObjectId = S3Object.ObjectId.generate();
+                        var targetObjectId = S3Object.Id.generate();
                         var targetObjectKey = ObjectKey.of(targetKey);
                         var s3Object = S3Object.create(targetObjectId, targetBucketInfo.id(), targetObjectKey,
                             sourceObject.contentType(), null, null, contentDescriptor.size(), Map.of());
                         var withContent = s3Object.withContent(contentDescriptor);
+                        var etag = contentDescriptor.md5Hash() != null
+                            ? "\"" + contentDescriptor.md5Hash() + "\""
+                            : "\"\"";
                         return objectService.saveObject(withContent)
                             .then(ServerResponse.ok()
                                 .contentType(MediaType.APPLICATION_XML)
-                                .header("ETag", "\"\"")
-                                .bodyValue(CopyObjectResultQuery.from(Instant.now().toString(), "\"\"")));
+                                .header("ETag", etag)
+                                .bodyValue(CopyObjectResultQuery.from(Instant.now().toString(), etag)));
                     })
                     .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found"));
             })
@@ -139,20 +142,13 @@ public class S3ObjectOperationsHandler {
                     Mono<DeleteResultQuery> xmlMono = DeleteResultQuery.from(keys);
                     // Delete all objects in parallel
                     Mono<Void> deleteAll = Flux.fromIterable(cmd.objects())
-                        .flatMap(obj -> {
-                            var bucketKey = S3Object.ObjectId.BucketKey.of(b.id(), ObjectKey.of(obj.key()));
-                            return objectService.findByBucketAndKey(bucketKey)
-                                .flatMap(object -> objectService.deleteObject(object));
-                        })
+                        .flatMap(obj -> objectService.findByBucketAndKey(b.id(), ObjectKey.of(obj.key()))
+                            .flatMap(object -> objectService.deleteObject(object)))
                         .then();
                     return Mono.zip(xmlMono, deleteAll)
-                        .flatMap(tuple -> {
-                            DataBuffer buf = DATA_BUFFER_FACTORY.wrap(
-                                tuple.getT1().xmlContent().getBytes(StandardCharsets.UTF_8));
-                            return ServerResponse.ok()
-                                .contentType(MediaType.APPLICATION_XML)
-                                .body(BodyInserters.fromDataBuffers(Flux.just(buf)));
-                        });
+                        .flatMap(tuple -> ServerResponse.ok()
+                            .contentType(MediaType.APPLICATION_XML)
+                            .bodyValue(tuple.getT1()));
                 }))
             .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
     }
@@ -163,8 +159,7 @@ public class S3ObjectOperationsHandler {
         var key = request.pathVariable("key");
         return bucketService.findByName(bucket)
             .flatMap(b -> {
-                var bucketKey = S3Object.ObjectId.BucketKey.of(b.id(), ObjectKey.of(key));
-                return objectService.findByBucketAndKey(bucketKey)
+                return objectService.findByBucketAndKey(b.id(), ObjectKey.of(key))
                     .flatMap(obj -> {
                         var contentFlux = objectService.getContent(obj.id());
                         // Convert Flux<Byte> to Flux<DataBuffer> for response body
@@ -176,9 +171,13 @@ public class S3ObjectOperationsHandler {
                                 }
                                 return DATA_BUFFER_FACTORY.wrap(arr);
                             });
+                        var contentType = obj.contentType() != null ? obj.contentType() : "application/octet-stream";
+                        var etag = obj.contentDescriptor() != null && obj.contentDescriptor().md5Hash() != null
+                            ? "\"" + obj.contentDescriptor().md5Hash() + "\""
+                            : "\"\"";
                         return ServerResponse.ok()
-                            .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                            .header("ETag", "\"\"")
+                            .contentType(MediaType.parseMediaType(contentType))
+                            .header("ETag", etag)
                             .body(BodyInserters.fromDataBuffers(dataBufferFlux));
                     })
                     .switchIfEmpty(Mono.defer(() -> ServerResponse.notFound().build()));
@@ -192,8 +191,7 @@ public class S3ObjectOperationsHandler {
         var key = request.pathVariable("key");
         return bucketService.findByName(bucket)
             .flatMap(b -> {
-                var bucketKey = S3Object.ObjectId.BucketKey.of(b.id(), ObjectKey.of(key));
-                return objectService.findByBucketAndKey(bucketKey)
+                return objectService.findByBucketAndKey(b.id(), ObjectKey.of(key))
                     .flatMap(obj -> ServerResponse.ok().build())
                     .switchIfEmpty(Mono.defer(() -> ServerResponse.notFound().build()));
             })
@@ -206,8 +204,7 @@ public class S3ObjectOperationsHandler {
         var key = request.pathVariable("key");
         return bucketService.findByName(bucket)
             .flatMap(b -> {
-                var bucketKey = S3Object.ObjectId.BucketKey.of(b.id(), ObjectKey.of(key));
-                return objectService.findByBucketAndKey(bucketKey)
+                return objectService.findByBucketAndKey(b.id(), ObjectKey.of(key))
                     .flatMap(object -> objectService.deleteObject(object)
                         .then(ServerResponse.noContent().build()))
                     .switchIfEmpty(Mono.defer(() -> ServerResponse.noContent().build()));

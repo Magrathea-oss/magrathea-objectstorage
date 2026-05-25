@@ -56,6 +56,8 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 
 /**
  * Bucket configuration operations: CORS, policy, encryption, logging, website, notification.
@@ -65,6 +67,9 @@ import java.util.Optional;
  * Configuration storage uses aggregate-root patterns — all config data is stored on the Bucket aggregate.
  * Each GET endpoint extracts relevant configuration data from Bucket.Configuration or domain value objects.
  * Each PUT endpoint merges new data into the bucket via withConfiguration() and saves the bucket.
+ *
+ * Uses generic helper methods to eliminate duplication — all 50+ config operations
+ * are reduced to a few lines each by extracting the common find-bucket → apply → respond pattern.
  */
 public class S3BucketConfigHandler {
 
@@ -74,592 +79,434 @@ public class S3BucketConfigHandler {
         this.bucketService = bucketService;
     }
 
+    // ─────────────────────────────────────────────────────
+    //  Generic helpers — capture the common pattern
+    // ─────────────────────────────────────────────────────
+
+    /** Finds a bucket by name from the request, applies handler, or returns 404. */
+    private Mono<ServerResponse> findBucket(ServerRequest request,
+                                            Function<Bucket, Mono<ServerResponse>> handler) {
+        var bucketName = request.pathVariable("bucket");
+        return bucketService.findByName(bucketName)
+            .flatMap(handler)
+            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+    }
+
+    /** Helper for GET config — finds bucket, checks config exists, maps to response. */
+    private Mono<ServerResponse> getConfig(ServerRequest request,
+                                           String errorCode,
+                                           String errorMessage,
+                                           Function<Bucket.Configuration, Mono<ServerResponse>> responseMapper) {
+        return findBucket(request, b -> Mono.justOrEmpty(b.configuration())
+            .flatMap(config -> {
+                if (!config.hasCors()) {
+                    return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, errorCode, errorMessage);
+                }
+                return responseMapper.apply(config);
+            }));
+    }
+
+    /** Helper for GET config with a required query parameter. */
+    private Mono<ServerResponse> getConfigWithParam(ServerRequest request,
+                                                    String paramName,
+                                                    String missingCode,
+                                                    String missingMessage,
+                                                    String errorCode,
+                                                    String errorMessage,
+                                                    Function<Bucket.Configuration, Mono<ServerResponse>> responseMapper) {
+        var paramValue = request.queryParam(paramName).orElse(null);
+        if (paramValue == null || paramValue.isBlank()) {
+            return S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, missingCode, missingMessage);
+        }
+        return getConfig(request, errorCode, errorMessage, responseMapper);
+    }
+
+    /** Helper for PUT config — finds bucket, parses command body, applies handler. */
+    private <T> Mono<ServerResponse> putConfig(ServerRequest request,
+                                               Class<T> commandClass,
+                                               BiFunction<Bucket, T, Mono<ServerResponse>> handler) {
+        return findBucket(request, b -> request.bodyToMono(commandClass)
+            .flatMap(cmd -> handler.apply(b, cmd)));
+    }
+
+    /** Helper for PUT config with a required query parameter. */
+    private <T> Mono<ServerResponse> putConfigWithParam(ServerRequest request,
+                                                        String paramName,
+                                                        String missingCode,
+                                                        String missingMessage,
+                                                        Class<T> commandClass,
+                                                        BiFunction<Bucket, T, Mono<ServerResponse>> handler) {
+        var paramValue = request.queryParam(paramName).orElse(null);
+        if (paramValue == null || paramValue.isBlank()) {
+            return S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, missingCode, missingMessage);
+        }
+        return putConfig(request, commandClass, handler);
+    }
+
+    /** Helper for DELETE config — clears configuration on the bucket. */
+    private Mono<ServerResponse> deleteConfig(ServerRequest request) {
+        return findBucket(request, b -> {
+            var updatedBucket = new Bucket(b.id(), b.name(), b.region(), b.storageClass(),
+                b.versioningEnabled(), b.encryptionEnabled(), null, b.events());
+            return bucketService.createBucket(updatedBucket)
+                .then(ServerResponse.noContent().build());
+        });
+    }
+
+    /** Helper for DELETE config with a required query parameter. */
+    private Mono<ServerResponse> deleteConfigWithParam(ServerRequest request,
+                                                       String paramName,
+                                                       String missingCode,
+                                                       String missingMessage) {
+        var paramValue = request.queryParam(paramName).orElse(null);
+        if (paramValue == null || paramValue.isBlank()) {
+            return S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, missingCode, missingMessage);
+        }
+        return deleteConfig(request);
+    }
+
+    /** Helper for PUT with String body (not a typed command). */
+    private Mono<ServerResponse> putConfigString(ServerRequest request,
+                                                 BiFunction<Bucket, String, Mono<ServerResponse>> handler) {
+        return findBucket(request, b -> request.bodyToMono(String.class)
+            .defaultIfEmpty("")
+            .flatMap(body -> handler.apply(b, body)));
+    }
+
     // ── CORS Configuration ──
 
     /** GET /{bucket}?cors — GetBucketCors */
     public Mono<ServerResponse> getBucketCors(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> Mono.justOrEmpty(b.configuration())
-                .flatMap(config -> {
-                    if (!config.hasCors()) {
-                        return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchCorsConfiguration",
-                            "The CORS configuration is not found");
-                    }
-                    var rules = config.corsRules().stream()
-                        .map(r -> new BucketCorsQuery.CorsRuleEntry(
-                            r.allowedOrigins(), r.allowedMethods(), r.allowedHeaders(),
-                            r.maxAgeSeconds(), r.exposeHeaders(), r.id()))
-                        .toList();
-                    return ServerResponse.ok()
-                        .contentType(MediaType.APPLICATION_XML)
-                        .bodyValue(new BucketCorsQuery(rules));
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return getConfig(request, "NoSuchCorsConfiguration", "The CORS configuration is not found",
+            config -> {
+                var rules = config.corsRules().stream()
+                    .map(r -> new BucketCorsQuery.CorsRuleEntry(
+                        r.allowedOrigins(), r.allowedMethods(), r.allowedHeaders(),
+                        r.maxAgeSeconds(), r.exposeHeaders(), r.id()))
+                    .toList();
+                return ServerResponse.ok()
+                    .contentType(MediaType.APPLICATION_XML)
+                    .bodyValue(new BucketCorsQuery(rules));
+            });
     }
 
     /** PUT /{bucket}?cors — PutBucketCors */
     public Mono<ServerResponse> putBucketCors(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> request.bodyToMono(CorsConfigurationCommand.class)
-                .flatMap(xmlCmd -> {
-                    var corsRules = xmlCmd.corsRules().stream()
-                        .map(r -> new Bucket.Configuration.CorsRule(
-                            r.allowedOrigins(), r.allowedMethods(), r.allowedHeaders(),
-                            r.maxAgeSeconds() != null ? r.maxAgeSeconds() : 0,
-                            r.exposeHeaders(), r.id()))
-                        .toList();
-                    var config = new Bucket.Configuration(corsRules);
-                    var updatedBucket = b.withConfiguration(config).clearEvents();
-                    return bucketService.createBucket(updatedBucket)
-                        .then(ServerResponse.ok().build());
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return putConfig(request, CorsConfigurationCommand.class, (b, cmd) -> {
+            var corsRules = cmd.corsRules().stream()
+                .map(r -> new Bucket.Configuration.CorsRule(
+                    r.allowedOrigins(), r.allowedMethods(), r.allowedHeaders(),
+                    r.maxAgeSeconds() != null ? r.maxAgeSeconds() : 0,
+                    r.exposeHeaders(), r.id()))
+                .toList();
+            var config = new Bucket.Configuration(corsRules);
+            var updatedBucket = b.withConfiguration(config).clearEvents();
+            return bucketService.createBucket(updatedBucket)
+                .then(ServerResponse.ok().build());
+        });
     }
 
     /** DELETE /{bucket}?cors — DeleteBucketCors */
     public Mono<ServerResponse> deleteBucketCors(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> {
-                var updatedBucket = new Bucket(b.id(), b.name(), b.region(), b.storageClass(),
-                    b.versioningEnabled(), b.encryptionEnabled(), null, b.events());
-                return bucketService.createBucket(updatedBucket)
-                    .then(ServerResponse.noContent().build());
-            })
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return deleteConfig(request);
     }
 
     // ── Lifecycle Configuration ──
 
     /** GET /{bucket}?lifecycle — GetBucketLifecycleConfiguration */
     public Mono<ServerResponse> getBucketLifecycle(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> Mono.justOrEmpty(b.configuration())
-                .flatMap(config -> {
-                    if (!config.hasCors()) {
-                        return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchLifecycleConfiguration",
-                            "The lifecycle configuration does not exist");
-                    }
-                    return ServerResponse.ok()
-                        .contentType(MediaType.APPLICATION_XML)
-                        .bodyValue(BucketLifecycleQuery.from(Optional.empty()));
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return getConfig(request, "NoSuchLifecycleConfiguration", "The lifecycle configuration does not exist",
+            config -> ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(BucketLifecycleQuery.from(Optional.empty())));
     }
 
     /** PUT /{bucket}?lifecycle — PutBucketLifecycleConfiguration */
     public Mono<ServerResponse> putBucketLifecycle(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> request.bodyToMono(LifecycleConfigurationCommand.class)
-                .flatMap(cmd -> {
-                    var rules = cmd.rules().stream()
-                        .map(r -> new BucketLifecycleConfiguration.LifecycleRule(
-                            r.id(), r.status(), r.prefix(),
-                            r.expiration() != null
-                                ? new BucketLifecycleConfiguration.Expiration(r.expiration().days(), r.expiration().date())
-                                : null,
-                            r.noncurrentVersionExpiration() != null
-                                ? new BucketLifecycleConfiguration.NoncurrentVersionExpiration(
-                                    r.noncurrentVersionExpiration().noncurrentDays())
-                                : null,
-                            r.abortIncompleteMultipartUpload() != null
-                                ? new BucketLifecycleConfiguration.AbortIncompleteMultipartUpload(
-                                    r.abortIncompleteMultipartUpload().daysAfterInitiation())
-                                : null))
-                        .toList();
-                    var lifecycleConfig = new BucketLifecycleConfiguration(bucket, rules);
-                    // Store lifecycle config on the bucket by updating configuration
-                    var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
-                    return bucketService.createBucket(updatedBucket)
-                        .then(ServerResponse.ok().build());
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return putConfig(request, LifecycleConfigurationCommand.class, (b, cmd) -> {
+            var rules = cmd.rules().stream()
+                .map(r -> new BucketLifecycleConfiguration.LifecycleRule(
+                    r.id(), r.status(), r.prefix(),
+                    r.expiration() != null
+                        ? new BucketLifecycleConfiguration.Expiration(r.expiration().days(), r.expiration().date())
+                        : null,
+                    r.noncurrentVersionExpiration() != null
+                        ? new BucketLifecycleConfiguration.NoncurrentVersionExpiration(
+                            r.noncurrentVersionExpiration().noncurrentDays())
+                        : null,
+                    r.abortIncompleteMultipartUpload() != null
+                        ? new BucketLifecycleConfiguration.AbortIncompleteMultipartUpload(
+                            r.abortIncompleteMultipartUpload().daysAfterInitiation())
+                        : null))
+                .toList();
+            var lifecycleConfig = new BucketLifecycleConfiguration(b.name(), rules);
+            var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
+            return bucketService.createBucket(updatedBucket)
+                .then(ServerResponse.ok().build());
+        });
     }
 
     /** DELETE /{bucket}?lifecycle — DeleteBucketLifecycleConfiguration */
     public Mono<ServerResponse> deleteBucketLifecycle(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> {
-                var updatedBucket = new Bucket(b.id(), b.name(), b.region(), b.storageClass(),
-                    b.versioningEnabled(), b.encryptionEnabled(), null, b.events());
-                return bucketService.createBucket(updatedBucket)
-                    .then(ServerResponse.noContent().build());
-            })
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return deleteConfig(request);
     }
 
     // ── Bucket Policy ──
 
     /** GET /{bucket}?policy — GetBucketPolicy */
     public Mono<ServerResponse> getBucketPolicy(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> Mono.justOrEmpty(b.configuration())
-                .flatMap(config -> {
-                    if (!config.hasCors()) {
-                        return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucketPolicy",
-                            "The bucket policy does not exist");
-                    }
-                    return ServerResponse.ok()
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue("{}");
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return getConfig(request, "NoSuchBucketPolicy", "The bucket policy does not exist",
+            config -> ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{}"));
     }
 
     /** PUT /{bucket}?policy — PutBucketPolicy */
     public Mono<ServerResponse> putBucketPolicy(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> request.bodyToMono(String.class)
-                .defaultIfEmpty("")
-                .flatMap(body -> {
-                    var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
-                    return bucketService.createBucket(updatedBucket)
-                        .then(ServerResponse.ok().build());
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return putConfigString(request, (b, body) -> {
+            var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
+            return bucketService.createBucket(updatedBucket)
+                .then(ServerResponse.ok().build());
+        });
     }
 
     /** DELETE /{bucket}?policy — DeleteBucketPolicy */
     public Mono<ServerResponse> deleteBucketPolicy(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> {
-                var updatedBucket = new Bucket(b.id(), b.name(), b.region(), b.storageClass(),
-                    b.versioningEnabled(), b.encryptionEnabled(), null, b.events());
-                return bucketService.createBucket(updatedBucket)
-                    .then(ServerResponse.noContent().build());
-            })
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return deleteConfig(request);
     }
 
     // ── Encryption Configuration ──
 
     /** GET /{bucket}?encryption — GetBucketEncryption */
     public Mono<ServerResponse> getBucketEncryption(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> Mono.justOrEmpty(b.configuration())
-                .flatMap(config -> {
-                    if (!config.hasCors()) {
-                        return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchEncryptionConfiguration",
-                            "The encryption configuration does not exist");
-                    }
-                    return ServerResponse.ok()
-                        .contentType(MediaType.APPLICATION_XML)
-                        .bodyValue(BucketEncryptionQuery.from(Optional.empty()));
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return getConfig(request, "NoSuchEncryptionConfiguration", "The encryption configuration does not exist",
+            config -> ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(BucketEncryptionQuery.from(Optional.empty())));
     }
 
     /** PUT /{bucket}?encryption — PutBucketEncryption */
     public Mono<ServerResponse> putBucketEncryption(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> request.bodyToMono(EncryptionConfigurationCommand.class)
-                .flatMap(cmd -> {
-                    var encryptionConfig = new BucketEncryptionConfiguration(bucket,
-                        cmd.ruleId(), cmd.algorithm(), cmd.kmsKeyId());
-                    var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
-                    return bucketService.createBucket(updatedBucket)
-                        .then(ServerResponse.ok().build());
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return putConfig(request, EncryptionConfigurationCommand.class, (b, cmd) -> {
+            var encryptionConfig = new BucketEncryptionConfiguration(b.name(),
+                cmd.ruleId(), cmd.algorithm(), cmd.kmsKeyId());
+            var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
+            return bucketService.createBucket(updatedBucket)
+                .then(ServerResponse.ok().build());
+        });
     }
 
     /** DELETE /{bucket}?encryption — DeleteBucketEncryption */
     public Mono<ServerResponse> deleteBucketEncryption(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> {
-                var updatedBucket = new Bucket(b.id(), b.name(), b.region(), b.storageClass(),
-                    b.versioningEnabled(), b.encryptionEnabled(), null, b.events());
-                return bucketService.createBucket(updatedBucket)
-                    .then(ServerResponse.noContent().build());
-            })
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return deleteConfig(request);
     }
 
     // ── Logging Configuration ──
 
     /** GET /{bucket}?logging — GetBucketLogging */
     public Mono<ServerResponse> getBucketLogging(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> Mono.justOrEmpty(b.configuration())
-                .flatMap(config -> {
-                    if (!config.hasCors()) {
-                        return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchLoggingConfiguration",
-                            "The logging configuration does not exist");
-                    }
-                    return ServerResponse.ok()
-                        .contentType(MediaType.APPLICATION_XML)
-                        .bodyValue(BucketLoggingQuery.from(Optional.empty()));
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return getConfig(request, "NoSuchLoggingConfiguration", "The logging configuration does not exist",
+            config -> ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(BucketLoggingQuery.from(Optional.empty())));
     }
 
     /** PUT /{bucket}?logging — PutBucketLogging */
     public Mono<ServerResponse> putBucketLogging(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> request.bodyToMono(LoggingConfigurationCommand.class)
-                .flatMap(cmd -> {
-                    var loggingConfig = new BucketLoggingConfiguration(bucket,
-                        cmd.targetBucket(), cmd.targetPrefix(),
-                        cmd.targetGrants() != null ? cmd.targetGrants() : List.of());
-                    var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
-                    return bucketService.createBucket(updatedBucket)
-                        .then(ServerResponse.ok().build());
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return putConfig(request, LoggingConfigurationCommand.class, (b, cmd) -> {
+            var loggingConfig = new BucketLoggingConfiguration(b.name(),
+                cmd.targetBucket(), cmd.targetPrefix(),
+                cmd.targetGrants() != null ? cmd.targetGrants() : List.of());
+            var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
+            return bucketService.createBucket(updatedBucket)
+                .then(ServerResponse.ok().build());
+        });
     }
 
     /** DELETE /{bucket}?logging — DeleteBucketLogging */
     public Mono<ServerResponse> deleteBucketLogging(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> {
-                var updatedBucket = new Bucket(b.id(), b.name(), b.region(), b.storageClass(),
-                    b.versioningEnabled(), b.encryptionEnabled(), null, b.events());
-                return bucketService.createBucket(updatedBucket)
-                    .then(ServerResponse.noContent().build());
-            })
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return deleteConfig(request);
     }
 
     // ── Website Configuration ──
 
     /** GET /{bucket}?website — GetBucketWebsite */
     public Mono<ServerResponse> getBucketWebsite(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> Mono.justOrEmpty(b.configuration())
-                .flatMap(config -> {
-                    if (!config.hasCors()) {
-                        return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchWebsiteConfiguration",
-                            "The website configuration does not exist");
-                    }
-                    return ServerResponse.ok()
-                        .contentType(MediaType.APPLICATION_XML)
-                        .bodyValue(BucketWebsiteQuery.from(Optional.empty()));
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return getConfig(request, "NoSuchWebsiteConfiguration", "The website configuration does not exist",
+            config -> ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(BucketWebsiteQuery.from(Optional.empty())));
     }
 
     /** PUT /{bucket}?website — PutBucketWebsite */
     public Mono<ServerResponse> putBucketWebsite(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> request.bodyToMono(WebsiteConfigurationCommand.class)
-                .flatMap(cmd -> {
-                    var websiteConfig = new BucketWebsiteConfiguration(bucket,
-                        cmd.indexDocument(), cmd.errorDocument(),
-                        cmd.redirectAllRequestsTo(), cmd.routingRules());
-                    var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
-                    return bucketService.createBucket(updatedBucket)
-                        .then(ServerResponse.ok().build());
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return putConfig(request, WebsiteConfigurationCommand.class, (b, cmd) -> {
+            var websiteConfig = new BucketWebsiteConfiguration(b.name(),
+                cmd.indexDocument(), cmd.errorDocument(),
+                cmd.redirectAllRequestsTo(), cmd.routingRules());
+            var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
+            return bucketService.createBucket(updatedBucket)
+                .then(ServerResponse.ok().build());
+        });
     }
 
     /** DELETE /{bucket}?website — DeleteBucketWebsite */
     public Mono<ServerResponse> deleteBucketWebsite(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> {
-                var updatedBucket = new Bucket(b.id(), b.name(), b.region(), b.storageClass(),
-                    b.versioningEnabled(), b.encryptionEnabled(), null, b.events());
-                return bucketService.createBucket(updatedBucket)
-                    .then(ServerResponse.noContent().build());
-            })
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return deleteConfig(request);
     }
 
     // ── Notification Configuration ──
 
     /** GET /{bucket}?notification — GetBucketNotification */
     public Mono<ServerResponse> getBucketNotification(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> Mono.justOrEmpty(b.configuration())
-                .flatMap(config -> {
-                    if (!config.hasCors()) {
-                        return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchNotificationConfiguration",
-                            "The notification configuration does not exist");
-                    }
-                    return ServerResponse.ok()
-                        .contentType(MediaType.APPLICATION_XML)
-                        .bodyValue(BucketNotificationQuery.from(Optional.empty()));
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return getConfig(request, "NoSuchNotificationConfiguration", "The notification configuration does not exist",
+            config -> ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(BucketNotificationQuery.from(Optional.empty())));
     }
 
     /** PUT /{bucket}?notification — PutBucketNotification */
     public Mono<ServerResponse> putBucketNotification(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> request.bodyToMono(NotificationConfigurationCommand.class)
-                .flatMap(cmd -> {
-                    var notificationConfig = new BucketNotificationConfiguration(bucket,
-                        cmd.topicConfigurations(), cmd.queueConfigurations(), cmd.lambdaConfigurations(),
-                        cmd.eventBridgeConfigurations() != null ? cmd.eventBridgeConfigurations() : List.of());
-                    var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
-                    return bucketService.createBucket(updatedBucket)
-                        .then(ServerResponse.ok().build());
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return putConfig(request, NotificationConfigurationCommand.class, (b, cmd) -> {
+            var notificationConfig = new BucketNotificationConfiguration(b.name(),
+                cmd.topicConfigurations(), cmd.queueConfigurations(), cmd.lambdaConfigurations(),
+                cmd.eventBridgeConfigurations() != null ? cmd.eventBridgeConfigurations() : List.of());
+            var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
+            return bucketService.createBucket(updatedBucket)
+                .then(ServerResponse.ok().build());
+        });
     }
 
     /** DELETE /{bucket}?notification — DeleteBucketNotification */
     public Mono<ServerResponse> deleteBucketNotification(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> {
-                var updatedBucket = new Bucket(b.id(), b.name(), b.region(), b.storageClass(),
-                    b.versioningEnabled(), b.encryptionEnabled(), null, b.events());
-                return bucketService.createBucket(updatedBucket)
-                    .then(ServerResponse.noContent().build());
-            })
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return deleteConfig(request);
     }
 
     // ── Replication Configuration ──
 
     /** GET /{bucket}?replication — GetBucketReplication */
     public Mono<ServerResponse> getBucketReplication(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> Mono.justOrEmpty(b.configuration())
-                .flatMap(config -> {
-                    if (!config.hasCors()) {
-                        return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchReplicationConfiguration",
-                            "The replication configuration does not exist");
-                    }
-                    return ServerResponse.ok()
-                        .contentType(MediaType.APPLICATION_XML)
-                        .bodyValue(BucketReplicationQuery.from(Optional.empty()));
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return getConfig(request, "NoSuchReplicationConfiguration", "The replication configuration does not exist",
+            config -> ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(BucketReplicationQuery.from(Optional.empty())));
     }
 
     /** PUT /{bucket}?replication — PutBucketReplication */
     public Mono<ServerResponse> putBucketReplication(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> request.bodyToMono(ReplicationConfigurationCommand.class)
-                .flatMap(cmd -> {
-                    var replicationConfig = new BucketReplicationConfiguration(bucket,
-                        cmd.role(), cmd.rules(), cmd.sourceBucket(), cmd.destinationBucket());
-                    var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
-                    return bucketService.createBucket(updatedBucket)
-                        .then(ServerResponse.ok().build());
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return putConfig(request, ReplicationConfigurationCommand.class, (b, cmd) -> {
+            var replicationConfig = new BucketReplicationConfiguration(b.name(),
+                cmd.role(), cmd.rules(), cmd.sourceBucket(), cmd.destinationBucket());
+            var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
+            return bucketService.createBucket(updatedBucket)
+                .then(ServerResponse.ok().build());
+        });
     }
 
     /** DELETE /{bucket}?replication — DeleteBucketReplication */
     public Mono<ServerResponse> deleteBucketReplication(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> {
-                var updatedBucket = new Bucket(b.id(), b.name(), b.region(), b.storageClass(),
-                    b.versioningEnabled(), b.encryptionEnabled(), null, b.events());
-                return bucketService.createBucket(updatedBucket)
-                    .then(ServerResponse.noContent().build());
-            })
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return deleteConfig(request);
     }
 
     // ── Request Payment Configuration ──
 
     /** GET /{bucket}?requestPayment — GetBucketRequestPayment */
     public Mono<ServerResponse> getBucketRequestPayment(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> Mono.justOrEmpty(b.configuration())
-                .flatMap(config -> {
-                    if (!config.hasCors()) {
-                        return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchRequestPaymentConfiguration",
-                            "The request payment configuration does not exist");
-                    }
-                    return ServerResponse.ok()
-                        .contentType(MediaType.APPLICATION_XML)
-                        .bodyValue(BucketRequestPaymentQuery.from(Optional.empty()));
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return getConfig(request, "NoSuchRequestPaymentConfiguration", "The request payment configuration does not exist",
+            config -> ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(BucketRequestPaymentQuery.from(Optional.empty())));
     }
 
     /** PUT /{bucket}?requestPayment — PutBucketRequestPayment */
     public Mono<ServerResponse> putBucketRequestPayment(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> request.bodyToMono(RequestPaymentConfigurationCommand.class)
-                .flatMap(cmd -> {
-                    var requestPaymentConfig = new BucketRequestPaymentConfiguration(bucket, cmd.payer());
-                    var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
-                    return bucketService.createBucket(updatedBucket)
-                        .then(ServerResponse.ok().build());
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return putConfig(request, RequestPaymentConfigurationCommand.class, (b, cmd) -> {
+            var requestPaymentConfig = new BucketRequestPaymentConfiguration(b.name(), cmd.payer());
+            var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
+            return bucketService.createBucket(updatedBucket)
+                .then(ServerResponse.ok().build());
+        });
     }
 
     /** DELETE /{bucket}?requestPayment — DeleteBucketRequestPayment */
     public Mono<ServerResponse> deleteBucketRequestPayment(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> {
-                var updatedBucket = new Bucket(b.id(), b.name(), b.region(), b.storageClass(),
-                    b.versioningEnabled(), b.encryptionEnabled(), null, b.events());
-                return bucketService.createBucket(updatedBucket)
-                    .then(ServerResponse.noContent().build());
-            })
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return deleteConfig(request);
     }
 
     // ── Ownership Controls ──
 
     /** GET /{bucket}?ownershipControls — GetBucketOwnershipControls */
     public Mono<ServerResponse> getBucketOwnershipControls(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> Mono.justOrEmpty(b.configuration())
-                .flatMap(config -> {
-                    if (!config.hasCors()) {
-                        return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchOwnershipControls",
-                            "The ownership controls do not exist");
-                    }
-                    return ServerResponse.ok()
-                        .contentType(MediaType.APPLICATION_XML)
-                        .bodyValue(BucketOwnershipControlsQuery.from(Optional.empty()));
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return getConfig(request, "NoSuchOwnershipControls", "The ownership controls do not exist",
+            config -> ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(BucketOwnershipControlsQuery.from(Optional.empty())));
     }
 
     /** PUT /{bucket}?ownershipControls — PutBucketOwnershipControls */
     public Mono<ServerResponse> putBucketOwnershipControls(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> request.bodyToMono(OwnershipControlsCommand.class)
-                .flatMap(cmd -> {
-                    var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
-                    return bucketService.createBucket(updatedBucket)
-                        .then(ServerResponse.ok().build());
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return putConfig(request, OwnershipControlsCommand.class, (b, cmd) -> {
+            var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
+            return bucketService.createBucket(updatedBucket)
+                .then(ServerResponse.ok().build());
+        });
     }
 
     /** DELETE /{bucket}?ownershipControls — DeleteBucketOwnershipControls */
     public Mono<ServerResponse> deleteBucketOwnershipControls(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> {
-                var updatedBucket = new Bucket(b.id(), b.name(), b.region(), b.storageClass(),
-                    b.versioningEnabled(), b.encryptionEnabled(), null, b.events());
-                return bucketService.createBucket(updatedBucket)
-                    .then(ServerResponse.noContent().build());
-            })
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return deleteConfig(request);
     }
 
     // ── Public Access Block ──
 
     /** GET /{bucket}?publicAccessBlock — GetPublicAccessBlock */
     public Mono<ServerResponse> getPublicAccessBlock(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> Mono.justOrEmpty(b.configuration())
-                .flatMap(config -> {
-                    if (!config.hasCors()) {
-                        return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchPublicAccessBlockConfiguration",
-                            "The public access block configuration does not exist");
-                    }
-                    return ServerResponse.ok()
-                        .contentType(MediaType.APPLICATION_XML)
-                        .bodyValue(PublicAccessBlockQuery.from(Optional.empty()));
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return getConfig(request, "NoSuchPublicAccessBlockConfiguration", "The public access block configuration does not exist",
+            config -> ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(PublicAccessBlockQuery.from(Optional.empty())));
     }
 
     /** PUT /{bucket}?publicAccessBlock — PutPublicAccessBlock */
     public Mono<ServerResponse> putPublicAccessBlock(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> request.bodyToMono(PublicAccessBlockCommand.class)
-                .flatMap(cmd -> {
-                    var publicAccessBlockConfig = new PublicAccessBlockConfiguration(
-                        cmd.blockPublicAcls(), cmd.ignorePublicAcls(),
-                        cmd.blockPublicPolicy(), cmd.restrictPublicBucketPolicy());
-                    var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
-                    return bucketService.createBucket(updatedBucket)
-                        .then(ServerResponse.ok().build());
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return putConfig(request, PublicAccessBlockCommand.class, (b, cmd) -> {
+            var publicAccessBlockConfig = new PublicAccessBlockConfiguration(
+                cmd.blockPublicAcls(), cmd.ignorePublicAcls(),
+                cmd.blockPublicPolicy(), cmd.restrictPublicBucketPolicy());
+            var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
+            return bucketService.createBucket(updatedBucket)
+                .then(ServerResponse.ok().build());
+        });
     }
 
     /** DELETE /{bucket}?publicAccessBlock — DeletePublicAccessBlock */
     public Mono<ServerResponse> deletePublicAccessBlock(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> {
-                var updatedBucket = new Bucket(b.id(), b.name(), b.region(), b.storageClass(),
-                    b.versioningEnabled(), b.encryptionEnabled(), null, b.events());
-                return bucketService.createBucket(updatedBucket)
-                    .then(ServerResponse.noContent().build());
-            })
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return deleteConfig(request);
     }
 
     // ── Accelerate Configuration ──
 
     /** GET /{bucket}?accelerate — GetBucketAccelerateConfiguration */
     public Mono<ServerResponse> getBucketAccelerate(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> Mono.justOrEmpty(b.configuration())
-                .flatMap(config -> {
-                    if (!config.hasCors()) {
-                        return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchAccelerateConfiguration",
-                            "The accelerate configuration does not exist");
-                    }
-                    return ServerResponse.ok()
-                        .contentType(MediaType.APPLICATION_XML)
-                        .bodyValue(BucketAccelerateQuery.from(Optional.empty()));
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return getConfig(request, "NoSuchAccelerateConfiguration", "The accelerate configuration does not exist",
+            config -> ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(BucketAccelerateQuery.from(Optional.empty())));
     }
 
     /** PUT /{bucket}?accelerate — PutBucketAccelerateConfiguration */
     public Mono<ServerResponse> putBucketAccelerate(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> request.bodyToMono(AccelerateConfigurationCommand.class)
-                .flatMap(cmd -> {
-                    var accelerateConfig = new BucketAccelerateConfiguration(cmd.status());
-                    var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
-                    return bucketService.createBucket(updatedBucket)
-                        .then(ServerResponse.ok().build());
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return putConfig(request, AccelerateConfigurationCommand.class, (b, cmd) -> {
+            var accelerateConfig = new BucketAccelerateConfiguration(cmd.status());
+            var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
+            return bucketService.createBucket(updatedBucket)
+                .then(ServerResponse.ok().build());
+        });
     }
 
     /** DELETE /{bucket}?accelerate — DeleteBucketAccelerateConfiguration */
     public Mono<ServerResponse> deleteBucketAccelerate(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> {
-                var updatedBucket = new Bucket(b.id(), b.name(), b.region(), b.storageClass(),
-                    b.versioningEnabled(), b.encryptionEnabled(), null, b.events());
-                return bucketService.createBucket(updatedBucket)
-                    .then(ServerResponse.noContent().build());
-            })
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return deleteConfig(request);
     }
 
     // ─────────────────────────────────────────────────────
@@ -668,79 +515,39 @@ public class S3BucketConfigHandler {
 
     /** GET /{bucket}?analytics&analyticsId={id} — GetBucketAnalyticsConfiguration */
     public Mono<ServerResponse> getBucketAnalytics(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        var analyticsId = request.queryParam("analyticsId").orElse(null);
-        return bucketService.findByName(bucket)
-            .flatMap(b -> {
-                if (analyticsId == null || analyticsId.isBlank()) {
-                    return S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "MissingAnalyticsId",
-                        "The analyticsId query parameter is required");
-                }
-                return Mono.justOrEmpty(b.configuration())
-                    .flatMap(config -> {
-                        if (!config.hasCors()) {
-                            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchAnalyticsConfiguration",
-                                "The analytics configuration does not exist");
-                        }
-                        return ServerResponse.ok()
-                            .contentType(MediaType.APPLICATION_XML)
-                            .bodyValue(BucketAnalyticsQuery.from(Optional.empty()));
-                    });
-            })
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return getConfigWithParam(request, "analyticsId", "MissingAnalyticsId",
+            "The analyticsId query parameter is required",
+            "NoSuchAnalyticsConfiguration", "The analytics configuration does not exist",
+            config -> ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(BucketAnalyticsQuery.from(Optional.empty())));
     }
 
     /** PUT /{bucket}?analytics&analyticsId={id} — PutBucketAnalyticsConfiguration */
     public Mono<ServerResponse> putBucketAnalytics(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        var analyticsId = request.queryParam("analyticsId").orElse(null);
-        return bucketService.findByName(bucket)
-            .flatMap(b -> {
-                if (analyticsId == null || analyticsId.isBlank()) {
-                    return S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "MissingAnalyticsId",
-                        "The analyticsId query parameter is required");
-                }
-                return request.bodyToMono(AnalyticsConfigurationCommand.class)
-                    .flatMap(cmd -> {
-                        var analyticsConfig = new BucketAnalyticsConfiguration(bucket,
-                            cmd.id(), cmd.filter(), cmd.storageClass(), cmd.tags());
-                        var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
-                        return bucketService.createBucket(updatedBucket)
-                            .then(ServerResponse.ok().build());
-                    });
-            })
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return putConfigWithParam(request, "analyticsId", "MissingAnalyticsId",
+            "The analyticsId query parameter is required",
+            AnalyticsConfigurationCommand.class, (b, cmd) -> {
+                var analyticsConfig = new BucketAnalyticsConfiguration(b.name(),
+                    cmd.id(), cmd.filter(), cmd.storageClass(), cmd.tags());
+                var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
+                return bucketService.createBucket(updatedBucket)
+                    .then(ServerResponse.ok().build());
+            });
     }
 
     /** DELETE /{bucket}?analytics&analyticsId={id} — DeleteBucketAnalyticsConfiguration */
     public Mono<ServerResponse> deleteBucketAnalytics(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        var analyticsId = request.queryParam("analyticsId").orElse(null);
-        return bucketService.findByName(bucket)
-            .flatMap(b -> {
-                if (analyticsId == null || analyticsId.isBlank()) {
-                    return S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "MissingAnalyticsId",
-                        "The analyticsId query parameter is required");
-                }
-                var updatedBucket = new Bucket(b.id(), b.name(), b.region(), b.storageClass(),
-                    b.versioningEnabled(), b.encryptionEnabled(), null, b.events());
-                return bucketService.createBucket(updatedBucket)
-                    .then(ServerResponse.noContent().build());
-            })
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return deleteConfigWithParam(request, "analyticsId", "MissingAnalyticsId",
+            "The analyticsId query parameter is required");
     }
 
     /** GET /{bucket}?analytics&list-type — ListBucketAnalyticsConfigurations */
     public Mono<ServerResponse> listBucketAnalyticsConfigurations(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> Mono.justOrEmpty(b.configuration())
-                .flatMap(config -> {
-                    return ServerResponse.ok()
-                        .contentType(MediaType.APPLICATION_XML)
-                        .bodyValue(BucketAnalyticsListQuery.fromIds(List.of()));
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return findBucket(request, b -> Mono.justOrEmpty(b.configuration())
+            .flatMap(config -> ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(new BucketAnalyticsListQuery(List.of()))));
     }
 
     // ─────────────────────────────────────────────────────
@@ -749,80 +556,40 @@ public class S3BucketConfigHandler {
 
     /** GET /{bucket}?inventory&inventoryId={id} — GetBucketInventoryConfiguration */
     public Mono<ServerResponse> getBucketInventory(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        var inventoryId = request.queryParam("inventoryId").orElse(null);
-        return bucketService.findByName(bucket)
-            .flatMap(b -> {
-                if (inventoryId == null || inventoryId.isBlank()) {
-                    return S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "MissingInventoryId",
-                        "The inventoryId query parameter is required");
-                }
-                return Mono.justOrEmpty(b.configuration())
-                    .flatMap(config -> {
-                        if (!config.hasCors()) {
-                            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchInventoryConfiguration",
-                                "The inventory configuration does not exist");
-                        }
-                        return ServerResponse.ok()
-                            .contentType(MediaType.APPLICATION_XML)
-                            .bodyValue(BucketInventoryQuery.from(Optional.empty()));
-                    });
-            })
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return getConfigWithParam(request, "inventoryId", "MissingInventoryId",
+            "The inventoryId query parameter is required",
+            "NoSuchInventoryConfiguration", "The inventory configuration does not exist",
+            config -> ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(BucketInventoryQuery.from(Optional.empty())));
     }
 
     /** PUT /{bucket}?inventory&inventoryId={id} — PutBucketInventoryConfiguration */
     public Mono<ServerResponse> putBucketInventory(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        var inventoryId = request.queryParam("inventoryId").orElse(null);
-        return bucketService.findByName(bucket)
-            .flatMap(b -> {
-                if (inventoryId == null || inventoryId.isBlank()) {
-                    return S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "MissingInventoryId",
-                        "The inventoryId query parameter is required");
-                }
-                return request.bodyToMono(InventoryConfigurationCommand.class)
-                    .flatMap(cmd -> {
-                        var inventoryConfig = new BucketInventoryConfiguration(bucket,
-                            cmd.id(), cmd.filter(), cmd.schedule(), cmd.destination(),
-                            cmd.enabled(), cmd.includedObjectVersions(), cmd.optionalFields());
-                        var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
-                        return bucketService.createBucket(updatedBucket)
-                            .then(ServerResponse.ok().build());
-                    });
-            })
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return putConfigWithParam(request, "inventoryId", "MissingInventoryId",
+            "The inventoryId query parameter is required",
+            InventoryConfigurationCommand.class, (b, cmd) -> {
+                var inventoryConfig = new BucketInventoryConfiguration(b.name(),
+                    cmd.id(), cmd.filter(), cmd.schedule(), cmd.destination(),
+                    cmd.enabled(), cmd.includedObjectVersions(), cmd.optionalFields());
+                var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
+                return bucketService.createBucket(updatedBucket)
+                    .then(ServerResponse.ok().build());
+            });
     }
 
     /** DELETE /{bucket}?inventory&inventoryId={id} — DeleteBucketInventoryConfiguration */
     public Mono<ServerResponse> deleteBucketInventory(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        var inventoryId = request.queryParam("inventoryId").orElse(null);
-        return bucketService.findByName(bucket)
-            .flatMap(b -> {
-                if (inventoryId == null || inventoryId.isBlank()) {
-                    return S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "MissingInventoryId",
-                        "The inventoryId query parameter is required");
-                }
-                var updatedBucket = new Bucket(b.id(), b.name(), b.region(), b.storageClass(),
-                    b.versioningEnabled(), b.encryptionEnabled(), null, b.events());
-                return bucketService.createBucket(updatedBucket)
-                    .then(ServerResponse.noContent().build());
-            })
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return deleteConfigWithParam(request, "inventoryId", "MissingInventoryId",
+            "The inventoryId query parameter is required");
     }
 
     /** GET /{bucket}?inventory&list-type — ListBucketInventoryConfigurations */
     public Mono<ServerResponse> listBucketInventoryConfigurations(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> Mono.justOrEmpty(b.configuration())
-                .flatMap(config -> {
-                    return ServerResponse.ok()
-                        .contentType(MediaType.APPLICATION_XML)
-                        .bodyValue(BucketInventoryListQuery.fromIds(List.of()));
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return findBucket(request, b -> Mono.justOrEmpty(b.configuration())
+            .flatMap(config -> ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(new BucketInventoryListQuery(List.of()))));
     }
 
     // ─────────────────────────────────────────────────────
@@ -831,47 +598,26 @@ public class S3BucketConfigHandler {
 
     /** GET /{bucket}?metrics — GetBucketMetricsConfiguration */
     public Mono<ServerResponse> getBucketMetrics(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> Mono.justOrEmpty(b.configuration())
-                .flatMap(config -> {
-                    if (!config.hasCors()) {
-                        return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchMetricsConfiguration",
-                            "The metrics configuration does not exist");
-                    }
-                    return ServerResponse.ok()
-                        .contentType(MediaType.APPLICATION_XML)
-                        .bodyValue(BucketMetricsQuery.from(Optional.empty()));
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return getConfig(request, "NoSuchMetricsConfiguration", "The metrics configuration does not exist",
+            config -> ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(BucketMetricsQuery.from(Optional.empty())));
     }
 
     /** PUT /{bucket}?metrics — PutBucketMetricsConfiguration */
     public Mono<ServerResponse> putBucketMetrics(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> request.bodyToMono(MetricsConfigurationCommand.class)
-                .flatMap(cmd -> {
-                    var metricsConfig = new BucketMetricsConfiguration(bucket,
-                        cmd.id(), cmd.filter(), cmd.storageClass(), cmd.tags());
-                    var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
-                    return bucketService.createBucket(updatedBucket)
-                        .then(ServerResponse.ok().build());
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return putConfig(request, MetricsConfigurationCommand.class, (b, cmd) -> {
+            var metricsConfig = new BucketMetricsConfiguration(b.name(),
+                cmd.id(), cmd.filter(), cmd.storageClass(), cmd.tags());
+            var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
+            return bucketService.createBucket(updatedBucket)
+                .then(ServerResponse.ok().build());
+        });
     }
 
     /** DELETE /{bucket}?metrics — DeleteBucketMetricsConfiguration */
     public Mono<ServerResponse> deleteBucketMetrics(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> {
-                var updatedBucket = new Bucket(b.id(), b.name(), b.region(), b.storageClass(),
-                    b.versioningEnabled(), b.encryptionEnabled(), null, b.events());
-                return bucketService.createBucket(updatedBucket)
-                    .then(ServerResponse.noContent().build());
-            })
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return deleteConfig(request);
     }
 
     // ─────────────────────────────────────────────────────
@@ -880,46 +626,25 @@ public class S3BucketConfigHandler {
 
     /** GET /{bucket}?intelligent-tiering — GetBucketIntelligentTieringConfiguration */
     public Mono<ServerResponse> getBucketIntelligentTiering(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> Mono.justOrEmpty(b.configuration())
-                .flatMap(config -> {
-                    if (!config.hasCors()) {
-                        return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchIntelligentTieringConfiguration",
-                            "The intelligent-tiering configuration does not exist");
-                    }
-                    return ServerResponse.ok()
-                        .contentType(MediaType.APPLICATION_XML)
-                        .bodyValue(BucketIntelligentTieringQuery.from(Optional.empty()));
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return getConfig(request, "NoSuchIntelligentTieringConfiguration", "The intelligent-tiering configuration does not exist",
+            config -> ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(BucketIntelligentTieringQuery.from(Optional.empty())));
     }
 
     /** PUT /{bucket}?intelligent-tiering — PutBucketIntelligentTieringConfiguration */
     public Mono<ServerResponse> putBucketIntelligentTiering(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> request.bodyToMono(IntelligentTieringConfigurationCommand.class)
-                .flatMap(cmd -> {
-                    var intelligentTieringConfig = new BucketIntelligentTieringConfiguration(
-                        cmd.id(), cmd.status(), cmd.tieringDefinitions());
-                    var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
-                    return bucketService.createBucket(updatedBucket)
-                        .then(ServerResponse.ok().build());
-                }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return putConfig(request, IntelligentTieringConfigurationCommand.class, (b, cmd) -> {
+            var intelligentTieringConfig = new BucketIntelligentTieringConfiguration(
+                cmd.id(), cmd.status(), cmd.tieringDefinitions());
+            var updatedBucket = b.withConfiguration(new Bucket.Configuration(null)).clearEvents();
+            return bucketService.createBucket(updatedBucket)
+                .then(ServerResponse.ok().build());
+        });
     }
 
     /** DELETE /{bucket}?intelligent-tiering — DeleteBucketIntelligentTieringConfiguration */
     public Mono<ServerResponse> deleteBucketIntelligentTiering(ServerRequest request) {
-        var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> {
-                var updatedBucket = new Bucket(b.id(), b.name(), b.region(), b.storageClass(),
-                    b.versioningEnabled(), b.encryptionEnabled(), null, b.events());
-                return bucketService.createBucket(updatedBucket)
-                    .then(ServerResponse.noContent().build());
-            })
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+        return deleteConfig(request);
     }
 }
