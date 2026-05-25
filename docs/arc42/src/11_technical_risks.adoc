@@ -5,8 +5,8 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 | # | Risk | Impact | Mitigation |
 |---|---|---|---|
-| 1 | **Single-node in-memory only** — `InMemoryObjectRepository` non persiste su disco | Perdita dati al riavvio | Introdurre file persistence o R2DBC; `persistence-context-*` moduli placeholder pronti |
-| 2 | **Limited S3 coverage** — 30/111 operations implementate | AWS CLI/SDK features non supportate | Fasi C (Multipart), D (Bucket Config), E (Analytics), F (Advanced) pianificate in PLAN.md |
-| 3 | **In-memory content store** — oggetti grandi in ConcurrentHashMap | OutOfMemoryError per file > 1GB | Flush su file system, chunked streaming, content store con file persistence |
-| 4 | **No authentication/authorization** — AWS SigV4 non implementato | Uso solo in ambienti trusted | Implementare SigV4 verification middleware |
-| 5 | **No persistence-context integration** — moduli placeholder vuoti | Persistenza alternativa non testabile | Non priorità v1 — pianificato come bounded context separato |
+| 1 | **Single-node in-memory only** — reactive in-memory repositories do not persist to disk | Data loss on restart | Introduce file persistence or R2DBC; `persistence-context-*` placeholder modules ready |
+| 2 | **Limited S3 coverage** — 30/111 operations implemented | Unsupported AWS CLI/SDK features | Phases C (Multipart), D (Bucket Config), E (Analytics), F (Advanced) planned in PLAN.md |
+| 3 | **In-memory content store** — large objects stored in ConcurrentHashMap | OutOfMemoryError for files > 1GB | Flush to file system, chunked streaming, content store with file persistence |
+| 4 | **No authentication/authorization** — AWS SigV4 not implemented | Usable only in trusted environments | Implement SigV4 verification middleware |
+| 5 | **No persistence-context integration** — placeholder modules are empty | Alternative persistence untestable | Not a v1 priority — planned as a separate bounded context |

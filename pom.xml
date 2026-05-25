@@ -9,15 +9,17 @@
     <packaging>pom</packaging>
 
     <modules>
-        <module>s3-api</module>
+        <module>s3-reactive-api-adapter</module>
 
         <module>object-storage-domain</module>
-        <module>object-storage-application</module>
-        <module>object-storage-infrastructure</module>
         <module>persistence-context-domain</module>
         <module>persistence-context-application</module>
         <module>persistence-context-infrastructure</module>
         <module>bootstrap-application</module>
+
+        <module>object-storage-reactive-repository-application</module>
+        <module>object-storage-reactive-application</module>
+        <module>object-storage-reactive-infrastructure</module>
     </modules>
 
     <properties>
@@ -25,6 +27,7 @@
         <spring-boot.version>4.0.0</spring-boot.version>
         <junit-jupiter.version>5.11.0</junit-jupiter.version>
         <cucumber.version>7.18.0</cucumber.version>
+        <junit-platform.version>1.11.0</junit-platform.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>21</maven.compiler.release>
     </properties>
@@ -55,7 +58,7 @@
             <!-- Internal module dependencies -->
             <dependency>
                 <groupId>com.example</groupId>
-                <artifactId>s3-api</artifactId>
+                <artifactId>s3-reactive-api-adapter</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -63,20 +66,38 @@
                 <artifactId>object-storage-domain</artifactId>
                 <version>${project.version}</version>
             </dependency>
-            <dependency>
-                <groupId>com.example</groupId>
-                <artifactId>object-storage-application</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.example</groupId>
-                <artifactId>object-storage-infrastructure</artifactId>
-                <version>${project.version}</version>
-            </dependency>
+
             <dependency>
                 <groupId>com.example</groupId>
                 <artifactId>bootstrap-application</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.example</groupId>
+                <artifactId>object-storage-reactive-repository-application</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.example</groupId>
+                <artifactId>object-storage-reactive-application</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.example</groupId>
+                <artifactId>object-storage-reactive-infrastructure</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.projectreactor</groupId>
+                <artifactId>reactor-test</artifactId>
+                <version>3.6.0</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.junit.platform</groupId>
+                <artifactId>junit-platform-suite</artifactId>
+                <version>${junit-platform.version}</version>
+                <scope>test</scope>
             </dependency>
             <dependency>
                 <groupId>io.cucumber</groupId>

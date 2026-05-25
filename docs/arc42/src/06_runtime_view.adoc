@@ -10,54 +10,63 @@ The runtime view describes the key interaction scenarios of the Magrathea Object
 .Runtime Diagram — CreateBucket
 image::../../c4/images/CreateBucketRuntime.png[CreateBucket Runtime, width=600]
 
-**Flusso:**
-1. User → s3-api-adapter: `PUT /{bucket}`
-2. s3-api-adapter → bucket-managment: CreateBucket use case
-3. bucket-managment → in-memory-repository: Save Bucket aggregate
+**Flow:**
+1. User → s3-reactive-api-adapter: `PUT /{bucket}`
+2. s3-reactive-api-adapter → reactive-bucket-management: CreateBucket use case
+3. reactive-bucket-management → reactive-repository-application: Save Bucket aggregate via command repository
+4. reactive-repository-application → reactive-infrastructure: Persist Bucket aggregate
 
 === Scenario 2 — PutObject
 
 .Runtime Diagram — PutObject
 image::../../c4/images/PutObjectRuntime.png[PutObject Runtime, width=600]
 
-**Flusso:**
-1. User → s3-api-adapter: `PUT /{bucket}/{key}`
-2. s3-api-adapter → bucket-managment: Verify bucket exists
-3. bucket-managment → in-memory-repository: Read bucket metadata
-4. s3-api-adapter → object-store: PutObject use case
-5. object-store → in-memory-repository: Save object metadata and bytes
+**Flow:**
+1. User → s3-reactive-api-adapter: `PUT /{bucket}/{key}`
+2. s3-reactive-api-adapter → reactive-bucket-management: Verify bucket exists
+3. reactive-bucket-management → reactive-repository-application: Read bucket metadata via query repository
+4. reactive-repository-application → reactive-infrastructure: Read bucket from persistence
+5. s3-reactive-api-adapter → reactive-object-store: PutObject use case
+6. reactive-object-store → reactive-repository-application: Save object metadata and bytes via command repository
+7. reactive-repository-application → reactive-infrastructure: Persist object metadata and bytes
 
 === Scenario 3 — GetObject
 
 .Runtime Diagram — GetObject
 image::../../c4/images/GetObjectRuntime.png[GetObject Runtime, width=600]
 
-**Flusso:**
-1. User → s3-api-adapter: `GET /{bucket}/{key}`
-2. s3-api-adapter → bucket-managment: Verify bucket exists
-3. bucket-managment → in-memory-repository: Read bucket metadata
-4. s3-api-adapter → object-store: GetObject use case
-5. object-store → in-memory-repository: Read object metadata and bytes
+**Flow:**
+1. User → s3-reactive-api-adapter: `GET /{bucket}/{key}`
+2. s3-reactive-api-adapter → reactive-bucket-management: Verify bucket exists
+3. reactive-bucket-management → reactive-repository-application: Read bucket metadata via query repository
+4. reactive-repository-application → reactive-infrastructure: Read bucket from persistence
+5. s3-reactive-api-adapter → reactive-object-store: GetObject use case
+6. reactive-object-store → reactive-repository-application: Read object metadata and bytes via query repository
+7. reactive-repository-application → reactive-infrastructure: Read object metadata and bytes from persistence
 
 === Scenario 4 — Multipart Upload Lifecycle
 
 .Runtime Diagram — Multipart Upload
 image::../../c4/images/MultipartUploadRuntime.png[MultipartUpload Runtime, width=600]
 
-**Flusso:**
-1. User → s3-api-adapter: POST/PUT/GET/DELETE multipart endpoints
-2. s3-api-adapter → object-store: Multipart upload lifecycle use cases
-3. object-store → in-memory-repository: Read/write multipart upload state
+**Flow:**
+1. User → s3-reactive-api-adapter: POST/PUT/GET/DELETE multipart endpoints
+2. s3-reactive-api-adapter → reactive-object-store: Multipart upload lifecycle use cases
+3. reactive-object-store → reactive-repository-application: Write multipart upload state via command repository
+4. reactive-object-store → reactive-repository-application: Read multipart upload state via query repository
+5. reactive-repository-application → reactive-infrastructure: Persist multipart upload state
+6. reactive-repository-application → reactive-infrastructure: Read multipart upload state from persistence
 
 === Scenario 6 — Bucket Configuration (CORS, Lifecycle, Policy, Encryption, Logging, Website, Notification, Replication, Request Payment, Ownership Controls, Public Access Block, Accelerate, Analytics, Inventory, Metrics, Intelligent-Tiering)
 
 .Runtime Diagram — Bucket Configuration
 image::../../c4/images/BucketConfigurationRuntime.png[Bucket Configuration Runtime, width=600]
 
-**Flusso:**
-1. User → s3-api-adapter: `GET/PUT/DELETE /{bucket}?{config}` with query parameter identifying the configuration type
-2. s3-api-adapter → bucket-managment: `S3BucketConfigHandler` dispatches to `BucketService.{get|put|delete}{Config}` based on query parameter
-3. bucket-managment → in-memory-repository: `BucketRepositoryImpl.{find|save|delete}{Config}` reads/writes configuration value objects
+**Flow:**
+1. User → s3-reactive-api-adapter: `GET/PUT/DELETE /{bucket}?{config}` with query parameter identifying the configuration type
+2. s3-reactive-api-adapter → reactive-bucket-management: `S3BucketConfigHandler` dispatches to `ReactiveBucketService.{get|put|delete}{Config}` based on query parameter
+3. reactive-bucket-management → reactive-repository-application: `BucketCommandRepository.{save|delete}` or `BucketQueryRepository.{find}` reads/writes configuration via the Bucket aggregate root
+4. reactive-repository-application → reactive-infrastructure: `InMemoryReactiveBucketRepository` persists updated Bucket aggregate with configuration
 
 **Configuration types and query parameters:**
 

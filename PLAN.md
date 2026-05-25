@@ -250,6 +250,38 @@ Goal: support common AWS CLI object workflows beyond current CRUD.
 | Metrics | GetBucketMetricsConfiguration, PutBucketMetricsConfiguration, DeleteBucketMetricsConfiguration | ✅ Implemented, Cucumber tested |
 | Intelligent-Tiering | GetBucketIntelligentTieringConfiguration, PutBucketIntelligentTieringConfiguration, DeleteBucketIntelligentTieringConfiguration | ✅ Implemented, Cucumber tested |
 
+### Course Correction — ADR 0010
+
+ADR 0010 (2026-05-24) identified quality and completeness issues in the ADR 0009 reactive migration implementation. A full course correction is required before Phase E can be closed and before Phase F work begins.
+
+#### Derailments Identified
+
+| # | Derailment | Description |
+|---|---|---|
+| 1 | **Stub methods** | `InMemoryReactiveBucketRepository.saveConfiguration`/`deleteConfiguration` are empty stubs; other repository methods are simplistic |
+| 2 | **Aggregate root integrity** | Objects inside aggregate roots (`Bucket`, `S3Object`, `MultipartUpload`) are independent — state transitions don't pass through the main aggregate root, domain events are not notified/tracked |
+| 3 | **Reactive repository interfaces too simplistic** | Interfaces don't leverage backpressure, error handling, operator fusion, etc. |
+| 4 | **C4 diagrams not aligned** | C4 diagrams not updated to reflect current architecture state |
+| 5 | **ARC42 not aligned** | ARC42 likely out of date with current implementation |
+
+#### Corrective Actions
+
+| # | Action | Owner |
+|---|---|---|
+| 1 | All repository implementations must have real (non-stub) method bodies with proper in-memory storage and reactive patterns | java-infra-coder |
+| 2 | Aggregate roots must enforce state transitions through the main aggregate object with domain event notification | java-domain-coder |
+| 3 | Redesign reactive repository interfaces to fully leverage reactive capabilities (`Flux`/`Mono` operators, backpressure, error handling) | java-infra-coder |
+| 4 | Update C4 diagrams to reflect actual current architecture | documenter / c4model |
+| 5 | Update ARC42 to align with current state | documenter |
+| 6 | Write sophisticated tests matching real behavior | java-tester |
+
+#### Impact on Timeline
+
+- All ADR 0009 implementation code from Steps 3-5-6 needs review and rework.
+- Phase E closure is blocked until corrective actions complete.
+- Phase F work is deferred until Phase E closure and reactive migration rework are complete.
+- Timeline estimate: **significant rework** of the reactive migration (estimated 2–3 additional development cycles).
+
 ### Phase F — Advanced / Specialized Operations
 
 | Operation |
@@ -351,20 +383,21 @@ mvn -N verify -Paws-cli-tests
 
 ## Phase E Completion — Remaining Work
 
-Phase E implemented Analytics, Inventory, Metrics, and Intelligent-Tiering configuration operations (14 operations) in `S3BucketConfigHandler` with Cucumber tests passing. The Phase E closure list now has the following status: items 4, 5, and 7 are complete; item 6 remains paused pending ADR 0009; item 3 remains the separate AWS CLI Maven-profile verification gate.
+Phase E implemented Analytics, Inventory, Metrics, and Intelligent-Tiering configuration operations (14 operations) in `S3BucketConfigHandler` with Cucumber tests passing. The Phase E closure list now has the following status: items 4, 5, and 7 are complete; item 3 remains the separate AWS CLI Maven-profile verification gate. Item 6 (Reactive End-to-End Migration per ADR 0009) has been started but requires rework per ADR 0010 course correction — see the Course Correction section above and the Post-ADR 0010 Status section below.
 
-### Work Allowed Before ADR 0009 Is Applied
+### Post-ADR 0010 Status — Course Correction Required
 
-ADR 0009 is still proposed. Until it is accepted and applied, only non-conflicting verification and documentation items may proceed. Current status:
+ADR 0009 is now **Accepted** (2026-05-24) but its implementation produced incomplete code with stub methods, missing aggregate root state transitions, and overly simplistic reactive patterns. ADR 0010 (2026-05-24) prescribes corrective actions (see Course Correction section above). Item 6 (Reactive End-to-End Migration) is **REWORK NEEDED** per ADR 0010.
 
-| Item | Status | Why it does not conflict with ADR 0009 | Gate / verification commands |
-|---|---|---|---|
-| 3. Verify `mvn verify -Paws-cli-tests` after Phase E additions | Pending | External AWS CLI compatibility verification only; no module or reactive architecture change. | Start the app with `java -jar bootstrap-application/target/bootstrap-application-1.0.0-SNAPSHOT.jar`, then run `mvn -N verify -Paws-cli-tests`. |
-| 4. New workflow rule: AWS CLI test sub-phase after Cucumber | ✅ Completed | Process/documentation rule only. | `grep -n "AWS CLI test sub-phase" PLAN.md` |
-| 5. `api-coverage.md` complete review — headers, params, status codes | ✅ Completed | Documentation-only API coverage work; independent of the ADR 0009 module split. | `grep -n "Status Code" docs/api-coverage.md`; manual review that operations 1–84 include required headers, params, bodies, and status codes. |
-| 7. Status code documentation for all 84 operations | ✅ Completed | Documentation-only work completed together with item 5. | `grep -n "Status Code" docs/api-coverage.md`; manual review that every operation section contains a status-code table. |
+Remaining Phase E closure items:
 
-Item 6 remains intentionally paused because ADR 0009 supersedes the `CompletableFuture` / `Mono.fromFuture()` direction with native `Mono`/`Flux` reactive modules.
+| Item | Status | Gate / verification commands |
+|---|---|---|
+| 3. Verify `mvn verify -Paws-cli-tests` after Phase E additions | Pending | Start the app with `java -jar bootstrap-application/target/bootstrap-application-1.0.0-SNAPSHOT.jar`, then run `mvn -N verify -Paws-cli-tests`. |
+| 4. New workflow rule: AWS CLI test sub-phase after Cucumber | ✅ Completed | `grep -n "AWS CLI test sub-phase" PLAN.md` |
+| 5. `api-coverage.md` complete review — headers, params, status codes | ✅ Completed | `grep -n "Status Code" docs/api-coverage.md`; manual review that operations 1–84 include required headers, params, bodies, and status codes. |
+| 6. Reactive end-to-end migration (ADR 0009 → ADR 0010) — native `Mono`/`Flux` reactive modules with CQRS | ⚠️ REWORK NEEDED | ADR 0010 course correction (2026-05-24) — see Course Correction section above |
+| 7. Status code documentation for all 84 operations | ✅ Completed | `grep -n "Status Code" docs/api-coverage.md`; manual review that every operation section contains a status-code table. |
 
 ### 1. Dead Code Removal ✅ Completed — `S3BucketConfigListHandler.java`
 
@@ -511,9 +544,9 @@ Each operation section lists the operation-category status codes and marks each 
 
 ---
 
-### 6. Blocking Reactive Methods — Convert to `CompletableFuture` / `Mono.fromFuture()`
+### 6. Reactive End-to-End Migration (ADR 0009 → ADR 0010) — Native `Mono`/`Flux` Reactive Modules
 
-**ADR 0009 alignment note:** Pause this item until ADR 0009 is accepted and applied. The `CompletableFuture` / `Mono.fromFuture()` target conflicts with, and is superseded by, ADR 0009's native `Mono`/`Flux` reactive repository, application, infrastructure, and API-adapter modules. Do not refactor the current classic services/repositories toward `CompletableFuture` as standalone work; resume this area only through the ADR 0009 migration plan.
+**Status: ⚠️ REWORK NEEDED — ADR 0010 course correction** — ADR 0009 implementation produced incomplete code (stub methods, missing aggregate root state transitions, simplistic reactive patterns). ADR 0010 (2026-05-24) prescribes corrective actions. See course correction section above.
 
 **Problem:** All handlers in `s3-api` use the pattern:
 
@@ -524,37 +557,49 @@ Mono.fromCallable(() -> {
 }).subscribeOn(Schedulers.boundedElastic())
 ```
 
-This defeats the purpose of reactive programming. Instead of chaining reactive operators, every handler wraps blocking calls in `Mono.fromCallable` and offloads to a thread pool. This pattern was counted in `S3BucketConfigHandler.java` (~68 occurrences) and `S3BucketOperationsHandler.java` (~20 occurrences).
+This defeats the purpose of reactive programming. Instead of chaining reactive operators, every handler wraps blocking calls in `Mono.fromCallable` and offloads to a thread pool.
 
-**Fix strategy:**
+**Fix strategy (per ADR 0009):**
 
 | Layer | Current pattern | Target pattern |
 |---|---|---|
-| **Service layer** (`BucketService`, `ObjectService`) | Returns `Optional<T>` or `T` synchronously | Returns `CompletableFuture<T>` or `Mono<T>` |
-| **Handler layer** | `Mono.fromCallable(() -> service.method().join()).subscribeOn(...)` | `Mono.fromFuture(service.methodAsync())` |
-| **Repository layer** | Returns `Optional<T>` | Returns `CompletableFuture<Optional<T>>` |
+| **Reactive repository interfaces** (`object-storage-reactive-repository-application`) | `CompletableFuture<Optional<T>>` in `object-storage-domain` | Native `Mono<T>` / `Flux<T>` with CQRS split (Command + Query per aggregate) |
+| **Reactive application services** (`object-storage-reactive-application`) | `.join()` bridge in `BucketService`/`ObjectService` | No blocking, methods return `Mono<T>` / `Flux<T>` natively |
+| **Reactive infrastructure** (`object-storage-reactive-infrastructure`) | `InMemoryBucketRepository` with blocking impls | Reactive repository implementations (combined or split Command/Query) |
+| **Handler layer** (`s3-reactive-api-adapter`) | `Mono.fromCallable(() -> service.method().join()).subscribeOn(...)` | Direct `Mono`/`Flux` chaining, no `.fromCallable`, no `.subscribeOn` |
 
-**Required changes per service method:**
+**New modules to create:**
 
-| Service method | Current return type | Target return type | Handler change |
-|---|---|---|---|
-| `BucketService.findBucket(name)` | `Optional<S3Bucket>` | `CompletableFuture<Optional<S3Bucket>>` | `Mono.fromFuture()` |
-| `BucketService.createBucket(...)` | `S3Bucket` | `CompletableFuture<S3Bucket>` | `Mono.fromFuture()` |
-| `BucketService.deleteBucket(name)` | `boolean` | `CompletableFuture<Boolean>` | `Mono.fromFuture()` |
-| `ObjectService.putObject(...)` | `S3Object` | `CompletableFuture<S3Object>` | `Mono.fromFuture()` |
-| `ObjectService.getObject(...)` | `Optional<S3Object>` | `CompletableFuture<Optional<S3Object>>` | `Mono.fromFuture()` |
-| ... | (all remaining methods) | (same pattern) | (same pattern) |
+| Module | Purpose |
+|---|---|
+| `object-storage-reactive-repository-application` | Reactive repository interfaces with `Mono`/`Flux`/`DataBuffer` and CQRS command/query split |
+| `object-storage-reactive-application` | Reactive application services — no `.join()`, no blocking |
+| `object-storage-reactive-infrastructure` | Reactive repository implementations |
+| `s3-reactive-api-adapter` (rename from `s3-api`) | Updated handlers using reactive services |
 
-**Domain layer impact:** Repository interfaces (`BucketRepository`, `S3ObjectRepository`) must also return `CompletableFuture` so the entire chain is reactive from bottom to top.
+**Domain cleanup:** Remove repository interfaces from `object-storage-domain` — keep only aggregates, value objects, domain events (ADR 0002 purity).
 
 **Verification:**
 
 ```bash
-# After fix, grep should show zero occurrences of:
+# After migration, grep should show zero occurrences of blocking patterns in the reactive path:
 grep "Mono.fromCallable" s3-api/src/main/java/**/*.java
 grep "\.join()" s3-api/src/main/java/**/*.java
 grep "subscribeOn.*boundedElastic" s3-api/src/main/java/**/*.java
+
+# All Cucumber tests pass with reactive chain (no .join() in application path)
+mvn test -pl s3-api
 ```
+
+#### Sub-items (ADR 0010 course correction)
+
+| # | Item | Owner | Priority | Status |
+|---|---|---|---|---|
+| 6a | Fix repository implementations — remove stubs, add real reactive patterns with proper in-memory storage | java-infra-coder | High | Pending — requires ADR 0010 corrective action 1 |
+| 6b | Fix aggregate root state transitions with domain event notification | java-domain-coder | High | Pending — requires ADR 0010 corrective action 2 |
+| 6c | Redesign reactive repository interfaces for full reactive capability (backpressure, error handling, operator fusion) | java-infra-coder | High | Pending — requires ADR 0010 corrective action 3 |
+| 6d | Update C4 diagrams and ARC42 documentation | documenter / c4model | Medium | Pending — requires ADR 0010 corrective actions 4, 5 |
+| 6e | Write sophisticated tests matching real behavior | java-tester | High | Pending — requires ADR 0010 corrective action 6 |
 
 ---
 
@@ -608,7 +653,7 @@ grep "subscribeOn.*boundedElastic" s3-api/src/main/java/**/*.java
 | 3 | Verify `mvn verify -Paws-cli-tests` after additions | java-tester | High | #2 | Pending |
 | 4 | New workflow rule: CLI test sub-phase after Cucumber | java-planner / documenter | Medium | None (documentation only) | ✅ Completed |
 | 5 | `api-coverage.md` complete review — headers, params, status codes | documenter | High | None | ✅ Completed |
-| 6 | Blocking reactive methods → `CompletableFuture` + `Mono.fromFuture()` — paused; superseded by ADR 0009 native `Mono`/`Flux` migration | java-infra-coder | Medium | ADR 0009 native reactive migration plan | ⏸️ Paused pending ADR 0009 |
+| 6 | Reactive end-to-end migration (ADR 0009 → ADR 0010) — native `Mono`/`Flux` reactive modules with CQRS | java-infra-coder, java-domain-coder, java-tester, documenter | High | ADR 0010 course correction (2026-05-24) | ⚠️ REWORK NEEDED — ADR 0010 course correction |
 | 7 | Status code documentation for all 84 operations | documenter | Medium | #5 (completed together) | ✅ Completed |
 
 

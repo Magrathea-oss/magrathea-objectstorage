@@ -5,56 +5,65 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 === Level 1 — Container Diagram
 
-Il sistema è composto da quattro container runtime:
+The system is composed of five container runtime modules:
 
 .C2 Container Diagram — Magrathea ObjectStorage
 image::../../c4/images/Container.png[Container Diagram, width=600]
 
-==== s3-api-adapter (HTTP adapter)
+==== s3-reactive-api-adapter (HTTP adapter)
 
 **Blackbox Description:**
-Espone l'API REST S3-compatible via RouterFunction WebFlux. Traduce richieste HTTP/XML/binary in chiamate ai servizi applicativi. Serializza le risposte XML con Jackson 3.
+Exposes the S3-compatible REST API via RouterFunction WebFlux. Translates HTTP/XML/binary requests into calls to reactive application services. Serializes XML responses with Jackson 3.
 
-- **Provided Interface:** S3 REST API (84 endpoints su 111)
-- **Required Interface:** ObjectService, MultipartUploadService, BucketService
+- **Provided Interface:** S3 REST API (84 endpoints out of 111)
+- **Required Interface:** ReactiveBucketService, ReactiveObjectService, ReactiveMultipartUploadService
 - **Technology:** Spring Boot 4 WebFlux, Java 21, RouterFunction, Jackson 3 XML
 
-==== object-store (Object storage capability)
+==== reactive-object-store (Reactive object storage capability)
 
 **Blackbox Description:**
-Implementa le use case di object CRUD, multipart upload, e content retrieval. Contiene i service application, gli aggregate di dominio (S3Object, MultipartUpload), e i port di repository.
+Implements reactive object CRUD, multipart upload, and content retrieval use cases using Mono/Flux. Contains reactive application services (ReactiveObjectService, ReactiveMultipartUploadService), domain aggregates (S3Object, MultipartUpload), and repository ports.
 
-- **Provided Interface:** ObjectService, MultipartUploadService
-- **Required Interface:** BucketRepository (read), S3ObjectRepository, MultipartUploadRepository
-- **Technology:** Java 21, Spring @Service, domain aggregates
+- **Provided Interface:** ReactiveObjectService, ReactiveMultipartUploadService
+- **Required Interface:** BucketRepository (read), S3ObjectCommandRepository, S3ObjectQueryRepository, MultipartUploadCommandRepository, MultipartUploadQueryRepository
+- **Technology:** Java 21, Spring @Service, Reactor Mono/Flux, domain aggregates
 
-==== bucket-managment (Bucket management capability)
-
-**Blackbox Description:**
-Implementa le use case di bucket lifecycle, metadata (ACL, tagging), configurazione (CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate), e advanced configuration (analytics, inventory, metrics, intelligent-tiering). Contiene BucketService, gli aggregate di dominio (Bucket, BucketConfiguration, CorsConfiguration, BucketAnalyticsConfiguration, BucketInventoryConfiguration, BucketMetricsConfiguration, BucketIntelligentTieringConfiguration), e i port di repository.
-
-- **Provided Interface:** BucketService
-- **Required Interface:** BucketRepository
-- **Technology:** Java 21, Spring @Service, domain aggregates
-
-==== in-memory-repository (In-process database)
+==== reactive-bucket-management (Reactive bucket management capability)
 
 **Blackbox Description:**
-Implementa i repository di dominio in-memory con ConcurrentHashMap. Non è un database esterno — viene resettato quando il processo termina.
+Implements reactive bucket lifecycle, metadata (ACL, tagging), configuration (CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate), and advanced configuration (analytics, inventory, metrics, intelligent-tiering) use cases using Mono/Flux. Contains ReactiveBucketService, the Bucket aggregate root (with inline Configuration nested record and domain events), and repository ports. Configuration lives inside the Bucket aggregate — there is no separate configuration service.
 
-- **Provided Interface:** BucketRepositoryImpl, InMemoryObjectRepository, InMemoryMultipartUploadRepository
-- **Required Interface:** Domain repository interfaces
-- **Technology:** Java 21, ConcurrentHashMap
+- **Provided Interface:** ReactiveBucketService
+- **Required Interface:** BucketCommandRepository, BucketQueryRepository
+- **Technology:** Java 21, Spring @Service, Reactor Mono/Flux, domain aggregates
+
+==== reactive-repository-application (CQS repository interfaces)
+
+**Blackbox Description:**
+Implements the Command-Query Separation (CQS) pattern at the application layer. Provides separate command and query repository interfaces for each aggregate (Bucket, S3Object, MultipartUpload). Bridges domain repository ports to reactive persistence adapters.
+
+- **Provided Interface:** BucketCommandRepository, BucketQueryRepository, S3ObjectCommandRepository, S3ObjectQueryRepository, MultipartUploadCommandRepository, MultipartUploadQueryRepository
+- **Required Interface:** Reactive persistence implementations
+- **Technology:** Java 21, Mono/Flux, CQS pattern
+
+==== reactive-infrastructure (In-process reactive database)
+
+**Blackbox Description:**
+Implements reactive in-memory repositories with ConcurrentHashMap using Mono/Flux. Not an external database — resets when the process stops.
+
+- **Provided Interface:** InMemoryReactiveBucketRepository, InMemoryReactiveS3ObjectRepository, InMemoryReactiveMultipartUploadRepository
+- **Required Interface:** CQS repository interfaces
+- **Technology:** Java 21, ConcurrentHashMap, Reactor
 - **Tag:** Database
 
-=== Level 2 — Component Diagram (s3-api-adapter)
+=== Level 2 — Component Diagram (s3-reactive-api-adapter)
 
-.C3 Component — s3-api-adapter
-image::../../c4/images/S3ApiAdapterComponents.png[S3 API Adapter Components, width=600]
+.C3 Component — s3-reactive-api-adapter
+image::../../c4/images/S3ReactiveApiAdapterComponents.png[S3 Reactive API Adapter Components, width=600]
 
 | Component | Responsibility |
 |---|---|
-| `S3ProxyRouter` | Entry point RouterFunction: definisce le route S3 e dispatches richieste agli handler |
+| `S3ProxyRouter` | Entry point RouterFunction: defines S3 routes and dispatches requests to handlers |
 | `S3BucketOperationsHandler` | Bucket lifecycle: create, delete, head, list, location, versioning |
 | `S3BucketMetadataHandler` | Bucket metadata: ACL, tagging |
 | `S3BucketConfigHandler` | Bucket configuration: CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate, analytics, inventory, metrics, intelligent-tiering |
@@ -63,55 +72,64 @@ image::../../c4/images/S3ApiAdapterComponents.png[S3 API Adapter Components, wid
 | `S3MultipartHandler` | Multipart upload lifecycle: initiate, upload, complete, abort, list |
 | `S3WebSupport` | Shared request predicates, parsing, lookup, error helpers |
 
-=== Level 2 — Component Diagram (object-store)
+=== Level 2 — Component Diagram (reactive-object-store)
 
-.C3 Component — object-store
-image::../../c4/images/ObjectStoreComponents.png[Object Store Components, width=600]
+.C3 Component — reactive-object-store
+image::../../c4/images/ReactiveObjectStoreComponents.png[Reactive Object Store Components, width=600]
 
 | Component | Responsibility |
 |---|---|
-| `ObjectService` | Application service: object CRUD, metadata, listing, content retrieval |
-| `MultipartUploadService` | Application service: multipart upload session e part lifecycle |
+| `ReactiveObjectService` | Reactive application service: object CRUD, metadata, listing, content retrieval via Mono/Flux |
+| `ReactiveMultipartUploadService` | Reactive application service: multipart upload session and part lifecycle via Mono/Flux |
 | `S3Object` | Domain aggregate: object identity, key, ETag, storage class, metadata |
 | `MultipartUpload` | Domain aggregate: multipart state, uploaded parts, completion/abort |
-| `S3ObjectRepository port` | Repository port: object metadata e binary content persistence |
+| `S3ObjectRepository port` | Repository port: object metadata and binary content persistence |
 | `MultipartUploadRepository port` | Repository port: multipart upload persistence |
-| `BucketRepository read port` | Read-side repository port: validazione esistenza bucket |
-| `DefaultS3ObjectWrite / DefaultS3ObjectContent` | Application-layer content boundary: Flux<DataBuffer> senza leak nel dominio |
+| `BucketRepository read port` | Read-side repository port: bucket existence validation |
+| `DefaultS3ObjectWrite / DefaultS3ObjectContent` | Application-layer content boundary: Flux<DataBuffer> without leaking into the domain |
 
-=== Level 2 — Component Diagram (bucket-managment)
+=== Level 2 — Component Diagram (reactive-bucket-management)
 
-.C3 Component — bucket-managment
-image::../../c4/images/BucketManagmentComponents.png[Bucket Management Components, width=600]
-
-| Component | Responsibility |
-|---|---|
-| `BucketService` | Application service: bucket lifecycle, versioning, CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate, analytics, inventory, metrics, intelligent-tiering configuration |
-| `Bucket` | Domain aggregate: bucket identity, name, region, storage class, versioning |
-| `BucketConfiguration` | Domain value object: bucket-level configuration (CORS rules) |
-| `CorsConfiguration` | Domain value object: CORS-related configuration |
-| `BucketAnalyticsConfiguration` | Domain value object: analytics configuration with filter rules |
-| `BucketInventoryConfiguration` | Domain value object: inventory configuration with format, frequency, enabled flag |
-| `BucketMetricsConfiguration` | Domain value object: metrics configuration with filter rules |
-| `BucketIntelligentTieringConfiguration` | Domain value object: intelligent-tiering configuration with tiering policy and auto-tiering status |
-| `BucketRepository port` | Repository port: bucket metadata e configuration persistence |
-
-=== Level 2 — Component Diagram (in-memory-repository)
-
-.C3 Component — in-memory-repository
-image::../../c4/images/PersistenceComponents.png[Persistence Components, width=600]
+.C3 Component — reactive-bucket-management
+image::../../c4/images/ReactiveBucketManagementComponents.png[Reactive Bucket Management Components, width=600]
 
 | Component | Responsibility |
 |---|---|
-| `BucketRepositoryImpl` | In-memory BucketRepository: ConcurrentHashMap per bucket aggregates e configuration |
-| `InMemoryObjectRepository` | In-memory S3ObjectRepository: ConcurrentHashMap per metadata e raw bytes |
-| `InMemoryMultipartUploadRepository` | In-memory MultipartUploadRepository: ConcurrentHashMap per upload sessions |
+| `ReactiveBucketService` | Reactive application service: bucket lifecycle, versioning, CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate, analytics, inventory, metrics, intelligent-tiering configuration via Mono/Flux |
+| `Bucket` | Domain aggregate root: bucket identity, name, region, storage class, versioning, encryption, inline Configuration. Emits ObjectStorageEvent domain events on state transitions |
+| `BucketRepository port` | Repository port: bucket metadata and configuration persistence |
+
+=== Level 2 — Component Diagram (reactive-repository-application)
+
+.C3 Component — reactive-repository-application
+image::../../c4/images/ReactiveRepositoryApplicationComponents.png[Reactive Repository Application Components, width=600]
+
+| Component | Responsibility |
+|---|---|
+| `BucketCommandRepository` | Command repository: bucket writes (save, delete) via Mono<Void> |
+| `BucketQueryRepository` | Query repository: bucket reads (find by id, find by name) via Mono<Bucket> |
+| `S3ObjectCommandRepository` | Command repository: object writes (save, delete) via Mono<Void> |
+| `S3ObjectQueryRepository` | Query repository: object reads (find by id, find by bucket, list) via Mono<Flux<S3Object>> |
+| `MultipartUploadCommandRepository` | Command repository: multipart upload writes (save, delete, update parts) via Mono<Void> |
+| `MultipartUploadQueryRepository` | Query repository: multipart upload reads (find by upload id, list by bucket) via Mono<Flux<MultipartUpload>> |
+
+=== Level 2 — Component Diagram (reactive-infrastructure)
+
+.C3 Component — reactive-infrastructure
+image::../../c4/images/ReactiveInfrastructureComponents.png[Reactive Infrastructure Components, width=600]
+
+| Component | Responsibility |
+|---|---|
+| `InMemoryReactiveBucketRepository` | In-memory reactive BucketRepository: ConcurrentHashMap for bucket aggregates and configuration via Mono/Flux |
+| `InMemoryReactiveS3ObjectRepository` | In-memory reactive S3ObjectRepository: ConcurrentHashMap for metadata and raw bytes via Mono/Flux |
+| `InMemoryReactiveMultipartUploadRepository` | In-memory reactive MultipartUploadRepository: ConcurrentHashMap for upload sessions via Mono/Flux |
 
 === Important Interfaces
 
 | Interface | Description | Connected Containers |
 |---|---|---|
-| S3 REST API | Public HTTP API — solo endpoint AWS S3-compatible | User ↔ s3-api-adapter |
-| Service calls | ObjectService, MultipartUploadService, BucketService | s3-api-adapter ↔ object-store/bucket-managment |
-| Repository interfaces | CompletableFuture-based domain ports | object-store/bucket-managment ↔ in-memory-repository |
-| Bucket lookup | Validazione esistenza bucket | object-store → bucket-managment |
+| S3 REST API | Public HTTP API — only AWS S3-compatible endpoints | User ↔ s3-reactive-api-adapter |
+| Reactive service calls | ReactiveBucketService, ReactiveObjectService, ReactiveMultipartUploadService via Mono/Flux | s3-reactive-api-adapter ↔ reactive-object-store / reactive-bucket-management |
+| CQS repository interfaces | Mono/Flux-based command and query ports | reactive-object-store / reactive-bucket-management ↔ reactive-repository-application |
+| Repository implementations | Reactive in-memory adapters | reactive-repository-application ↔ reactive-infrastructure |
+| Bucket lookup | Bucket existence validation | reactive-object-store → reactive-bucket-management |

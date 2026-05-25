@@ -2,7 +2,9 @@
 
 ## Status
 
-Proposed
+Accepted — 2026-05-24
+
+Accepted by java-planner on 2026-05-24. This ADR defines the target architecture for reactive end-to-end non-blocking via native Mono/Flux modules and CQRS repository split. All implementation phases should follow the module structure and migration plan defined herein.
 
 ## Context
 

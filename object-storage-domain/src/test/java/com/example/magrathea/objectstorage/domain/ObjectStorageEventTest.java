@@ -3,6 +3,7 @@ package com.example.magrathea.objectstorage.domain;
 import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
 import com.example.magrathea.objectstorage.domain.aggregate.S3Object;
 import com.example.magrathea.objectstorage.domain.event.ObjectStorageEvent;
+import com.example.magrathea.objectstorage.domain.valueobject.ContentDescriptor;
 import com.example.magrathea.objectstorage.domain.valueobject.ObjectKey;
 import org.junit.jupiter.api.Test;
 
@@ -56,6 +57,18 @@ class ObjectStorageEventTest {
     void sealedInterface_permitsOnlyKnownTypes() {
         // ObjectStorageEvent permits only BucketCreated, BucketDeleted, ObjectCreated, ObjectDeleted
         assertTrue(ObjectStorageEvent.class.isSealed());
+    }
+
+    @Test
+    void contentDescriptorCreated() {
+        var id = S3Object.Id.generate();
+        var descriptor = ContentDescriptor.of(100, "abc123", "content-id-1");
+        var event = new ObjectStorageEvent.ContentDescriptorCreated(id, descriptor, Instant.now());
+        assertEquals(id, event.id());
+        assertEquals(100, event.descriptor().size());
+        assertEquals("abc123", event.descriptor().md5Hash());
+        assertEquals("content-id-1", event.descriptor().contentId());
+        assertNotNull(event.occurredOn());
     }
 
     @Test

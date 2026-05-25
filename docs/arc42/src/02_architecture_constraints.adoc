@@ -9,7 +9,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 - **Spring Boot 4 WebFlux**: reactive non-blocking stack
 - **Maven multi-module**: flat sibling modules per bounded context
 - **S3-only HTTP API**: public HTTP endpoints MUST be AWS S3-compatible; non-S3 internal REST APIs are not allowed
-- **Pluggable S3 adapter**: S3 API lives in `s3-api` and is loaded via Spring Boot auto-configuration, not component scanning
+- **Pluggable S3 adapter**: S3 API lives in `s3-reactive-api-adapter` and is loaded via Spring Boot auto-configuration, not component scanning
 - **S3 API toggle**: `s3.api.enabled=false` disables S3 routes even when the module is present
 - **RouterFunction**: NO `@Controller`, NO `@RequestMapping` — functional WebFlux style only
 - **XML serialization**: Jackson 3 XML annotated record objects (`tools.jackson.dataformat.xml.annotation.*`) with `XmlMapper`, NOT StringBuilder
@@ -25,25 +25,25 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 === Infrastructure Constraints
 
-- `object-storage-infrastructure`: repository implementations only; no HTTP API routes
-- `InMemoryObjectRepository`: in-memory S3 object metadata + content store
+- `object-storage-reactive-infrastructure`: reactive repository implementations only; no HTTP API routes
+- `InMemoryReactiveS3ObjectRepository`: reactive in-memory S3 object metadata + content store via Mono/Flux
 - `ContentStore` is removed; object content is saved through `S3ObjectRepository.save(S3ObjectWrite)`
 - `S3ObjectWrite` and `S3ObjectContent` are domain interfaces without framework types; their application implementations carry `Flux<DataBuffer>`
 - byte[] only exists inside repository content storage internals, never in domain signatures
 
 === XML Serialization Constraints
 
-- **FORBIDDEN: regex XML parsing** — `java.util.regex.Pattern`, `String.contains()`, e `extractXmlValue()` per XML sono vietati. Tutto il parsing XML deve usare Jackson 3 codec
-- **JacksonXmlDecoder obbligatorio**: `JacksonXmlCodecConfig` deve registrare sia l'encoder (response) che il decoder (request) per XML. Senza decoder, `request.bodyToMono(Dto.class)` non funziona
-- **Command/Query DTO pattern**: ogni PUT/POST che riceve XML usa un Command DTO annotato Jackson XML; ogni GET che produce XML usa un Query DTO annotato. Niente DTO generici "request" o "response"
-- **DTO in file separati**: ogni Command/Query DTO vive in un file dedicato nel package `dto/command/` o `dto/query/`. Niente file unici (es. niente `S3Request.java`)
-- **Niente parser custom**: niente classi come `S3XmlParser` che avvolgono `XmlMapper`. Il framework deserializza direttamente — `S3XmlParser` e `S3XmlResponses` rimossi, ADR 0008 implementato e verificato
-- **Application DTO come Command**: i Command DTO XML possono coincidere con gli application DTO (es. `CorsConfigurationCommand`) se hanno le annotazioni Jackson XML necessarie
-- **Mapping nel handler**: la conversione da Command XML a domain value object avviene nell'handler, non in un parser separato
+- **FORBIDDEN: regex XML parsing** — `java.util.regex.Pattern`, `String.contains()`, and `extractXmlValue()` for XML are forbidden. All XML parsing must use Jackson 3 codec
+- **JacksonXmlDecoder mandatory**: `JacksonXmlCodecConfig` must register both the encoder (response) and the decoder (request) for XML. Without the decoder, `request.bodyToMono(Dto.class)` will not work
+- **Command/Query DTO pattern**: every PUT/POST receiving XML uses a Jackson XML-annotated Command DTO; every GET producing XML uses a Query DTO. No generic "request" or "response" DTOs
+- **DTOs in separate files**: each Command/Query DTO lives in a dedicated file in the `dto/command/` or `dto/query/` package. No monolithic files (e.g., no `S3Request.java`)
+- **No custom parsers**: no classes like `S3XmlParser` wrapping `XmlMapper`. The framework deserializes directly — `S3XmlParser` and `S3XmlResponses` removed, ADR 0008 implemented and verified
+- **Application DTO as Command**: XML Command DTOs may coincide with application DTOs (e.g., `CorsConfigurationCommand`) if they have the required Jackson XML annotations
+- **Mapping in handler**: conversion from XML Command to domain value object occurs in the handler, not in a separate parser
 
 === Testing Constraints
 
 - Domain tests: pure JUnit, NO Spring context
-- Integration tests: Cucumber BDD with WebTestClient in `s3-api`
+- Integration tests: Cucumber BDD with WebTestClient in `s3-reactive-api-adapter`
 - AWS CLI compatibility tests: `test-aws-cli.sh`, also runnable via Maven profile `aws-cli-tests`
 - Coverage verification: OpenClover profile `coverage`

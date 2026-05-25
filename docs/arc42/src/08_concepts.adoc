@@ -5,82 +5,102 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 === Hexagonal Architecture (Ports and Adapters)
 
-Il sistema segue il pattern hexagonal architecture con tre layer:
+The system follows the hexagonal architecture pattern with three layers:
 
-- **Dominio (core):** puro business logic, zero framework dependencies
-- **Applicazione:** orchestrazione, bridge CompletableFuture ↔ Mono/Flux
-- **Infrastruttura:** adapter HTTP (RouterFunction), adapter persistenza (in-memory)
+- **Domain (core):** pure business logic, zero framework dependencies
+- **Application:** orchestration, reactive bridge via Mono/Flux
+- **Infrastructure:** HTTP adapter (RouterFunction), persistence adapter (in-memory)
 
-Le dipendenze vanno solo verso l'interno: infrastruttura → applicazione → dominio.
+Dependencies flow only inward: infrastructure → application → domain.
 
 === Reactive Non-blocking I/O
 
-Tutta la gestione delle richieste HTTP è reattiva:
+All HTTP request handling is reactive:
 
-- RouterFunction invece di @Controller
-- Flux<DataBuffer> per upload/download binario (mai byte[] nei handler)
-- Mono.fromFuture() per bridge CompletableFuture → reattivo
-- Schedulers.boundedElastic() solo per operazioni che consumano il flusso in memoria
+- RouterFunction instead of @Controller
+- Flux<DataBuffer> for binary upload/download (never byte[] in handlers)
+- Mono/Flux throughout the reactive application and infrastructure layers
+- Schedulers.boundedElastic() only for operations that consume the stream in memory
 
 === Domain Purity
 
-Il modulo `object-storage-domain` è rigorosamente puro:
+The `object-storage-domain` module is strictly pure:
 
 - NO Spring imports
 - NO JPA, NO jakarta.validation
 - NO reactive types (Mono, Flux, DataBuffer)
-- Repository interfaces con CompletableFuture (standard Java async)
-- S3ObjectWrite/S3ObjectContent senza tipi framework
+- Repository interfaces with CompletableFuture (standard Java async)
+- S3ObjectWrite/S3ObjectContent without framework types
 
-I value object di configurazione avanzata (BucketAnalyticsConfiguration, BucketInventoryConfiguration, BucketMetricsConfiguration, BucketIntelligentTieringConfiguration) seguono lo stesso pattern: record immutabili, zero dipendenze framework, validation con Objects.requireNonNull.
+Advanced configuration value objects (BucketAnalyticsConfiguration, BucketInventoryConfiguration, BucketMetricsConfiguration, BucketIntelligentTieringConfiguration) follow the same pattern: immutable records, zero framework dependencies, validation with Objects.requireNonNull.
+
+=== Domain Events and State Transitions
+
+The Bucket aggregate root emits sealed `ObjectStorageEvent` records on every state transition:
+
+- `BucketCreated`, `BucketDeleted`, `BucketVersioningEnabled`, `BucketVersioningSuspended`
+- `BucketEncryptionEnabled`, `BucketConfigurationChanged`
+- State transitions return NEW immutable instances with accumulated events
+- `domainEvents()` retrieves pending events; `clearEvents()` returns a clean instance for persistence
+
+S3Object and MultipartUpload aggregates follow the same pattern with `ObjectCreated`, `ObjectDeleted`, `ObjectEtagUpdated`, `ObjectStorageClassChanged`, `ContentDescriptorCreated`, `PartUploaded`, `MultipartUploadCreated`, `MultipartUploadCompleted`, `MultipartUploadAborted`.
 
 === S3 API Compatibility
 
-Il sistema espone SOLO endpoint AWS S3-compatible:
+The system exposes ONLY AWS S3-compatible endpoints:
 
-- Stessa firma HTTP (metodi, header, query parameters)
-- Stesso formato XML (ListAllMyBucketsResult, ListBucketResult, Error, ecc.)
-- Stessa codifica degli errori (NoSuchBucket, NoSuchKey, BucketAlreadyExists)
-- Pluggable via Spring Boot auto-configuration (s3-api si attacca come modulo opzionale)
-- Toggle con `s3.api.enabled=false`
+- Same HTTP signature (methods, headers, query parameters)
+- Same XML format (ListAllMyBucketsResult, ListBucketResult, Error, etc.)
+- Same error encoding (NoSuchBucket, NoSuchKey, BucketAlreadyExists)
+- Pluggable via Spring Boot auto-configuration (s3-reactive-api-adapter attaches as an optional module)
+- Toggle with `s3.api.enabled=false`
 
 === Pluggable S3 API Module
 
-`s3-api` è un modulo auto-configurante che si innesta nel contesto Spring Boot:
+`s3-reactive-api-adapter` is an auto-configuring module that plugs into the Spring Boot context:
 
 - `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`
-- `S3ApiConfig` guardato da `@ConditionalOnClass({ BucketService.class, ObjectService.class })`
-- `s3.api.enabled=true` per default
-- Se `s3-api` non è nel classpath, le route S3 non vengono caricate
+- `S3ApiConfig` guarded by `@ConditionalOnClass({ ReactiveBucketService.class, ReactiveObjectService.class })`
+- `s3.api.enabled=true` by default
+- If `s3-reactive-api-adapter` is not in the classpath, S3 routes are not loaded
 
 === Command/Query DTO Pattern for XML Serialization
 
-Il sistema espone un'API XML S3-compatible dove ogni operazione ha un body XML strutturato. Invece di usare parser custom (regex, XmlMapper esplicito) o DTO generici "request"/"response", il sistema segue il pattern CQS (Command-Query Separation) del DDD:
+The system exposes an XML S3-compatible API where each operation has a structured XML body. Instead of using custom parsers (regex, explicit XmlMapper) or generic "request"/"response" DTOs, the system follows the DDD CQS (Command-Query Separation) pattern:
 
-- **Commands**: rappresentano l'intenzione di cambiare stato (PUT, POST, DELETE). Sono DTO annotati Jackson XML che il framework deserializza direttamente dal body HTTP. Esempi: `CorsConfigurationCommand`, `LifecycleConfigurationCommand`, `DeleteObjectsCommand`
-- **Queries**: rappresentano la risposta a una richiesta di lettura (GET). Sono DTO annotati Jackson XML che il framework serializza direttamente nel body HTTP. Esempi: `ListBucketsQuery`, `GetBucketCorsQuery`, `ErrorResponse`
+- **Commands**: represent the intention to change state (PUT, POST, DELETE). They are Jackson XML-annotated DTOs that the framework deserializes directly from the HTTP body. Examples: `CorsConfigurationCommand`, `LifecycleConfigurationCommand`, `DeleteObjectsCommand`
+- **Queries**: represent the response to a read request (GET). They are Jackson XML-annotated DTOs that the framework serializes directly into the HTTP body. Examples: `ListBucketsQuery`, `GetBucketCorsQuery`, `ErrorResponse`
 
-Vantaggi:
-- Zero parsing custom: Spring Boot 4 WebFlux deserializza/serializza con i codec registrati
-- DTO separati per operazione: ogni Command/Query vive nel proprio file, organizzato per dominio
-- Allineamento DDD: i Command esprimono intento, i Query esprimono lettura — semanticamente chiari
-- Manutenibilità: modificare un XML tag significa modificare un solo DTO, non un parser regex e un mapping separato
+Benefits:
+- Zero custom parsing: Spring Boot 4 WebFlux deserializes/serializes with registered codecs
+- Separate DTOs per operation: each Command/Query lives in its own file, organized by domain
+- DDD alignment: Commands express intent, Queries express reads — semantically clear
+- Maintainability: modifying an XML tag means modifying a single DTO, not a regex parser and a separate mapping
 
 === XML Codec Infrastructure
 
-Spring Boot 4 WebFlux gestisce la serializzazione XML tramite codec registrati in `JacksonXmlCodecConfig`:
+Spring Boot 4 WebFlux handles XML serialization via codecs registered in `JacksonXmlCodecConfig`:
 
-- **JacksonXmlEncoder**: serializza response DTO in XML (gia' presente)
-- **JacksonXmlDecoder**: deserializza request body in Command DTO (aggiunto con ADR 0008)
-- Entrambi usano `tools.jackson.dataformat:jackson-dataformat-xml` (Jackson 3, non Jackson 2)
-- I DTO usano annotazioni `tools.jackson.dataformat.xml.annotation.*` (`@JacksonXmlRootElement`, `@JacksonXmlProperty`, `@JacksonXmlElementWrapper`, `@JacksonXmlText`)
+- **JacksonXmlEncoder**: serializes response DTOs into XML
+- **JacksonXmlDecoder**: deserializes request body into Command DTOs (added with ADR 0008)
+- Both use `tools.jackson.dataformat:jackson-dataformat-xml` (Jackson 3, not Jackson 2)
+- DTOs use `tools.jackson.dataformat.xml.annotation.*` annotations (`@JacksonXmlRootElement`, `@JacksonXmlProperty`, `@JacksonXmlElementWrapper`, `@JacksonXmlText`)
 
-Il decoder permette a `request.bodyToMono(CorsConfigurationCommand.class)` di funzionare per XML — il framework legge il body, lo passa al decoder XML, e produce il record annotato. Nessuna chiamata esplicita a `XmlMapper`.
+The decoder allows `request.bodyToMono(CorsConfigurationCommand.class)` to work for XML — the framework reads the body, passes it to the XML decoder, and produces the annotated record. No explicit call to `XmlMapper`.
+
+=== Command-Query Separation (CQS) Repository Pattern
+
+The application layer separates write and read concerns at the repository level:
+
+- **Command repositories**: `BucketCommandRepository`, `S3ObjectCommandRepository`, `MultipartUploadCommandRepository` — accept Mono<Void> return types for write operations
+- **Query repositories**: `BucketQueryRepository`, `S3ObjectQueryRepository`, `MultipartUploadQueryRepository` — return Mono<T> or Flux<T> for read operations
+
+This enables independent optimization of read and write paths, and aligns with CQS principles at the persistence boundary.
 
 === Testing Strategy
 
-Tre livelli di test:
+Three levels of testing:
 
-1. **Dominio:** JUnit puro, zero Spring — testano invarianti e regole di business
-2. **Integrazione S3:** Cucumber BDD con WebTestClient — verificano endpoint HTTP
-3. **Compatibilità AWS CLI:** `test-aws-cli.sh` script bash + `mvn verify -Paws-cli-tests`
+1. **Domain:** Pure JUnit, zero Spring — test invariants and business rules
+2. **S3 Integration:** Cucumber BDD with WebTestClient — verify HTTP endpoints
+3. **AWS CLI Compatibility:** `test-aws-cli.sh` bash script + `mvn verify -Paws-cli-tests`

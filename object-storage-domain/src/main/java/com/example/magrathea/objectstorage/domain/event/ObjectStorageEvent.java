@@ -3,6 +3,7 @@ package com.example.magrathea.objectstorage.domain.event;
 import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
 import com.example.magrathea.objectstorage.domain.aggregate.MultipartUpload;
 import com.example.magrathea.objectstorage.domain.aggregate.S3Object;
+import com.example.magrathea.objectstorage.domain.valueobject.ContentDescriptor;
 import com.example.magrathea.objectstorage.domain.valueobject.ObjectKey;
 import com.example.magrathea.objectstorage.domain.valueobject.UploadId;
 
@@ -20,6 +21,17 @@ public sealed interface ObjectStorageEvent {
     record ObjectDeleted(S3Object.Id id, Bucket.Id bucketId, Instant occurredOn) implements ObjectStorageEvent {}
 
     record MultipartUploadCreated(MultipartUpload.Id id, UploadId uploadId, Bucket.Id bucketId, ObjectKey key, Instant occurredOn) implements ObjectStorageEvent {}
+
+    // ── Bucket state transitions ──
+    record BucketVersioningEnabled(Bucket.Id id, Instant occurredOn) implements ObjectStorageEvent {}
+    record BucketVersioningSuspended(Bucket.Id id, Instant occurredOn) implements ObjectStorageEvent {}
+    record BucketEncryptionEnabled(Bucket.Id id, Instant occurredOn) implements ObjectStorageEvent {}
+    record BucketConfigurationChanged(Bucket.Id id, Bucket.Configuration config, Instant occurredOn) implements ObjectStorageEvent {}
+
+    // ── Object state transitions ──
+    record ObjectEtagUpdated(S3Object.Id id, String etag, Instant occurredOn) implements ObjectStorageEvent {}
+    record ObjectStorageClassChanged(S3Object.Id id, String storageClass, Instant occurredOn) implements ObjectStorageEvent {}
+    record ContentDescriptorCreated(S3Object.Id id, ContentDescriptor descriptor, Instant occurredOn) implements ObjectStorageEvent {}
     record PartUploaded(MultipartUpload.Id id, UploadId uploadId, int partNumber, String etag, Instant occurredOn) implements ObjectStorageEvent {}
     record MultipartUploadCompleted(MultipartUpload.Id id, UploadId uploadId, Bucket.Id bucketId, ObjectKey key, Instant occurredOn) implements ObjectStorageEvent {}
     record MultipartUploadAborted(MultipartUpload.Id id, UploadId uploadId, Instant occurredOn) implements ObjectStorageEvent {}

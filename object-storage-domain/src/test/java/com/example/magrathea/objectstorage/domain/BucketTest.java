@@ -1,9 +1,13 @@
 package com.example.magrathea.objectstorage.domain;
 
 import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
+import com.example.magrathea.objectstorage.domain.aggregate.Bucket.Configuration.CorsRule;
+import com.example.magrathea.objectstorage.domain.event.ObjectStorageEvent;
 import com.example.magrathea.objectstorage.domain.valueobject.Region;
 import com.example.magrathea.objectstorage.domain.valueobject.StorageClass;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -75,6 +79,112 @@ class BucketTest {
         var encrypted = bucket.withEncryptionEnabled();
         assertTrue(encrypted.encryptionEnabled());
         assertNotEquals(bucket, encrypted);
+    }
+
+    @Test
+    void create_withConfiguration() {
+        var id = Bucket.Id.generate();
+        var rule = new CorsRule(List.of("*", "http://example.com"), List.of("GET", "PUT"),
+            List.of("x-amz-request-id"), 3600, List.of("x-amz-request-id"), "my-rule");
+        var config = new Bucket.Configuration(List.of(rule));
+        var bucket = Bucket.create(id, "my-bucket", Region.US_EAST_1, StorageClass.STANDARD, config);
+        assertEquals("my-bucket", bucket.name());
+        assertNotNull(bucket.configuration());
+        assertTrue(bucket.configuration().hasCors());
+        assertEquals(1, bucket.configuration().corsRules().size());
+    }
+
+    @Test
+    void create_withoutConfiguration() {
+        var id = Bucket.Id.generate();
+        var bucket = Bucket.create(id, "my-bucket", Region.US_EAST_1, StorageClass.STANDARD);
+        assertNull(bucket.configuration());
+    }
+
+    @Test
+    void withConfiguration_returnsNewInstance() {
+        var id = Bucket.Id.generate();
+        var bucket = Bucket.create(id, "my-bucket", Region.US_EAST_1, StorageClass.STANDARD);
+        assertNull(bucket.configuration());
+
+        var rule = new CorsRule(List.of("*"), List.of("GET"), null, 0, null, null);
+        var config = new Bucket.Configuration(List.of(rule));
+        var configured = bucket.withConfiguration(config);
+
+        assertNotNull(configured.configuration());
+        assertTrue(configured.configuration().hasCors());
+        assertNotEquals(bucket, configured);
+        // Original unchanged
+        assertNull(bucket.configuration());
+    }
+
+    @Test
+    void withConfiguration_recordsEvent() {
+        var id = Bucket.Id.generate();
+        var bucket = Bucket.create(id, "my-bucket", Region.US_EAST_1, StorageClass.STANDARD);
+        var config = new Bucket.Configuration(List.of(
+            new CorsRule(List.of("*"), List.of("GET"), null, 0, null, null)));
+        var configured = bucket.withConfiguration(config);
+        var events = configured.domainEvents();
+        assertEquals(2, events.size()); // BucketCreated + BucketConfigurationChanged
+        var changeEvent = events.get(1);
+        assertInstanceOf(ObjectStorageEvent.BucketConfigurationChanged.class, changeEvent);
+        var cast = (ObjectStorageEvent.BucketConfigurationChanged) changeEvent;
+        assertEquals(id, cast.id());
+        assertTrue(cast.config().hasCors());
+    }
+
+    @Test
+    void withConfiguration_null_throws() {
+        var id = Bucket.Id.generate();
+        var bucket = Bucket.create(id, "my-bucket", Region.US_EAST_1, StorageClass.STANDARD);
+        assertThrows(NullPointerException.class, () -> bucket.withConfiguration(null));
+    }
+
+    @Test
+    void configuration_preservedAcrossTransitions() {
+        var id = Bucket.Id.generate();
+        var config = new Bucket.Configuration(List.of(
+            new CorsRule(List.of("*"), List.of("GET"), null, 0, null, null)));
+        var bucket = Bucket.create(id, "my-bucket", Region.US_EAST_1, StorageClass.STANDARD, config);
+        var versioned = bucket.withVersioningEnabled();
+        assertTrue(versioned.versioningEnabled());
+        assertNotNull(versioned.configuration());
+        assertTrue(versioned.configuration().hasCors());
+    }
+
+    @Test
+    void restore_withConfiguration() {
+        var id = Bucket.Id.generate();
+        var config = new Bucket.Configuration(List.of(
+            new CorsRule(List.of("*"), List.of("GET"), null, 0, null, null)));
+        var bucket = Bucket.restore(id, "my-bucket", Region.US_EAST_1, StorageClass.STANDARD,
+            true, true, config);
+        assertTrue(bucket.versioningEnabled());
+        assertTrue(bucket.encryptionEnabled());
+        assertNotNull(bucket.configuration());
+        assertTrue(bucket.configuration().hasCors());
+        assertTrue(bucket.domainEvents().isEmpty());
+    }
+
+    @Test
+    void restore_withoutConfiguration() {
+        var id = Bucket.Id.generate();
+        var bucket = Bucket.restore(id, "my-bucket", Region.US_EAST_1, StorageClass.STANDARD,
+            false, false);
+        assertNull(bucket.configuration());
+    }
+
+    @Test
+    void clearEvents_preservesConfiguration() {
+        var id = Bucket.Id.generate();
+        var config = new Bucket.Configuration(List.of(
+            new CorsRule(List.of("*"), List.of("GET"), null, 0, null, null)));
+        var bucket = Bucket.create(id, "my-bucket", Region.US_EAST_1, StorageClass.STANDARD, config);
+        var cleared = bucket.clearEvents();
+        assertTrue(cleared.domainEvents().isEmpty());
+        assertNotNull(cleared.configuration());
+        assertTrue(cleared.configuration().hasCors());
     }
 
     @Test

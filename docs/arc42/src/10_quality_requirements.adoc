@@ -7,8 +7,8 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 | Category | Goal | Description | Metric |
 |---|---|---|---|
-| Functional | S3 API Compatibility | Implementare core S3 REST API operations | 30/111 operations implemented |
-| Performance | Reactive non-blocking I/O | Upload/download senza thread blocking | DataBuffer streaming, no byte[] in handlers |
+| Functional | S3 API Compatibility | Implement core S3 REST API operations | 30/111 operations implemented |
+| Performance | Reactive non-blocking I/O | Upload/download without thread blocking | DataBuffer streaming, no byte[] in handlers |
 | Testability | 3-layer testing | Domain JUnit + Cucumber BDD + AWS CLI | 104 tests, 0 failures |
 | Maintainability | Domain-Driven Design | Pure domain, zero framework dependencies | 7 ADRs document decisions |
 
@@ -16,21 +16,21 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 ==== Scenario 1 — Object Upload Performance
 
-- **Context:** Utente carica file di grandi dimensioni (100+ MB)
-- **Stimulus:** PUT /{bucket}/{key} con body binario
-- **Response:** Upload completato senza OutOfMemoryError
-- **Metric:** Throughput > 50 MB/s, picco memoria < 256 MB
+- **Context:** User uploads large files (100+ MB)
+- **Stimulus:** PUT /{bucket}/{key} with binary body
+- **Response:** Upload completes without OutOfMemoryError
+- **Metric:** Throughput > 50 MB/s, peak memory < 256 MB
 
 ==== Scenario 2 — S3 API Compatibility
 
-- **Context:** AWS CLI interagisce con il sistema
-- **Stimulus:** AWS CLI command per ogni operazione implementata
-- **Response:** Output identico a AWS S3 reale (stessi XML, stessi error codes)
+- **Context:** AWS CLI interacts with the system
+- **Stimulus:** AWS CLI command for each implemented operation
+- **Response:** Output identical to real AWS S3 (same XML, same error codes)
 - **Metric:** 30/30 CLI checks pass, 51/51 AWS CLI test assertions pass
 
 ==== Scenario 3 — Test Coverage
 
-- **Context:** Nuova operazione S3 viene implementata
-- **Stimulus:** Commit del codice
-- **Response:** Pre-commit hook genera Clover coverage
-- **Metric:** Coverage > 80% (83.45% attuale)
+- **Context:** A new S3 operation is implemented
+- **Stimulus:** Code commit
+- **Response:** Pre-commit hook generates Clover coverage
+- **Metric:** Coverage > 80% (83.45% current)

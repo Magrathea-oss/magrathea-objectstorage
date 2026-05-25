@@ -12,6 +12,6 @@ All architectural decisions are documented as Architecture Decision Records (ADR
 | [0003](adr/0003-binarycontent-vs-databuffer-boundary.md) | BinaryContent vs DataBuffer boundary | ✅ Accepted |
 | [0004](adr/0004-reactive-boundary-completablefuture-to-mono-flux.md) | Reactive boundary CompletableFuture to Mono/Flux | ✅ Accepted |
 | [0005](adr/0005-routerfunction-functional-webflux-pattern.md) | RouterFunction functional WebFlux pattern | ✅ Accepted |
-| [0006](adr/0006-s3-api-protocol-endpoint-mapping.md) | S3 API protocol endpoint mapping | ⏳ Proposed |
-| [0007](adr/0007-pluggable-s3-api-autoconfiguration.md) | Pluggable S3 API via Spring Boot Auto-Configuration | ✅ Accepted |
+| [0006](adr/0006-s3-api-protocol-endpoint-mapping.md) | S3 reactive API protocol endpoint mapping | ⏳ Proposed |
+| [0007](adr/0007-pluggable-s3-api-autoconfiguration.md) | Pluggable S3 reactive API via Spring Boot Auto-Configuration | ✅ Accepted |
 | [0008](adr/0008-remove-xml-parsing-use-spring-codec.md) | Remove all custom XML parsing, use Spring Boot 4 codec infrastructure | ✅ Accepted |

@@ -5,34 +5,34 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 === Development Environment
 
-**Singolo nodo, eseguito localmente.**
+**Single node, running locally.**
 
 | Element | Description |
 |---|---|
-| S3 Server | JAR `bootstrap-application-1.0.0-SNAPSHOT.jar` in esecuzione su `localhost:8080` |
-| File Store | In-memory (ConcurrentHashMap), allocato nello stesso heap JVM del server |
+| S3 Server | JAR `bootstrap-application-1.0.0-SNAPSHOT.jar` running on `localhost:8080` |
+| File Store | In-memory (ConcurrentHashMap), allocated in the same JVM heap as the server |
 | Java Runtime | JDK 21 |
 | Build Tool | Apache Maven 3.9+ |
 
 === Docker Deployment
 
-Un `Dockerfile` e `docker-compose.yml` sono presenti alla root del progetto per esecuzione containerizzata:
+A `Dockerfile` and `docker-compose.yml` are present at the project root for containerized execution:
 
 **Dockerfile:**
 - Base: `eclipse-temurin:21-jdk`
-- Copia `bootstrap-application/target/*.jar`
-- Espone porta 8080
+- Copy `bootstrap-application/target/*.jar`
+- Expose port 8080
 - Entrypoint: `java -jar bootstrap-application-1.0.0-SNAPSHOT.jar`
 
 **docker-compose.yml:**
-- Singolo servizio `magrathea-s3` su porta `8080:8080`
-- Environment variables per configurazione
+- Single service `magrathea-s3` on port `8080:8080`
+- Environment variables for configuration
 
 === Production Deployment (Future)
 
-L'architettura a due container (`s3-server` + `file-store`) è volutamente monolitica per single-node. In futuro:
+The two-container architecture (`s3-server` + `file-store`) is intentionally monolithic for single-node operation. In the future:
 
-- `file-store` può essere sostituito da R2DBC + PostgreSQL per persistenza relazionale
-- `file-store` può diventare container separato per scaling orizzontale
-- `s3-server` può essere clusterizzato con session affinity
-- `persistence-context-*` moduli placeholder per bounded context di persistenza separato
+- `file-store` can be replaced by R2DBC + PostgreSQL for relational persistence
+- `file-store` can become a separate container for horizontal scaling
+- `s3-server` can be clustered with session affinity
+- `persistence-context-*` placeholder modules for a separate persistence bounded context
