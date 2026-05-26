@@ -6,7 +6,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 === Architecture Strategy
 
 - **Hexagonal Architecture** (Ports and Adapters): domain is pure business logic, application and infrastructure are adapters
-- **DDD with strategic design**: bounded contexts for ObjectStorage and Persistence, shared-kernel for BinaryContent
+- **DDD with strategic design**: bounded contexts for ObjectStore and Persistence, shared-kernel for BinaryContent
 - **Reactive by design**: WebFlux RouterFunction, DataBuffer streaming, CompletableFuture → Mono/Flux bridge
 
 === Key Technical Decisions

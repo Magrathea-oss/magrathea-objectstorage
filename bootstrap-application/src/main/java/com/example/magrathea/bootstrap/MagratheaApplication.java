@@ -5,14 +5,14 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.ComponentScan;
 
 /**
- * Spring Boot 4 entry point for Magrathea ObjectStorage.
+ * Spring Boot 4 entry point for Magrathea ObjectStore.
  * S3 API module (s3-api) is auto-configured via META-INF/spring/AutoConfiguration.imports
  * when it's on the classpath. No explicit @ComponentScan needed for s3-api.
  * Disable via s3.api.enabled=false in application.properties.
  */
 @SpringBootApplication
 @ComponentScan(basePackages = {
-    "com.example.magrathea.objectstorage"
+    "com.example.magrathea.objectstore"
 })
 public class MagratheaApplication {
 

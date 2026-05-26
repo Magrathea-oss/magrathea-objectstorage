@@ -33,5 +33,5 @@ META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports
 - Including `s3-api` on the classpath activates S3 routes by default.
 - Setting `s3.api.enabled=false` disables S3 routes at runtime.
 - Removing the `s3-api` dependency removes the web API completely.
-- `object-storage-infrastructure` contains repository implementations only.
+- `object-store-infrastructure` contains repository implementations only.
 - No custom non-S3 HTTP API is allowed.

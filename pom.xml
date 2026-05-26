@@ -11,15 +11,15 @@
     <modules>
         <module>s3-reactive-api-adapter</module>
 
-        <module>object-storage-domain</module>
+        <module>object-store-domain</module>
         <module>storage-engine-domain</module>
         <module>storage-engine-application</module>
         <module>storage-engine-infrastructure</module>
         <module>bootstrap-application</module>
 
-        <module>object-storage-reactive-repository-application</module>
-        <module>object-storage-reactive-application</module>
-        <module>object-storage-reactive-infrastructure</module>
+        <module>object-store-reactive-repository-application</module>
+        <module>object-store-reactive-application</module>
+        <module>object-store-reactive-infrastructure</module>
     </modules>
 
     <properties>
@@ -63,7 +63,7 @@
             </dependency>
             <dependency>
                 <groupId>com.example</groupId>
-                <artifactId>object-storage-domain</artifactId>
+                <artifactId>object-store-domain</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
@@ -74,17 +74,17 @@
             </dependency>
             <dependency>
                 <groupId>com.example</groupId>
-                <artifactId>object-storage-reactive-repository-application</artifactId>
+                <artifactId>object-store-reactive-repository-application</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.example</groupId>
-                <artifactId>object-storage-reactive-application</artifactId>
+                <artifactId>object-store-reactive-application</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.example</groupId>
-                <artifactId>object-storage-reactive-infrastructure</artifactId>
+                <artifactId>object-store-reactive-infrastructure</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

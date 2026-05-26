@@ -1,4 +1,4 @@
-# Plan: Magrathea ObjectStorage — AWS S3 Compatible
+# Plan: Magrathea ObjectStore — AWS S3 Compatible
 
 ## Status
 
@@ -10,9 +10,9 @@ Current implementation is a Java 21 + Spring Boot 4 WebFlux S3-compatible object
 magrathea-objectstorage/
 ├── pom.xml
 ├── s3-api/                         # Pluggable S3 HTTP adapter (RouterFunction, XML, AWS CLI tests)
-├── object-storage-domain/          # Pure S3 domain: Bucket, S3Object, repository interfaces
-├── object-storage-application/     # Application services, DTOs, S3ObjectWrite implementation with Flux<DataBuffer>
-├── object-storage-infrastructure/  # Repository implementations only (BucketRepositoryImpl, InMemoryObjectRepository)
+├── object-store-domain/          # Pure S3 domain: Bucket, S3Object, repository interfaces
+├── object-store-application/     # Application services, DTOs, S3ObjectWrite implementation with Flux<DataBuffer>
+├── object-store-infrastructure/  # Repository implementations only (BucketRepositoryImpl, InMemoryObjectRepository)
 ├── storage-engine-domain/     # EMPTY — reserved for future use
 ├── storage-engine-application/# EMPTY — reserved for future use
 ├── storage-engine-infrastructure/ # EMPTY — reserved for future use
@@ -59,7 +59,7 @@ Activation modes:
 
 | Level | Type | Command | Notes |
 |---|---|---|---|
-| 1 | Pure JUnit | `mvn test -pl object-storage-domain` | Domain only, no Spring |
+| 1 | Pure JUnit | `mvn test -pl object-store-domain` | Domain only, no Spring |
 | 2 | Cucumber BDD | `mvn test -pl s3-api` | RouterFunction integration |
 | 3 | AWS CLI compatibility | `bash test-aws-cli.sh` | Requires app running on `localhost:8080` |
 | 4 | Clover coverage | `mvn -Pcoverage clover:setup test clover:aggregate clover:clover` | Generates Clover reports |
@@ -91,7 +91,7 @@ AWS CLI compatibility tests are not run by the default `mvn test` because they r
 
 Source: https://docs.aws.amazon.com/AmazonS3/latest/API/API_Operations.md
 
-Scope: **Amazon S3 actions only**. Amazon S3 Control actions are intentionally out of scope for the object-storage S3 REST API module.
+Scope: **Amazon S3 actions only**. Amazon S3 Control actions are intentionally out of scope for the object-store S3 REST API module.
 
 ### Current Implemented Operations (84/111)
 
@@ -330,7 +330,7 @@ For every newly implemented S3 operation:
 1. Add RouterFunction route in `s3-api`.
 2. Use AWS S3 terminology only in domain/application DTOs.
 3. Add XML response/request records using Jackson 3 annotations when XML is required.
-4. Add Cucumber feature scenario(s) in `s3-api/src/test/features/object-storage/`.
+4. Add Cucumber feature scenario(s) in `s3-reactive-api-adapter/src/test/features/object-store/`.
 5. Add AWS CLI coverage in `test-aws-cli.sh` if AWS CLI exposes the operation.
 6. Update this PLAN coverage table.
 7. Update ARC42 and ADRs if the operation introduces a new architectural decision.
@@ -339,11 +339,11 @@ For every newly implemented S3 operation:
 
 Every new S3 operation MUST include:
 
-**Domain layer (`object-storage-domain`):**
+**Domain layer (`object-store-domain`):**
 - Add or update domain value objects / aggregates if the operation introduces new data concepts (e.g., ACL, tagging, storage class)
-- Add pure JUnit tests in `object-storage-domain/src/test/` for every new domain type
+- Add pure JUnit tests in `object-store-domain/src/test/` for every new domain type
 
-**Application layer (`object-storage-application`):**
+**Application layer (`object-store-application`):**
 - Add or update application service methods in `BucketService` / `ObjectService`
 - Add or update DTOs in `application/dto/`
 - Data MUST flow through domain → application → handler, NOT be stored directly in handler `ConcurrentHashMap`
@@ -363,7 +363,7 @@ mvn test -pl s3-api
 bash test-aws-cli.sh
 
 # Verify domain unit tests
-mvn test -pl object-storage-domain
+mvn test -pl object-store-domain
 ```
 
 ## Verification
@@ -563,21 +563,21 @@ This defeats the purpose of reactive programming. Instead of chaining reactive o
 
 | Layer | Current pattern | Target pattern |
 |---|---|---|
-| **Reactive repository interfaces** (`object-storage-reactive-repository-application`) | `CompletableFuture<Optional<T>>` in `object-storage-domain` | Native `Mono<T>` / `Flux<T>` with CQRS split (Command + Query per aggregate) |
-| **Reactive application services** (`object-storage-reactive-application`) | `.join()` bridge in `BucketService`/`ObjectService` | No blocking, methods return `Mono<T>` / `Flux<T>` natively |
-| **Reactive infrastructure** (`object-storage-reactive-infrastructure`) | `InMemoryBucketRepository` with blocking impls | Reactive repository implementations (combined or split Command/Query) |
+| **Reactive repository interfaces** (`object-store-reactive-repository-application`) | `CompletableFuture<Optional<T>>` in `object-store-domain` | Native `Mono<T>` / `Flux<T>` with CQRS split (Command + Query per aggregate) |
+| **Reactive application services** (`object-store-reactive-application`) | `.join()` bridge in `BucketService`/`ObjectService` | No blocking, methods return `Mono<T>` / `Flux<T>` natively |
+| **Reactive infrastructure** (`object-store-reactive-infrastructure`) | `InMemoryBucketRepository` with blocking impls | Reactive repository implementations (combined or split Command/Query) |
 | **Handler layer** (`s3-reactive-api-adapter`) | `Mono.fromCallable(() -> service.method().join()).subscribeOn(...)` | Direct `Mono`/`Flux` chaining, no `.fromCallable`, no `.subscribeOn` |
 
 **New modules to create:**
 
 | Module | Purpose |
 |---|---|
-| `object-storage-reactive-repository-application` | Reactive repository interfaces with `Mono`/`Flux`/`DataBuffer` and CQRS command/query split |
-| `object-storage-reactive-application` | Reactive application services — no `.join()`, no blocking |
-| `object-storage-reactive-infrastructure` | Reactive repository implementations |
+| `object-store-reactive-repository-application` | Reactive repository interfaces with `Mono`/`Flux`/`DataBuffer` and CQRS command/query split |
+| `object-store-reactive-application` | Reactive application services — no `.join()`, no blocking |
+| `object-store-reactive-infrastructure` | Reactive repository implementations |
 | `s3-reactive-api-adapter` (rename from `s3-api`) | Updated handlers using reactive services |
 
-**Domain cleanup:** Remove repository interfaces from `object-storage-domain` — keep only aggregates, value objects, domain events (ADR 0002 purity).
+**Domain cleanup:** Remove repository interfaces from `object-store-domain` — keep only aggregates, value objects, domain events (ADR 0002 purity).
 
 **Verification:**
 

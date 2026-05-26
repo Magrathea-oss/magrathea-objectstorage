@@ -18,14 +18,14 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 === Domain Constraints
 
-- `object-storage-domain`: uses ONLY AWS S3 native terminology — no custom abstractions like BinaryContent
-- `object-storage-domain`: zero dependencies except test dependencies
+- `object-store-domain`: uses ONLY AWS S3 native terminology — no custom abstractions like BinaryContent
+- `object-store-domain`: zero dependencies except test dependencies
 - No `shared-domain` module exists
 - `persistence-context-*` modules are intentionally empty placeholders and are not referenced by S3 implementation
 
 === Infrastructure Constraints
 
-- `object-storage-reactive-infrastructure`: reactive repository implementations only; no HTTP API routes
+- `object-store-reactive-infrastructure`: reactive repository implementations only; no HTTP API routes
 - `InMemoryReactiveS3ObjectRepository`: reactive in-memory S3 object metadata + content store via Mono/Flux
 - `ContentStore` is removed; object content is saved through `S3ObjectRepository.save(S3ObjectWrite)`
 - `S3ObjectWrite` and `S3ObjectContent` are domain interfaces without framework types; their application implementations carry `Flux<DataBuffer>`

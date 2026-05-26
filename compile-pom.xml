@@ -9,11 +9,10 @@
     <packaging>pom</packaging>
 
     <modules>
-        <module>object-storage-domain</module>
-        <module>object-storage-infrastructure</module>
-        <module>object-storage-reactive-repository-application</module>
-        <module>object-storage-reactive-application</module>
-        <module>object-storage-reactive-infrastructure</module>
+        <module>object-store-domain</module>
+        <module>object-store-reactive-repository-application</module>
+        <module>object-store-reactive-application</module>
+        <module>object-store-reactive-infrastructure</module>
         <module>s3-reactive-api-adapter</module>
     </modules>
 
@@ -41,32 +40,23 @@
             </dependency>
             <dependency>
                 <groupId>com.example</groupId>
-                <artifactId>object-storage-domain</artifactId>
+                <artifactId>object-store-domain</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.example</groupId>
+                <artifactId>object-store-reactive-repository-application</artifactId>
                 <version>1.0.0-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>com.example</groupId>
-                <artifactId>object-storage-application</artifactId>
+                <artifactId>object-store-reactive-application</artifactId>
                 <version>1.0.0-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>com.example</groupId>
-                <artifactId>object-storage-infrastructure</artifactId>
-                <version>1.0.0-SNAPSHOT</version>
-            </dependency>
-            <dependency>
-                <groupId>com.example</groupId>
-                <artifactId>object-storage-reactive-repository-application</artifactId>
-                <version>1.0.0-SNAPSHOT</version>
-            </dependency>
-            <dependency>
-                <groupId>com.example</groupId>
-                <artifactId>object-storage-reactive-application</artifactId>
-                <version>1.0.0-SNAPSHOT</version>
-            </dependency>
-            <dependency>
-                <groupId>com.example</groupId>
-                <artifactId>object-storage-reactive-infrastructure</artifactId>
+                <artifactId>object-store-reactive-infrastructure</artifactId>
                 <version>1.0.0-SNAPSHOT</version>
             </dependency>
             <dependency>

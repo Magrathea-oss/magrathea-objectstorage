@@ -34,8 +34,12 @@ Specific symptoms, violated constraints:
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
 2026-05-24
+
+## Implementation Note
+
+The reactive migration was fully implemented. Repository implementations now have real (non-stub) method bodies. Aggregate roots enforce state transitions through the main aggregate object with domain event notification. Reactive repository interfaces leverage Flux/Mono operators. C4 diagrams and ARC42 have been aligned. Tests have been updated for real behavior. The remaining `Mono.fromCallable` wrappers in repository implementations are acceptable for in-memory storage where synchronous operations are the norm.

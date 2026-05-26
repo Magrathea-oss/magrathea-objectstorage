@@ -1,7 +1,7 @@
 package com.example.magrathea.s3api.dto.query;
 
-import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
-import com.example.magrathea.objectstorage.domain.valueobject.BucketReplicationConfiguration;
+import com.example.magrathea.objectstore.domain.aggregate.Bucket;
+import com.example.magrathea.objectstore.domain.valueobject.BucketReplicationConfiguration;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
 

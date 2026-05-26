@@ -3,7 +3,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 [[section-introduction-and-goals]]
 == Introduction and Goals
 
-The Magrathea ObjectStorage project implements an **AWS S3-compatible object storage** built with Spring Boot 4 WebFlux and Java 21.
+The Magrathea ObjectStore project implements an **AWS S3-compatible object storage** built with Spring Boot 4 WebFlux and Java 21.
 
 It provides a lightweight, single-node implementation of the AWS S3 REST API for development, testing, and small-scale deployments.
 

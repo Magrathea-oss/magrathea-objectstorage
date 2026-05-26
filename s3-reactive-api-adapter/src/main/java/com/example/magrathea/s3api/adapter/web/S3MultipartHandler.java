@@ -1,10 +1,10 @@
 package com.example.magrathea.s3api.adapter.web;
 
-import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
-import com.example.magrathea.objectstorage.domain.aggregate.MultipartUpload;
-import com.example.magrathea.objectstorage.domain.valueobject.ObjectKey;
-import com.example.magrathea.objectstorage.domain.valueobject.PartNumber;
-import com.example.magrathea.objectstorage.domain.valueobject.UploadId;
+import com.example.magrathea.objectstore.domain.aggregate.Bucket;
+import com.example.magrathea.objectstore.domain.aggregate.MultipartUpload;
+import com.example.magrathea.objectstore.domain.valueobject.ObjectKey;
+import com.example.magrathea.objectstore.domain.valueobject.PartNumber;
+import com.example.magrathea.objectstore.domain.valueobject.UploadId;
 import com.example.magrathea.reactive.application.service.ReactiveBucketService;
 import com.example.magrathea.reactive.application.service.ReactiveMultipartUploadService;
 import com.example.magrathea.s3api.dto.query.ErrorQuery;
@@ -80,7 +80,7 @@ public class S3MultipartHandler {
         return multipartUploadService.findById(uploadId)
             .flatMap(upload -> {
                 var etag = "\"" + DigestUtils.md5DigestAsHex((uploadIdStr + "-" + partNumberStr).getBytes()) + "\"";
-                var part = com.example.magrathea.objectstorage.domain.valueobject.UploadPart.create(
+                var part = com.example.magrathea.objectstore.domain.valueobject.UploadPart.create(
                     PartNumber.of(partNumber), etag, 0
                 );
                 var updated = upload.withPart(part);
@@ -105,7 +105,7 @@ public class S3MultipartHandler {
         return multipartUploadService.findById(uploadId)
             .flatMap(upload -> {
                 var etag = "\"" + DigestUtils.md5DigestAsHex((uploadIdStr + "-" + partNumberStr).getBytes()) + "\"";
-                var part = com.example.magrathea.objectstorage.domain.valueobject.UploadPart.create(
+                var part = com.example.magrathea.objectstore.domain.valueobject.UploadPart.create(
                     PartNumber.of(partNumber), etag, size
                 );
                 var updated = upload.withPart(part);

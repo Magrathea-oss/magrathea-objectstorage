@@ -24,7 +24,7 @@ All HTTP request handling is reactive:
 
 === Domain Purity
 
-The `object-storage-domain` module is strictly pure:
+The `object-store-domain` module is strictly pure:
 
 - NO Spring imports
 - NO JPA, NO jakarta.validation
@@ -36,7 +36,7 @@ Advanced configuration value objects (BucketAnalyticsConfiguration, BucketInvent
 
 === Domain Events and State Transitions
 
-The Bucket aggregate root emits sealed `ObjectStorageEvent` records on every state transition:
+The Bucket aggregate root emits sealed `ObjectStoreEvent` records on every state transition:
 
 - `BucketCreated`, `BucketDeleted`, `BucketVersioningEnabled`, `BucketVersioningSuspended`
 - `BucketEncryptionEnabled` (separate from encryption configuration!)
@@ -46,7 +46,7 @@ The Bucket aggregate root emits sealed `ObjectStorageEvent` records on every sta
 Instead of a single generic `BucketConfigurationChanged`, each configuration feature emits a specific event subtype:
 
 ```
-ObjectStorageEvent
+ObjectStoreEvent
 ├── BucketCreated
 ├── BucketDeleted
 ├── BucketVersioningEnabled
@@ -81,7 +81,7 @@ Each event carries the specific value object type (e.g., `BucketLifecycleConfigu
 - State transitions return NEW immutable instances with accumulated events
 - `domainEvents()` retrieves pending events; `clearEvents()` returns a clean instance for persistence
 
-S3Object and MultipartUpload aggregates follow the same pattern with `ObjectCreated`, `ObjectDeleted`, `ObjectEtagUpdated`, `ObjectStorageClassChanged`, `ContentDescriptorCreated`, `PartUploaded`, `MultipartUploadCreated`, `MultipartUploadCompleted`, `MultipartUploadAborted`.
+S3Object and MultipartUpload aggregates follow the same pattern with `ObjectCreated`, `ObjectDeleted`, `ObjectEtagUpdated`, `ObjectStoreStorageClassChanged`, `ContentDescriptorCreated`, `PartUploaded`, `MultipartUploadCreated`, `MultipartUploadCompleted`, `MultipartUploadAborted`.
 
 === Registry-based Handler Integration
 

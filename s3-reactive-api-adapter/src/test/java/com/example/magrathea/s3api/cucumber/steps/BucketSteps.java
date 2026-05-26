@@ -1,6 +1,6 @@
 package com.example.magrathea.s3api.cucumber.steps;
 
-import com.example.magrathea.objectstorage.application.service.BucketService;
+import com.example.magrathea.reactive.application.service.ReactiveBucketService;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.When;
 import io.cucumber.java.en.Then;
@@ -17,7 +17,7 @@ public class BucketSteps {
     private WebTestClient webTestClient;
 
     @Autowired
-    private BucketService bucketService;
+    private ReactiveBucketService bucketService;
 
     @Autowired
     private CommonSteps commonSteps;
@@ -228,7 +228,7 @@ public class BucketSteps {
 
     @Then("the bucket no longer appears in the bucket list")
     public void bucketNoLongerAppears() {
-        var buckets = bucketService.findAll();
+        var buckets = bucketService.findAllBuckets().collectList().block();
         assertFalse(buckets.stream().anyMatch(b -> b.name().equals(bucketName)));
     }
 }

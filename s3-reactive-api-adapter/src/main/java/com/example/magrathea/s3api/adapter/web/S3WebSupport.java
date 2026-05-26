@@ -1,9 +1,10 @@
 package com.example.magrathea.s3api.adapter.web;
 
-import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
-import com.example.magrathea.objectstorage.domain.aggregate.S3Object;
-import com.example.magrathea.objectstorage.domain.valueobject.BucketWebsiteConfiguration;
-import com.example.magrathea.objectstorage.domain.valueobject.ObjectKey;
+import com.example.magrathea.objectstore.domain.aggregate.Bucket;
+import com.example.magrathea.objectstore.domain.aggregate.S3Object;
+import com.example.magrathea.objectstore.domain.valueobject.BucketConfig;
+import com.example.magrathea.objectstore.domain.valueobject.BucketWebsiteConfiguration;
+import com.example.magrathea.objectstore.domain.valueobject.ObjectKey;
 import com.example.magrathea.reactive.application.service.ReactiveBucketService;
 import com.example.magrathea.reactive.application.service.ReactiveObjectService;
 import com.example.magrathea.s3api.dto.query.ErrorQuery;
@@ -129,11 +130,12 @@ final class S3WebSupport {
         if (origin == null || origin.isBlank()) {
             return Mono.empty();
         }
-        var config = bucket.configuration();
-        if (config == null || !config.hasCors()) {
+        var corsConfig = bucket.bucketConfig() != null
+            ? bucket.bucketConfig().getCorsConfiguration().orElse(null) : null;
+        if (corsConfig == null || corsConfig.corsRules() == null || corsConfig.corsRules().isEmpty()) {
             return xmlError(HttpStatus.FORBIDDEN, "AccessForbidden", "CORS not configured");
         }
-        for (var rule : config.corsRules()) {
+        for (var rule : corsConfig.corsRules()) {
             for (var allowedOrigin : rule.allowedOrigins()) {
                 if (originMatches(origin, allowedOrigin)) {
                     return Mono.empty();
@@ -176,12 +178,13 @@ final class S3WebSupport {
      * - Access-Control-Max-Age (if > 0)
      */
     static Mono<ServerResponse> applyCorsHeaders(Mono<ServerResponse> response, Bucket bucket, String origin) {
-        var config = bucket.configuration();
-        if (config == null || !config.hasCors()) {
+        var corsConfig = bucket.bucketConfig() != null
+            ? bucket.bucketConfig().getCorsConfiguration().orElse(null) : null;
+        if (corsConfig == null || corsConfig.corsRules() == null || corsConfig.corsRules().isEmpty()) {
             return response;
         }
         // Find matching CORS rule and return response with CORS headers
-        for (var rule : config.corsRules()) {
+        for (var rule : corsConfig.corsRules()) {
             for (var allowedOrigin : rule.allowedOrigins()) {
                 if (originMatches(origin, allowedOrigin)) {
                     return response.flatMap(r -> {
@@ -229,8 +232,8 @@ final class S3WebSupport {
      * should fall through to normal S3 handling.
      * <p>
      * NOTE: The current domain model does not store website configuration on
-     * {@link Bucket.Configuration}. Once ADR 0011 is resolved and website fields
-     * are added to {@link Bucket.Configuration} or stored via
+     * {@link BucketConfig}. Once ADR 0011 is resolved and website fields
+     * are added to {@link BucketConfig} or stored via
      * {@link BucketWebsiteConfiguration}, this method will activate the routing logic.
      *
      * @param request the incoming HTTP request
@@ -238,7 +241,7 @@ final class S3WebSupport {
      * @return a Mono resolving to a redirect or error response, or Mono.empty() if no website config
      */
     static Mono<ServerResponse> handleWebsiteRequest(ServerRequest request, Bucket bucket) {
-        // Website config is not stored on Bucket.Configuration in the current domain model.
+        // Website config is not stored on BucketConfig in the current domain model.
         // Always returns Mono.empty() until ADR 0011 adds website fields.
         return Mono.empty();
     }
@@ -305,13 +308,13 @@ final class S3WebSupport {
     /**
      * Checks if the bucket configuration has website configuration.
      * <p>
-     * Currently returns false because the domain model's {@link Bucket.Configuration}
+     * Currently returns false because the domain model's {@link BucketConfig}
      * does not yet have website fields. Once ADR 0011 adds website fields to
-     * {@code Configuration}, this method will check for them.
+     * {@code BucketConfig}, this method will check for them.
      */
-    private static boolean hasWebsiteConfig(Bucket.Configuration config) {
-        // Future: config.websiteIndexDocument() != null or config.websiteRedirectAll() != null
-        // ADR 0011 scope — domain model needs website fields on Configuration
+    private static boolean hasWebsiteConfig(BucketConfig config) {
+        // Future: config.websiteConfiguration() != null
+        // ADR 0011 scope — domain model needs website fields on BucketConfig
         return false;
     }
 

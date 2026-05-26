@@ -1,8 +1,8 @@
 package com.example.magrathea.s3api.cucumber.steps;
 
-import com.example.magrathea.objectstorage.infrastructure.adapter.persistence.InMemoryBucketRepository;
-import com.example.magrathea.objectstorage.infrastructure.adapter.persistence.InMemoryMultipartUploadRepository;
-import com.example.magrathea.objectstorage.infrastructure.adapter.persistence.InMemoryObjectRepository;
+import com.example.magrathea.reactive.infrastructure.adapter.persistence.InMemoryReactiveBucketRepository;
+import com.example.magrathea.reactive.infrastructure.adapter.persistence.InMemoryReactiveMultipartUploadRepository;
+import com.example.magrathea.reactive.infrastructure.adapter.persistence.InMemoryReactiveS3ObjectRepository;
 import io.cucumber.java.Before;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -13,13 +13,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 public class RepositoryResetSteps {
 
     @Autowired
-    private InMemoryBucketRepository bucketRepository;
+    private InMemoryReactiveBucketRepository bucketRepository;
 
     @Autowired
-    private InMemoryObjectRepository objectRepository;
+    private InMemoryReactiveS3ObjectRepository objectRepository;
 
     @Autowired
-    private InMemoryMultipartUploadRepository multipartUploadRepository;
+    private InMemoryReactiveMultipartUploadRepository multipartUploadRepository;
 
     @Autowired
     private CommonSteps commonSteps;

@@ -589,7 +589,7 @@ This feature should be designed as an **extensible interface**. Define a `Metric
 Instead of a single generic `BucketConfigurationChanged`, use specific events:
 
 ```
-ObjectStorageEvent
+ObjectStoreEvent
 ├── BucketCreated
 ├── BucketVersioningEnabled
 ├── BucketVersioningSuspended
@@ -1087,7 +1087,7 @@ Based on the priority and feasibility matrix, the recommended implementation ord
 
 ## Extensible Interfaces Design
 
-Several bucket configuration features are **POSTPONED** for implementation. Instead of leaving them undefined, the domain should define **extensible interfaces** that allow future modules to plug in their own implementations. These interfaces live in the `object-storage-domain` module and will be implemented in the `storage-engine` module when its design begins.
+Several bucket configuration features are **POSTPONED** for implementation. Instead of leaving them undefined, the domain should define **extensible interfaces** that allow future modules to plug in their own implementations. These interfaces live in the `object-store-domain` module and will be implemented in the `storage-engine` module when its design begins.
 
 ### Notification — Event Publishing
 

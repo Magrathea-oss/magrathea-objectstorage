@@ -5,14 +5,14 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 === Business Context
 
-Magrathea ObjectStorage provides an S3-compatible REST API. Users interact with it via HTTP to store and retrieve objects in buckets.
+Magrathea ObjectStore provides an S3-compatible REST API. Users interact with it via HTTP to store and retrieve objects in buckets.
 
-.System Context — Magrathea ObjectStorage
+.System Context — Magrathea ObjectStore
 image::../../c4/images/SystemContext.png[System Context, width=600]
 
 The system context shows:
 - **User**: end user interacting via HTTPS — S3-compatible API
-- **Magrathea ObjectStorage**: Spring Boot 4 reactive S3-compatible object storage
+- **Magrathea ObjectStore**: Spring Boot 4 reactive S3-compatible object storage
 
 === Technical Context
 

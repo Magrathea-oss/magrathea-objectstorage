@@ -8,7 +8,7 @@ Accepted
 
 ## Context
 
-Il progetto Magrathea ObjectStorage implementa un AWS S3-compatible object storage con Spring Boot 4 WebFlux. La struttura modulare deve separare rigorosamente il dominio puro (DDD) dall'infrastruttura reattiva, seguendo i pattern definiti dagli agenti `domain-coder` e `app-infra-coder`.
+Il progetto Magrathea ObjectStore implementa un AWS S3-compatible object storage con Spring Boot 4 WebFlux. La struttura modulare deve separare rigorosamente il dominio puro (DDD) dall'infrastruttura reattiva, seguendo i pattern definiti dagli agenti `domain-coder` e `app-infra-coder`.
 
 ## Decision
 

@@ -1,4 +1,4 @@
-workspace "Magrathea ObjectStorage" "C4 model for the Magrathea S3-compatible object storage service" {
+workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible object storage service" {
 
   !identifiers hierarchical
 
@@ -34,7 +34,7 @@ workspace "Magrathea ObjectStorage" "C4 model for the Magrathea S3-compatible ob
     }
 
 
-    magrathea = softwareSystem "Magrathea ObjectStorage" "AWS S3-compatible object storage built with Spring Boot 4 WebFlux and Java 21." {
+    magrathea = softwareSystem "Magrathea ObjectStore" "AWS S3-compatible object storage built with Spring Boot 4 WebFlux and Java 21." {
       s3ReactiveApiAdapter = container "s3-reactive-api-adapter" "HTTP adapter that exposes the S3-compatible REST API and translates HTTP/XML/binary requests into reactive application use cases." "Spring Boot 4 WebFlux, RouterFunction, Java 21, Jackson XML" {
         bucketOperationsHandler = component "S3BucketOperationsHandler" "Handles bucket lifecycle endpoints: create, delete, head, list, location and versioning." "Java WebFlux handler"
         bucketMetadataHandler = component "S3BucketMetadataHandler" "Handles bucket metadata endpoints such as ACL and tagging." "Java WebFlux handler"
@@ -56,7 +56,7 @@ workspace "Magrathea ObjectStorage" "C4 model for the Magrathea S3-compatible ob
 
       reactiveBucketManagement = container "reactive-bucket-management" "Reactive bucket management capability: bucket lifecycle, metadata, configuration, CORS/versioning and bucket-level operations." "Java 21 reactive application/domain services" {
         reactiveBucketService = component "ReactiveBucketService" "Reactive application service for bucket lifecycle, versioning, CORS, analytics, inventory, metrics, intelligent-tiering configuration." "Spring @Service"
-        bucket = component "Bucket" "Domain aggregate root for bucket identity, name, region, storage class, versioning/encryption state and inline Configuration. Emits ObjectStorageEvent domain events on state transitions (withVersioningEnabled, withVersioningSuspended, withEncryptionEnabled, withConfiguration)." "Domain aggregate root"
+        bucket = component "Bucket" "Domain aggregate root for bucket identity, name, region, storage class, versioning/encryption state and inline Configuration. Emits ObjectStoreEvent domain events on state transitions (withVersioningEnabled, withVersioningSuspended, withEncryptionEnabled, withConfiguration)." "Domain aggregate root"
         bucketRepositoryPort = component "BucketRepository port" "Domain repository port for bucket aggregate persistence." "Domain repository interface"
       }
 
@@ -75,7 +75,7 @@ workspace "Magrathea ObjectStorage" "C4 model for the Magrathea S3-compatible ob
         inMemoryReactiveMultipartUploadRepository = component "InMemoryReactiveMultipartUploadRepository" "In-memory reactive implementation of MultipartUploadCommandRepository and MultipartUploadQueryRepository. Internally stores multipart upload sessions in a ConcurrentHashMap structure." "Spring @Repository"
       }
 
-      storageEngine = container "storage-engine" "Future implementation module for extensible interfaces: event notification publishing, access log writing, metrics collection, and analytics data export. These interfaces are defined in object-storage-domain and will be implemented here." "Java 21, domain interfaces" {
+      storageEngine = container "storage-engine" "Future implementation module for extensible interfaces: event notification publishing, access log writing, metrics collection, and analytics data export. These interfaces are defined in object-store-domain and will be implemented here." "Java 21, domain interfaces" {
       tags "planned"
         notificationEventPublisher = component "NotificationEventPublisher" "Extensible event publishing interface for S3 event notifications (s3:ObjectCreated, s3:ObjectRemoved). Publishes to TopicConfiguration, QueueConfiguration, CloudFunctionConfiguration destinations." "Domain interface"
         accessLogWriter = component "AccessLogWriter" "Extensible interface for writing S3 access logs to external destinations (Kafka, ElasticSearch, file system, S3 target bucket)." "Domain interface"
@@ -108,7 +108,7 @@ workspace "Magrathea ObjectStorage" "C4 model for the Magrathea S3-compatible ob
     magrathea.reactiveObjectStore.reactiveMultipartUploadService -> magrathea.reactiveObjectStore.multipartUpload "Creates/updates multipart upload state" "Java calls"
 
     magrathea.reactiveBucketManagement.reactiveBucketService -> magrathea.reactiveBucketManagement.bucketRepositoryPort "Persists and loads bucket aggregates via domain repository port" "Repository interfaces"
-    magrathea.reactiveBucketManagement.reactiveBucketService -> magrathea.reactiveBucketManagement.bucket "Creates/updates bucket aggregate root (emits ObjectStorageEvent on state transitions)" "Java calls"
+    magrathea.reactiveBucketManagement.reactiveBucketService -> magrathea.reactiveBucketManagement.bucket "Creates/updates bucket aggregate root (emits ObjectStoreEvent on state transitions)" "Java calls"
 
     magrathea.reactiveObjectStore.s3ObjectRepositoryPort -> magrathea.reactiveRepositoryApplication.s3ObjectCommandRepository "CQS command interface for S3Object persistence" "Implemented by"
     magrathea.reactiveObjectStore.s3ObjectRepositoryPort -> magrathea.reactiveRepositoryApplication.s3ObjectQueryRepository "CQS query interface for S3Object reads" "Implemented by"
@@ -148,15 +148,15 @@ workspace "Magrathea ObjectStorage" "C4 model for the Magrathea S3-compatible ob
 
   views {
     systemContext magrathea "SystemContext" {
-      title "C1 System Context: Magrathea ObjectStorage"
-      description "External S3-compatible clients interact with Magrathea ObjectStorage as a single software system."
+      title "C1 System Context: Magrathea ObjectStore"
+      description "External S3-compatible clients interact with Magrathea ObjectStore as a single software system."
       include user
       include magrathea
       autolayout lr
     }
 
     container magrathea "Container" {
-      title "C2 Container: Magrathea ObjectStorage"
+      title "C2 Container: Magrathea ObjectStore"
       description "s3-reactive-api-adapter exposes the S3 API, reactive-object-store and reactive-bucket-management implement core reactive capabilities, reactive-repository-application provides CQS interfaces, reactive-infrastructure persists state reactively in-process, and storage-engine provides extensible interfaces for notification, logging, metrics, and analytics."
       include user
       include magrathea.s3ReactiveApiAdapter
@@ -231,7 +231,7 @@ workspace "Magrathea ObjectStorage" "C4 model for the Magrathea S3-compatible ob
 
     component magrathea.storageEngine "StorageEngineComponents" {
       title "C3 Component: storage-engine"
-      description "Extensible domain interfaces for event notification publishing, access log writing, metrics collection, and analytics data export. Implementation is POSTPONED — only interfaces are defined now in object-storage-domain."
+      description "Extensible domain interfaces for event notification publishing, access log writing, metrics collection, and analytics data export. Implementation is POSTPONED — only interfaces are defined now in object-store-domain."
       include *
       include kafka
       include awsSns

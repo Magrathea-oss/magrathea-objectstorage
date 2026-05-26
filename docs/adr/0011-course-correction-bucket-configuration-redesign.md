@@ -36,8 +36,12 @@ Instead of a flat Configuration record:
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
 2026-05-25
+
+## Implementation Note
+
+Bucket.Configuration was replaced by BucketConfig with dedicated with* methods per config type. Each config feature now has a specific value object (CorsConfiguration, BucketLifecycleConfiguration, etc.). Domain events use BucketConfigChanged with the full BucketConfig payload. Handler code properly stores and retrieves config data through the aggregate root. C4 diagrams and ARC42 have been aligned.

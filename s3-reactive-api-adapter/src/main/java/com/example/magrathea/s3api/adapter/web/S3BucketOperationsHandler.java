@@ -1,10 +1,10 @@
 package com.example.magrathea.s3api.adapter.web;
 
-import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
-import com.example.magrathea.objectstorage.domain.aggregate.S3Object;
-import com.example.magrathea.objectstorage.domain.valueobject.ObjectKey;
-import com.example.magrathea.objectstorage.domain.valueobject.Region;
-import com.example.magrathea.objectstorage.domain.valueobject.StorageClass;
+import com.example.magrathea.objectstore.domain.aggregate.Bucket;
+import com.example.magrathea.objectstore.domain.aggregate.S3Object;
+import com.example.magrathea.objectstore.domain.valueobject.ObjectKey;
+import com.example.magrathea.objectstore.domain.valueobject.Region;
+import com.example.magrathea.objectstore.domain.valueobject.StorageClass;
 import com.example.magrathea.reactive.application.service.ReactiveBucketService;
 import com.example.magrathea.reactive.application.service.ReactiveObjectService;
 import com.example.magrathea.s3api.dto.command.VersioningConfigurationCommand;

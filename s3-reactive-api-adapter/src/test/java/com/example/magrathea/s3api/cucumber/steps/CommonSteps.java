@@ -7,7 +7,7 @@ import java.util.Map;
 
 /**
  * Shared state between step classes.
- * Registered as a Spring bean by ObjectStorageTestApp — not a Cucumber glue class.
+ * Registered as a Spring bean by ObjectStoreTestApp — not a Cucumber glue class.
  */
 public class CommonSteps {
 

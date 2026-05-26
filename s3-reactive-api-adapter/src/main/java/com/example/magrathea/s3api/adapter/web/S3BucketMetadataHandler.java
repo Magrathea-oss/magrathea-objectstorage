@@ -1,6 +1,6 @@
 package com.example.magrathea.s3api.adapter.web;
 
-import com.example.magrathea.objectstorage.domain.aggregate.Bucket;
+import com.example.magrathea.objectstore.domain.aggregate.Bucket;
 import com.example.magrathea.reactive.application.service.ReactiveBucketService;
 import com.example.magrathea.s3api.dto.command.TaggingCommand;
 import com.example.magrathea.s3api.dto.query.AccessControlPolicyQuery;

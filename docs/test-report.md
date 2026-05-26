@@ -1,4 +1,4 @@
-# Magrathea ObjectStorage Test Report
+# Magrathea ObjectStore Test Report
 
 Generated: 2026-05-24T15:14:59+02:00
 
@@ -141,34 +141,34 @@ Bucket: `magrathea-cli-test-1779628454-199892`
 
 | Module | Report | Tests | Failures | Errors | Skipped | Status |
 |---|---|---:|---:|---:|---:|---|
-| object-storage-domain | com.example.magrathea.objectstorage.domain.BucketAccelerateConfigurationTest.txt | 3 | 0 | 0 | 0 | ✅ Passed |
-| object-storage-domain | com.example.magrathea.objectstorage.domain.BucketAnalyticsConfigurationTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
-| object-storage-domain | com.example.magrathea.objectstorage.domain.BucketConfigurationTest.txt | 3 | 0 | 0 | 0 | ✅ Passed |
-| object-storage-domain | com.example.magrathea.objectstorage.domain.BucketEncryptionConfigurationTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
-| object-storage-domain | com.example.magrathea.objectstorage.domain.BucketIntelligentTieringConfigurationTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
-| object-storage-domain | com.example.magrathea.objectstorage.domain.BucketInventoryConfigurationTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
-| object-storage-domain | com.example.magrathea.objectstorage.domain.BucketLifecycleConfigurationTest.txt | 8 | 0 | 0 | 0 | ✅ Passed |
-| object-storage-domain | com.example.magrathea.objectstorage.domain.BucketLoggingConfigurationTest.txt | 3 | 0 | 0 | 0 | ✅ Passed |
-| object-storage-domain | com.example.magrathea.objectstorage.domain.BucketMetricsConfigurationTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
-| object-storage-domain | com.example.magrathea.objectstorage.domain.BucketNotificationConfigurationTest.txt | 3 | 0 | 0 | 0 | ✅ Passed |
-| object-storage-domain | com.example.magrathea.objectstorage.domain.BucketOwnershipControlsTest.txt | 2 | 0 | 0 | 0 | ✅ Passed |
-| object-storage-domain | com.example.magrathea.objectstorage.domain.BucketPolicyTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
-| object-storage-domain | com.example.magrathea.objectstorage.domain.BucketReplicationConfigurationTest.txt | 3 | 0 | 0 | 0 | ✅ Passed |
-| object-storage-domain | com.example.magrathea.objectstorage.domain.BucketRequestPaymentConfigurationTest.txt | 3 | 0 | 0 | 0 | ✅ Passed |
-| object-storage-domain | com.example.magrathea.objectstorage.domain.BucketTest.txt | 11 | 0 | 0 | 0 | ✅ Passed |
-| object-storage-domain | com.example.magrathea.objectstorage.domain.BucketWebsiteConfigurationTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
-| object-storage-domain | com.example.magrathea.objectstorage.domain.CorsConfigurationTest.txt | 7 | 0 | 0 | 0 | ✅ Passed |
-| object-storage-domain | com.example.magrathea.objectstorage.domain.MultipartUploadTest.txt | 9 | 0 | 0 | 0 | ✅ Passed |
-| object-storage-domain | com.example.magrathea.objectstorage.domain.ObjectKeyTest.txt | 6 | 0 | 0 | 0 | ✅ Passed |
-| object-storage-domain | com.example.magrathea.objectstorage.domain.ObjectStorageEventTest.txt | 6 | 0 | 0 | 0 | ✅ Passed |
-| object-storage-domain | com.example.magrathea.objectstorage.domain.PartNumberTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
-| object-storage-domain | com.example.magrathea.objectstorage.domain.PublicAccessBlockConfigurationTest.txt | 3 | 0 | 0 | 0 | ✅ Passed |
-| object-storage-domain | com.example.magrathea.objectstorage.domain.RegionTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
-| object-storage-domain | com.example.magrathea.objectstorage.domain.S3ObjectTest.txt | 8 | 0 | 0 | 0 | ✅ Passed |
-| object-storage-domain | com.example.magrathea.objectstorage.domain.StorageClassTest.txt | 7 | 0 | 0 | 0 | ✅ Passed |
-| object-storage-domain | com.example.magrathea.objectstorage.domain.UploadIdTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
-| object-storage-domain | com.example.magrathea.objectstorage.domain.UploadPartTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
-| s3-api | com.example.magrathea.s3api.cucumber.ObjectStorageCucumberTest.txt | 171 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.BucketAccelerateConfigurationTest.txt | 3 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.BucketAnalyticsConfigurationTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.BucketConfigurationTest.txt | 3 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.BucketEncryptionConfigurationTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.BucketIntelligentTieringConfigurationTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.BucketInventoryConfigurationTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.BucketLifecycleConfigurationTest.txt | 8 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.BucketLoggingConfigurationTest.txt | 3 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.BucketMetricsConfigurationTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.BucketNotificationConfigurationTest.txt | 3 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.BucketOwnershipControlsTest.txt | 2 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.BucketPolicyTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.BucketReplicationConfigurationTest.txt | 3 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.BucketRequestPaymentConfigurationTest.txt | 3 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.BucketTest.txt | 11 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.BucketWebsiteConfigurationTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.CorsConfigurationTest.txt | 7 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.MultipartUploadTest.txt | 9 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.ObjectKeyTest.txt | 6 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.ObjectStoreEventTest.txt | 6 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.PartNumberTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.PublicAccessBlockConfigurationTest.txt | 3 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.RegionTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.S3ObjectTest.txt | 8 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.StorageClassTest.txt | 7 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.UploadIdTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.UploadPartTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
+| s3-api | com.example.magrathea.s3api.cucumber.ObjectStoreCucumberTest.txt | 171 | 0 | 0 | 0 | ✅ Passed |
 | **Total** |  | **300** | **0** | **0** | **0** | **✅ Passed** |
 
 ## Clover Coverage

@@ -1,6 +1,6 @@
 package com.example.magrathea.s3api.dto.query;
 
-import com.example.magrathea.objectstorage.domain.valueobject.Region;
+import com.example.magrathea.objectstore.domain.valueobject.Region;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlText;
 

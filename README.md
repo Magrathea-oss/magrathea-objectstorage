@@ -1,17 +1,17 @@
-# Magrathea ObjectStorage
+# Magrathea ObjectStore
 
 [![Java](https://img.shields.io/badge/Java-21-blue)](https://openjdk.org/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0-green)](https://spring.io/)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-**Magrathea ObjectStorage** is an AWS S3-compatible object storage built with Spring Boot 4 WebFlux and Java 21. The only public HTTP API is the S3 REST API exposed by the pluggable `s3-api` module.
+**Magrathea ObjectStore** is an AWS S3-compatible object storage built with Spring Boot 4 WebFlux and Java 21. The only public HTTP API is the S3 REST API exposed by the pluggable `s3-api` module.
 
 ---
 
 ## System Context
 
 <div align="center">
-  <img src="docs/c4/images/SystemContext.png" alt="System Context — Magrathea ObjectStorage" width="600">
+  <img src="docs/c4/images/SystemContext.png" alt="System Context — Magrathea ObjectStore" width="600">
 </div>
 
 *Generated from the Structurizr workspace — see `docs/c4/workspace.dsl` and [`docs/c4/README.md`](docs/c4/README.md).*
@@ -25,7 +25,7 @@
 - **Pluggable S3 API** — auto-configured when `s3-api` is on the classpath; disabled with `s3.api.enabled=false`
 - **Spring Boot 4 WebFlux** — functional RouterFunction endpoints
 - **Jackson 3 XML** — `tools.jackson.dataformat:jackson-dataformat-xml` with custom WebFlux encoder
-- **Pure domain** — no Spring, no JPA, no reactive types in `object-storage-domain`
+- **Pure domain** — no Spring, no JPA, no reactive types in `object-store-domain`
 - **In-memory infrastructure** — `InMemoryObjectRepository` and `BucketRepositoryImpl`
 - **Testing** — JUnit, Cucumber, AWS CLI compatibility, Clover coverage profile
 
@@ -36,9 +36,9 @@
 | Module | Responsibility | Notes |
 |---|---|---|
 | `s3-api` | Pluggable AWS S3 HTTP adapter | Auto-configuration, RouterFunction, XML responses, Cucumber tests |
-| `object-storage-domain` | S3 domain model | Zero framework dependencies |
-| `object-storage-application` | Application services and DTOs | Includes `DefaultS3ObjectWrite` carrying `Flux<DataBuffer>` for repository saves |
-| `object-storage-infrastructure` | Repository implementations | No HTTP API, no S3 router |
+| `object-store-domain` | S3 domain model | Zero framework dependencies |
+| `object-store-application` | Application services and DTOs | Includes `DefaultS3ObjectWrite` carrying `Flux<DataBuffer>` for repository saves |
+| `object-store-infrastructure` | Repository implementations | No HTTP API, no S3 router |
 | `bootstrap-application` | Spring Boot entry point | Includes `s3-api` to activate S3 endpoints |
 | `persistence-context-*` | Reserved placeholders | Empty by design |
 
@@ -85,7 +85,7 @@ aws --endpoint-url http://localhost:8080 s3api get-object --bucket test-bucket -
 | Level | Type | Command |
 |---|---|---|
 | 1 | All unit + integration tests | `mvn test` |
-| 2 | Domain JUnit only | `mvn test -pl object-storage-domain` |
+| 2 | Domain JUnit only | `mvn test -pl object-store-domain` |
 | 3 | S3 API Cucumber only | `mvn test -pl s3-api` |
 | 4 | Clover coverage | `mvn -Pcoverage clover:setup test clover:aggregate clover:clover` |
 | 5 | AWS CLI compatibility | `bash test-aws-cli.sh` |

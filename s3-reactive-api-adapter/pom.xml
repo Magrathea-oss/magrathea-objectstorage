@@ -26,12 +26,12 @@
         <!-- Domain layer — domain value objects, aggregates, repository interfaces -->
         <dependency>
             <groupId>com.example</groupId>
-            <artifactId>object-storage-domain</artifactId>
+            <artifactId>object-store-domain</artifactId>
         </dependency>
         <!-- Reactive application layer — reactive services -->
         <dependency>
             <groupId>com.example</groupId>
-            <artifactId>object-storage-reactive-application</artifactId>
+            <artifactId>object-store-reactive-application</artifactId>
         </dependency>
         <!-- Spring Boot 4 WebFlux — reactive HTTP -->
         <dependency>

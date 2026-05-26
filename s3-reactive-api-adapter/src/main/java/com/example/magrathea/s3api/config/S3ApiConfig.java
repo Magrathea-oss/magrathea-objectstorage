@@ -20,7 +20,7 @@ import org.springframework.web.reactive.function.server.ServerResponse;
 /**
  * Auto-configuration for S3 Reactive API Adapter module.
  * Activates when:
- *  - object-storage-reactive-application is on the classpath (ReactiveBucketService, ReactiveObjectService available)
+ *  - object-store-reactive-application is on the classpath (ReactiveBucketService, ReactiveObjectService available)
  *  - s3.api.enabled property is not false
  *
  * When s3-reactive-api-adapter module is excluded from the build, this config is not loaded.
