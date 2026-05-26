@@ -166,6 +166,18 @@ public record S3Object(
     }
 
     /**
+     * Delete this object. Returns new instance with an {@link ObjectStoreEvent.ObjectDeleted} event.
+     */
+    public S3Object withDeleted() {
+        var newEvents = appendEvent(
+            new ObjectStoreEvent.ObjectDeleted(id, bucketId, Instant.now())
+        );
+        return new S3Object(id, bucketId, key, etag, size, storageClass,
+            lastModified, contentType, contentDisposition, contentEncoding, metadata,
+            contentDescriptor, newEvents);
+    }
+
+    /**
      * Returns the accumulated domain events since the last {@link #clearEvents()}.
      */
     public List<ObjectStoreEvent> domainEvents() {

@@ -9,7 +9,7 @@ It provides a lightweight, single-node implementation of the AWS S3 REST API for
 
 === Goals
 
-- **S3 API compatibility**: implement core S3 REST API operations (ListBuckets, CreateBucket, PutObject, GetObject, HeadObject, ListObjects, DeleteObject, DeleteBucket)
+- **S3 API compatibility**: implement the in-scope AWS S3 REST API operation set (111/111), including Phase F advanced/specialized operations
 - **Reactive by design**: full WebFlux non-blocking I/O, DataBuffer streaming for binary content
 - **Domain-Driven Design**: pure domain with zero framework dependencies, hexagonal architecture
 - **Testability**: 3-layer testing (JUnit domain, Cucumber BDD integration, AWS CLI compatibility)

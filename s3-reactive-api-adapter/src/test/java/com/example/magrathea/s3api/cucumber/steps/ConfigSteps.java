@@ -1389,5 +1389,450 @@ public class ConfigSteps {
         commonSteps.setResponseStatus(status);
     }
 
+    // ── ABAC ──
+
+    @Given("bucket ABAC is preset with rule id {string} and principal {string}")
+    public void bucketAbacPreset(String ruleId, String principal) {
+        webTestClient.put()
+            .uri("/test-bucket?abac")
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(abacBody(ruleId, principal))
+            .exchange()
+            .expectStatus().isOk();
+    }
+
+    @When("bucket ABAC is configured with rule id {string} and principal {string}")
+    public void putBucketAbac(String ruleId, String principal) {
+        var status = webTestClient.put()
+            .uri("/test-bucket?abac")
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(abacBody(ruleId, principal))
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket ABAC is configured for {string} with rule id {string} and principal {string}")
+    public void putBucketAbacFor(String bucket, String ruleId, String principal) {
+        var status = webTestClient.put()
+            .uri("/{bucket}?abac", bucket)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(abacBody(ruleId, principal))
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket ABAC configuration is requested")
+    public void getBucketAbac() {
+        var result = webTestClient.get()
+            .uri("/test-bucket?abac")
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket ABAC configuration is requested for {string}")
+    public void getBucketAbacFor(String bucket) {
+        var result = webTestClient.get()
+            .uri("/{bucket}?abac", bucket)
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    // ── Object Lock ──
+
+    @Given("bucket object lock is preset with mode {string} and days {int}")
+    public void bucketObjectLockPreset(String mode, int days) {
+        webTestClient.put()
+            .uri("/test-bucket?object-lock")
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(objectLockBody(mode, days))
+            .exchange()
+            .expectStatus().isOk();
+    }
+
+    @When("bucket object lock is configured with mode {string} and days {int}")
+    public void putBucketObjectLock(String mode, int days) {
+        var status = webTestClient.put()
+            .uri("/test-bucket?object-lock")
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(objectLockBody(mode, days))
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket object lock is configured for {string} with mode {string} and days {int}")
+    public void putBucketObjectLockFor(String bucket, String mode, int days) {
+        var status = webTestClient.put()
+            .uri("/{bucket}?object-lock", bucket)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(objectLockBody(mode, days))
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket object lock configuration is requested")
+    public void getBucketObjectLock() {
+        var result = webTestClient.get()
+            .uri("/test-bucket?object-lock")
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket object lock configuration is requested for {string}")
+    public void getBucketObjectLockFor(String bucket) {
+        var result = webTestClient.get()
+            .uri("/{bucket}?object-lock", bucket)
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    // ── Metadata Configuration ──
+
+    @Given("bucket metadata is preset with rule id {string} and status {string}")
+    public void bucketMetadataPreset(String ruleId, String statusValue) {
+        webTestClient.put()
+            .uri("/test-bucket?metadata-config")
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(metadataBody(ruleId, statusValue))
+            .exchange()
+            .expectStatus().isOk();
+    }
+
+    @When("bucket metadata is configured with rule id {string} and status {string}")
+    public void putBucketMetadata(String ruleId, String statusValue) {
+        var status = webTestClient.put()
+            .uri("/test-bucket?metadata-config")
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(metadataBody(ruleId, statusValue))
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket metadata is configured for {string} with rule id {string} and status {string}")
+    public void putBucketMetadataFor(String bucket, String ruleId, String statusValue) {
+        var status = webTestClient.put()
+            .uri("/{bucket}?metadata-config", bucket)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(metadataBody(ruleId, statusValue))
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket metadata configuration is requested")
+    public void getBucketMetadata() {
+        var result = webTestClient.get()
+            .uri("/test-bucket?metadata-config")
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket metadata configuration is requested for {string}")
+    public void getBucketMetadataFor(String bucket) {
+        var result = webTestClient.get()
+            .uri("/{bucket}?metadata-config", bucket)
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket metadata configuration is deleted")
+    public void deleteBucketMetadata() {
+        var status = webTestClient.delete()
+            .uri("/test-bucket?metadata-config")
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket metadata configuration is deleted for {string}")
+    public void deleteBucketMetadataFor(String bucket) {
+        var status = webTestClient.delete()
+            .uri("/{bucket}?metadata-config", bucket)
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    // ── Metadata Table Configuration ──
+
+    @Given("bucket metadata table is preset with rule id {string} and table name {string}")
+    public void bucketMetadataTablePreset(String ruleId, String tableName) {
+        webTestClient.put()
+            .uri("/test-bucket?metadata-table-config")
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(metadataTableBody(ruleId, tableName))
+            .exchange()
+            .expectStatus().isOk();
+    }
+
+    @When("bucket metadata table is configured with rule id {string} and table name {string}")
+    public void putBucketMetadataTable(String ruleId, String tableName) {
+        var status = webTestClient.put()
+            .uri("/test-bucket?metadata-table-config")
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(metadataTableBody(ruleId, tableName))
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket metadata table is configured for {string} with rule id {string} and table name {string}")
+    public void putBucketMetadataTableFor(String bucket, String ruleId, String tableName) {
+        var status = webTestClient.put()
+            .uri("/{bucket}?metadata-table-config", bucket)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(metadataTableBody(ruleId, tableName))
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket metadata table configuration is requested")
+    public void getBucketMetadataTable() {
+        var result = webTestClient.get()
+            .uri("/test-bucket?metadata-table-config")
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket metadata table configuration is requested for {string}")
+    public void getBucketMetadataTableFor(String bucket) {
+        var result = webTestClient.get()
+            .uri("/{bucket}?metadata-table-config", bucket)
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket metadata table configuration is deleted")
+    public void deleteBucketMetadataTable() {
+        var status = webTestClient.delete()
+            .uri("/test-bucket?metadata-table-config")
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket metadata table configuration is deleted for {string}")
+    public void deleteBucketMetadataTableFor(String bucket) {
+        var status = webTestClient.delete()
+            .uri("/{bucket}?metadata-table-config", bucket)
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    // ── Inventory Table Configuration ──
+
+    @Given("bucket inventory table is preset with id {string} and format {string}")
+    public void bucketInventoryTablePreset(String id, String format) {
+        webTestClient.put()
+            .uri("/test-bucket?inventory-table-config")
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(tableBody("InventoryTableConfiguration", id, format))
+            .exchange()
+            .expectStatus().isOk();
+    }
+
+    @When("bucket inventory table is configured with id {string} and format {string}")
+    public void putBucketInventoryTable(String id, String format) {
+        var status = webTestClient.put()
+            .uri("/test-bucket?inventory-table-config")
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(tableBody("InventoryTableConfiguration", id, format))
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket inventory table is configured for {string} with id {string} and format {string}")
+    public void putBucketInventoryTableFor(String bucket, String id, String format) {
+        var status = webTestClient.put()
+            .uri("/{bucket}?inventory-table-config", bucket)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(tableBody("InventoryTableConfiguration", id, format))
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket inventory table configuration is requested")
+    public void getBucketInventoryTable() {
+        var result = webTestClient.get()
+            .uri("/test-bucket?inventory-table-config")
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket inventory table configuration is requested for {string}")
+    public void getBucketInventoryTableFor(String bucket) {
+        var result = webTestClient.get()
+            .uri("/{bucket}?inventory-table-config", bucket)
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    // ── Journal Table Configuration ──
+
+    @Given("bucket journal table is preset with id {string} and format {string}")
+    public void bucketJournalTablePreset(String id, String format) {
+        webTestClient.put()
+            .uri("/test-bucket?journal-table-config")
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(tableBody("JournalTableConfiguration", id, format))
+            .exchange()
+            .expectStatus().isOk();
+    }
+
+    @When("bucket journal table is configured with id {string} and format {string}")
+    public void putBucketJournalTable(String id, String format) {
+        var status = webTestClient.put()
+            .uri("/test-bucket?journal-table-config")
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(tableBody("JournalTableConfiguration", id, format))
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket journal table is configured for {string} with id {string} and format {string}")
+    public void putBucketJournalTableFor(String bucket, String id, String format) {
+        var status = webTestClient.put()
+            .uri("/{bucket}?journal-table-config", bucket)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(tableBody("JournalTableConfiguration", id, format))
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("bucket journal table configuration is requested")
+    public void getBucketJournalTable() {
+        var result = webTestClient.get()
+            .uri("/test-bucket?journal-table-config")
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("bucket journal table configuration is requested for {string}")
+    public void getBucketJournalTableFor(String bucket) {
+        var result = webTestClient.get()
+            .uri("/{bucket}?journal-table-config", bucket)
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    private String abacBody(String ruleId, String principal) {
+        return "<AbacConfiguration><AbacRule>" +
+            "<Id>" + ruleId + "</Id>" +
+            "<Principal>" + principal + "</Principal>" +
+            "<Resource>arn:aws:s3:::test-bucket/*</Resource>" +
+            "<Action>s3:GetObject</Action>" +
+            "<Condition><Tag>department</Tag><Value>engineering</Value></Condition>" +
+            "</AbacRule></AbacConfiguration>";
+    }
+
+    private String objectLockBody(String mode, int days) {
+        return "<ObjectLockConfiguration>" +
+            "<ObjectLockEnabled>true</ObjectLockEnabled>" +
+            "<Rule><DefaultRetention><Mode>" + mode + "</Mode><Days>" + days +
+            "</Days></DefaultRetention></Rule>" +
+            "</ObjectLockConfiguration>";
+    }
+
+    private String metadataBody(String ruleId, String statusValue) {
+        return "<MetadataConfiguration><MetadataRule>" +
+            "<Id>" + ruleId + "</Id>" +
+            "<Status>" + statusValue + "</Status>" +
+            "<MetadataResourceType>Object</MetadataResourceType>" +
+            "<MetadataResourceSubtype>UserMetadata</MetadataResourceSubtype>" +
+            "</MetadataRule></MetadataConfiguration>";
+    }
+
+    private String metadataTableBody(String ruleId, String tableName) {
+        return "<MetadataTableConfiguration><MetadataTableRule>" +
+            "<Id>" + ruleId + "</Id>" +
+            "<Status>Enabled</Status>" +
+            "<MetadataTableName>" + tableName + "</MetadataTableName>" +
+            "<MetadataTableDatabase>default</MetadataTableDatabase>" +
+            "</MetadataTableRule></MetadataTableConfiguration>";
+    }
+
+    private String tableBody(String root, String id, String format) {
+        return "<" + root + ">" +
+            "<Id>" + id + "</Id>" +
+            "<DestinationFormat>" + format + "</DestinationFormat>" +
+            "<ScheduleFrequency>Daily</ScheduleFrequency>" +
+            "<Enabled>true</Enabled>" +
+            "</" + root + ">";
+    }
+
     // ── Then ── (uses BucketSteps.responseStatusIs and BucketSteps.metadataResponseContains)
 }

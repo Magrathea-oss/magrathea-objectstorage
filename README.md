@@ -4,7 +4,7 @@
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0-green)](https://spring.io/)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-**Magrathea ObjectStore** is an AWS S3-compatible object storage built with Spring Boot 4 WebFlux and Java 21. The only public HTTP API is the S3 REST API exposed by the pluggable `s3-api` module.
+**Magrathea ObjectStore** is an AWS S3-compatible object store built with Spring Boot 4 WebFlux and Java 21. The only public HTTP API is the S3 REST API exposed by the pluggable `s3-reactive-api-adapter` module.
 
 ---
 
@@ -21,12 +21,12 @@
 ## Features
 
 - **S3-compatible API only** — no custom internal REST API
-- **Implemented operations** — 84 Amazon S3 actions, including bucket/object CRUD, ListObjectsV2, CopyObject, DeleteObjects, bucket location/versioning, object versions, ACLs, tagging, object attributes, bucket configuration (CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate), multipart uploads, and analytics, inventory, metrics, intelligent-tiering configuration
-- **Pluggable S3 API** — auto-configured when `s3-api` is on the classpath; disabled with `s3.api.enabled=false`
+- **Implemented operations** — 111/111 Amazon S3 actions in scope, including bucket/object CRUD, multipart upload, bucket/object metadata, bucket configuration, analytics/inventory/metrics/intelligent-tiering, and Phase F advanced/specialized operations from ADR 0012
+- **Pluggable S3 API** — auto-configured when `s3-reactive-api-adapter` is on the classpath; disabled with `s3.api.enabled=false`
 - **Spring Boot 4 WebFlux** — functional RouterFunction endpoints
 - **Jackson 3 XML** — `tools.jackson.dataformat:jackson-dataformat-xml` with custom WebFlux encoder
 - **Pure domain** — no Spring, no JPA, no reactive types in `object-store-domain`
-- **In-memory infrastructure** — `InMemoryObjectRepository` and `BucketRepositoryImpl`
+- **In-memory infrastructure** — reactive in-memory bucket, object, and multipart repositories
 - **Testing** — JUnit, Cucumber, AWS CLI compatibility, Clover coverage profile
 
 ---
@@ -35,27 +35,28 @@
 
 | Module | Responsibility | Notes |
 |---|---|---|
-| `s3-api` | Pluggable AWS S3 HTTP adapter | Auto-configuration, RouterFunction, XML responses, Cucumber tests |
+| `s3-reactive-api-adapter` | Pluggable AWS S3 HTTP adapter | Auto-configuration, RouterFunction, XML responses, Cucumber tests |
 | `object-store-domain` | S3 domain model | Zero framework dependencies |
-| `object-store-application` | Application services and DTOs | Includes `DefaultS3ObjectWrite` carrying `Flux<DataBuffer>` for repository saves |
-| `object-store-infrastructure` | Repository implementations | No HTTP API, no S3 router |
-| `bootstrap-application` | Spring Boot entry point | Includes `s3-api` to activate S3 endpoints |
-| `persistence-context-*` | Reserved placeholders | Empty by design |
+| `object-store-reactive-repository-application` | Reactive CQS repository interfaces | Bucket, object, and multipart command/query ports |
+| `object-store-reactive-application` | Reactive application services and DTOs | Native Mono/Flux service APIs |
+| `object-store-reactive-infrastructure` | Reactive in-memory repository implementations | No HTTP API, no S3 router |
+| `storage-engine-domain` / `storage-engine-application` / `storage-engine-infrastructure` | Reserved storage-engine modules | Empty by design for future persistence/storage-engine work |
+| `bootstrap-application` | Spring Boot entry point | Includes `s3-reactive-api-adapter` to activate S3 endpoints |
 
 ### S3 API activation
 
 ```properties
-# default: enabled when s3-api is on the classpath
+# default: enabled when s3-reactive-api-adapter is on the classpath
 s3.api.enabled=true
 
-# disable S3 routes even with s3-api present
+# disable S3 routes even with s3-reactive-api-adapter present
 s3.api.enabled=false
 ```
 
 `S3ApiConfig` and `JacksonXmlCodecConfig` are loaded through:
 
 ```text
-s3-api/src/main/resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports
+s3-reactive-api-adapter/src/main/resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports
 ```
 
 ---
@@ -86,7 +87,7 @@ aws --endpoint-url http://localhost:8080 s3api get-object --bucket test-bucket -
 |---|---|---|
 | 1 | All unit + integration tests | `mvn test` |
 | 2 | Domain JUnit only | `mvn test -pl object-store-domain` |
-| 3 | S3 API Cucumber only | `mvn test -pl s3-api` |
+| 3 | S3 API Cucumber only | `mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false` |
 | 4 | Clover coverage | `mvn -Pcoverage clover:setup test clover:aggregate clover:clover` |
 | 5 | AWS CLI compatibility | `bash test-aws-cli.sh` |
 | 6 | AWS CLI via Maven profile | `mvn verify -Paws-cli-tests` (auto-starts/stops server) |
@@ -146,11 +147,9 @@ The implementation plan tracks all Amazon S3 actions from:
 
 <https://docs.aws.amazon.com/AmazonS3/latest/API/API_Operations.md>
 
-Current coverage: **84 / 111 Amazon S3 actions**.
+Current coverage: **111 / 111 Amazon S3 actions**.
 
-Phases A, B, C, D, and E are complete. Next operations:
-
-1. Advanced/specialized operations (Phase F)
+Phases A, B, C, D, E, and F are complete. Phase F advanced/specialized operations are recorded in [ADR 0012](docs/adr/0012-phase-f-advanced-s3-operations.md) and verified by Cucumber.
 
 See [`PLAN.md`](PLAN.md) for the full phased inclusion plan.
 

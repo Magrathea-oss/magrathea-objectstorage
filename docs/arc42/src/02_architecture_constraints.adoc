@@ -21,7 +21,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 - `object-store-domain`: uses ONLY AWS S3 native terminology — no custom abstractions like BinaryContent
 - `object-store-domain`: zero dependencies except test dependencies
 - No `shared-domain` module exists
-- `persistence-context-*` modules are intentionally empty placeholders and are not referenced by S3 implementation
+- `storage-engine-*` modules are intentionally empty placeholders reserved for future storage-engine design and are not referenced by the current S3 implementation
 
 === Infrastructure Constraints
 

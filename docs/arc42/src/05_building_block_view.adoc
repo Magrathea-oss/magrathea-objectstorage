@@ -15,14 +15,14 @@ image::../../c4/images/Container.png[Container Diagram, width=600]
 **Blackbox Description:**
 Exposes the S3-compatible REST API via RouterFunction WebFlux. Translates HTTP/XML/binary requests into calls to reactive application services. Serializes XML responses with Jackson 3.
 
-- **Provided Interface:** S3 REST API (84 endpoints out of 111)
+- **Provided Interface:** S3 REST API (111/111 in-scope operations)
 - **Required Interface:** ReactiveBucketService, ReactiveObjectService, ReactiveMultipartUploadService
 - **Technology:** Spring Boot 4 WebFlux, Java 21, RouterFunction, Jackson 3 XML
 
 ==== reactive-object-store (Reactive object storage capability)
 
 **Blackbox Description:**
-Implements reactive object CRUD, multipart upload, and content retrieval use cases using Mono/Flux. Contains reactive application services (ReactiveObjectService, ReactiveMultipartUploadService), domain aggregates (S3Object, MultipartUpload), and repository ports.
+Implements reactive object CRUD, multipart upload, content retrieval, and Phase F advanced object use cases using Mono/Flux. Contains reactive application services (ReactiveObjectService, ReactiveMultipartUploadService), domain aggregates (S3Object, MultipartUpload), and repository ports.
 
 - **Provided Interface:** ReactiveObjectService, ReactiveMultipartUploadService
 - **Required Interface:** BucketRepository (read), S3ObjectCommandRepository, S3ObjectQueryRepository, MultipartUploadCommandRepository, MultipartUploadQueryRepository
@@ -31,7 +31,7 @@ Implements reactive object CRUD, multipart upload, and content retrieval use cas
 ==== reactive-bucket-management (Reactive bucket management capability)
 
 **Blackbox Description:**
-Implements reactive bucket lifecycle, metadata (ACL, tagging), configuration (CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate), and advanced configuration (analytics, inventory, metrics, intelligent-tiering) use cases using Mono/Flux. Contains ReactiveBucketService, the Bucket aggregate root (with inline Configuration nested record and domain events), and repository ports. Configuration lives inside the Bucket aggregate — there is no separate configuration service.
+Implements reactive bucket lifecycle, metadata (ACL, tagging), configuration (CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate), advanced configuration (analytics, inventory, metrics, intelligent-tiering), and Phase F bucket metadata/ABAC/object-lock configuration use cases using Mono/Flux. Contains ReactiveBucketService, the Bucket aggregate root (with dedicated configuration value objects and domain events), and repository ports. Configuration lives inside the Bucket aggregate — there is no separate configuration service.
 
 - **Provided Interface:** ReactiveBucketService
 - **Required Interface:** BucketCommandRepository, BucketQueryRepository
@@ -64,12 +64,13 @@ image::../../c4/images/S3ReactiveApiAdapterComponents.png[S3 Reactive API Adapte
 | Component | Responsibility |
 |---|---|
 | `S3ProxyRouter` | Entry point RouterFunction: defines S3 routes and dispatches requests to handlers |
-| `S3BucketOperationsHandler` | Bucket lifecycle: create, delete, head, list, location, versioning |
+| `S3BucketOperationsHandler` | Bucket lifecycle: create, delete, head, list, location, versioning, directory-bucket listing |
 | `S3BucketMetadataHandler` | Bucket metadata: ACL, tagging |
-| `S3BucketConfigHandler` | Bucket configuration: CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate, analytics, inventory, metrics, intelligent-tiering |
-| `S3ObjectOperationsHandler` | Object CRUD, copy, multi-delete |
-| `S3ObjectMetadataHandler` | Object metadata: ACL, tagging, attributes |
+| `S3BucketConfigHandler` | Bucket configuration: CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate, analytics, inventory, metrics, intelligent-tiering, ABAC, object lock, bucket metadata/table configuration |
+| `S3ObjectOperationsHandler` | Object CRUD, copy, multi-delete, rename, torrent, restore, select, Object Lambda response |
+| `S3ObjectMetadataHandler` | Object metadata: ACL, tagging, attributes, legal hold, retention, encryption metadata |
 | `S3MultipartHandler` | Multipart upload lifecycle: initiate, upload, complete, abort, list |
+| `S3SessionHandler` | CreateSession support for Phase F session management |
 | `S3WebSupport` | Shared request predicates, parsing, lookup, error helpers |
 
 === Level 2 — Component Diagram (reactive-object-store)
@@ -95,7 +96,7 @@ image::../../c4/images/ReactiveBucketManagementComponents.png[Reactive Bucket Ma
 
 | Component | Responsibility |
 |---|---|
-| `ReactiveBucketService` | Reactive application service: bucket lifecycle, versioning, CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate, analytics, inventory, metrics, intelligent-tiering configuration via Mono/Flux |
+| `ReactiveBucketService` | Reactive application service: bucket lifecycle, versioning, CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate, analytics, inventory, metrics, intelligent-tiering, ABAC, object lock, and metadata configuration via Mono/Flux |
 | `Bucket` | Domain aggregate root: bucket identity, name, region, storage class, versioning, encryption, and dedicated configuration fields per config type (CORS, Lifecycle, Encryption, Logging, Website, Notification, Replication, Policy, PublicAccessBlock, OwnershipControls, RequestPayment, Accelerate, plus multi-instance maps for Analytics, Inventory, Metrics, Intelligent-Tiering). Emits specific ObjectStoreEvent subtypes per config change (e.g., `BucketLifecycleConfigurationChanged`, `BucketNotificationConfigurationChanged`). Each config feature has a dedicated `with*()` / `without*()` method — no generic `withConfiguration()` / flat `Configuration` record. |
 | `BucketRepository port` | Repository port: bucket metadata and configuration persistence |
 

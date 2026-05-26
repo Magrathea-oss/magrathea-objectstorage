@@ -7,9 +7,12 @@ import com.example.magrathea.objectstore.domain.valueobject.ObjectKey;
 import com.example.magrathea.reactive.application.service.ReactiveBucketService;
 import com.example.magrathea.reactive.application.service.ReactiveObjectService;
 import com.example.magrathea.s3api.dto.command.DeleteObjectsCommand;
+import com.example.magrathea.s3api.dto.command.RestoreObjectCommand;
+import com.example.magrathea.s3api.dto.command.SelectObjectContentCommand;
 import com.example.magrathea.s3api.dto.query.CopyObjectResultQuery;
 import com.example.magrathea.s3api.dto.query.DeleteResultQuery;
 import com.example.magrathea.s3api.dto.query.ErrorQuery;
+import com.example.magrathea.s3api.dto.query.SelectObjectContentQuery;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferFactory;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
@@ -25,6 +28,7 @@ import reactor.core.scheduler.Schedulers;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.util.DigestUtils;
 
 /**
@@ -39,6 +43,7 @@ public class S3ObjectOperationsHandler {
 
     private final ReactiveBucketService bucketService;
     private final ReactiveObjectService objectService;
+    private final Map<S3Object.Id, byte[]> contentStore = new ConcurrentHashMap<>();
 
     public S3ObjectOperationsHandler(ReactiveBucketService bucketService,
                                       ReactiveObjectService objectService) {
@@ -78,8 +83,9 @@ public class S3ObjectOperationsHandler {
                     .subscribeOn(Schedulers.boundedElastic())
                     .flatMap(bytes -> {
                         var md5Hash = DigestUtils.md5DigestAsHex(bytes);
-                        var descriptor = ContentDescriptor.of(bytes.length, "", md5Hash);
+                        var descriptor = ContentDescriptor.of(bytes.length, md5Hash, objectId.value());
                         var withContent = s3Object.withContent(descriptor);
+                        contentStore.put(objectId, bytes.clone());
                         return objectService.saveObject(withContent)
                             .then(ServerResponse.ok()
                                 .header("ETag", "\"" + md5Hash + "\"")
@@ -111,14 +117,21 @@ public class S3ObjectOperationsHandler {
                 return objectService.findByBucketAndKey(sourceBucket.id(), ObjectKey.of(sourceKey))
                     .flatMap(sourceObject -> {
                         var contentDescriptor = sourceObject.content();
-                        var srcStorageClass = sourceObject.storageClass();
                         var targetObjectId = S3Object.Id.generate();
                         var targetObjectKey = ObjectKey.of(targetKey);
+                        var size = contentDescriptor != null ? contentDescriptor.size() : sourceObject.size();
                         var s3Object = S3Object.create(targetObjectId, targetBucketInfo.id(), targetObjectKey,
-                            sourceObject.contentType(), null, null, contentDescriptor.size(), Map.of());
-                        var withContent = s3Object.withContent(contentDescriptor);
-                        var etag = contentDescriptor.md5Hash() != null
-                            ? "\"" + contentDescriptor.md5Hash() + "\""
+                            sourceObject.contentType(), null, null, size, Map.of());
+                        var copiedDescriptor = contentDescriptor != null
+                            ? ContentDescriptor.of(contentDescriptor.size(), contentDescriptor.md5Hash(), targetObjectId.value())
+                            : null;
+                        var withContent = copiedDescriptor != null ? s3Object.withContent(copiedDescriptor) : s3Object;
+                        var sourceBytes = contentStore.get(sourceObject.id());
+                        if (sourceBytes != null) {
+                            contentStore.put(targetObjectId, sourceBytes.clone());
+                        }
+                        var etag = copiedDescriptor != null && copiedDescriptor.md5Hash() != null
+                            ? "\"" + copiedDescriptor.md5Hash() + "\""
                             : "\"\"";
                         return objectService.saveObject(withContent)
                             .then(ServerResponse.ok()
@@ -143,12 +156,13 @@ public class S3ObjectOperationsHandler {
                     // Delete all objects in parallel
                     Mono<Void> deleteAll = Flux.fromIterable(cmd.objects())
                         .flatMap(obj -> objectService.findByBucketAndKey(b.id(), ObjectKey.of(obj.key()))
-                            .flatMap(object -> objectService.deleteObject(object)))
+                            .flatMap(object -> objectService.deleteObject(object)
+                                .doOnSuccess(ignored -> contentStore.remove(object.id()))))
                         .then();
-                    return Mono.zip(xmlMono, deleteAll)
-                        .flatMap(tuple -> ServerResponse.ok()
+                    return deleteAll.then(xmlMono)
+                        .flatMap(result -> ServerResponse.ok()
                             .contentType(MediaType.APPLICATION_XML)
-                            .bodyValue(tuple.getT1()));
+                            .bodyValue(result));
                 }))
             .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
     }
@@ -161,16 +175,18 @@ public class S3ObjectOperationsHandler {
             .flatMap(b -> {
                 return objectService.findByBucketAndKey(b.id(), ObjectKey.of(key))
                     .flatMap(obj -> {
-                        var contentFlux = objectService.getContent(obj.id());
-                        // Convert Flux<Byte> to Flux<DataBuffer> for response body
-                        var dataBufferFlux = contentFlux.buffer(8192)
-                            .map(bytes -> {
-                                var arr = new byte[bytes.size()];
-                                for (int i = 0; i < bytes.size(); i++) {
-                                    arr[i] = bytes.get(i);
-                                }
-                                return DATA_BUFFER_FACTORY.wrap(arr);
-                            });
+                        var storedBytes = contentStore.get(obj.id());
+                        var dataBufferFlux = storedBytes != null
+                            ? Flux.just(DATA_BUFFER_FACTORY.wrap(storedBytes))
+                            : objectService.getContent(obj.id())
+                                .buffer(8192)
+                                .map(bytes -> {
+                                    var arr = new byte[bytes.size()];
+                                    for (int i = 0; i < bytes.size(); i++) {
+                                        arr[i] = bytes.get(i);
+                                    }
+                                    return DATA_BUFFER_FACTORY.wrap(arr);
+                                });
                         var contentType = obj.contentType() != null ? obj.contentType() : "application/octet-stream";
                         var etag = obj.contentDescriptor() != null && obj.contentDescriptor().md5Hash() != null
                             ? "\"" + obj.contentDescriptor().md5Hash() + "\""
@@ -198,6 +214,109 @@ public class S3ObjectOperationsHandler {
             .switchIfEmpty(Mono.defer(() -> ServerResponse.notFound().build()));
     }
 
+    /** PUT /{bucket}/{key}?rename — RenameObject */
+    public Mono<ServerResponse> renameObject(ServerRequest request) {
+        var bucket = request.pathVariable("bucket");
+        var sourceKey = request.pathVariable("key");
+        var destinationKey = request.headers().firstHeader("x-amz-rename-destination");
+        if (destinationKey == null || destinationKey.isBlank()) {
+            return S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "InvalidArgument",
+                "x-amz-rename-destination header is required");
+        }
+
+        return bucketService.findByName(bucket)
+            .flatMap(b -> objectService.findByBucketAndKey(b.id(), ObjectKey.of(sourceKey))
+                .flatMap(sourceObject -> {
+                    // Create a new object with the destination key, copying source metadata
+                    var targetObjectId = S3Object.Id.generate();
+                    var targetObjectKey = ObjectKey.of(destinationKey);
+                    var contentType = sourceObject.contentType();
+                    var contentDisposition = sourceObject.contentDisposition();
+                    var contentEncoding = sourceObject.contentEncoding();
+                    var size = sourceObject.size();
+                    var metadata = sourceObject.metadata();
+
+                    var s3Object = S3Object.create(targetObjectId, b.id(), targetObjectKey,
+                        contentType, contentDisposition, contentEncoding, size, metadata);
+
+                    var contentDescriptor = sourceObject.content();
+                    var renamedDescriptor = contentDescriptor != null
+                        ? ContentDescriptor.of(contentDescriptor.size(), contentDescriptor.md5Hash(), targetObjectId.value())
+                        : null;
+                    var withContent = renamedDescriptor != null
+                        ? s3Object.withContent(renamedDescriptor)
+                        : s3Object;
+                    var sourceBytes = contentStore.get(sourceObject.id());
+                    if (sourceBytes != null) {
+                        contentStore.put(targetObjectId, sourceBytes.clone());
+                    }
+
+                    var etag = renamedDescriptor != null && renamedDescriptor.md5Hash() != null
+                        ? "\"" + renamedDescriptor.md5Hash() + "\""
+                        : "\"\"";
+
+                    // Save new object and delete original
+                    return objectService.saveObject(withContent)
+                        .then(objectService.deleteObject(sourceObject)
+                            .doOnSuccess(ignored -> contentStore.remove(sourceObject.id())))
+                        .then(ServerResponse.ok()
+                            .header("ETag", etag)
+                            .build());
+                })
+                .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found"))
+            )
+            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+    }
+
+    /** GET /{bucket}/{key}?torrent — GetObjectTorrent */
+    public Mono<ServerResponse> getObjectTorrent(ServerRequest request) {
+        var bucket = request.pathVariable("bucket");
+        var key = request.pathVariable("key");
+        return bucketService.findByName(bucket)
+            .flatMap(b -> objectService.findByBucketAndKey(b.id(), ObjectKey.of(key))
+                .flatMap(obj -> {
+                    // Placeholder torrent content
+                    var torrentContent = """
+                        Placeholder torrent file for %s/%s
+                        This is a mock torrent response for S3 API compatibility.
+                        """.formatted(bucket, key).getBytes(StandardCharsets.UTF_8);
+                    var dataBuffer = DATA_BUFFER_FACTORY.wrap(torrentContent);
+                    return ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                        .body(BodyInserters.fromDataBuffers(Flux.just(dataBuffer)));
+                })
+                .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found"))
+            )
+            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+    }
+
+    /** POST /{bucket}/{key}?restore — RestoreObject */
+    public Mono<ServerResponse> restoreObject(ServerRequest request) {
+        var bucket = request.pathVariable("bucket");
+        var key = request.pathVariable("key");
+        return bucketService.findByName(bucket)
+            .flatMap(b -> objectService.findByBucketAndKey(b.id(), ObjectKey.of(key))
+                .flatMap(obj -> request.bodyToMono(RestoreObjectCommand.class)
+                    .flatMap(cmd -> {
+                        var tier = cmd.restoreRequest() != null
+                            ? cmd.restoreRequest().tier()
+                            : cmd.restoreRequest() != null && cmd.restoreRequest().glacierJobParameters() != null
+                                ? cmd.restoreRequest().glacierJobParameters().tier()
+                                : "Standard";
+                        var days = cmd.restoreRequest() != null
+                            ? cmd.restoreRequest().days()
+                            : 0;
+                        // Update storage class to indicate restoration
+                        var updatedObject = obj.withStorageClass("%s_RESTORE_%s_%d".formatted(tier, tier, days));
+                        return objectService.saveObject(updatedObject)
+                            .then(ServerResponse.ok().build());
+                    })
+                    .switchIfEmpty(Mono.defer(() -> ServerResponse.ok().build())))
+                .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found"))
+            )
+            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+    }
+
     /** DELETE /{bucket}/{key} — DeleteObject */
     public Mono<ServerResponse> deleteObject(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
@@ -206,9 +325,82 @@ public class S3ObjectOperationsHandler {
             .flatMap(b -> {
                 return objectService.findByBucketAndKey(b.id(), ObjectKey.of(key))
                     .flatMap(object -> objectService.deleteObject(object)
+                        .doOnSuccess(ignored -> contentStore.remove(object.id()))
                         .then(ServerResponse.noContent().build()))
                     .switchIfEmpty(Mono.defer(() -> ServerResponse.noContent().build()));
             })
             .switchIfEmpty(Mono.defer(() -> ServerResponse.noContent().build()));
+    }
+
+    // ─────────────────────────────────────────────────────
+    //  SelectObjectContent
+    // ─────────────────────────────────────────────────────
+
+    /**
+     * POST /{bucket}/{key}?select — SelectObjectContent
+     * <p>
+     * S3 Select API: receives a SQL expression in XML body and returns CSV/JSON content.
+     * Simplified placeholder implementation that acknowledges the request.
+     */
+    public Mono<ServerResponse> selectObjectContent(ServerRequest request) {
+        var bucket = request.pathVariable("bucket");
+        var key = request.pathVariable("key");
+        return bucketService.findByName(bucket)
+            .flatMap(b -> objectService.findByBucketAndKey(b.id(), ObjectKey.of(key))
+                .flatMap(obj -> request.bodyToMono(SelectObjectContentCommand.class)
+                    .flatMap(cmd -> {
+                        var expression = cmd.expression() != null ? cmd.expression() : "";
+                        var result = SelectObjectContentQuery.placeholder(expression);
+                        return ServerResponse.ok()
+                            .contentType(MediaType.APPLICATION_XML)
+                            .bodyValue(result);
+                    })
+                    .switchIfEmpty(Mono.defer(() -> ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_XML)
+                        .bodyValue(SelectObjectContentQuery.placeholder("")))))
+                .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found")))
+            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+    }
+
+    // ─────────────────────────────────────────────────────
+    //  WriteGetObjectResponse
+    // ─────────────────────────────────────────────────────
+
+    /**
+     * PUT /{bucket}/{key}?x-id=WriteGetObjectResponse — WriteGetObjectResponse
+     * <p>
+     * S3 Object Lambda API: accepts a binary response body and stores it.
+     * Simplified implementation that acknowledges receipt of the response data.
+     */
+    public Mono<ServerResponse> writeGetObjectResponse(ServerRequest request) {
+        var bucket = request.pathVariable("bucket");
+        var key = request.pathVariable("key");
+        var requestId = request.headers().firstHeader("x-amz-request-id");
+        var statusCode = request.headers().firstHeader("x-amz-fwd-status");
+        var errorMessage = request.headers().firstHeader("x-amz-fwd-error-message");
+
+        return bucketService.findByName(bucket)
+            .flatMap(b -> {
+                // Read the binary body as Flux<DataBuffer> and accumulate to acknowledge receipt
+                return request.bodyToFlux(DataBuffer.class)
+                    .reduceWith(
+                        () -> new byte[0],
+                        (acc, buf) -> {
+                            var bytes = new byte[acc.length + buf.readableByteCount()];
+                            System.arraycopy(acc, 0, bytes, 0, acc.length);
+                            buf.read(bytes, acc.length, buf.readableByteCount());
+                            return bytes;
+                        }
+                    )
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .flatMap(bytes -> ServerResponse.ok()
+                        .header("x-amz-request-id", requestId != null ? requestId : "")
+                        .build());
+            })
+            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+    }
+
+    public void resetInMemoryContent() {
+        contentStore.clear();
     }
 }

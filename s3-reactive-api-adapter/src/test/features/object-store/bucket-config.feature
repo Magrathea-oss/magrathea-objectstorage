@@ -572,3 +572,177 @@ Feature: S3-compatible Bucket Configuration APIs (CORS, Policy, Encryption, etc.
   Scenario: Delete intelligent-tiering for nonexistent bucket
     When bucket intelligent-tiering configuration is deleted for "ghost-bucket"
     Then the response status is 404
+
+  # ── ABAC Success (Batch 2) ──
+
+  Scenario: Put bucket ABAC configuration
+    When bucket ABAC is configured with rule id "abac-1" and principal "arn:aws:iam::123:user/admin"
+    Then the response status is 200
+
+  Scenario: Get bucket ABAC configuration
+    Given bucket ABAC is preset with rule id "abac-1" and principal "arn:aws:iam::123:user/admin"
+    When bucket ABAC configuration is requested
+    Then the response status is 200
+    And the metadata response contains "AbacRule"
+
+  # ── ABAC Failure ──
+
+  Scenario: Get ABAC for nonexistent bucket
+    When bucket ABAC configuration is requested for "ghost-bucket"
+    Then the response status is 404
+
+  Scenario: Get ABAC when no configuration exists
+    When bucket ABAC configuration is requested
+    Then the response status is 404
+
+  Scenario: Put ABAC for nonexistent bucket
+    When bucket ABAC is configured for "ghost-bucket" with rule id "x" and principal "*"
+    Then the response status is 404
+
+  # ── Object Lock Configuration Success (Batch 5) ──
+
+  Scenario: Put bucket object lock configuration
+    When bucket object lock is configured with mode "GOVERNANCE" and days 5
+    Then the response status is 200
+
+  Scenario: Get bucket object lock configuration
+    Given bucket object lock is preset with mode "GOVERNANCE" and days 5
+    When bucket object lock configuration is requested
+    Then the response status is 200
+    And the metadata response contains "DefaultRetention"
+
+  # ── Object Lock Failure ──
+
+  Scenario: Get object lock for nonexistent bucket
+    When bucket object lock configuration is requested for "ghost-bucket"
+    Then the response status is 404
+
+  Scenario: Get object lock when no configuration exists
+    When bucket object lock configuration is requested
+    Then the response status is 404
+
+  Scenario: Put object lock for nonexistent bucket
+    When bucket object lock is configured for "ghost-bucket" with mode "GOVERNANCE" and days 5
+    Then the response status is 404
+
+  # ── Metadata Configuration Success (Batch 2) ──
+
+  Scenario: Put bucket metadata configuration
+    When bucket metadata is configured with rule id "meta-1" and status "Enabled"
+    Then the response status is 200
+
+  Scenario: Get bucket metadata configuration
+    Given bucket metadata is preset with rule id "meta-1" and status "Enabled"
+    When bucket metadata configuration is requested
+    Then the response status is 200
+    And the metadata response contains "MetadataResourceType"
+
+  Scenario: Delete bucket metadata configuration
+    Given bucket metadata is preset with rule id "meta-1" and status "Enabled"
+    When bucket metadata configuration is deleted
+    Then the response status is 204
+
+  # ── Metadata Configuration Failure ──
+
+  Scenario: Get metadata config for nonexistent bucket
+    When bucket metadata configuration is requested for "ghost-bucket"
+    Then the response status is 404
+
+  Scenario: Get metadata config when no configuration exists
+    When bucket metadata configuration is requested
+    Then the response status is 404
+
+  Scenario: Put metadata config for nonexistent bucket
+    When bucket metadata is configured for "ghost-bucket" with rule id "x" and status "Enabled"
+    Then the response status is 404
+
+  Scenario: Delete metadata config for nonexistent bucket
+    When bucket metadata configuration is deleted for "ghost-bucket"
+    Then the response status is 404
+
+  # ── Metadata Table Configuration Success (Batch 2) ──
+
+  Scenario: Put bucket metadata table configuration
+    When bucket metadata table is configured with rule id "meta-table-1" and table name "my-table"
+    Then the response status is 200
+
+  Scenario: Get bucket metadata table configuration
+    Given bucket metadata table is preset with rule id "meta-table-1" and table name "my-table"
+    When bucket metadata table configuration is requested
+    Then the response status is 200
+    And the metadata response contains "MetadataTableName"
+
+  Scenario: Delete bucket metadata table configuration
+    Given bucket metadata table is preset with rule id "meta-table-1" and table name "my-table"
+    When bucket metadata table configuration is deleted
+    Then the response status is 204
+
+  # ── Metadata Table Configuration Failure ──
+
+  Scenario: Get metadata table config for nonexistent bucket
+    When bucket metadata table configuration is requested for "ghost-bucket"
+    Then the response status is 404
+
+  Scenario: Get metadata table config when no configuration exists
+    When bucket metadata table configuration is requested
+    Then the response status is 404
+
+  Scenario: Put metadata table config for nonexistent bucket
+    When bucket metadata table is configured for "ghost-bucket" with rule id "x" and table name "x"
+    Then the response status is 404
+
+  Scenario: Delete metadata table config for nonexistent bucket
+    When bucket metadata table configuration is deleted for "ghost-bucket"
+    Then the response status is 404
+
+  # ── Inventory Table Configuration Success (Batch 2) ──
+
+  Scenario: Put bucket inventory table configuration
+    When bucket inventory table is configured with id "inv-table-1" and format "CSV"
+    Then the response status is 200
+
+  Scenario: Get bucket inventory table configuration
+    Given bucket inventory table is preset with id "inv-table-1" and format "CSV"
+    When bucket inventory table configuration is requested
+    Then the response status is 200
+    And the metadata response contains "DestinationFormat"
+
+  # ── Inventory Table Configuration Failure ──
+
+  Scenario: Get inventory table config for nonexistent bucket
+    When bucket inventory table configuration is requested for "ghost-bucket"
+    Then the response status is 404
+
+  Scenario: Get inventory table config when no configuration exists
+    When bucket inventory table configuration is requested
+    Then the response status is 404
+
+  Scenario: Put inventory table config for nonexistent bucket
+    When bucket inventory table is configured for "ghost-bucket" with id "x" and format "CSV"
+    Then the response status is 404
+
+  # ── Journal Table Configuration Success (Batch 2) ──
+
+  Scenario: Put bucket journal table configuration
+    When bucket journal table is configured with id "journal-table-1" and format "JSON"
+    Then the response status is 200
+
+  Scenario: Get bucket journal table configuration
+    Given bucket journal table is preset with id "journal-table-1" and format "JSON"
+    When bucket journal table configuration is requested
+    Then the response status is 200
+    And the metadata response contains "DestinationFormat"
+
+  # ── Journal Table Configuration Failure ──
+
+  Scenario: Get journal table config for nonexistent bucket
+    When bucket journal table configuration is requested for "ghost-bucket"
+    Then the response status is 404
+
+  Scenario: Get journal table config when no configuration exists
+    When bucket journal table configuration is requested
+    Then the response status is 404
+
+  Scenario: Put journal table config for nonexistent bucket
+    When bucket journal table is configured for "ghost-bucket" with id "x" and format "JSON"
+    Then the response status is 404

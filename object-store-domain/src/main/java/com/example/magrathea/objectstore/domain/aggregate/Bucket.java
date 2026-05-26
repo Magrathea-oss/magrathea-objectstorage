@@ -145,6 +145,17 @@ public record Bucket(
         return new Bucket(id, name, region, storageClass, versioningEnabled, true, bucketConfig, newEvents);
     }
 
+    /**
+     * Delete this bucket. Returns new instance with a {@link ObjectStoreEvent.BucketDeleted} event.
+     */
+    public Bucket withDeleted() {
+        var newEvents = appendEvent(
+            new ObjectStoreEvent.BucketDeleted(id, Instant.now())
+        );
+        return new Bucket(id, name, region, storageClass, versioningEnabled, encryptionEnabled,
+            bucketConfig, newEvents);
+    }
+
     // ── Config transition ──
 
     /**

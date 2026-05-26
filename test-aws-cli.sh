@@ -263,6 +263,35 @@ run_failure "DeleteBucketInventoryConfiguration nonexistent bucket" aws_s3api de
 run_failure "DeleteBucketInventoryConfiguration missing id" aws_s3api delete-bucket-inventory-configuration --bucket "$BUCKET" --id "nonexistent-id" --output json
 run_failure "PutBucketInventoryConfiguration nonexistent bucket" aws_s3api put-bucket-inventory-configuration --bucket "nonexistent-bucket" --id "$INVENTORY_ID" --inventory-configuration "$INVENTORY_CONFIG" --output json
 run_failure "ListBucketInventoryConfigurations nonexistent bucket" aws_s3api list-bucket-inventory-configurations --bucket "nonexistent-bucket" --output json
+
+# ── Batch 1 Phase F operations ──
+
+# RenameObject: aws s3api rename-object (available since AWS CLI 2.15+)
+if aws_s3api rename-object --help >/dev/null 2>&1; then
+    run_success "RenameObject" aws_s3api rename-object --bucket "$BUCKET" --key "$KEY" --destination-key "rename-dest.txt" --output json
+    run_success "HeadObject after rename (destination)" aws_s3api head-object --bucket "$BUCKET" --key "rename-dest.txt" --output json
+    run_failure "HeadObject after rename (source gone)" aws_s3api head-object --bucket "$BUCKET" --key "$KEY" --output json
+    KEY="rename-dest.txt"
+else
+    echo "  ⚠️  aws s3api rename-object not available — skipping"
+fi
+
+# GetObjectTorrent: aws s3api get-object-torrent
+if aws_s3api get-object-torrent --help >/dev/null 2>&1; then
+    run_success "GetObjectTorrent" aws_s3api get-object-torrent --bucket "$BUCKET" --key "$KEY" "$OUTPUT_FILE" --output json
+    run_failure "GetObjectTorrent nonexistent" aws_s3api get-object-torrent --bucket "$BUCKET" --key "nonexistent.txt" /dev/null --output json
+else
+    echo "  ⚠️  aws s3api get-object-torrent not available — skipping"
+fi
+
+# RestoreObject: aws s3api restore-object
+if aws_s3api restore-object --help >/dev/null 2>&1; then
+    run_success "RestoreObject" aws_s3api restore-object --bucket "$BUCKET" --key "$KEY" --restore-request '{RestoreRequest: {Tier: Standard, Days: 30}}' --output json
+    run_failure "RestoreObject nonexistent" aws_s3api restore-object --bucket "$BUCKET" --key "nonexistent.txt" --restore-request '{RestoreRequest: {Tier: Standard, Days: 30}}' --output json
+else
+    echo "  ⚠️  aws s3api restore-object not available — skipping"
+fi
+
 run_success "DeleteBucket" aws_s3api delete-bucket --bucket "$BUCKET" --output json
 run_failure "HeadBucket after DeleteBucket" aws_s3api head-bucket --bucket "$BUCKET"
 

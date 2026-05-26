@@ -21,7 +21,7 @@ Feature: Bucket lifecycle
   Scenario: Find bucket by name not found
     Given bucket "find-me" does not exist
     When I find bucket by name "find-me"
-    Then the result is Mono.empty (not found)
+    Then the result is Mono.empty not found
 
   Scenario: Delete a bucket
     Given bucket "delete-me" exists

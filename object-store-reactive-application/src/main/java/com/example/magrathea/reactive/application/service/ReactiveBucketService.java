@@ -23,16 +23,16 @@ public class ReactiveBucketService {
 
     public Mono<CommandResult<Bucket>> createBucket(Bucket bucket) {
         return queryRepository.findByName(bucket.name())
-            .flatMap(existing -> {
-                if (existing != null) {
-                    return Mono.error(new BucketAlreadyExistsException(bucket.name()));
-                }
-                return commandRepository.save(bucket);
-            });
+            .flatMap(existing -> Mono.<CommandResult<Bucket>>error(new BucketAlreadyExistsException(bucket.name())))
+            .switchIfEmpty(Mono.defer(() -> commandRepository.save(bucket)));
+    }
+
+    public Mono<CommandResult<Bucket>> updateBucket(Bucket bucket) {
+        return commandRepository.save(bucket);
     }
 
     public Mono<CommandResult<Bucket>> deleteBucket(Bucket bucket) {
-        return commandRepository.delete(bucket);
+        return commandRepository.delete(bucket.withDeleted());
     }
 
     public Mono<Bucket> findById(Bucket.Id bucketId) {

@@ -1,7 +1,7 @@
 # S3 API Coverage Analysis
 
-This document covers the 84 implemented Amazon S3 REST operations exposed by the `s3-api` module.
-Each operation section includes request header coverage, query parameter coverage, request/response body coverage, and a per-operation Status Codes table.
+This document tracks the 111/111 implemented Amazon S3 REST operations exposed by the `s3-reactive-api-adapter` module.
+Detailed per-operation sections cover operations 1–84. Phase F operations 85–111 are summarized in the implemented operation index and tracked in [ADR 0012](adr/0012-phase-f-advanced-s3-operations.md) / [PLAN.md](../PLAN.md).
 
 Scope: Amazon S3 data-plane actions only. Amazon S3 Control actions remain out of scope.
 
@@ -33,6 +33,7 @@ Scope: Amazon S3 data-plane actions only. Amazon S3 Control actions remain out o
 | 28–63 | Bucket configuration operations | CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, and accelerate. |
 | 64–70 | Multipart upload operations | Newly documented in this file: CreateMultipartUpload, UploadPart, UploadPartCopy, CompleteMultipartUpload, AbortMultipartUpload, ListMultipartUploads, ListParts. |
 | 71–84 | Analytics, inventory, metrics, intelligent-tiering | Phase E operations. |
+| 85–111 | Phase F advanced/specialized operations | Implemented and Cucumber-tested per ADR 0012. Includes session/directory bucket, ABAC, legal hold, object lock, retention, torrent, restore, select, rename, encryption update, Object Lambda response, and bucket metadata configuration operations. |
 
 ---
 
@@ -2196,15 +2197,16 @@ Scope: Amazon S3 data-plane actions only. Amazon S3 Control actions remain out o
 
 | Category | Count / Status | Notes |
 |---|---:|---|
-| Implemented operations documented | 84 | Every operation has request header, query parameter, request body, response body/header, and Status Codes coverage. |
+| Implemented operations tracked | 111 | 111/111 in-scope operations are implemented. Operations 1–84 have detailed per-operation tables; Phase F operations 85–111 are summarized here and in ADR 0012. |
 | Multipart operations documented | 7 | Operations 64–70 cover CreateMultipartUpload, UploadPart, UploadPartCopy, CompleteMultipartUpload, AbortMultipartUpload, ListMultipartUploads, and ListParts. |
 | Phase E operations documented | 14 | Operations 71–84 cover Analytics, Inventory, Metrics, and Intelligent-Tiering configuration APIs. |
+| Phase F operations implemented | 27 | Advanced/specialized operations are implemented and Cucumber-tested; see ADR 0012 and PLAN.md for batch and handler details. |
 | Source-code changes in this update | 0 | Documentation-only update. |
 
 ### APIs yet to implement or out of scope
 
-Advanced/specialized Amazon S3 operations such as CreateSession, directory buckets, object lock/legal hold/retention, torrent, restore, select, rename, update object encryption, write-get-object-response, and bucket metadata table operations remain future Phase F work. Amazon S3 Control APIs remain out of scope.
+No in-scope Amazon S3 REST operations remain unimplemented. Some advanced operation semantics remain simplified for in-memory compatibility and are tracked as semantic-depth risks in ARC42. Amazon S3 Control APIs remain out of scope.
 
 ---
 
-*Generated from PLAN.md operation inventory and current `s3-api` route/handler analysis. Update this file whenever an S3 operation, header, parameter, body, or status mapping changes.*
+*Generated from PLAN.md operation inventory and current `s3-reactive-api-adapter` route/handler analysis. Update this file whenever an S3 operation, header, parameter, body, or status mapping changes.*

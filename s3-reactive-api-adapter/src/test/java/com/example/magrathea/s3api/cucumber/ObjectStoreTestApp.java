@@ -14,7 +14,8 @@ import tools.jackson.dataformat.xml.XmlMapper;
 
 @SpringBootApplication
 @ComponentScan({
-    "com.example.magrathea.objectstore"
+    "com.example.magrathea.objectstore",
+    "com.example.magrathea.reactive"
 })
 public class ObjectStoreTestApp {
 

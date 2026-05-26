@@ -41,7 +41,7 @@ public class MultipartUploadStepDefinitions {
         activeUpload = null;
     }
 
-    @Given("bucket {string} exists")
+    @Given("multipart bucket {string} exists")
     public void bucketExists(String bucketName) {
         Bucket.Id id = Bucket.Id.generate();
         Bucket bucket = Bucket.create(id, bucketName,
@@ -51,7 +51,7 @@ public class MultipartUploadStepDefinitions {
         testBucketId = id;
     }
 
-    @Given("multipart upload {string} exists with {int} parts")
+    @Given("multipart upload {string} exists with {int} part(s)")
     public void multipartUploadExistsWithParts(String uploadName, int partCount) {
         assertNotNull(testBucketId);
         UploadId uploadId = UploadId.of(uploadName);
@@ -79,7 +79,7 @@ public class MultipartUploadStepDefinitions {
         MultipartUpload.Id id = MultipartUpload.Id.generate();
         UploadId uploadId = UploadId.generate();
         MultipartUpload upload = MultipartUpload.create(id, testBucketId, ObjectKey.of(objectKey), uploadId);
-        result = service.saveUpload(upload);
+        result = service.saveUpload(upload).cache();
     }
 
     @Then("the result is a Created<MultipartUpload> with version {long}")
@@ -99,7 +99,7 @@ public class MultipartUploadStepDefinitions {
             .verifyComplete();
     }
 
-    @Then("the upload has {int} parts")
+    @Then("the upload has {int} part(s)")
     public void uploadHasParts(int partCount) {
         assertNotNull(result);
         StepVerifier.create(result)
@@ -135,7 +135,7 @@ public class MultipartUploadStepDefinitions {
         assertNotNull(existing);
         UploadPart part = UploadPart.create(PartNumber.of(partNumber), "etag-" + partNumber, 1024);
         MultipartUpload updated = existing.withPart(part);
-        result = service.saveUpload(updated);
+        result = service.saveUpload(updated).cache();
     }
 
     @Then("the result is an Updated<MultipartUpload> with version {long}")
@@ -176,7 +176,7 @@ public class MultipartUploadStepDefinitions {
         MultipartUpload existing = uploadRepository.findById(uploadId).block();
         assertNotNull(existing);
         MultipartUpload completed = existing.withCompleted();
-        result = service.saveUpload(completed);
+        result = service.saveUpload(completed).cache();
     }
 
     @Then("the event MultipartUploadCompleted is recorded")
@@ -200,7 +200,7 @@ public class MultipartUploadStepDefinitions {
         MultipartUpload existing = uploadRepository.findById(uploadId).block();
         assertNotNull(existing);
         MultipartUpload aborted = existing.withAborted();
-        result = service.saveUpload(aborted);
+        result = service.saveUpload(aborted).cache();
     }
 
     @Then("the event MultipartUploadAborted is recorded")
@@ -221,6 +221,13 @@ public class MultipartUploadStepDefinitions {
     public void findUploadById(String uploadName) {
         UploadId uploadId = UploadId.of(uploadName);
         result = service.findById(uploadId);
+    }
+
+    @Then("the multipart result is Mono.empty (not found)")
+    public void multipartResultIsMonoEmpty() {
+        assertNotNull(result);
+        StepVerifier.create(result)
+            .verifyComplete();
     }
 
     @Then("the result is a MultipartUpload with {int} parts")

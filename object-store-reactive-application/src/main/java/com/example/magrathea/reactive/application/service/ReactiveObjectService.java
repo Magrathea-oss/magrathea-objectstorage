@@ -27,7 +27,7 @@ public class ReactiveObjectService {
     }
 
     public Mono<CommandResult<S3Object>> deleteObject(S3Object object) {
-        return commandRepository.delete(object);
+        return commandRepository.delete(object.withDeleted());
     }
 
     public Mono<S3Object> findById(S3Object.Id objectId) {

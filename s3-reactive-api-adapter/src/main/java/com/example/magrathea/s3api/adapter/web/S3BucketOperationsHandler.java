@@ -10,6 +10,7 @@ import com.example.magrathea.reactive.application.service.ReactiveObjectService;
 import com.example.magrathea.s3api.dto.command.VersioningConfigurationCommand;
 import com.example.magrathea.s3api.dto.query.ErrorQuery;
 import com.example.magrathea.s3api.dto.query.ListAllMyBucketsResultQuery;
+import com.example.magrathea.s3api.dto.query.ListDirectoryBucketsQuery;
 import com.example.magrathea.s3api.dto.query.LocationConstraintQuery;
 import com.example.magrathea.s3api.dto.query.VersioningConfigurationQuery;
 import com.example.magrathea.s3api.dto.query.ListObjectsQuery;
@@ -115,7 +116,7 @@ public class S3BucketOperationsHandler {
                 .flatMap(cmd -> {
                     var enabled = "Enabled".equals(cmd.status());
                     var updated = enabled ? b.withVersioningEnabled() : b.withVersioningSuspended();
-                    return bucketService.createBucket(updated)
+                    return bucketService.updateBucket(updated)
                         .then(ServerResponse.ok().build());
                 }))
             .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
@@ -165,6 +166,17 @@ public class S3BucketOperationsHandler {
             .flatMap(bucket -> S3WebSupport.handleWebsiteRequest(request, bucket)
                 .switchIfEmpty(Mono.defer(() -> listObjectsXml(request))))
             .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+    }
+
+    /** GET /?directory-buckets — ListDirectoryBuckets */
+    public Mono<ServerResponse> listDirectoryBuckets(ServerRequest request) {
+        return bucketService.findAllBuckets()
+            .map(b -> new ListDirectoryBucketsQuery.BucketEntry(
+                b.name(), b.id().value(), java.time.Instant.now().toString()))
+            .collectList()
+            .flatMap(entries -> ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(new ListDirectoryBucketsQuery(entries)));
     }
 
     /** DELETE /{bucket} — DeleteBucket */

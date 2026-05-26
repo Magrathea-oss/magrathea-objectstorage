@@ -5,8 +5,8 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 | # | Risk | Impact | Mitigation |
 |---|---|---|---|
-| 1 | **Single-node in-memory only** — reactive in-memory repositories do not persist to disk | Data loss on restart | Introduce file persistence or R2DBC; `persistence-context-*` placeholder modules ready |
-| 2 | **Limited S3 coverage** — 30/111 operations implemented | Unsupported AWS CLI/SDK features | Phases C (Multipart), D (Bucket Config), E (Analytics), F (Advanced) planned in PLAN.md |
+| 1 | **Single-node in-memory only** — reactive in-memory repositories do not persist to disk | Data loss on restart | Introduce file persistence or R2DBC; `storage-engine-*` placeholder modules are reserved for this work |
+| 2 | **S3 semantic depth** — 111/111 operations are routed and Cucumber-tested, but some advanced operations use simplified compatibility behavior | AWS SDK features may expect deeper semantics than the in-memory implementation provides | Track semantic gaps in PLAN.md and ADR follow-ups; prioritize AWS CLI/SDK compatibility cases |
 | 3 | **In-memory content store** — large objects stored in ConcurrentHashMap | OutOfMemoryError for files > 1GB | Flush to file system, chunked streaming, content store with file persistence |
 | 4 | **No authentication/authorization** — AWS SigV4 not implemented | Usable only in trusted environments | Implement SigV4 verification middleware |
-| 5 | **No persistence-context integration** — placeholder modules are empty | Alternative persistence untestable | Not a v1 priority — planned as a separate bounded context |
+| 5 | **No storage-engine integration** — placeholder modules are empty | Alternative persistence untestable | Not a v1 priority — planned as future storage-engine architecture work |

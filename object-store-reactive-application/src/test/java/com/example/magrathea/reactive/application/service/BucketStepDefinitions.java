@@ -51,7 +51,7 @@ public class BucketStepDefinitions {
     public void createBucket(String bucketName) {
         Bucket.Id id = Bucket.Id.generate();
         Bucket bucket = Bucket.create(id, bucketName, Region.EU_WEST_1, StorageClass.STANDARD);
-        result = service.createBucket(bucket);
+        result = service.createBucket(bucket).cache();
     }
 
     @Then("the result is a Created<Bucket> with version {long}")
@@ -125,11 +125,11 @@ public class BucketStepDefinitions {
     public void deleteBucket(String bucketName) {
         Bucket found = repository.findByName(bucketName).block();
         if (found != null) {
-            result = service.deleteBucket(found);
+            result = service.deleteBucket(found).cache();
         } else {
             result = service.deleteBucket(
                 Bucket.create(Bucket.Id.generate(), bucketName, Region.EU_WEST_1, StorageClass.STANDARD)
-            );
+            ).cache();
         }
     }
 
@@ -184,7 +184,7 @@ public class BucketStepDefinitions {
             ))
         );
         Bucket updated = found.withBucketConfig(BucketConfig.EMPTY.withCorsConfiguration(corsConfig));
-        result = service.createBucket(updated);
+        result = service.updateBucket(updated).cache();
     }
 
     @Then("the result is an Updated<Bucket> with version {long}")

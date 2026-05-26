@@ -83,7 +83,11 @@ final class S3WebSupport {
             "website", "notification", "replication", "requestPayment",
             "ownershipControls", "publicAccessBlock", "accelerate", "analytics",
             "inventory", "metrics", "intelligent-tiering", "uploads", "uploadId",
-            "delete", "attributes");
+            "delete", "attributes", "session", "abac", "directory-buckets",
+            "legal-hold", "retention", "object-lock",
+            "metadata-config", "metadata-table-config",
+            "inventory-table-config", "journal-table-config",
+            "select", "x-id");
         for (var part : rawQuery.split("&")) {
             var name = part.contains("?") ? part.substring(part.indexOf('?') + 1) : part;
             name = name.contains("=") ? name.substring(0, name.indexOf('=')) : name;

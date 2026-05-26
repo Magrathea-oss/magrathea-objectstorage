@@ -57,7 +57,7 @@ image::../../c4/images/MultipartUploadRuntime.png[MultipartUpload Runtime, width
 5. reactive-repository-application → reactive-infrastructure: Persist multipart upload state
 6. reactive-repository-application → reactive-infrastructure: Read multipart upload state from persistence
 
-=== Scenario 6 — Bucket Configuration (CORS, Lifecycle, Policy, Encryption, Logging, Website, Notification, Replication, Request Payment, Ownership Controls, Public Access Block, Accelerate, Analytics, Inventory, Metrics, Intelligent-Tiering)
+=== Scenario 6 — Bucket Configuration (CORS, Lifecycle, Policy, Encryption, Logging, Website, Notification, Replication, Request Payment, Ownership Controls, Public Access Block, Accelerate, Analytics, Inventory, Metrics, Intelligent-Tiering, ABAC, Object Lock, Metadata Configuration)
 
 .Runtime Diagram — Bucket Configuration
 image::../../c4/images/BucketConfigurationRuntime.png[Bucket Configuration Runtime, width=600]
@@ -88,6 +88,25 @@ image::../../c4/images/BucketConfigurationRuntime.png[Bucket Configuration Runti
 | Inventory | `?inventory` | Yes (`list-type`) | `BucketInventoryConfiguration` |
 | Metrics | `?metrics` | No | `BucketMetricsConfiguration` |
 | Intelligent-Tiering | `?intelligent-tiering` | No | `BucketIntelligentTieringConfiguration` |
+| ABAC | `?abac` | No | ABAC command/query DTOs |
+| Object Lock | `?object-lock` | No | `ObjectLockConfiguration` command/query DTOs |
+| Bucket Metadata Configuration | `?metadata-config` | No | `MetadataConfiguration` command/query DTOs |
+| Bucket Metadata Table Configuration | `?metadata-table-config` | No | `MetadataTableConfiguration` command/query DTOs |
+| Inventory Table Configuration | `?inventory-table-config` | No | metadata table command/query DTOs |
+| Journal Table Configuration | `?journal-table-config` | No | metadata table command/query DTOs |
+
+=== Scenario 7 — Phase F Advanced Object Operations
+
+**Description:** Phase F adds advanced/specialized operations from ADR 0012 while reusing existing RouterFunction and handler patterns.
+
+**Flow:**
+1. User → s3-reactive-api-adapter: sends an advanced S3 request such as RenameObject, RestoreObject, SelectObjectContent, WriteGetObjectResponse, legal hold, retention, torrent, or encryption update.
+2. `S3ProxyRouter` dispatches by HTTP method, path, query parameter, and headers.
+3. `S3ObjectOperationsHandler` handles advanced object behavior such as rename, torrent, restore, select, and Object Lambda response.
+4. `S3ObjectMetadataHandler` handles metadata-oriented Phase F operations such as legal hold, retention, and encryption update.
+5. Reactive services/repositories are used where object or bucket state must be read or updated.
+
+**Verification:** Phase F is Cucumber-tested; `mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false` completed with 216 tests, 0 failures, and 0 errors.
 
 === Scenario 5 — Error Handling
 

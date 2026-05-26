@@ -38,7 +38,7 @@ public class ObjectStepDefinitions {
         testBucketId = null;
     }
 
-    @Given("bucket {string} exists")
+    @Given("object store bucket {string} exists")
     public void bucketExists(String bucketName) {
         Bucket.Id id = Bucket.Id.generate();
         Bucket bucket = Bucket.create(id, bucketName,
@@ -70,7 +70,7 @@ public class ObjectStepDefinitions {
         S3Object object = S3Object.create(id, testBucketId, ObjectKey.of(objectKey), "text/plain", null, null, size, Map.of());
         ContentDescriptor descriptor = ContentDescriptor.of(size, "abc123", "content-" + id.value());
         S3Object withContent = object.withContent(descriptor);
-        result = service.saveObject(withContent);
+        result = service.saveObject(withContent).cache();
     }
 
     @Then("the result is a Created<S3Object> with version {long}")
@@ -142,10 +142,10 @@ public class ObjectStepDefinitions {
         assertNotNull(testBucketId);
         S3Object found = objectRepository.findByBucketAndKey(testBucketId, ObjectKey.of(objectKey)).block();
         if (found != null) {
-            result = service.deleteObject(found);
+            result = service.deleteObject(found).cache();
         } else {
             S3Object dummy = S3Object.create(S3Object.Id.generate(), testBucketId, ObjectKey.of(objectKey), null, null, null, 0, Map.of());
-            result = service.deleteObject(dummy);
+            result = service.deleteObject(dummy).cache();
         }
     }
 
@@ -190,7 +190,7 @@ public class ObjectStepDefinitions {
             .verify();
     }
 
-    @Then("the result is Mono.empty (not found)")
+    @Then("the object result is Mono.empty (not found)")
     public void resultIsMonoEmpty() {
         assertNotNull(result);
         StepVerifier.create(result)

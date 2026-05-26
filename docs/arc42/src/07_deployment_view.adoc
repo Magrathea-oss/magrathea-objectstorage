@@ -35,4 +35,4 @@ The two-container architecture (`s3-server` + `file-store`) is intentionally mon
 - `file-store` can be replaced by R2DBC + PostgreSQL for relational persistence
 - `file-store` can become a separate container for horizontal scaling
 - `s3-server` can be clustered with session affinity
-- `persistence-context-*` placeholder modules for a separate persistence bounded context
+- `storage-engine-*` placeholder modules for future storage-engine persistence design

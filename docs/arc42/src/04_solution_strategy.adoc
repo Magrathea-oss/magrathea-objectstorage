@@ -6,17 +6,17 @@ ifndef::imagesdir[:imagesdir: ../images]
 === Architecture Strategy
 
 - **Hexagonal Architecture** (Ports and Adapters): domain is pure business logic, application and infrastructure are adapters
-- **DDD with strategic design**: bounded contexts for ObjectStore and Persistence, shared-kernel for BinaryContent
-- **Reactive by design**: WebFlux RouterFunction, DataBuffer streaming, CompletableFuture → Mono/Flux bridge
+- **DDD with strategic design**: ObjectStore domain with reserved `storage-engine-*` modules for future persistence/storage-engine work
+- **Reactive by design**: WebFlux RouterFunction, DataBuffer streaming, native Mono/Flux application and repository interfaces
 
 === Key Technical Decisions
 
 | Decision | Rationale |
 |----------|-----------|
 | Maven multi-module per bounded context | Enforces dependency boundaries, domain isolation |
-| Records for aggregates/value objects | Immutability, zero boilerplate, Java 17+ idiomatic |
+| Records for aggregates/value objects | Immutability, zero boilerplate, Java 21 idiomatic |
 | Sealed interfaces for domain events | Exhaustive pattern matching, type safety |
-| CompletableFuture repositories | Standard Java async — no framework coupling |
+| Reactive repository interfaces | Native Mono/Flux command/query APIs for non-blocking service composition |
 | RouterFunction over @Controller | Functional style, precise content negotiation |
 | Jackson XML for S3 responses | Auto-serialization, no StringBuilder XML |
 | DataBuffer for binary streaming | Reactive non-blocking I/O, WebFlux native |
@@ -55,5 +55,5 @@ See `docs/s3-bucket-configuration-design.md#open-design-issues` for a complete l
 === Quality Strategy
 
 - **Testability**: domain tested with pure JUnit (no Spring), integration tested with Cucumber BDD, S3 compatibility verified with AWS CLI
-- **Simplicity**: single-node file persistence, in-memory stores for metadata
+- **Simplicity**: single-node in-memory stores for metadata and content
 - **Traceability**: ADRs document every architectural decision, ARC42 provides full architecture documentation

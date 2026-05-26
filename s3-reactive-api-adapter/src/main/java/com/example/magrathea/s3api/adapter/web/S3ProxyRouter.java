@@ -18,19 +18,22 @@ public class S3ProxyRouter {
     private final S3ObjectMetadataHandler objectMetadata;
     private final S3BucketConfigHandler bucketConfig;
     private final S3MultipartHandler multipartHandler;
+    private final S3SessionHandler sessionHandler;
 
     public S3ProxyRouter(S3BucketOperationsHandler bucketOperations,
                          S3BucketMetadataHandler bucketMetadata,
                          S3ObjectOperationsHandler objectOperations,
                          S3ObjectMetadataHandler objectMetadata,
                          S3BucketConfigHandler bucketConfig,
-                         S3MultipartHandler multipartHandler) {
+                         S3MultipartHandler multipartHandler,
+                         S3SessionHandler sessionHandler) {
         this.bucketOperations = bucketOperations;
         this.bucketMetadata = bucketMetadata;
         this.objectOperations = objectOperations;
         this.objectMetadata = objectMetadata;
         this.bucketConfig = bucketConfig;
         this.multipartHandler = multipartHandler;
+        this.sessionHandler = sessionHandler;
     }
 
     public RouterFunction<ServerResponse> s3Routes() {
@@ -38,6 +41,7 @@ public class S3ProxyRouter {
             .route()
             .GET("/", S3WebSupport::acceptXml, bucketOperations::listBucketsXml)
             .GET("/", S3WebSupport::acceptJson, bucketOperations::listBucketsJson)
+            .GET("/", request -> S3WebSupport.hasQuery(request, "directory-buckets"), bucketOperations::listDirectoryBuckets)
 
             .GET("/{bucket}", request -> S3WebSupport.hasQuery(request, "acl"), bucketMetadata::getBucketAcl)
             .GET("/{bucket}", request -> S3WebSupport.hasQuery(request, "tagging"), bucketMetadata::getBucketTagging)
@@ -64,6 +68,20 @@ public class S3ProxyRouter {
             .GET("/{bucket}", request -> S3WebSupport.hasQuery(request, "metrics"), bucketConfig::getBucketMetrics)
             .GET("/{bucket}", request -> S3WebSupport.hasQuery(request, "intelligent-tiering"), bucketConfig::getBucketIntelligentTiering)
             .GET("/{bucket}", request -> S3WebSupport.hasQuery(request, "uploads"), multipartHandler::listMultipartUploads)
+            .GET("/{bucket}", request -> S3WebSupport.hasQuery(request, "object-lock"), bucketConfig::getObjectLockConfiguration)
+            .PUT("/{bucket}", request -> S3WebSupport.hasQuery(request, "object-lock"), bucketConfig::putObjectLockConfiguration)
+            .GET("/{bucket}", request -> S3WebSupport.hasQuery(request, "abac"), bucketConfig::getBucketAbac)
+            .PUT("/{bucket}", request -> S3WebSupport.hasQuery(request, "abac"), bucketConfig::putBucketAbac)
+            .GET("/{bucket}", request -> S3WebSupport.hasQuery(request, "metadata-config"), bucketConfig::getBucketMetadataConfiguration)
+            .PUT("/{bucket}", request -> S3WebSupport.hasQuery(request, "metadata-config"), bucketConfig::putBucketMetadataConfiguration)
+            .DELETE("/{bucket}", request -> S3WebSupport.hasQuery(request, "metadata-config"), bucketConfig::deleteBucketMetadataConfiguration)
+            .GET("/{bucket}", request -> S3WebSupport.hasQuery(request, "metadata-table-config"), bucketConfig::getBucketMetadataTableConfiguration)
+            .PUT("/{bucket}", request -> S3WebSupport.hasQuery(request, "metadata-table-config"), bucketConfig::putBucketMetadataTableConfiguration)
+            .DELETE("/{bucket}", request -> S3WebSupport.hasQuery(request, "metadata-table-config"), bucketConfig::deleteBucketMetadataTableConfiguration)
+            .GET("/{bucket}", request -> S3WebSupport.hasQuery(request, "inventory-table-config"), bucketConfig::getBucketInventoryTableConfiguration)
+            .PUT("/{bucket}", request -> S3WebSupport.hasQuery(request, "inventory-table-config"), bucketConfig::putBucketInventoryTableConfiguration)
+            .GET("/{bucket}", request -> S3WebSupport.hasQuery(request, "journal-table-config"), bucketConfig::getBucketJournalTableConfiguration)
+            .PUT("/{bucket}", request -> S3WebSupport.hasQuery(request, "journal-table-config"), bucketConfig::putBucketJournalTableConfiguration)
             .GET("/{bucket}", S3WebSupport::isPlainGet, bucketOperations::websiteRouting)
             .GET("/{bucket}", S3WebSupport::acceptXml, bucketOperations::listObjectsXml)
             .PUT("/{bucket}", request -> S3WebSupport.hasQuery(request, "acl"), bucketMetadata::putBucketAcl)
@@ -107,23 +125,34 @@ public class S3ProxyRouter {
             .DELETE("/{bucket}", bucketOperations::deleteBucket)
 
             .POST("/{bucket}", request -> S3WebSupport.hasQuery(request, "delete"), objectOperations::deleteObjects)
+            .POST("/{bucket}", request -> S3WebSupport.hasQuery(request, "session"), sessionHandler::createSession)
             .POST("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "uploads"), multipartHandler::initiateMultipartUpload)
             .POST("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "uploadId"), multipartHandler::completeMultipartUpload)
             .GET("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "acl"), objectMetadata::getObjectAcl)
             .GET("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "tagging"), objectMetadata::getObjectTagging)
             .GET("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "attributes"), objectMetadata::getObjectAttributes)
+            .GET("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "legal-hold"), objectMetadata::getObjectLegalHold)
+            .GET("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "retention"), objectMetadata::getObjectRetention)
             .GET("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "uploadId"), multipartHandler::listParts)
             .PUT("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "acl"), objectMetadata::putObjectAcl)
             .PUT("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "tagging"), objectMetadata::putObjectTagging)
+            .PUT("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "legal-hold"), objectMetadata::putObjectLegalHold)
+            .PUT("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "retention"), objectMetadata::putObjectRetention)
             .PUT("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "uploadId") && request.headers().firstHeader("x-amz-copy-source") != null, multipartHandler::uploadPartCopy)
             .PUT("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "uploadId"), multipartHandler::uploadPart)
             .PUT("/{bucket}/{key}", request -> request.headers().firstHeader("x-amz-copy-source") != null, objectOperations::copyObject)
+            .PUT("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "rename"), objectOperations::renameObject)
+            .PUT("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "encryption"), objectMetadata::updateObjectEncryption)
+            .PUT("/{bucket}/{key}", request -> "WriteGetObjectResponse".equals(request.queryParam("x-id").orElse("")), objectOperations::writeGetObjectResponse)
             .PUT("/{bucket}/{key}", objectOperations::putObject)
+            .GET("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "torrent"), objectOperations::getObjectTorrent)
             .GET("/{bucket}/{key}", objectOperations::getObject)
             .HEAD("/{bucket}/{key}", objectOperations::headObject)
             .DELETE("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "tagging"), objectMetadata::deleteObjectTagging)
             .DELETE("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "uploadId"), multipartHandler::abortMultipartUpload)
             .DELETE("/{bucket}/{key}", objectOperations::deleteObject)
+            .POST("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "restore"), objectOperations::restoreObject)
+            .POST("/{bucket}/{key}", request -> S3WebSupport.hasQuery(request, "select"), objectOperations::selectObjectContent)
             .build();
     }
 }

@@ -168,8 +168,8 @@ Bucket: `magrathea-cli-test-1779628454-199892`
 | object-store-domain | com.example.magrathea.objectstore.domain.StorageClassTest.txt | 7 | 0 | 0 | 0 | ✅ Passed |
 | object-store-domain | com.example.magrathea.objectstore.domain.UploadIdTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
 | object-store-domain | com.example.magrathea.objectstore.domain.UploadPartTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
-| s3-api | com.example.magrathea.s3api.cucumber.ObjectStoreCucumberTest.txt | 171 | 0 | 0 | 0 | ✅ Passed |
-| **Total** |  | **300** | **0** | **0** | **0** | **✅ Passed** |
+| s3-reactive-api-adapter | com.example.magrathea.s3api.cucumber.ObjectStoreCucumberTest.txt | 216 | 0 | 0 | 0 | ✅ Passed |
+| **Total** |  | **345** | **0** | **0** | **0** | **✅ Passed** |
 
 ## Clover Coverage
 

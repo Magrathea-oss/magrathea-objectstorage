@@ -18,6 +18,7 @@ import com.example.magrathea.objectstore.domain.valueobject.PublicAccessBlockCon
 import com.example.magrathea.objectstore.domain.valueobject.BucketOwnershipControls;
 import com.example.magrathea.objectstore.domain.valueobject.CorsConfiguration;
 import com.example.magrathea.reactive.application.service.ReactiveBucketService;
+import com.example.magrathea.s3api.dto.command.AbacConfigurationCommand;
 import com.example.magrathea.s3api.dto.command.AccelerateConfigurationCommand;
 import com.example.magrathea.s3api.dto.command.AnalyticsConfigurationCommand;
 import com.example.magrathea.s3api.dto.command.CorsConfigurationCommand;
@@ -33,6 +34,17 @@ import com.example.magrathea.s3api.dto.command.RequestPaymentConfigurationComman
 import com.example.magrathea.s3api.dto.command.OwnershipControlsCommand;
 import com.example.magrathea.s3api.dto.command.PublicAccessBlockCommand;
 import com.example.magrathea.s3api.dto.command.WebsiteConfigurationCommand;
+import com.example.magrathea.s3api.dto.command.ObjectLockConfigurationCommand;
+import com.example.magrathea.s3api.dto.command.InventoryTableConfigurationCommand;
+import com.example.magrathea.s3api.dto.command.JournalTableConfigurationCommand;
+import com.example.magrathea.s3api.dto.command.MetadataConfigurationCommand;
+import com.example.magrathea.s3api.dto.command.MetadataTableConfigurationCommand;
+import com.example.magrathea.s3api.dto.query.InventoryTableConfigurationQuery;
+import com.example.magrathea.s3api.dto.query.JournalTableConfigurationQuery;
+import com.example.magrathea.s3api.dto.query.MetadataConfigurationQuery;
+import com.example.magrathea.s3api.dto.query.MetadataTableConfigurationQuery;
+import com.example.magrathea.s3api.dto.query.ObjectLockConfigurationQuery;
+import com.example.magrathea.s3api.dto.query.AbacConfigurationQuery;
 import com.example.magrathea.s3api.dto.query.BucketAccelerateQuery;
 import com.example.magrathea.s3api.dto.query.BucketAnalyticsListQuery;
 import com.example.magrathea.s3api.dto.query.BucketAnalyticsQuery;
@@ -57,7 +69,9 @@ import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
@@ -79,9 +93,39 @@ import java.util.function.Function;
 public class S3BucketConfigHandler {
 
     private final ReactiveBucketService bucketService;
+    private final Map<String, List<AbacConfigEntry>> abacConfigs = new ConcurrentHashMap<>();
+
+    private final Map<String, ObjectLockConfigEntry> objectLockConfigs = new ConcurrentHashMap<>();
+
+    private final Map<String, MetadataConfigEntry> metadataConfigs = new ConcurrentHashMap<>();
+    private final Map<String, MetadataTableConfigEntry> metadataTableConfigs = new ConcurrentHashMap<>();
+    private final Map<String, InventoryTableConfigEntry> inventoryTableConfigs = new ConcurrentHashMap<>();
+    private final Map<String, JournalTableConfigEntry> journalTableConfigs = new ConcurrentHashMap<>();
+
+    /**
+     * In-memory object lock configuration entry — stored per bucket.
+     */
+    private record ObjectLockConfigEntry(boolean enabled, String mode, int days) {}
 
     public S3BucketConfigHandler(ReactiveBucketService bucketService) {
         this.bucketService = bucketService;
+    }
+
+    public void resetInMemoryConfigurations() {
+        abacConfigs.clear();
+        objectLockConfigs.clear();
+        metadataConfigs.clear();
+        metadataTableConfigs.clear();
+        inventoryTableConfigs.clear();
+        journalTableConfigs.clear();
+    }
+
+    /**
+     * In-memory ABAC configuration entry — stored per bucket.
+     */
+    private record AbacConfigEntry(String id, String principal, String resource, String action,
+                                    List<AbacCondition> conditions) {
+        private record AbacCondition(String tag, String value) {}
     }
 
     // ─────────────────────────────────────────────────────
@@ -135,7 +179,7 @@ public class S3BucketConfigHandler {
             var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
             var newConfig = clearFunction.apply(baseConfig);
             var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.createBucket(updatedBucket)
+            return bucketService.updateBucket(updatedBucket)
                 .then(ServerResponse.noContent().build());
         });
     }
@@ -176,7 +220,7 @@ public class S3BucketConfigHandler {
             var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
             var newConfig = baseConfig.withCorsConfiguration(corsConfig);
             var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.createBucket(updatedBucket)
+            return bucketService.updateBucket(updatedBucket)
                 .then(ServerResponse.ok().build());
         });
     }
@@ -225,7 +269,7 @@ public class S3BucketConfigHandler {
             var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
             var newConfig = baseConfig.withLifecycleConfiguration(lifecycleConfig);
             var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.createBucket(updatedBucket)
+            return bucketService.updateBucket(updatedBucket)
                 .then(ServerResponse.ok().build());
         });
     }
@@ -263,7 +307,7 @@ public class S3BucketConfigHandler {
             var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
             var newConfig = baseConfig.withBucketPolicy(body);
             var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.createBucket(updatedBucket)
+            return bucketService.updateBucket(updatedBucket)
                 .then(ServerResponse.ok().build());
         });
     }
@@ -298,7 +342,7 @@ public class S3BucketConfigHandler {
             var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
             var newConfig = baseConfig.withEncryptionConfiguration(encryptionConfig);
             var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.createBucket(updatedBucket)
+            return bucketService.updateBucket(updatedBucket)
                 .then(ServerResponse.ok().build());
         });
     }
@@ -333,7 +377,7 @@ public class S3BucketConfigHandler {
             var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
             var newConfig = baseConfig.withLoggingConfiguration(loggingConfig);
             var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.createBucket(updatedBucket)
+            return bucketService.updateBucket(updatedBucket)
                 .then(ServerResponse.ok().build());
         });
     }
@@ -369,7 +413,7 @@ public class S3BucketConfigHandler {
             var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
             var newConfig = baseConfig.withWebsiteConfiguration(websiteConfig);
             var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.createBucket(updatedBucket)
+            return bucketService.updateBucket(updatedBucket)
                 .then(ServerResponse.ok().build());
         });
     }
@@ -408,7 +452,7 @@ public class S3BucketConfigHandler {
             var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
             var newConfig = baseConfig.withNotificationConfiguration(notificationConfig);
             var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.createBucket(updatedBucket)
+            return bucketService.updateBucket(updatedBucket)
                 .then(ServerResponse.ok().build());
         });
     }
@@ -448,7 +492,7 @@ public class S3BucketConfigHandler {
             var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
             var newConfig = baseConfig.withReplicationConfiguration(replicationConfig);
             var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.createBucket(updatedBucket)
+            return bucketService.updateBucket(updatedBucket)
                 .then(ServerResponse.ok().build());
         });
     }
@@ -482,7 +526,7 @@ public class S3BucketConfigHandler {
             var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
             var newConfig = baseConfig.withRequestPaymentConfiguration(requestPaymentConfig);
             var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.createBucket(updatedBucket)
+            return bucketService.updateBucket(updatedBucket)
                 .then(ServerResponse.ok().build());
         });
     }
@@ -516,7 +560,7 @@ public class S3BucketConfigHandler {
             var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
             var newConfig = baseConfig.withOwnershipControls(ownershipControls);
             var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.createBucket(updatedBucket)
+            return bucketService.updateBucket(updatedBucket)
                 .then(ServerResponse.ok().build());
         });
     }
@@ -552,7 +596,7 @@ public class S3BucketConfigHandler {
             var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
             var newConfig = baseConfig.withPublicAccessBlock(publicAccessBlockConfig);
             var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.createBucket(updatedBucket)
+            return bucketService.updateBucket(updatedBucket)
                 .then(ServerResponse.ok().build());
         });
     }
@@ -586,7 +630,7 @@ public class S3BucketConfigHandler {
             var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
             var newConfig = baseConfig.withAccelerateConfiguration(accelerateConfig);
             var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.createBucket(updatedBucket)
+            return bucketService.updateBucket(updatedBucket)
                 .then(ServerResponse.ok().build());
         });
     }
@@ -628,7 +672,7 @@ public class S3BucketConfigHandler {
             var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
             var newConfig = baseConfig.withAnalyticsConfiguration(analyticsConfig);
             var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.createBucket(updatedBucket)
+            return bucketService.updateBucket(updatedBucket)
                 .then(ServerResponse.ok().build());
         });
     }
@@ -692,7 +736,7 @@ public class S3BucketConfigHandler {
             var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
             var newConfig = baseConfig.withInventoryConfiguration(inventoryConfig);
             var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.createBucket(updatedBucket)
+            return bucketService.updateBucket(updatedBucket)
                 .then(ServerResponse.ok().build());
         });
     }
@@ -749,7 +793,7 @@ public class S3BucketConfigHandler {
             var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
             var newConfig = baseConfig.withMetricsConfiguration(metricsConfig);
             var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.createBucket(updatedBucket)
+            return bucketService.updateBucket(updatedBucket)
                 .then(ServerResponse.ok().build());
         });
     }
@@ -787,7 +831,7 @@ public class S3BucketConfigHandler {
             var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
             var newConfig = baseConfig.withIntelligentTieringConfiguration(intelligentTieringConfig);
             var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.createBucket(updatedBucket)
+            return bucketService.updateBucket(updatedBucket)
                 .then(ServerResponse.ok().build());
         });
     }
@@ -801,5 +845,266 @@ public class S3BucketConfigHandler {
                 bc.metricsConfiguration(), null, bc.encryptionConfiguration(),
                 bc.lifecycleConfiguration(), bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
                 bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy()));
+    }
+
+    // ─────────────────────────────────────────────────────
+    //  ABAC Configuration
+    // ─────────────────────────────────────────────────────
+
+    /** GET /{bucket}?abac — GetBucketAbac */
+    public Mono<ServerResponse> getBucketAbac(ServerRequest request) {
+        return findBucket(request, b -> {
+            var entries = abacConfigs.get(b.name());
+            if (entries == null || entries.isEmpty()) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchAbacConfiguration",
+                    "The ABAC configuration does not exist");
+            }
+            var rules = entries.stream()
+                .map(e -> new AbacConfigurationQuery.AbacRuleEntry(
+                    e.id(), e.principal(), e.resource(), e.action(),
+                    e.conditions().stream()
+                        .map(c -> new AbacConfigurationQuery.ConditionEntry(c.tag(), c.value()))
+                        .toList()))
+                .toList();
+            return ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(new AbacConfigurationQuery(rules));
+        });
+    }
+
+    // ─────────────────────────────────────────────────────
+    //  Object Lock Configuration
+    // ─────────────────────────────────────────────────────
+
+    /** GET /{bucket}?object-lock — GetObjectLockConfiguration */
+    public Mono<ServerResponse> getObjectLockConfiguration(ServerRequest request) {
+        var bucketName = request.pathVariable("bucket");
+        return bucketService.findByName(bucketName)
+            .flatMap(b -> {
+                var config = objectLockConfigs.get(bucketName);
+                if (config == null || !config.enabled()) {
+                    return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchObjectLockConfiguration",
+                        "The object lock configuration does not exist");
+                }
+                return ServerResponse.ok()
+                    .contentType(MediaType.APPLICATION_XML)
+                    .bodyValue(ObjectLockConfigurationQuery.from(config.mode(), config.days()));
+            })
+            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+    }
+
+    /** PUT /{bucket}?object-lock — PutObjectLockConfiguration */
+    public Mono<ServerResponse> putObjectLockConfiguration(ServerRequest request) {
+        var bucketName = request.pathVariable("bucket");
+        return bucketService.findByName(bucketName)
+            .flatMap(b -> request.bodyToMono(ObjectLockConfigurationCommand.class)
+                .flatMap(cmd -> {
+                    if (!cmd.isEnabled()) {
+                        objectLockConfigs.remove(bucketName);
+                        return ServerResponse.ok().build();
+                    }
+                    var mode = cmd.rule() != null && cmd.rule().defaultRetention() != null
+                        ? cmd.rule().defaultRetention().mode() : "GOVERNANCE";
+                    var days = cmd.rule() != null && cmd.rule().defaultRetention() != null
+                        ? cmd.rule().defaultRetention().days() != null ? cmd.rule().defaultRetention().days() : 5
+                        : 5;
+                    objectLockConfigs.put(bucketName, new ObjectLockConfigEntry(true, mode, days));
+                    return ServerResponse.ok().build();
+                }))
+            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+    }
+
+    /** PUT /{bucket}?abac — PutBucketAbac */
+    public Mono<ServerResponse> putBucketAbac(ServerRequest request) {
+        return findBucket(request, b -> request.bodyToMono(AbacConfigurationCommand.class)
+            .flatMap(cmd -> {
+                var entries = cmd.rules().stream()
+                    .map(r -> new AbacConfigEntry(
+                        r.id(), r.principal(), r.resource(), r.action(),
+                        r.conditions() != null
+                            ? r.conditions().stream()
+                                .map(c -> new AbacConfigEntry.AbacCondition(c.tag(), c.value()))
+                                .toList()
+                            : List.of()))
+                    .toList();
+                abacConfigs.put(b.name(), entries);
+                return ServerResponse.ok().build();
+            })
+            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "InvalidRequest",
+                "Missing ABAC configuration body")));
+    }
+
+    // ─────────────────────────────────────────────────────
+    //  Metadata Configuration
+    // ─────────────────────────────────────────────────────
+
+    private record MetadataConfigEntry(List<MetadataConfigRule> rules) {
+        private record MetadataConfigRule(String id, String status,
+                                           String metadataResourceType,
+                                           String metadataResourceSubtype) {}
+    }
+
+    /** GET /{bucket}?metadata-config — GetBucketMetadataConfiguration */
+    public Mono<ServerResponse> getBucketMetadataConfiguration(ServerRequest request) {
+        return findBucket(request, b -> {
+            var entry = metadataConfigs.get(b.name());
+            if (entry == null || entry.rules() == null || entry.rules().isEmpty()) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchMetadataConfiguration",
+                    "The metadata configuration does not exist");
+            }
+            var rules = entry.rules().stream()
+                .map(r -> new MetadataConfigurationQuery.MetadataRuleEntry(
+                    r.id(), r.status(), r.metadataResourceType(), r.metadataResourceSubtype()))
+                .toList();
+            return ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(new MetadataConfigurationQuery(rules));
+        });
+    }
+
+    /** PUT /{bucket}?metadata-config — PutBucketMetadataConfiguration */
+    public Mono<ServerResponse> putBucketMetadataConfiguration(ServerRequest request) {
+        return findBucket(request, b -> request.bodyToMono(MetadataConfigurationCommand.class)
+            .flatMap(cmd -> {
+                var rules = cmd.rules().stream()
+                    .map(r -> new MetadataConfigEntry.MetadataConfigRule(
+                        r.id(), r.status(), r.metadataResourceType(), r.metadataResourceSubtype()))
+                    .toList();
+                metadataConfigs.put(b.name(), new MetadataConfigEntry(rules));
+                return ServerResponse.ok().build();
+            })
+            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "InvalidRequest",
+                "Missing metadata configuration body")));
+    }
+
+    /** DELETE /{bucket}?metadata-config — DeleteBucketMetadataConfiguration */
+    public Mono<ServerResponse> deleteBucketMetadataConfiguration(ServerRequest request) {
+        return findBucket(request, b -> {
+            metadataConfigs.remove(b.name());
+            return ServerResponse.noContent().build();
+        });
+    }
+
+    // ─────────────────────────────────────────────────────
+    //  Metadata Table Configuration
+    // ─────────────────────────────────────────────────────
+
+    private record MetadataTableConfigEntry(List<MetadataTableConfigRule> rules) {
+        private record MetadataTableConfigRule(String id, String status,
+                                                String metadataTableName,
+                                                String metadataTableDatabase) {}
+    }
+
+    /** GET /{bucket}?metadata-table-config — GetBucketMetadataTableConfiguration */
+    public Mono<ServerResponse> getBucketMetadataTableConfiguration(ServerRequest request) {
+        return findBucket(request, b -> {
+            var entry = metadataTableConfigs.get(b.name());
+            if (entry == null || entry.rules() == null || entry.rules().isEmpty()) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchMetadataTableConfiguration",
+                    "The metadata table configuration does not exist");
+            }
+            var rules = entry.rules().stream()
+                .map(r -> new MetadataTableConfigurationQuery.MetadataTableRuleEntry(
+                    r.id(), r.status(), r.metadataTableName(), r.metadataTableDatabase()))
+                .toList();
+            return ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(new MetadataTableConfigurationQuery(rules));
+        });
+    }
+
+    /** PUT /{bucket}?metadata-table-config — PutBucketMetadataTableConfiguration */
+    public Mono<ServerResponse> putBucketMetadataTableConfiguration(ServerRequest request) {
+        return findBucket(request, b -> request.bodyToMono(MetadataTableConfigurationCommand.class)
+            .flatMap(cmd -> {
+                var rules = cmd.rules().stream()
+                    .map(r -> new MetadataTableConfigEntry.MetadataTableConfigRule(
+                        r.id(), r.status(), r.metadataTableName(), r.metadataTableDatabase()))
+                    .toList();
+                metadataTableConfigs.put(b.name(), new MetadataTableConfigEntry(rules));
+                return ServerResponse.ok().build();
+            })
+            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "InvalidRequest",
+                "Missing metadata table configuration body")));
+    }
+
+    /** DELETE /{bucket}?metadata-table-config — DeleteBucketMetadataTableConfiguration */
+    public Mono<ServerResponse> deleteBucketMetadataTableConfiguration(ServerRequest request) {
+        return findBucket(request, b -> {
+            metadataTableConfigs.remove(b.name());
+            return ServerResponse.noContent().build();
+        });
+    }
+
+    // ─────────────────────────────────────────────────────
+    //  Inventory Table Configuration
+    // ─────────────────────────────────────────────────────
+
+    private record InventoryTableConfigEntry(String id, String destinationFormat,
+                                              String scheduleFrequency, boolean enabled) {}
+
+    /** GET /{bucket}?inventory-table-config — GetBucketInventoryTableConfiguration */
+    public Mono<ServerResponse> getBucketInventoryTableConfiguration(ServerRequest request) {
+        return findBucket(request, b -> {
+            var entry = inventoryTableConfigs.get(b.name());
+            if (entry == null) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchInventoryTableConfiguration",
+                    "The inventory table configuration does not exist");
+            }
+            return ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(new InventoryTableConfigurationQuery(
+                    entry.id(), entry.destinationFormat(), entry.scheduleFrequency(),
+                    entry.enabled() ? "true" : "false"));
+        });
+    }
+
+    /** PUT /{bucket}?inventory-table-config — PutBucketInventoryTableConfiguration */
+    public Mono<ServerResponse> putBucketInventoryTableConfiguration(ServerRequest request) {
+        return findBucket(request, b -> request.bodyToMono(InventoryTableConfigurationCommand.class)
+            .flatMap(cmd -> {
+                inventoryTableConfigs.put(b.name(), new InventoryTableConfigEntry(
+                    cmd.id(), cmd.destinationFormat(), cmd.scheduleFrequency(),
+                    "true".equals(cmd.enabled())));
+                return ServerResponse.ok().build();
+            })
+            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "InvalidRequest",
+                "Missing inventory table configuration body")));
+    }
+
+    // ─────────────────────────────────────────────────────
+    //  Journal Table Configuration
+    // ─────────────────────────────────────────────────────
+
+    private record JournalTableConfigEntry(String id, String destinationFormat,
+                                            String scheduleFrequency, boolean enabled) {}
+
+    /** GET /{bucket}?journal-table-config — GetBucketJournalTableConfiguration */
+    public Mono<ServerResponse> getBucketJournalTableConfiguration(ServerRequest request) {
+        return findBucket(request, b -> {
+            var entry = journalTableConfigs.get(b.name());
+            if (entry == null) {
+                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchJournalTableConfiguration",
+                    "The journal table configuration does not exist");
+            }
+            return ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(new JournalTableConfigurationQuery(
+                    entry.id(), entry.destinationFormat(), entry.scheduleFrequency(),
+                    entry.enabled() ? "true" : "false"));
+        });
+    }
+
+    /** PUT /{bucket}?journal-table-config — PutBucketJournalTableConfiguration */
+    public Mono<ServerResponse> putBucketJournalTableConfiguration(ServerRequest request) {
+        return findBucket(request, b -> request.bodyToMono(JournalTableConfigurationCommand.class)
+            .flatMap(cmd -> {
+                journalTableConfigs.put(b.name(), new JournalTableConfigEntry(
+                    cmd.id(), cmd.destinationFormat(), cmd.scheduleFrequency(),
+                    "true".equals(cmd.enabled())));
+                return ServerResponse.ok().build();
+            })
+            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "InvalidRequest",
+                "Missing journal table configuration body")));
     }
 }

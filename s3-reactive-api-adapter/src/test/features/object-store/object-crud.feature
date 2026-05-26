@@ -61,6 +61,66 @@ Feature: S3-compatible Object CRUD
     When the object is deleted via S3 API
     Then the object no longer appears in the object list
 
+  # ── Batch 1 Phase F operations ──
+
+  Scenario: Rename an object
+    Given object "rename-me.txt" exists with content "Rename me!"
+    When object "rename-me.txt" is renamed to "renamed.txt"
+    Then the response status is 200
+    And object "rename-me.txt" does not appear in the object list
+    And object "renamed.txt" content is "Rename me!"
+
+  Scenario: Rename object to nonexistent destination
+    Given object "rename-me-2.txt" exists with content "Still here"
+    When object "rename-me-2.txt" is renamed to "renamed.txt"
+    Then the response status is 200
+    And object "renamed.txt" content is "Still here"
+
+  Scenario: Update object encryption
+    Given object "encrypted-file.txt" exists with content "Encrypt me"
+    When encryption is updated for object "encrypted-file.txt" with SSE algorithm "AES256"
+    Then the response status is 200
+
+  Scenario: Update object encryption with KMS key
+    Given object "kms-file.txt" exists with content "KMS encrypt"
+    When encryption is updated for object "kms-file.txt" with SSE algorithm "aws:kms" and KMS key "arn:aws:kms:us-east-1:123:key/test"
+    Then the response status is 200
+
+  Scenario: Get object torrent
+    Given object "torrent-file.txt" exists with content "Torrent data"
+    When the torrent is retrieved for object "torrent-file.txt"
+    Then the response status is 200
+
+  Scenario: Restore an object
+    Given object "restore-me.txt" exists with content "Restore me"
+    When the object is restored via S3 API with tier "Standard" and days 30
+    Then the response status is 200
+
+  Scenario: Restore object from Glacier with tier
+    Given object "glacier-restore.txt" exists with content "Glacier data"
+    When the object is restored via S3 API with Glacier tier "Bulk" and days 60
+    Then the response status is 200
+
+  # ── Failure scenarios ──
+
+  Scenario: Rename nonexistent object
+    Given object "ghost-rename.txt" does not exist
+    When object "ghost-rename.txt" is renamed to "still-ghost.txt"
+    Then the response status is 404
+
+  Scenario: Update encryption for nonexistent object
+    Given object "ghost-encrypt.txt" does not exist
+    When encryption is updated for object "ghost-encrypt.txt" with SSE algorithm "AES256"
+    Then the response status is 404
+
+  Scenario: Get torrent for nonexistent object
+    When the torrent is retrieved for object "ghost-torrent.txt"
+    Then the response status is 404
+
+  Scenario: Restore nonexistent object
+    When the object with key "ghost-restore.txt" is restored via S3 API
+    Then the response status is 404
+
   # ── Failure scenarios ──
 
   Scenario: Put object to nonexistent bucket
