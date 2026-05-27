@@ -3,9 +3,14 @@ package com.example.magrathea.objectstore.domain.event;
 import com.example.magrathea.objectstore.domain.aggregate.Bucket;
 import com.example.magrathea.objectstore.domain.aggregate.MultipartUpload;
 import com.example.magrathea.objectstore.domain.aggregate.S3Object;
+import com.example.magrathea.objectstore.domain.valueobject.AbacConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.BucketConfig;
+import com.example.magrathea.objectstore.domain.valueobject.BucketMetadataConfiguration;
+import com.example.magrathea.objectstore.domain.valueobject.BucketMetadataTableConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.ContentDescriptor;
 import com.example.magrathea.objectstore.domain.valueobject.ObjectKey;
+import com.example.magrathea.objectstore.domain.valueobject.ObjectLockConfiguration;
+import com.example.magrathea.objectstore.domain.valueobject.RestoreConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.UploadId;
 
 import java.time.Duration;
@@ -39,21 +44,36 @@ public sealed interface ObjectStoreEvent {
     record MultipartUploadAborted(MultipartUpload.Id id, UploadId uploadId, Instant occurredOn) implements ObjectStoreEvent {}
 
     // ── Object restore ──
-    record ObjectRestored(S3Object.Id id, Bucket.Id bucketId, RestoreTier tier, Instant occurredOn) implements ObjectStoreEvent {}
+    record ObjectRestored(S3Object.Id id, Bucket.Id bucketId, RestoreConfiguration.RestoreTier tier, Instant occurredOn) implements ObjectStoreEvent {}
 
     // ── Legal hold ──
     record LegalHoldApplied(S3Object.Id id, Instant occurredOn) implements ObjectStoreEvent {}
     record LegalHoldRemoved(S3Object.Id id, Instant occurredOn) implements ObjectStoreEvent {}
 
     // ── Object lock ──
-    record ObjectLockConfigured(S3Object.Id id, ObjectLockMode mode, Duration retentionDuration, Instant occurredOn) implements ObjectStoreEvent {}
+    record ObjectLockConfigured(S3Object.Id id, ObjectLockConfiguration.ObjectLockMode mode, Duration retentionDuration, Instant occurredOn) implements ObjectStoreEvent {}
 
     // ── Retention ──
     record ObjectRetentionSet(S3Object.Id id, Instant expirationAt, Instant occurredOn) implements ObjectStoreEvent {}
 
-    // ── Restore tier enum ──
-    enum RestoreTier { STANDARD, BULK, EXPEDITED }
+    // ── Phase F: Encryption update ──
+    record ObjectEncryptionUpdated(S3Object.Id id, String encryption, Instant occurredOn) implements ObjectStoreEvent {}
 
-    // ── Lock mode enum ──
-    enum ObjectLockMode { GOVERNANCE, COMPLIANCE }
+    // ── Phase F: Rename ──
+    record ObjectRenamed(S3Object.Id id, Bucket.Id bucketId, ObjectKey oldKey, ObjectKey newKey, Instant occurredOn) implements ObjectStoreEvent {}
+
+    // ── Phase F: Session ──
+    record SessionCreated(String sessionToken, Instant occurredOn) implements ObjectStoreEvent {}
+
+    // ── Phase F: Bucket directory ──
+    record DirectoryBucketConfigured(Bucket.Id id, Instant occurredOn) implements ObjectStoreEvent {}
+
+    // ── Phase F: Bucket ABAC config ──
+    record AbacConfigChanged(Bucket.Id id, AbacConfiguration config, Instant occurredOn) implements ObjectStoreEvent {}
+
+    // ── Phase F: Bucket metadata config ──
+    record MetadataConfigChanged(Bucket.Id id, BucketMetadataConfiguration config, Instant occurredOn) implements ObjectStoreEvent {}
+
+    // ── Phase F: Bucket metadata table config ──
+    record MetadataTableConfigChanged(Bucket.Id id, BucketMetadataTableConfiguration config, Instant occurredOn) implements ObjectStoreEvent {}
 }

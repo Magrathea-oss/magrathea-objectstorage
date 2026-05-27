@@ -67,8 +67,8 @@ public class S3ApiConfig {
     }
 
     @Bean
-    public S3SessionHandler s3SessionHandler() {
-        return new S3SessionHandler();
+    public S3SessionHandler s3SessionHandler(ReactiveBucketService bucketService) {
+        return new S3SessionHandler(bucketService);
     }
 
     @Bean

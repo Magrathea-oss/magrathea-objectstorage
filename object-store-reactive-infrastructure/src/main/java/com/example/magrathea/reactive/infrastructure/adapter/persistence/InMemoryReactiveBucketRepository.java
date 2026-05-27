@@ -1,6 +1,10 @@
 package com.example.magrathea.reactive.infrastructure.adapter.persistence;
 
 import com.example.magrathea.objectstore.domain.aggregate.Bucket;
+import com.example.magrathea.objectstore.domain.valueobject.AbacConfiguration;
+import com.example.magrathea.objectstore.domain.valueobject.BucketConfig;
+import com.example.magrathea.objectstore.domain.valueobject.BucketMetadataConfiguration;
+import com.example.magrathea.objectstore.domain.valueobject.BucketMetadataTableConfiguration;
 import com.example.magrathea.objectstore.reactive.repository.application.BucketCommandRepository;
 import com.example.magrathea.objectstore.reactive.repository.application.BucketQueryRepository;
 import com.example.magrathea.objectstore.reactive.repository.application.CommandResult;
@@ -17,6 +21,8 @@ public class InMemoryReactiveBucketRepository implements BucketCommandRepository
 
     private final Map<Bucket.Id, Bucket> store = new ConcurrentHashMap<>();
     private final AtomicLong versionCounter = new AtomicLong(1);
+
+    // ── Aggregate operations ──
 
     @Override
     public Mono<CommandResult<Bucket>> save(Bucket bucket) {
@@ -63,6 +69,79 @@ public class InMemoryReactiveBucketRepository implements BucketCommandRepository
     @Override
     public Flux<Bucket> findAll() {
         return Flux.fromIterable(store.values());
+    }
+
+    // ── Phase F config queries ──
+
+    @Override
+    public Mono<AbacConfiguration> findAbacConfiguration(String bucketName) {
+        return findByName(bucketName)
+            .flatMap(b -> {
+                var config = b.bucketConfig() != null
+                    ? b.bucketConfig().getAbacConfiguration().orElse(null) : null;
+                return Mono.justOrEmpty(config);
+            });
+    }
+
+    @Override
+    public Mono<BucketMetadataConfiguration> findMetadataConfiguration(String bucketName) {
+        return findByName(bucketName)
+            .flatMap(b -> {
+                var config = b.bucketConfig() != null
+                    ? b.bucketConfig().getMetadataConfiguration().orElse(null) : null;
+                return Mono.justOrEmpty(config);
+            });
+    }
+
+    @Override
+    public Mono<BucketMetadataTableConfiguration> findMetadataTableConfiguration(String bucketName) {
+        return findByName(bucketName)
+            .flatMap(b -> {
+                var config = b.bucketConfig() != null
+                    ? b.bucketConfig().getMetadataTableConfiguration().orElse(null) : null;
+                return Mono.justOrEmpty(config);
+            });
+    }
+
+    // ── Phase F config writes ──
+
+    @Override
+    public Mono<Void> saveAbacConfiguration(String bucketName, AbacConfiguration config) {
+        return findByName(bucketName)
+            .flatMap(b -> {
+                var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
+                var newConfig = baseConfig.withAbacConfiguration(config);
+                var updated = b.withBucketConfig(newConfig).clearEvents();
+                store.put(updated.id(), updated);
+                return Mono.<Void>empty();
+            })
+            .switchIfEmpty(Mono.<Void>error(new BucketNotFoundException(Bucket.Id.of(bucketName))));
+    }
+
+    @Override
+    public Mono<Void> saveMetadataConfiguration(String bucketName, BucketMetadataConfiguration config) {
+        return findByName(bucketName)
+            .flatMap(b -> {
+                var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
+                var newConfig = baseConfig.withMetadataConfiguration(config);
+                var updated = b.withBucketConfig(newConfig).clearEvents();
+                store.put(updated.id(), updated);
+                return Mono.<Void>empty();
+            })
+            .switchIfEmpty(Mono.<Void>error(new BucketNotFoundException(Bucket.Id.of(bucketName))));
+    }
+
+    @Override
+    public Mono<Void> saveMetadataTableConfiguration(String bucketName, BucketMetadataTableConfiguration config) {
+        return findByName(bucketName)
+            .flatMap(b -> {
+                var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
+                var newConfig = baseConfig.withMetadataTableConfiguration(config);
+                var updated = b.withBucketConfig(newConfig).clearEvents();
+                store.put(updated.id(), updated);
+                return Mono.<Void>empty();
+            })
+            .switchIfEmpty(Mono.<Void>error(new BucketNotFoundException(Bucket.Id.of(bucketName))));
     }
 
     public void reset() {

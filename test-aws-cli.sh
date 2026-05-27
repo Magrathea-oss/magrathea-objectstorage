@@ -2,7 +2,7 @@
 set -u
 
 # AWS CLI compatibility test for Magrathea ObjectStorage.
-# Scope: every S3 operation currently implemented by s3-api.
+# Scope: every S3 operation currently implemented by s3-reactive-api-adapter.
 # Requires: AWS CLI installed and Magrathea running (default: http://localhost:8080).
 # Also writes docs/test-report.md with AWS CLI, Surefire, and Clover coverage summaries.
 
@@ -88,7 +88,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Implemented S3 operations in s3-api:
+# Implemented S3 operations in s3-reactive-api-adapter:
 # ListBuckets, CreateBucket, HeadBucket, GetBucketLocation,
 # GetBucketVersioning, PutBucketVersioning, GetBucketAcl, PutBucketAcl,
 # GetBucketTagging, PutBucketTagging, DeleteBucketTagging,

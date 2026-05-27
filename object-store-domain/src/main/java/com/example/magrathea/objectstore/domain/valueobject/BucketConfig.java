@@ -4,7 +4,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * BucketConfig — wrapper record holding all 15 specialized config types as nullable fields,
+ * BucketConfig — wrapper record holding all 18 specialized config types as nullable fields,
  * plus a bucketPolicy (String) field.
  *
  * Each config type has a getter returning {@link Optional} and a with* method returning a new
@@ -28,13 +28,16 @@ public record BucketConfig(
     BucketOwnershipControls ownershipControls,
     PublicAccessBlockConfiguration publicAccessBlockConfiguration,
     CorsConfiguration corsConfiguration,
-    String bucketPolicy
+    String bucketPolicy,
+    AbacConfiguration abacConfiguration,
+    BucketMetadataConfiguration metadataConfiguration,
+    BucketMetadataTableConfiguration metadataTableConfiguration
 ) {
     /**
      * EMPTY constant — all fields null.
      */
     public static final BucketConfig EMPTY = new BucketConfig(null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null);
+        null, null, null, null, null, null, null, null, null, null, null, null, null);
 
     // ── Getter methods returning Optional ──
 
@@ -102,6 +105,18 @@ public record BucketConfig(
         return Optional.ofNullable(bucketPolicy);
     }
 
+    public Optional<AbacConfiguration> getAbacConfiguration() {
+        return Optional.ofNullable(abacConfiguration);
+    }
+
+    public Optional<BucketMetadataConfiguration> getMetadataConfiguration() {
+        return Optional.ofNullable(metadataConfiguration);
+    }
+
+    public Optional<BucketMetadataTableConfiguration> getMetadataTableConfiguration() {
+        return Optional.ofNullable(metadataTableConfiguration);
+    }
+
     // ── with* methods ──
 
     public BucketConfig withLoggingConfiguration(BucketLoggingConfiguration logging) {
@@ -109,7 +124,8 @@ public record BucketConfig(
             accelerateConfiguration, analyticsConfiguration, inventoryConfiguration,
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
-            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy);
+            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
     }
 
     public BucketConfig withWebsiteConfiguration(BucketWebsiteConfiguration website) {
@@ -117,7 +133,8 @@ public record BucketConfig(
             accelerateConfiguration, analyticsConfiguration, inventoryConfiguration,
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
-            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy);
+            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
     }
 
     public BucketConfig withNotificationConfiguration(BucketNotificationConfiguration notification) {
@@ -125,7 +142,8 @@ public record BucketConfig(
             accelerateConfiguration, analyticsConfiguration, inventoryConfiguration,
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
-            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy);
+            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
     }
 
     public BucketConfig withAccelerateConfiguration(BucketAccelerateConfiguration accelerate) {
@@ -133,7 +151,8 @@ public record BucketConfig(
             accelerate, analyticsConfiguration, inventoryConfiguration,
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
-            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy);
+            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
     }
 
     public BucketConfig withAnalyticsConfiguration(BucketAnalyticsConfiguration analytics) {
@@ -141,7 +160,8 @@ public record BucketConfig(
             accelerateConfiguration, analytics, inventoryConfiguration,
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
-            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy);
+            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
     }
 
     public BucketConfig withInventoryConfiguration(BucketInventoryConfiguration inventory) {
@@ -149,7 +169,8 @@ public record BucketConfig(
             accelerateConfiguration, analyticsConfiguration, inventory,
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
-            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy);
+            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
     }
 
     public BucketConfig withMetricsConfiguration(BucketMetricsConfiguration metrics) {
@@ -157,7 +178,8 @@ public record BucketConfig(
             accelerateConfiguration, analyticsConfiguration, inventoryConfiguration,
             metrics, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
-            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy);
+            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
     }
 
     public BucketConfig withIntelligentTieringConfiguration(BucketIntelligentTieringConfiguration tiering) {
@@ -165,7 +187,8 @@ public record BucketConfig(
             accelerateConfiguration, analyticsConfiguration, inventoryConfiguration,
             metricsConfiguration, tiering, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
-            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy);
+            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
     }
 
     public BucketConfig withEncryptionConfiguration(BucketEncryptionConfiguration encryption) {
@@ -173,7 +196,8 @@ public record BucketConfig(
             accelerateConfiguration, analyticsConfiguration, inventoryConfiguration,
             metricsConfiguration, intelligentTieringConfiguration, encryption,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
-            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy);
+            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
     }
 
     public BucketConfig withLifecycleConfiguration(BucketLifecycleConfiguration lifecycle) {
@@ -181,7 +205,8 @@ public record BucketConfig(
             accelerateConfiguration, analyticsConfiguration, inventoryConfiguration,
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycle, replicationConfiguration, requestPaymentConfiguration,
-            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy);
+            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
     }
 
     public BucketConfig withReplicationConfiguration(BucketReplicationConfiguration replication) {
@@ -189,7 +214,8 @@ public record BucketConfig(
             accelerateConfiguration, analyticsConfiguration, inventoryConfiguration,
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replication, requestPaymentConfiguration,
-            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy);
+            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
     }
 
     public BucketConfig withRequestPaymentConfiguration(BucketRequestPaymentConfiguration payment) {
@@ -197,7 +223,8 @@ public record BucketConfig(
             accelerateConfiguration, analyticsConfiguration, inventoryConfiguration,
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, payment,
-            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy);
+            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
     }
 
     public BucketConfig withOwnershipControls(BucketOwnershipControls ownership) {
@@ -205,7 +232,8 @@ public record BucketConfig(
             accelerateConfiguration, analyticsConfiguration, inventoryConfiguration,
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
-            ownership, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy);
+            ownership, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
     }
 
     public BucketConfig withPublicAccessBlock(PublicAccessBlockConfiguration publicAccessBlock) {
@@ -213,7 +241,8 @@ public record BucketConfig(
             accelerateConfiguration, analyticsConfiguration, inventoryConfiguration,
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
-            ownershipControls, publicAccessBlock, corsConfiguration, bucketPolicy);
+            ownershipControls, publicAccessBlock, corsConfiguration, bucketPolicy,
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
     }
 
     public BucketConfig withCorsConfiguration(CorsConfiguration cors) {
@@ -222,7 +251,8 @@ public record BucketConfig(
             accelerateConfiguration, analyticsConfiguration, inventoryConfiguration,
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
-            ownershipControls, publicAccessBlockConfiguration, cors, bucketPolicy);
+            ownershipControls, publicAccessBlockConfiguration, cors, bucketPolicy,
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
     }
 
     public BucketConfig withBucketPolicy(String policy) {
@@ -231,7 +261,38 @@ public record BucketConfig(
             accelerateConfiguration, analyticsConfiguration, inventoryConfiguration,
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
-            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, policy);
+            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, policy,
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
+    }
+
+    public BucketConfig withAbacConfiguration(AbacConfiguration abac) {
+        Objects.requireNonNull(abac);
+        return new BucketConfig(loggingConfiguration, websiteConfiguration, notificationConfiguration,
+            accelerateConfiguration, analyticsConfiguration, inventoryConfiguration,
+            metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
+            lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
+            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
+            abac, metadataConfiguration, metadataTableConfiguration);
+    }
+
+    public BucketConfig withMetadataConfiguration(BucketMetadataConfiguration metadata) {
+        Objects.requireNonNull(metadata);
+        return new BucketConfig(loggingConfiguration, websiteConfiguration, notificationConfiguration,
+            accelerateConfiguration, analyticsConfiguration, inventoryConfiguration,
+            metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
+            lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
+            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
+            abacConfiguration, metadata, metadataTableConfiguration);
+    }
+
+    public BucketConfig withMetadataTableConfiguration(BucketMetadataTableConfiguration metadataTable) {
+        Objects.requireNonNull(metadataTable);
+        return new BucketConfig(loggingConfiguration, websiteConfiguration, notificationConfiguration,
+            accelerateConfiguration, analyticsConfiguration, inventoryConfiguration,
+            metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
+            lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
+            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
+            abacConfiguration, metadataConfiguration, metadataTable);
     }
 
     /**

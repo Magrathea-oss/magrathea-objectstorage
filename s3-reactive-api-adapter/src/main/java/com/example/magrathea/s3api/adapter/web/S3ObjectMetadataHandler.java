@@ -26,6 +26,10 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Object metadata-context S3 operations: ACL, tagging, object attributes, and encryption.
  * Uses Jackson XML codec for request body deserialization.
+ *
+ * Phase E operations (ACL, tagging, encryption) use local in-memory maps as simplified
+ * adapter storage. Phase F operations (legal hold, retention, lock config) delegate to
+ * ReactiveObjectService for domain/application ownership.
  */
 public class S3ObjectMetadataHandler {
 
@@ -34,13 +38,6 @@ public class S3ObjectMetadataHandler {
     private final ConcurrentHashMap<String, String> objectAclStore = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, List<TaggingQuery.TagEntry>> objectTagStore = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Map<String, String>> objectEncryptionStore = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Boolean> objectLegalHoldStore = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, RetentionRecord> objectRetentionStore = new ConcurrentHashMap<>();
-
-    /**
-     * In-memory retention record for an object.
-     */
-    private record RetentionRecord(String mode, String retainUntilDate) {}
 
     public S3ObjectMetadataHandler(ReactiveBucketService bucketService,
                                     ReactiveObjectService objectService) {
@@ -177,7 +174,7 @@ public class S3ObjectMetadataHandler {
     }
 
     // ─────────────────────────────────────────────────────
-    //  Legal Hold
+    //  Legal Hold (Phase F — delegated to service)
     // ─────────────────────────────────────────────────────
 
     /** GET /{bucket}/{key}?legal-hold — GetObjectLegalHold */
@@ -186,13 +183,10 @@ public class S3ObjectMetadataHandler {
         var key = request.pathVariable("key");
         return bucketService.findByName(bucketName)
             .flatMap(b -> {
-                return objectService.findByBucketAndKey(b.id(), ObjectKey.of(key))
-                    .flatMap(obj -> {
-                        var active = objectLegalHoldStore.getOrDefault(objectStoreKey(bucketName, key), false);
-                        return ServerResponse.ok()
-                            .contentType(MediaType.APPLICATION_XML)
-                            .bodyValue(LegalHoldQuery.from(active));
-                    })
+                return objectService.getObjectLegalHold(bucketName, ObjectKey.of(key))
+                    .flatMap(hold -> ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_XML)
+                        .bodyValue(LegalHoldQuery.from(hold.status())))
                     .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found"));
             })
             .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
@@ -204,19 +198,18 @@ public class S3ObjectMetadataHandler {
         var key = request.pathVariable("key");
         return bucketService.findByName(bucketName)
             .flatMap(b -> {
-                return objectService.findByBucketAndKey(b.id(), ObjectKey.of(key))
-                    .flatMap(obj -> request.bodyToMono(LegalHoldCommand.class)
-                        .flatMap(cmd -> {
-                            objectLegalHoldStore.put(objectStoreKey(bucketName, key), cmd.isActive());
-                            return ServerResponse.ok().build();
-                        }))
-                    .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found"));
+                return request.bodyToMono(LegalHoldCommand.class)
+                    .flatMap(cmd -> objectService.putObjectLegalHold(bucketName, ObjectKey.of(key),
+                        cmd.isActive()
+                            ? com.example.magrathea.objectstore.domain.valueobject.LegalHold.apply()
+                            : com.example.magrathea.objectstore.domain.valueobject.LegalHold.remove(java.time.Instant.now())))
+                    .then(ServerResponse.ok().build());
             })
             .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
     }
 
     // ─────────────────────────────────────────────────────
-    //  Retention
+    //  Retention (Phase F — delegated to service)
     // ─────────────────────────────────────────────────────
 
     /** GET /{bucket}/{key}?retention — GetObjectRetention */
@@ -225,17 +218,17 @@ public class S3ObjectMetadataHandler {
         var key = request.pathVariable("key");
         return bucketService.findByName(bucketName)
             .flatMap(b -> {
-                return objectService.findByBucketAndKey(b.id(), ObjectKey.of(key))
-                    .flatMap(obj -> {
-                        var retention = objectRetentionStore.get(objectStoreKey(bucketName, key));
-                        if (retention == null) {
-                            return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchRetentionConfiguration",
-                                "The retention configuration does not exist");
-                        }
+                return objectService.getObjectLockConfiguration(bucketName, ObjectKey.of(key))
+                    .flatMap(lockConfig -> {
+                        var mode = lockConfig.mode().name();
+                        var untilDate = lockConfig.retention().appliedAt()
+                            .plus(lockConfig.retention().duration()).toString();
                         return ServerResponse.ok()
                             .contentType(MediaType.APPLICATION_XML)
-                            .bodyValue(RetentionQuery.from(retention.mode(), retention.retainUntilDate()));
+                            .bodyValue(RetentionQuery.from(mode, untilDate));
                     })
+                    .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchRetentionConfiguration",
+                        "The retention configuration does not exist"))
                     .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found"));
             })
             .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
@@ -247,15 +240,19 @@ public class S3ObjectMetadataHandler {
         var key = request.pathVariable("key");
         return bucketService.findByName(bucketName)
             .flatMap(b -> {
-                return objectService.findByBucketAndKey(b.id(), ObjectKey.of(key))
-                    .flatMap(obj -> request.bodyToMono(RetentionCommand.class)
-                        .flatMap(cmd -> {
-                            objectRetentionStore.put(
-                                objectStoreKey(bucketName, key),
-                                new RetentionRecord(cmd.mode(), cmd.retainUntilDate()));
-                            return ServerResponse.ok().build();
-                        }))
-                    .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found"));
+                return request.bodyToMono(RetentionCommand.class)
+                    .flatMap(cmd -> {
+                        var mode = "COMPLIANCE".equals(cmd.mode())
+                            ? com.example.magrathea.objectstore.domain.valueobject.ObjectLockConfiguration.ObjectLockMode.COMPLIANCE
+                            : com.example.magrathea.objectstore.domain.valueobject.ObjectLockConfiguration.ObjectLockMode.GOVERNANCE;
+                        var retainUntil = java.time.Instant.parse(cmd.retainUntilDate());
+                        var duration = java.time.Duration.between(java.time.Instant.now(), retainUntil);
+                        var retention = com.example.magrathea.objectstore.domain.valueobject.ObjectLockConfiguration.RetentionPeriod.of(duration, java.time.Instant.now());
+                        var lockConfig = com.example.magrathea.objectstore.domain.valueobject.ObjectLockConfiguration.of(mode, retention);
+                        return objectService.putObjectLockConfiguration(bucketName, ObjectKey.of(key), lockConfig)
+                            .then(objectService.putObjectRetention(bucketName, ObjectKey.of(key), retention));
+                    })
+                    .then(ServerResponse.ok().build());
             })
             .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
     }

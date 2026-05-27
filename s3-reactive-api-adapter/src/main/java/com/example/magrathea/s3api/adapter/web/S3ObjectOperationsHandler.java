@@ -273,20 +273,11 @@ public class S3ObjectOperationsHandler {
         var bucket = request.pathVariable("bucket");
         var key = request.pathVariable("key");
         return bucketService.findByName(bucket)
-            .flatMap(b -> objectService.findByBucketAndKey(b.id(), ObjectKey.of(key))
-                .flatMap(obj -> {
-                    // Placeholder torrent content
-                    var torrentContent = """
-                        Placeholder torrent file for %s/%s
-                        This is a mock torrent response for S3 API compatibility.
-                        """.formatted(bucket, key).getBytes(StandardCharsets.UTF_8);
-                    var dataBuffer = DATA_BUFFER_FACTORY.wrap(torrentContent);
-                    return ServerResponse.ok()
-                        .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                        .body(BodyInserters.fromDataBuffers(Flux.just(dataBuffer)));
-                })
-                .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found"))
-            )
+            .flatMap(b -> objectService.getObjectTorrent(bucket, ObjectKey.of(key))
+                .flatMap(torrentData -> ServerResponse.ok()
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .body(BodyInserters.fromDataBuffers(torrentData)))
+                .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found")))
             .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
     }
 

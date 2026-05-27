@@ -379,6 +379,32 @@ Phase F implements the remaining advanced and specialized S3 API operations. All
 - **Storage-engine note**: Batch 5 is available through S3-compatible in-memory configuration handling; deeper storage-engine integration remains future architecture work.
 - **AWS CLI tests**: AWS CLI coverage remains limited to operations exposed by `aws s3api`; Phase F completion is verified by Cucumber.
 
+### Course Correction — ADR 0013
+
+ADR: [`docs/adr/0013-course-correction-phase-f-domain-application-ownership-and-aws-cli-verification-gate.md`](docs/adr/0013-course-correction-phase-f-domain-application-ownership-and-aws-cli-verification-gate.md)
+
+Phase F API surface is implemented and Cucumber-green, but architectural completion is blocked until ADR 0013 is addressed. The correction moves Phase F business semantics out of web handlers and into domain, application, and infrastructure ownership, while also verifying or fixing the AWS CLI Maven gate.
+
+#### Correction Work Plan
+
+| # | Work item | Owner | Required action / gate |
+|---|---|---|---|
+| 1 | AWS CLI Maven gate verification/fix | java-tester | Run/fix `mvn -N verify -Paws-cli-tests`. |
+| 2 | Domain model for Phase F semantics | java-domain-coder | Model LegalHold, ObjectLock, Retention, Restore, Select, Object Lambda response, and Bucket Metadata config/table concepts. |
+| 3 | Application service/use-case layer | java-infra-coder | Add services/use cases and repository ports so handlers stop owning business state. |
+| 4 | Infrastructure repositories/state stores | java-infra-coder | Move handler-local `ConcurrentHashMap` state into infrastructure adapters. |
+| 5 | Handler refactor | java-infra-coder | Make handlers HTTP/XML adapters that call application services. |
+| 6 | Tests | java-tester | Keep Cucumber green, add AWS CLI coverage for exposed operations, and add domain/application tests. |
+| 7 | Documentation finalization | documenter/c4model | Update ARC42, C4, and API coverage documentation after rework. |
+
+#### Acceptance Criteria
+
+- `mvn test` passes.
+- `mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false` passes.
+- `mvn -N verify -Paws-cli-tests` either passes or fails only due to missing external AWS CLI/app environment with a documented actionable reason.
+- `grep` shows no Phase F business state maps in web handlers except pure adapter caches if justified.
+- Phase F use cases are reachable through application services.
+
 ## Current API Coverage Analysis
 
 See [`docs/api-coverage.md`](docs/api-coverage.md) for detailed request/response coverage, and the Phase F section above for the ADR 0012 advanced/specialized operation closure. The implemented operation count is now **111/111**.

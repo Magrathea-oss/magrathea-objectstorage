@@ -1,7 +1,10 @@
 package com.example.magrathea.objectstore.domain.aggregate;
 
 import com.example.magrathea.objectstore.domain.event.ObjectStoreEvent;
+import com.example.magrathea.objectstore.domain.valueobject.AbacConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.BucketConfig;
+import com.example.magrathea.objectstore.domain.valueobject.BucketMetadataConfiguration;
+import com.example.magrathea.objectstore.domain.valueobject.BucketMetadataTableConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.Region;
 import com.example.magrathea.objectstore.domain.valueobject.StorageClass;
 
@@ -35,6 +38,7 @@ public record Bucket(
     StorageClass storageClass,
     boolean versioningEnabled,
     boolean encryptionEnabled,
+    boolean directoryBucket,
     BucketConfig bucketConfig,
     List<ObjectStoreEvent> events
 ) {
@@ -53,6 +57,7 @@ public record Bucket(
         Objects.requireNonNull(name);
         Objects.requireNonNull(region);
         Objects.requireNonNull(storageClass);
+        Objects.requireNonNull(bucketConfig);
         Objects.requireNonNull(events);
         if (name.isBlank()) throw new IllegalArgumentException("Bucket name must not be blank");
         if (name.length() < 3 || name.length() > 63)
@@ -77,6 +82,15 @@ public record Bucket(
      */
     public static Bucket create(Id id, String name, Region region, StorageClass storageClass,
                                 BucketConfig bucketConfig) {
+        return create(id, name, region, storageClass, false, bucketConfig);
+    }
+
+    /**
+     * Factory method — create a new bucket with directory bucket flag and config.
+     * Records a {@link ObjectStoreEvent.BucketCreated} event.
+     */
+    public static Bucket create(Id id, String name, Region region, StorageClass storageClass,
+                                boolean directoryBucket, BucketConfig bucketConfig) {
         Objects.requireNonNull(id);
         Objects.requireNonNull(name);
         Objects.requireNonNull(region);
@@ -86,7 +100,7 @@ public record Bucket(
         var events = List.<ObjectStoreEvent>of(
             new ObjectStoreEvent.BucketCreated(id, name, now)
         );
-        return new Bucket(id, name, region, storageClass, false, false, bucketConfig, events);
+        return new Bucket(id, name, region, storageClass, false, false, directoryBucket, bucketConfig, events);
     }
 
     /**
@@ -94,23 +108,33 @@ public record Bucket(
      */
     public static Bucket restore(Id id, String name, Region region, StorageClass storageClass,
                                   boolean versioningEnabled, boolean encryptionEnabled,
-                                  BucketConfig bucketConfig) {
+                                  boolean directoryBucket, BucketConfig bucketConfig) {
         Objects.requireNonNull(id);
         Objects.requireNonNull(name);
         Objects.requireNonNull(region);
         Objects.requireNonNull(storageClass);
         Objects.requireNonNull(bucketConfig);
         return new Bucket(id, name, region, storageClass, versioningEnabled, encryptionEnabled,
-            bucketConfig, List.of());
+            directoryBucket, bucketConfig, List.of());
     }
 
     /**
-     * Legacy restore without config — defaults to BucketConfig.EMPTY.
+     * Legacy restore without config — defaults to BucketConfig.EMPTY and non-directory.
      */
     public static Bucket restore(Id id, String name, Region region, StorageClass storageClass,
                                   boolean versioningEnabled, boolean encryptionEnabled) {
         return restore(id, name, region, storageClass, versioningEnabled, encryptionEnabled,
-            BucketConfig.EMPTY);
+            false, BucketConfig.EMPTY);
+    }
+
+    /**
+     * Legacy restore with config but without directoryBucket flag — defaults to non-directory.
+     */
+    public static Bucket restore(Id id, String name, Region region, StorageClass storageClass,
+                                  boolean versioningEnabled, boolean encryptionEnabled,
+                                  BucketConfig bucketConfig) {
+        return restore(id, name, region, storageClass, versioningEnabled, encryptionEnabled,
+            false, bucketConfig);
     }
 
     // ── State transitions ──
@@ -122,7 +146,7 @@ public record Bucket(
         var newEvents = appendEvent(
             new ObjectStoreEvent.BucketVersioningEnabled(id, Instant.now())
         );
-        return new Bucket(id, name, region, storageClass, true, encryptionEnabled, bucketConfig, newEvents);
+        return new Bucket(id, name, region, storageClass, true, encryptionEnabled, directoryBucket, bucketConfig, newEvents);
     }
 
     /**
@@ -132,7 +156,7 @@ public record Bucket(
         var newEvents = appendEvent(
             new ObjectStoreEvent.BucketVersioningSuspended(id, Instant.now())
         );
-        return new Bucket(id, name, region, storageClass, false, encryptionEnabled, bucketConfig, newEvents);
+        return new Bucket(id, name, region, storageClass, false, encryptionEnabled, directoryBucket, bucketConfig, newEvents);
     }
 
     /**
@@ -142,7 +166,7 @@ public record Bucket(
         var newEvents = appendEvent(
             new ObjectStoreEvent.BucketEncryptionEnabled(id, Instant.now())
         );
-        return new Bucket(id, name, region, storageClass, versioningEnabled, true, bucketConfig, newEvents);
+        return new Bucket(id, name, region, storageClass, versioningEnabled, true, directoryBucket, bucketConfig, newEvents);
     }
 
     /**
@@ -153,7 +177,21 @@ public record Bucket(
             new ObjectStoreEvent.BucketDeleted(id, Instant.now())
         );
         return new Bucket(id, name, region, storageClass, versioningEnabled, encryptionEnabled,
-            bucketConfig, newEvents);
+            directoryBucket, bucketConfig, newEvents);
+    }
+
+    // ── Directory bucket transition ──
+
+    /**
+     * Mark this bucket as a directory bucket. Returns new instance with a
+     * {@link ObjectStoreEvent.DirectoryBucketConfigured} event.
+     */
+    public Bucket withDirectoryBucket() {
+        var newEvents = appendEvent(
+            new ObjectStoreEvent.DirectoryBucketConfigured(id, Instant.now())
+        );
+        return new Bucket(id, name, region, storageClass, versioningEnabled, encryptionEnabled,
+            true, bucketConfig, newEvents);
     }
 
     // ── Config transition ──
@@ -168,7 +206,50 @@ public record Bucket(
             new ObjectStoreEvent.BucketConfigChanged(id, config, Instant.now())
         );
         return new Bucket(id, name, region, storageClass, versioningEnabled, encryptionEnabled,
-            config, newEvents);
+            directoryBucket, config, newEvents);
+    }
+
+    // ── Phase F config transitions ──
+
+    /**
+     * Set ABAC configuration. Returns new instance with an {@link ObjectStoreEvent.AbacConfigChanged} event.
+     */
+    public Bucket withAbacConfiguration(AbacConfiguration abac) {
+        Objects.requireNonNull(abac);
+        var newConfig = bucketConfig.withAbacConfiguration(abac);
+        var newEvents = appendEvent(
+            new ObjectStoreEvent.AbacConfigChanged(id, abac, Instant.now())
+        );
+        return new Bucket(id, name, region, storageClass, versioningEnabled, encryptionEnabled,
+            directoryBucket, newConfig, newEvents);
+    }
+
+    /**
+     * Set metadata configuration. Returns new instance with a
+     * {@link ObjectStoreEvent.MetadataConfigChanged} event.
+     */
+    public Bucket withMetadataConfiguration(BucketMetadataConfiguration metadata) {
+        Objects.requireNonNull(metadata);
+        var newConfig = bucketConfig.withMetadataConfiguration(metadata);
+        var newEvents = appendEvent(
+            new ObjectStoreEvent.MetadataConfigChanged(id, metadata, Instant.now())
+        );
+        return new Bucket(id, name, region, storageClass, versioningEnabled, encryptionEnabled,
+            directoryBucket, newConfig, newEvents);
+    }
+
+    /**
+     * Set metadata table configuration. Returns new instance with a
+     * {@link ObjectStoreEvent.MetadataTableConfigChanged} event.
+     */
+    public Bucket withMetadataTableConfiguration(BucketMetadataTableConfiguration metadataTable) {
+        Objects.requireNonNull(metadataTable);
+        var newConfig = bucketConfig.withMetadataTableConfiguration(metadataTable);
+        var newEvents = appendEvent(
+            new ObjectStoreEvent.MetadataTableConfigChanged(id, metadataTable, Instant.now())
+        );
+        return new Bucket(id, name, region, storageClass, versioningEnabled, encryptionEnabled,
+            directoryBucket, newConfig, newEvents);
     }
 
     // ── Event management ──
@@ -185,7 +266,7 @@ public record Bucket(
      */
     public Bucket clearEvents() {
         return new Bucket(id, name, region, storageClass, versioningEnabled, encryptionEnabled,
-            bucketConfig, List.of());
+            directoryBucket, bucketConfig, List.of());
     }
 
     private List<ObjectStoreEvent> appendEvent(ObjectStoreEvent event) {

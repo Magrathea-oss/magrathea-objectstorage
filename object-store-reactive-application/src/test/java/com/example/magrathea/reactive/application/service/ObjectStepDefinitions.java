@@ -33,7 +33,7 @@ public class ObjectStepDefinitions {
     public void reset() {
         bucketRepository = new InMemoryReactiveBucketRepository();
         objectRepository = new InMemoryReactiveS3ObjectRepository();
-        service = new ReactiveObjectService(objectRepository, objectRepository);
+        service = new ReactiveObjectService(objectRepository, objectRepository, bucketRepository);
         result = null;
         testBucketId = null;
     }

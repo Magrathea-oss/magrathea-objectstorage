@@ -94,18 +94,31 @@ public class S3BucketConfigHandler {
 
     private final ReactiveBucketService bucketService;
     private final Map<String, List<AbacConfigEntry>> abacConfigs = new ConcurrentHashMap<>();
-
     private final Map<String, ObjectLockConfigEntry> objectLockConfigs = new ConcurrentHashMap<>();
-
     private final Map<String, MetadataConfigEntry> metadataConfigs = new ConcurrentHashMap<>();
     private final Map<String, MetadataTableConfigEntry> metadataTableConfigs = new ConcurrentHashMap<>();
     private final Map<String, InventoryTableConfigEntry> inventoryTableConfigs = new ConcurrentHashMap<>();
     private final Map<String, JournalTableConfigEntry> journalTableConfigs = new ConcurrentHashMap<>();
 
-    /**
-     * In-memory object lock configuration entry — stored per bucket.
-     */
     private record ObjectLockConfigEntry(boolean enabled, String mode, int days) {}
+    private record AbacConfigEntry(String id, String principal, String resource, String action,
+                                    List<AbacCondition> conditions) {
+        private record AbacCondition(String tag, String value) {}
+    }
+    private record MetadataConfigEntry(List<MetadataConfigRule> rules) {
+        private record MetadataConfigRule(String id, String status,
+                                           String metadataResourceType,
+                                           String metadataResourceSubtype) {}
+    }
+    private record MetadataTableConfigEntry(List<MetadataTableConfigRule> rules) {
+        private record MetadataTableConfigRule(String id, String status,
+                                                String metadataTableName,
+                                                String metadataTableDatabase) {}
+    }
+    private record InventoryTableConfigEntry(String id, String destinationFormat,
+                                              String scheduleFrequency, boolean enabled) {}
+    private record JournalTableConfigEntry(String id, String destinationFormat,
+                                            String scheduleFrequency, boolean enabled) {}
 
     public S3BucketConfigHandler(ReactiveBucketService bucketService) {
         this.bucketService = bucketService;
@@ -118,14 +131,6 @@ public class S3BucketConfigHandler {
         metadataTableConfigs.clear();
         inventoryTableConfigs.clear();
         journalTableConfigs.clear();
-    }
-
-    /**
-     * In-memory ABAC configuration entry — stored per bucket.
-     */
-    private record AbacConfigEntry(String id, String principal, String resource, String action,
-                                    List<AbacCondition> conditions) {
-        private record AbacCondition(String tag, String value) {}
     }
 
     // ─────────────────────────────────────────────────────
@@ -233,7 +238,8 @@ public class S3BucketConfigHandler {
                 bc.accelerateConfiguration(), bc.analyticsConfiguration(), bc.inventoryConfiguration(),
                 bc.metricsConfiguration(), bc.intelligentTieringConfiguration(), bc.encryptionConfiguration(),
                 bc.lifecycleConfiguration(), bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
-                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), null, bc.bucketPolicy()));
+                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), null, bc.bucketPolicy(),
+                null, null, null));
     }
 
     // ── Lifecycle Configuration ──
@@ -282,7 +288,8 @@ public class S3BucketConfigHandler {
                 bc.accelerateConfiguration(), bc.analyticsConfiguration(), bc.inventoryConfiguration(),
                 bc.metricsConfiguration(), bc.intelligentTieringConfiguration(), bc.encryptionConfiguration(),
                 null, bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
-                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy()));
+                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy(),
+                null, null, null));
     }
 
     // ── Bucket Policy ──
@@ -320,7 +327,8 @@ public class S3BucketConfigHandler {
                 bc.accelerateConfiguration(), bc.analyticsConfiguration(), bc.inventoryConfiguration(),
                 bc.metricsConfiguration(), bc.intelligentTieringConfiguration(), bc.encryptionConfiguration(),
                 bc.lifecycleConfiguration(), bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
-                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), null));
+                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), null,
+                null, null, null));
     }
 
     // ── Encryption Configuration ──
@@ -355,7 +363,8 @@ public class S3BucketConfigHandler {
                 bc.accelerateConfiguration(), bc.analyticsConfiguration(), bc.inventoryConfiguration(),
                 bc.metricsConfiguration(), bc.intelligentTieringConfiguration(), null,
                 bc.lifecycleConfiguration(), bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
-                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy()));
+                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy(),
+                null, null, null));
     }
 
     // ── Logging Configuration ──
@@ -390,7 +399,8 @@ public class S3BucketConfigHandler {
                 bc.accelerateConfiguration(), bc.analyticsConfiguration(), bc.inventoryConfiguration(),
                 bc.metricsConfiguration(), bc.intelligentTieringConfiguration(), bc.encryptionConfiguration(),
                 bc.lifecycleConfiguration(), bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
-                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy()));
+                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy(),
+                null, null, null));
     }
 
     // ── Website Configuration ──
@@ -426,7 +436,8 @@ public class S3BucketConfigHandler {
                 bc.accelerateConfiguration(), bc.analyticsConfiguration(), bc.inventoryConfiguration(),
                 bc.metricsConfiguration(), bc.intelligentTieringConfiguration(), bc.encryptionConfiguration(),
                 bc.lifecycleConfiguration(), bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
-                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy()));
+                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy(),
+                null, null, null));
     }
 
     // ── Notification Configuration ──
@@ -465,7 +476,8 @@ public class S3BucketConfigHandler {
                 bc.accelerateConfiguration(), bc.analyticsConfiguration(), bc.inventoryConfiguration(),
                 bc.metricsConfiguration(), bc.intelligentTieringConfiguration(), bc.encryptionConfiguration(),
                 bc.lifecycleConfiguration(), bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
-                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy()));
+                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy(),
+                null, null, null));
     }
 
     // ── Replication Configuration ──
@@ -505,7 +517,8 @@ public class S3BucketConfigHandler {
                 bc.accelerateConfiguration(), bc.analyticsConfiguration(), bc.inventoryConfiguration(),
                 bc.metricsConfiguration(), bc.intelligentTieringConfiguration(), bc.encryptionConfiguration(),
                 bc.lifecycleConfiguration(), null, bc.requestPaymentConfiguration(),
-                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy()));
+                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy(),
+                null, null, null));
     }
 
     // ── Request Payment Configuration ──
@@ -539,7 +552,8 @@ public class S3BucketConfigHandler {
                 bc.accelerateConfiguration(), bc.analyticsConfiguration(), bc.inventoryConfiguration(),
                 bc.metricsConfiguration(), bc.intelligentTieringConfiguration(), bc.encryptionConfiguration(),
                 bc.lifecycleConfiguration(), bc.replicationConfiguration(), null,
-                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy()));
+                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy(),
+                null, null, null));
     }
 
     // ── Ownership Controls ──
@@ -573,7 +587,8 @@ public class S3BucketConfigHandler {
                 bc.accelerateConfiguration(), bc.analyticsConfiguration(), bc.inventoryConfiguration(),
                 bc.metricsConfiguration(), bc.intelligentTieringConfiguration(), bc.encryptionConfiguration(),
                 bc.lifecycleConfiguration(), bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
-                null, bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy()));
+                null, bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy(),
+                null, null, null));
     }
 
     // ── Public Access Block ──
@@ -609,7 +624,8 @@ public class S3BucketConfigHandler {
                 bc.accelerateConfiguration(), bc.analyticsConfiguration(), bc.inventoryConfiguration(),
                 bc.metricsConfiguration(), bc.intelligentTieringConfiguration(), bc.encryptionConfiguration(),
                 bc.lifecycleConfiguration(), bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
-                bc.ownershipControls(), null, bc.corsConfiguration(), bc.bucketPolicy()));
+                bc.ownershipControls(), null, bc.corsConfiguration(), bc.bucketPolicy(),
+                null, null, null));
     }
 
     // ── Accelerate Configuration ──
@@ -643,7 +659,8 @@ public class S3BucketConfigHandler {
                 null, bc.analyticsConfiguration(), bc.inventoryConfiguration(),
                 bc.metricsConfiguration(), bc.intelligentTieringConfiguration(), bc.encryptionConfiguration(),
                 bc.lifecycleConfiguration(), bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
-                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy()));
+                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy(),
+                null, null, null));
     }
 
     // ─────────────────────────────────────────────────────
@@ -690,7 +707,8 @@ public class S3BucketConfigHandler {
                 bc.accelerateConfiguration(), null, bc.inventoryConfiguration(),
                 bc.metricsConfiguration(), bc.intelligentTieringConfiguration(), bc.encryptionConfiguration(),
                 bc.lifecycleConfiguration(), bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
-                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy()));
+                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy(),
+                null, null, null));
     }
 
     /** GET /{bucket}?analytics&list-type — ListBucketAnalyticsConfigurations */
@@ -754,7 +772,8 @@ public class S3BucketConfigHandler {
                 bc.accelerateConfiguration(), bc.analyticsConfiguration(), null,
                 bc.metricsConfiguration(), bc.intelligentTieringConfiguration(), bc.encryptionConfiguration(),
                 bc.lifecycleConfiguration(), bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
-                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy()));
+                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy(),
+                null, null, null));
     }
 
     /** GET /{bucket}?inventory&list-type — ListBucketInventoryConfigurations */
@@ -806,7 +825,8 @@ public class S3BucketConfigHandler {
                 bc.accelerateConfiguration(), bc.analyticsConfiguration(), bc.inventoryConfiguration(),
                 null, bc.intelligentTieringConfiguration(), bc.encryptionConfiguration(),
                 bc.lifecycleConfiguration(), bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
-                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy()));
+                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy(),
+                null, null, null));
     }
 
     // ─────────────────────────────────────────────────────
@@ -844,7 +864,8 @@ public class S3BucketConfigHandler {
                 bc.accelerateConfiguration(), bc.analyticsConfiguration(), bc.inventoryConfiguration(),
                 bc.metricsConfiguration(), null, bc.encryptionConfiguration(),
                 bc.lifecycleConfiguration(), bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
-                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy()));
+                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy(),
+                null, null, null));
     }
 
     // ─────────────────────────────────────────────────────
@@ -938,12 +959,6 @@ public class S3BucketConfigHandler {
     //  Metadata Configuration
     // ─────────────────────────────────────────────────────
 
-    private record MetadataConfigEntry(List<MetadataConfigRule> rules) {
-        private record MetadataConfigRule(String id, String status,
-                                           String metadataResourceType,
-                                           String metadataResourceSubtype) {}
-    }
-
     /** GET /{bucket}?metadata-config — GetBucketMetadataConfiguration */
     public Mono<ServerResponse> getBucketMetadataConfiguration(ServerRequest request) {
         return findBucket(request, b -> {
@@ -988,12 +1003,6 @@ public class S3BucketConfigHandler {
     // ─────────────────────────────────────────────────────
     //  Metadata Table Configuration
     // ─────────────────────────────────────────────────────
-
-    private record MetadataTableConfigEntry(List<MetadataTableConfigRule> rules) {
-        private record MetadataTableConfigRule(String id, String status,
-                                                String metadataTableName,
-                                                String metadataTableDatabase) {}
-    }
 
     /** GET /{bucket}?metadata-table-config — GetBucketMetadataTableConfiguration */
     public Mono<ServerResponse> getBucketMetadataTableConfiguration(ServerRequest request) {
@@ -1040,9 +1049,6 @@ public class S3BucketConfigHandler {
     //  Inventory Table Configuration
     // ─────────────────────────────────────────────────────
 
-    private record InventoryTableConfigEntry(String id, String destinationFormat,
-                                              String scheduleFrequency, boolean enabled) {}
-
     /** GET /{bucket}?inventory-table-config — GetBucketInventoryTableConfiguration */
     public Mono<ServerResponse> getBucketInventoryTableConfiguration(ServerRequest request) {
         return findBucket(request, b -> {
@@ -1075,9 +1081,6 @@ public class S3BucketConfigHandler {
     // ─────────────────────────────────────────────────────
     //  Journal Table Configuration
     // ─────────────────────────────────────────────────────
-
-    private record JournalTableConfigEntry(String id, String destinationFormat,
-                                            String scheduleFrequency, boolean enabled) {}
 
     /** GET /{bucket}?journal-table-config — GetBucketJournalTableConfiguration */
     public Mono<ServerResponse> getBucketJournalTableConfiguration(ServerRequest request) {

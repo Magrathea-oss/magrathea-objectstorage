@@ -2,7 +2,10 @@ package com.example.magrathea.objectstore.domain.aggregate;
 
 import com.example.magrathea.objectstore.domain.event.ObjectStoreEvent;
 import com.example.magrathea.objectstore.domain.valueobject.ContentDescriptor;
+import com.example.magrathea.objectstore.domain.valueobject.LegalHold;
 import com.example.magrathea.objectstore.domain.valueobject.ObjectKey;
+import com.example.magrathea.objectstore.domain.valueobject.ObjectLockConfiguration;
+import com.example.magrathea.objectstore.domain.valueobject.RestoreConfiguration;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -42,6 +45,10 @@ public record S3Object(
     String contentEncoding,
     Map<String, String> metadata,
     ContentDescriptor contentDescriptor,
+    LegalHold legalHold,
+    ObjectLockConfiguration objectLockConfiguration,
+    RestoreConfiguration restoreConfiguration,
+    String serverSideEncryption,
     List<ObjectStoreEvent> events
 ) {
 
@@ -72,6 +79,10 @@ public record S3Object(
     public boolean hasContentDisposition() { return contentDisposition != null; }
     public boolean hasContentEncoding() { return contentEncoding != null; }
     public boolean hasMetadata() { return !metadata.isEmpty(); }
+    public boolean hasLegalHold() { return legalHold != null; }
+    public boolean hasObjectLockConfiguration() { return objectLockConfiguration != null; }
+    public boolean hasRestoreConfiguration() { return restoreConfiguration != null; }
+    public boolean hasServerSideEncryption() { return serverSideEncryption != null; }
 
     /**
      * Factory method — create a new S3Object from a PutObject request.
@@ -93,7 +104,8 @@ public record S3Object(
             new ObjectStoreEvent.ObjectCreated(id, bucketId, key, now)
         );
         return new S3Object(id, bucketId, key, null, size, null, now,
-            contentType, contentDisposition, contentEncoding, meta, null, events);
+            contentType, contentDisposition, contentEncoding, meta, null,
+            null, null, null, null, events);
     }
 
     /**
@@ -104,7 +116,11 @@ public record S3Object(
                                    Instant lastModified, String contentType,
                                    String contentDisposition, String contentEncoding,
                                    Map<String, String> metadata,
-                                   ContentDescriptor contentDescriptor) {
+                                   ContentDescriptor contentDescriptor,
+                                   LegalHold legalHold,
+                                   ObjectLockConfiguration objectLockConfiguration,
+                                   RestoreConfiguration restoreConfiguration,
+                                   String serverSideEncryption) {
         Objects.requireNonNull(id);
         Objects.requireNonNull(bucketId);
         Objects.requireNonNull(key);
@@ -114,7 +130,22 @@ public record S3Object(
             : Map.<String, String>of();
         return new S3Object(id, bucketId, key, etag, size, storageClass,
             lastModified, contentType, contentDisposition, contentEncoding, meta,
-            contentDescriptor, List.of());
+            contentDescriptor, legalHold, objectLockConfiguration, restoreConfiguration,
+            serverSideEncryption, List.of());
+    }
+
+    /**
+     * Legacy restore without Phase F fields.
+     */
+    public static S3Object restore(Id id, Bucket.Id bucketId, ObjectKey key,
+                                   String etag, long size, String storageClass,
+                                   Instant lastModified, String contentType,
+                                   String contentDisposition, String contentEncoding,
+                                   Map<String, String> metadata,
+                                   ContentDescriptor contentDescriptor) {
+        return restore(id, bucketId, key, etag, size, storageClass, lastModified,
+            contentType, contentDisposition, contentEncoding, metadata,
+            contentDescriptor, null, null, null, null);
     }
 
     /**
@@ -126,7 +157,8 @@ public record S3Object(
         );
         return new S3Object(id, bucketId, key, etag, size, storageClass,
             lastModified, contentType, contentDisposition, contentEncoding, metadata,
-            contentDescriptor, newEvents);
+            contentDescriptor, legalHold, objectLockConfiguration, restoreConfiguration,
+            serverSideEncryption, newEvents);
     }
 
     /**
@@ -138,7 +170,8 @@ public record S3Object(
         );
         return new S3Object(id, bucketId, key, etag, size, storageClass,
             lastModified, contentType, contentDisposition, contentEncoding, metadata,
-            contentDescriptor, newEvents);
+            contentDescriptor, legalHold, objectLockConfiguration, restoreConfiguration,
+            serverSideEncryption, newEvents);
     }
 
     /**
@@ -155,7 +188,8 @@ public record S3Object(
         );
         return new S3Object(id, bucketId, key, etag, descriptor.size(), storageClass,
             lastModified, contentType, contentDisposition, contentEncoding, metadata,
-            descriptor, newEvents);
+            descriptor, legalHold, objectLockConfiguration, restoreConfiguration,
+            serverSideEncryption, newEvents);
     }
 
     /**
@@ -174,7 +208,107 @@ public record S3Object(
         );
         return new S3Object(id, bucketId, key, etag, size, storageClass,
             lastModified, contentType, contentDisposition, contentEncoding, metadata,
-            contentDescriptor, newEvents);
+            contentDescriptor, legalHold, objectLockConfiguration, restoreConfiguration,
+            serverSideEncryption, newEvents);
+    }
+
+    // ── Phase F transitions ──
+
+    /**
+     * Apply or remove a legal hold. Returns new instance with a
+     * {@link ObjectStoreEvent.LegalHoldApplied} or {@link ObjectStoreEvent.LegalHoldRemoved} event.
+     */
+    public S3Object withLegalHold(LegalHold hold) {
+        Objects.requireNonNull(hold);
+        ObjectStoreEvent event = hold.status()
+            ? new ObjectStoreEvent.LegalHoldApplied(id, Instant.now())
+            : new ObjectStoreEvent.LegalHoldRemoved(id, Instant.now());
+        var newEvents = appendEvent(event);
+        return new S3Object(id, bucketId, key, etag, size, storageClass,
+            lastModified, contentType, contentDisposition, contentEncoding, metadata,
+            contentDescriptor, hold, objectLockConfiguration, restoreConfiguration,
+            serverSideEncryption, newEvents);
+    }
+
+    /**
+     * Set object lock configuration. Returns new instance with an
+     * {@link ObjectStoreEvent.ObjectLockConfigured} event.
+     */
+    public S3Object withObjectLockConfiguration(ObjectLockConfiguration lockConfig) {
+        Objects.requireNonNull(lockConfig);
+        var newEvents = appendEvent(
+            new ObjectStoreEvent.ObjectLockConfigured(id, lockConfig.mode(),
+                lockConfig.retention().duration(), Instant.now())
+        );
+        return new S3Object(id, bucketId, key, etag, size, storageClass,
+            lastModified, contentType, contentDisposition, contentEncoding, metadata,
+            contentDescriptor, legalHold, lockConfig, restoreConfiguration,
+            serverSideEncryption, newEvents);
+    }
+
+    /**
+     * Set retention period. Returns new instance with an
+     * {@link ObjectStoreEvent.ObjectRetentionSet} event.
+     */
+    public S3Object withRetentionPeriod(ObjectLockConfiguration.RetentionPeriod retention) {
+        Objects.requireNonNull(retention);
+        var expirationAt = retention.appliedAt().plus(retention.duration());
+        var newEvents = appendEvent(
+            new ObjectStoreEvent.ObjectRetentionSet(id, expirationAt, Instant.now())
+        );
+        // Retention is stored as part of ObjectLockConfiguration
+        var updatedLockConfig = objectLockConfiguration != null
+            ? new ObjectLockConfiguration(objectLockConfiguration.mode(), retention)
+            : new ObjectLockConfiguration(ObjectLockConfiguration.ObjectLockMode.GOVERNANCE, retention);
+        return new S3Object(id, bucketId, key, etag, size, storageClass,
+            lastModified, contentType, contentDisposition, contentEncoding, metadata,
+            contentDescriptor, legalHold, updatedLockConfig, restoreConfiguration,
+            serverSideEncryption, newEvents);
+    }
+
+    /**
+     * Set restore configuration. Returns new instance with an
+     * {@link ObjectStoreEvent.ObjectRestored} event.
+     */
+    public S3Object withRestore(RestoreConfiguration restore) {
+        Objects.requireNonNull(restore);
+        var newEvents = appendEvent(
+            new ObjectStoreEvent.ObjectRestored(id, bucketId, restore.tier(), Instant.now())
+        );
+        return new S3Object(id, bucketId, key, etag, size, storageClass,
+            lastModified, contentType, contentDisposition, contentEncoding, metadata,
+            contentDescriptor, legalHold, objectLockConfiguration, restore,
+            serverSideEncryption, newEvents);
+    }
+
+    /**
+     * Update server-side encryption. Returns new instance with an
+     * {@link ObjectStoreEvent.ObjectEncryptionUpdated} event.
+     */
+    public S3Object withEncryption(String encryption) {
+        Objects.requireNonNull(encryption);
+        var newEvents = appendEvent(
+            new ObjectStoreEvent.ObjectEncryptionUpdated(id, encryption, Instant.now())
+        );
+        return new S3Object(id, bucketId, key, etag, size, storageClass,
+            lastModified, contentType, contentDisposition, contentEncoding, metadata,
+            contentDescriptor, legalHold, objectLockConfiguration, restoreConfiguration,
+            encryption, newEvents);
+    }
+
+    /**
+     * Rename (change the key). Returns new instance with a
+     * {@link ObjectStoreEvent.ObjectRenamed} event.
+     */
+    public S3Object withKey(ObjectKey newKey) {
+        Objects.requireNonNull(newKey);
+        var newEvents = appendEvent(
+            new ObjectStoreEvent.ObjectRenamed(id, bucketId, key, newKey, Instant.now())
+        );
+        return new S3Object(id, bucketId, newKey, etag, size, storageClass,
+            lastModified, contentType, contentDisposition, contentEncoding, metadata,
+            contentDescriptor, legalHold, objectLockConfiguration, restoreConfiguration,
+            serverSideEncryption, newEvents);
     }
 
     /**
@@ -190,7 +324,8 @@ public record S3Object(
     public S3Object clearEvents() {
         return new S3Object(id, bucketId, key, etag, size, storageClass,
             lastModified, contentType, contentDisposition, contentEncoding, metadata,
-            contentDescriptor, List.of());
+            contentDescriptor, legalHold, objectLockConfiguration, restoreConfiguration,
+            serverSideEncryption, List.of());
     }
 
     private List<ObjectStoreEvent> appendEvent(ObjectStoreEvent event) {
