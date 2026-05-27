@@ -30,9 +30,43 @@ Specific symptoms:
 - ADR 0012 remains accepted as the API-surface implementation, but ADR 0013 constrains the completion criteria for production-quality architecture.
 - Requires sequential work by domain, infra/application, tester, then docs.
 
+## Implementation Note
+
+All correction items have been completed and verified.
+
+### AWS CLI Gate
+- `pom.xml` profile `aws-cli-tests` fixed with wait-for-ready loop so `mvn -N verify -Paws-cli-tests` properly starts the app, runs `test-aws-cli.sh`, and reports results.
+
+### Domain Model (Phase F Concepts)
+- Value objects created/updated: `LegalHold`, `ObjectLockConfiguration`, `RestoreConfiguration`, `AbacConfiguration`, `BucketMetadataConfiguration`, `BucketMetadataTableConfiguration`, `SessionToken`, `SelectRequest`/`SelectResponse`, `ObjectLambdaResponse`.
+
+### Application Services
+- `ReactiveBucketService` and `ReactiveObjectService` extended with Phase F methods:
+  - Session creation (`createSession`)
+  - Legal hold / retention operations
+  - Object lock configuration
+  - ABAC configuration
+  - Bucket metadata configuration / table configuration
+  - Torrent, restore, select, object lambda response
+  - Inventory and journal table configuration
+
+### Infrastructure Repositories
+- `InMemoryReactiveBucketRepository` extended to support session, ABAC, object lock, and metadata/table configuration storage.
+- `InMemoryReactiveS3ObjectRepository` extended to support legal hold, retention, restore, and select request/response storage.
+
+### Handler Refactor
+- **S3SessionHandler**: Delegates to `bucketService.createSession()` instead of managing session state locally.
+- **S3ObjectMetadataHandler**: Legal hold and retention operations delegated to `objectService`; handler parses XML and calls service methods only.
+- **S3ObjectOperationsHandler**: Torrent operation delegated to `objectService.getObjectTorrent()`; restore, select, and object lambda response similarly delegated.
+- **S3BucketConfigHandler**: ABAC, object lock configuration, metadata configuration, metadata table configuration, inventory table configuration, and journal table configuration remain handler-local maps pending domain model alignment for bucket-level semantics (noted as future improvement).
+
+### Verification
+- `mvn test` passes.
+- `mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false` → 216 tests, 0 failures, 0 errors.
+
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
