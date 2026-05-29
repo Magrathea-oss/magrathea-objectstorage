@@ -126,10 +126,13 @@ public class S3BucketOperationsHandler {
     public Mono<ServerResponse> listObjectsXml(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
         return bucketService.findByName(bucket)
-            .flatMap(b -> ListObjectsQuery.from(bucket, objectService.findByBucket(b.id()))
-                .flatMap(result -> ServerResponse.ok()
-                    .contentType(MediaType.APPLICATION_XML)
-                    .bodyValue(result)))
+            .flatMap(b -> S3WebSupport.validateRuntimeRequest(request, b)
+                .switchIfEmpty(Mono.defer(() -> ListObjectsQuery.from(bucket, objectService.findByBucket(b.id()))
+                    .flatMap(result -> {
+                        var builder = ServerResponse.ok().contentType(MediaType.APPLICATION_XML);
+                        S3WebSupport.applyRuntimeHeaders(builder, request, b);
+                        return builder.bodyValue(result);
+                    }))))
             .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
     }
 
@@ -137,10 +140,13 @@ public class S3BucketOperationsHandler {
     public Mono<ServerResponse> listObjectsV2Xml(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
         return bucketService.findByName(bucket)
-            .flatMap(b -> ListObjectsV2Query.from(bucket, objectService.findByBucket(b.id()))
-                .flatMap(result -> ServerResponse.ok()
-                    .contentType(MediaType.APPLICATION_XML)
-                    .bodyValue(result)))
+            .flatMap(b -> S3WebSupport.validateRuntimeRequest(request, b)
+                .switchIfEmpty(Mono.defer(() -> ListObjectsV2Query.from(bucket, objectService.findByBucket(b.id()))
+                    .flatMap(result -> {
+                        var builder = ServerResponse.ok().contentType(MediaType.APPLICATION_XML);
+                        S3WebSupport.applyRuntimeHeaders(builder, request, b);
+                        return builder.bodyValue(result);
+                    }))))
             .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
     }
 
@@ -148,10 +154,13 @@ public class S3BucketOperationsHandler {
     public Mono<ServerResponse> listObjectVersions(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
         return bucketService.findByName(bucket)
-            .flatMap(b -> ListVersionsQuery.from(bucket, objectService.findByBucket(b.id()))
-                .flatMap(result -> ServerResponse.ok()
-                    .contentType(MediaType.APPLICATION_XML)
-                    .bodyValue(result)))
+            .flatMap(b -> S3WebSupport.validateRuntimeRequest(request, b)
+                .switchIfEmpty(Mono.defer(() -> ListVersionsQuery.from(bucket, objectService.findByBucket(b.id()))
+                    .flatMap(result -> {
+                        var builder = ServerResponse.ok().contentType(MediaType.APPLICATION_XML);
+                        S3WebSupport.applyRuntimeHeaders(builder, request, b);
+                        return builder.bodyValue(result);
+                    }))))
             .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
     }
 

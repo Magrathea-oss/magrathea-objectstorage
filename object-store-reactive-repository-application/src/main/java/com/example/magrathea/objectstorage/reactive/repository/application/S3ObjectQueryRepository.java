@@ -12,8 +12,9 @@ import reactor.core.publisher.Flux;
 public interface S3ObjectQueryRepository {
     Mono<S3Object> findById(S3Object.Id objectId);
     Mono<S3Object> findByBucketAndKey(Bucket.Id bucketId, ObjectKey key);
+    Mono<S3Object> findByBucketAndKey(ObjectKey key);
     Flux<S3Object> findByBucket(Bucket.Id bucketId);
-    Flux<Byte> getContent(S3Object.Id objectId);
+    Flux<DataBuffer> getContent(S3Object.Id objectId);
 
     // ── Phase F object config queries ──
 
@@ -27,5 +28,5 @@ public interface S3ObjectQueryRepository {
     Mono<ObjectLockConfiguration.RetentionPeriod> findRetention(String bucketName, ObjectKey key);
 
     /** Find torrent content for an object by bucket name and key. */
-    Mono<Flux<DataBuffer>> findTorrent(String bucketName, ObjectKey key);
+    Flux<DataBuffer> findTorrent(String bucketName, ObjectKey key);
 }

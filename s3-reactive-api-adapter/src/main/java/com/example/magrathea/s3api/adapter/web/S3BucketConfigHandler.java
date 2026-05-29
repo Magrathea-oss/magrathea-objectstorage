@@ -11,12 +11,12 @@ import com.example.magrathea.objectstore.domain.valueobject.BucketLifecycleConfi
 import com.example.magrathea.objectstore.domain.valueobject.BucketLoggingConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.BucketMetricsConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.BucketNotificationConfiguration;
+import com.example.magrathea.objectstore.domain.valueobject.BucketOwnershipControls;
 import com.example.magrathea.objectstore.domain.valueobject.BucketReplicationConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.BucketRequestPaymentConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.BucketWebsiteConfiguration;
-import com.example.magrathea.objectstore.domain.valueobject.PublicAccessBlockConfiguration;
-import com.example.magrathea.objectstore.domain.valueobject.BucketOwnershipControls;
 import com.example.magrathea.objectstore.domain.valueobject.CorsConfiguration;
+import com.example.magrathea.objectstore.domain.valueobject.PublicAccessBlockConfiguration;
 import com.example.magrathea.reactive.application.service.ReactiveBucketService;
 import com.example.magrathea.s3api.dto.command.AbacConfigurationCommand;
 import com.example.magrathea.s3api.dto.command.AccelerateConfigurationCommand;
@@ -25,25 +25,20 @@ import com.example.magrathea.s3api.dto.command.CorsConfigurationCommand;
 import com.example.magrathea.s3api.dto.command.EncryptionConfigurationCommand;
 import com.example.magrathea.s3api.dto.command.IntelligentTieringConfigurationCommand;
 import com.example.magrathea.s3api.dto.command.InventoryConfigurationCommand;
-import com.example.magrathea.s3api.dto.command.LifecycleConfigurationCommand;
-import com.example.magrathea.s3api.dto.command.LoggingConfigurationCommand;
-import com.example.magrathea.s3api.dto.command.MetricsConfigurationCommand;
-import com.example.magrathea.s3api.dto.command.NotificationConfigurationCommand;
-import com.example.magrathea.s3api.dto.command.ReplicationConfigurationCommand;
-import com.example.magrathea.s3api.dto.command.RequestPaymentConfigurationCommand;
-import com.example.magrathea.s3api.dto.command.OwnershipControlsCommand;
-import com.example.magrathea.s3api.dto.command.PublicAccessBlockCommand;
-import com.example.magrathea.s3api.dto.command.WebsiteConfigurationCommand;
-import com.example.magrathea.s3api.dto.command.ObjectLockConfigurationCommand;
 import com.example.magrathea.s3api.dto.command.InventoryTableConfigurationCommand;
 import com.example.magrathea.s3api.dto.command.JournalTableConfigurationCommand;
+import com.example.magrathea.s3api.dto.command.LifecycleConfigurationCommand;
+import com.example.magrathea.s3api.dto.command.LoggingConfigurationCommand;
 import com.example.magrathea.s3api.dto.command.MetadataConfigurationCommand;
 import com.example.magrathea.s3api.dto.command.MetadataTableConfigurationCommand;
-import com.example.magrathea.s3api.dto.query.InventoryTableConfigurationQuery;
-import com.example.magrathea.s3api.dto.query.JournalTableConfigurationQuery;
-import com.example.magrathea.s3api.dto.query.MetadataConfigurationQuery;
-import com.example.magrathea.s3api.dto.query.MetadataTableConfigurationQuery;
-import com.example.magrathea.s3api.dto.query.ObjectLockConfigurationQuery;
+import com.example.magrathea.s3api.dto.command.MetricsConfigurationCommand;
+import com.example.magrathea.s3api.dto.command.NotificationConfigurationCommand;
+import com.example.magrathea.s3api.dto.command.ObjectLockConfigurationCommand;
+import com.example.magrathea.s3api.dto.command.OwnershipControlsCommand;
+import com.example.magrathea.s3api.dto.command.PublicAccessBlockCommand;
+import com.example.magrathea.s3api.dto.command.ReplicationConfigurationCommand;
+import com.example.magrathea.s3api.dto.command.RequestPaymentConfigurationCommand;
+import com.example.magrathea.s3api.dto.command.WebsiteConfigurationCommand;
 import com.example.magrathea.s3api.dto.query.AbacConfigurationQuery;
 import com.example.magrathea.s3api.dto.query.BucketAccelerateQuery;
 import com.example.magrathea.s3api.dto.query.BucketAnalyticsListQuery;
@@ -57,42 +52,77 @@ import com.example.magrathea.s3api.dto.query.BucketLifecycleQuery;
 import com.example.magrathea.s3api.dto.query.BucketLoggingQuery;
 import com.example.magrathea.s3api.dto.query.BucketMetricsQuery;
 import com.example.magrathea.s3api.dto.query.BucketNotificationQuery;
+import com.example.magrathea.s3api.dto.query.BucketOwnershipControlsQuery;
 import com.example.magrathea.s3api.dto.query.BucketReplicationQuery;
 import com.example.magrathea.s3api.dto.query.BucketRequestPaymentQuery;
-import com.example.magrathea.s3api.dto.query.BucketOwnershipControlsQuery;
 import com.example.magrathea.s3api.dto.query.BucketWebsiteQuery;
+import com.example.magrathea.s3api.dto.query.InventoryTableConfigurationQuery;
+import com.example.magrathea.s3api.dto.query.JournalTableConfigurationQuery;
+import com.example.magrathea.s3api.dto.query.MetadataConfigurationQuery;
+import com.example.magrathea.s3api.dto.query.MetadataTableConfigurationQuery;
+import com.example.magrathea.s3api.dto.query.ObjectLockConfigurationQuery;
 import com.example.magrathea.s3api.dto.query.PublicAccessBlockQuery;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
- * Bucket configuration operations: CORS, policy, encryption, logging, website, notification,
- * accelerate, analytics, inventory, metrics, intelligent-tiering, ownership controls, public access block,
- * request payment, replication, lifecycle.
+ * Bucket configuration operations.
  *
- * Uses Jackson XML codec for request body deserialization and response serialization.
- * All operations are fully reactive — no blocking, no CompletableFuture bridging.
- *
- * Configuration storage uses the unified BucketConfig value object — each config type
- * is stored as a nullable field on BucketConfig, accessed via getXxxConfiguration() and
- * set via withXxxConfiguration() on BucketConfig, then applied to the Bucket aggregate
- * via withBucketConfig(BucketConfig).
- *
- * Generic helper methods eliminate duplication by extracting the common find-bucket → apply → respond pattern.
+ * The primary S3 bucket configuration endpoints are driven by a registry of
+ * small strategies. Each strategy owns extraction, command decoding, aggregate
+ * transition, deletion, and query DTO mapping for one configuration type.
  */
 public class S3BucketConfigHandler {
 
+    private enum ConfigType {
+        CORS,
+        LIFECYCLE,
+        POLICY,
+        ENCRYPTION,
+        LOGGING,
+        WEBSITE,
+        NOTIFICATION,
+        REPLICATION,
+        REQUEST_PAYMENT,
+        OWNERSHIP_CONTROLS,
+        PUBLIC_ACCESS_BLOCK,
+        ACCELERATE,
+        ANALYTICS,
+        INVENTORY,
+        METRICS,
+        INTELLIGENT_TIERING
+    }
+
+    private record ConfigStrategy<V>(
+        String errorCode,
+        String errorMessage,
+        MediaType responseType,
+        BiFunction<ServerRequest, Bucket, Optional<V>> extractor,
+        BiFunction<ServerRequest, Bucket, Mono<V>> reader,
+        BiFunction<Bucket, V, Mono<Bucket>> applier,
+        Function<Bucket, Bucket> deleter,
+        Function<V, Object> responseMapper,
+        Predicate<V> present,
+        BiFunction<Bucket, V, Mono<ServerResponse>> rejection
+    ) {}
+
     private final ReactiveBucketService bucketService;
+    private final Map<ConfigType, ConfigStrategy<?>> registry;
+
     private final Map<String, List<AbacConfigEntry>> abacConfigs = new ConcurrentHashMap<>();
     private final Map<String, ObjectLockConfigEntry> objectLockConfigs = new ConcurrentHashMap<>();
     private final Map<String, MetadataConfigEntry> metadataConfigs = new ConcurrentHashMap<>();
@@ -122,6 +152,7 @@ public class S3BucketConfigHandler {
 
     public S3BucketConfigHandler(ReactiveBucketService bucketService) {
         this.bucketService = bucketService;
+        this.registry = buildRegistry();
     }
 
     public void resetInMemoryConfigurations() {
@@ -134,10 +165,238 @@ public class S3BucketConfigHandler {
     }
 
     // ─────────────────────────────────────────────────────
-    //  Generic helpers — capture the common pattern
+    //  Registry and generic dispatch
     // ─────────────────────────────────────────────────────
 
-    /** Finds a bucket by name from the request, applies handler, or returns 404. */
+    private Map<ConfigType, ConfigStrategy<?>> buildRegistry() {
+        return Map.ofEntries(
+            Map.entry(ConfigType.CORS, xmlStrategy(
+                "NoSuchCorsConfiguration", "The CORS configuration is not found",
+                CorsConfigurationCommand.class,
+                (request, bucket) -> bucketConfig(bucket, BucketConfig::getCorsConfiguration),
+                this::toCorsConfiguration,
+                Bucket::withCorsConfiguration,
+                Bucket::withCorsConfigurationDeleted,
+                this::toCorsQuery,
+                cors -> cors.corsRules() != null && !cors.corsRules().isEmpty()
+            )),
+            Map.entry(ConfigType.LIFECYCLE, xmlStrategy(
+                "NoSuchLifecycleConfiguration", "The lifecycle configuration does not exist",
+                LifecycleConfigurationCommand.class,
+                (request, bucket) -> bucketConfig(bucket, BucketConfig::getLifecycleConfiguration),
+                this::toLifecycleConfiguration,
+                Bucket::withLifecycleConfiguration,
+                Bucket::withLifecycleConfigurationDeleted,
+                lc -> BucketLifecycleQuery.from(Optional.of(lc)),
+                lifecycle -> lifecycle.rules() != null && !lifecycle.rules().isEmpty()
+            )),
+            Map.entry(ConfigType.POLICY, policyStrategy()),
+            Map.entry(ConfigType.ENCRYPTION, xmlStrategy(
+                "NoSuchEncryptionConfiguration", "The encryption configuration does not exist",
+                EncryptionConfigurationCommand.class,
+                (request, bucket) -> bucketConfig(bucket, BucketConfig::getEncryptionConfiguration),
+                (bucket, cmd) -> new BucketEncryptionConfiguration(bucket.name(), cmd.ruleId(), cmd.algorithm(), cmd.kmsKeyId()),
+                Bucket::withEncryptionConfiguration,
+                Bucket::withEncryptionConfigurationDeleted,
+                ec -> BucketEncryptionQuery.from(Optional.of(ec))
+            )),
+            Map.entry(ConfigType.LOGGING, xmlStrategy(
+                "NoSuchLoggingConfiguration", "The logging configuration does not exist",
+                LoggingConfigurationCommand.class,
+                (request, bucket) -> bucketConfig(bucket, BucketConfig::getLoggingConfiguration),
+                (bucket, cmd) -> new BucketLoggingConfiguration(bucket.name(), cmd.targetBucket(), cmd.targetPrefix()),
+                Bucket::withLoggingConfiguration,
+                Bucket::withLoggingConfigurationDeleted,
+                lc -> BucketLoggingQuery.from(Optional.of(lc))
+            )),
+            Map.entry(ConfigType.WEBSITE, xmlStrategy(
+                "NoSuchWebsiteConfiguration", "The website configuration does not exist",
+                WebsiteConfigurationCommand.class,
+                (request, bucket) -> bucketConfig(bucket, BucketConfig::getWebsiteConfiguration),
+                (bucket, cmd) -> new BucketWebsiteConfiguration(bucket.name(), cmd.indexDocument(), cmd.errorDocument(),
+                    cmd.redirectAllRequestsTo(), cmd.hostName(), cmd.protocol()),
+                Bucket::withWebsiteConfiguration,
+                Bucket::withWebsiteConfigurationDeleted,
+                wc -> BucketWebsiteQuery.from(Optional.of(wc))
+            )),
+            Map.entry(ConfigType.NOTIFICATION, xmlStrategy(
+                "NoSuchNotificationConfiguration", "The notification configuration does not exist",
+                NotificationConfigurationCommand.class,
+                (request, bucket) -> bucketConfig(bucket, BucketConfig::getNotificationConfiguration),
+                this::toNotificationConfiguration,
+                Bucket::withNotificationConfiguration,
+                Bucket::withNotificationConfigurationDeleted,
+                nc -> BucketNotificationQuery.from(Optional.of(nc)),
+                notification -> notification.events() != null && !notification.events().isEmpty()
+            )),
+            Map.entry(ConfigType.REPLICATION, xmlStrategy(
+                "NoSuchReplicationConfiguration", "The replication configuration does not exist",
+                ReplicationConfigurationCommand.class,
+                (request, bucket) -> bucketConfig(bucket, BucketConfig::getReplicationConfiguration),
+                this::toReplicationConfiguration,
+                Bucket::withReplicationConfiguration,
+                Bucket::withReplicationConfigurationDeleted,
+                rc -> BucketReplicationQuery.from(Optional.of(rc))
+            )),
+            Map.entry(ConfigType.REQUEST_PAYMENT, xmlStrategy(
+                "NoSuchRequestPaymentConfiguration", "The request payment configuration does not exist",
+                RequestPaymentConfigurationCommand.class,
+                (request, bucket) -> bucketConfig(bucket, BucketConfig::getRequestPaymentConfiguration),
+                (bucket, cmd) -> new BucketRequestPaymentConfiguration(bucket.name(), cmd.payer()),
+                Bucket::withRequestPaymentConfiguration,
+                Bucket::withRequestPaymentConfigurationDeleted,
+                rpc -> BucketRequestPaymentQuery.from(Optional.of(rpc))
+            )),
+            Map.entry(ConfigType.OWNERSHIP_CONTROLS, ownershipControlsStrategy()),
+            Map.entry(ConfigType.PUBLIC_ACCESS_BLOCK, xmlStrategy(
+                "NoSuchPublicAccessBlockConfiguration", "The public access block configuration does not exist",
+                PublicAccessBlockCommand.class,
+                (request, bucket) -> bucketConfig(bucket, BucketConfig::getPublicAccessBlockConfiguration),
+                (bucket, cmd) -> new PublicAccessBlockConfiguration(bucket.name(), bool(cmd.blockPublicAcls()),
+                    bool(cmd.ignorePublicAcls()), bool(cmd.blockPublicPolicy()), bool(cmd.restrictPublicBuckets())),
+                Bucket::withPublicAccessBlockConfiguration,
+                Bucket::withPublicAccessBlockConfigurationDeleted,
+                pab -> PublicAccessBlockQuery.from(Optional.of(pab))
+            )),
+            Map.entry(ConfigType.ACCELERATE, xmlStrategy(
+                "NoSuchAccelerateConfiguration", "The accelerate configuration does not exist",
+                AccelerateConfigurationCommand.class,
+                (request, bucket) -> bucketConfig(bucket, BucketConfig::getAccelerateConfiguration),
+                (bucket, cmd) -> new BucketAccelerateConfiguration(bucket.name(), cmd.status()),
+                Bucket::withAccelerateConfiguration,
+                Bucket::withAccelerateConfigurationDeleted,
+                ac -> BucketAccelerateQuery.from(Optional.of(ac))
+            )),
+            Map.entry(ConfigType.ANALYTICS, analyticsStrategy()),
+            Map.entry(ConfigType.INVENTORY, inventoryStrategy()),
+            Map.entry(ConfigType.METRICS, xmlStrategy(
+                "NoSuchMetricsConfiguration", "The metrics configuration does not exist",
+                MetricsConfigurationCommand.class,
+                (request, bucket) -> bucketConfig(bucket, BucketConfig::getMetricsConfiguration),
+                (bucket, cmd) -> new BucketMetricsConfiguration(bucket.name(), cmd.id(),
+                    cmd.filter() != null ? cmd.filter().prefix() : null),
+                Bucket::withMetricsConfiguration,
+                Bucket::withMetricsConfigurationDeleted,
+                mc -> BucketMetricsQuery.from(Optional.of(mc))
+            )),
+            Map.entry(ConfigType.INTELLIGENT_TIERING, xmlStrategy(
+                "NoSuchIntelligentTieringConfiguration", "The intelligent-tiering configuration does not exist",
+                IntelligentTieringConfigurationCommand.class,
+                (request, bucket) -> bucketConfig(bucket, BucketConfig::getIntelligentTieringConfiguration),
+                (bucket, cmd) -> new BucketIntelligentTieringConfiguration(bucket.name(), cmd.id(),
+                    cmd.tieringPolicy() != null ? cmd.tieringPolicy().tieringRule() : null,
+                    cmd.autoTieringStatus()),
+                Bucket::withIntelligentTieringConfiguration,
+                Bucket::withIntelligentTieringConfigurationDeleted,
+                itc -> BucketIntelligentTieringQuery.from(Optional.of(itc))
+            ))
+        );
+    }
+
+    private <C, V> ConfigStrategy<V> xmlStrategy(String errorCode,
+                                                  String errorMessage,
+                                                  Class<C> commandClass,
+                                                  BiFunction<ServerRequest, Bucket, Optional<V>> extractor,
+                                                  BiFunction<Bucket, C, V> mapper,
+                                                  BiFunction<Bucket, V, Bucket> applier,
+                                                  Function<Bucket, Bucket> deleter,
+                                                  Function<V, Object> responseMapper) {
+        return xmlStrategy(errorCode, errorMessage, commandClass, extractor, mapper, applier, deleter,
+            responseMapper, value -> true);
+    }
+
+    private <C, V> ConfigStrategy<V> xmlStrategy(String errorCode,
+                                                  String errorMessage,
+                                                  Class<C> commandClass,
+                                                  BiFunction<ServerRequest, Bucket, Optional<V>> extractor,
+                                                  BiFunction<Bucket, C, V> mapper,
+                                                  BiFunction<Bucket, V, Bucket> applier,
+                                                  Function<Bucket, Bucket> deleter,
+                                                  Function<V, Object> responseMapper,
+                                                  Predicate<V> present) {
+        return new ConfigStrategy<>(
+            errorCode,
+            errorMessage,
+            MediaType.APPLICATION_XML,
+            extractor,
+            (request, bucket) -> request.bodyToMono(commandClass).map(cmd -> mapper.apply(bucket, cmd)),
+            (bucket, value) -> Mono.just(applier.apply(bucket, value)),
+            deleter,
+            responseMapper,
+            present,
+            this::noConfigRejection
+        );
+    }
+
+    private ConfigStrategy<String> policyStrategy() {
+        return new ConfigStrategy<>(
+            "NoSuchBucketPolicy",
+            "The bucket policy does not exist",
+            MediaType.APPLICATION_JSON,
+            (request, bucket) -> bucketConfig(bucket, BucketConfig::getBucketPolicy),
+            this::readPolicyBody,
+            (bucket, policy) -> Mono.just(bucket.withBucketPolicy(policy)),
+            Bucket::withBucketPolicyDeleted,
+            policy -> policy,
+            policy -> policy != null && !policy.isBlank(),
+            this::rejectBlockedPublicPolicy
+        );
+    }
+
+    private ConfigStrategy<BucketOwnershipControls> ownershipControlsStrategy() {
+        return new ConfigStrategy<>(
+            "NoSuchOwnershipControls",
+            "The ownership controls do not exist",
+            MediaType.APPLICATION_XML,
+            (request, bucket) -> bucketConfig(bucket, BucketConfig::getOwnershipControls),
+            (request, bucket) -> request.bodyToMono(OwnershipControlsCommand.class)
+                .map(cmd -> new BucketOwnershipControls(bucket.name(), cmd.id(), cmd.ownership())),
+            (bucket, value) -> Mono.just(bucket.withOwnershipControls(value)),
+            Bucket::withOwnershipControlsDeleted,
+            oc -> BucketOwnershipControlsQuery.from(Optional.of(oc)),
+            value -> true,
+            this::rejectOwnershipReversion
+        );
+    }
+
+    private ConfigStrategy<BucketAnalyticsConfiguration> analyticsStrategy() {
+        return new ConfigStrategy<>(
+            "NoSuchAnalyticsConfiguration",
+            "The analytics configuration does not exist",
+            MediaType.APPLICATION_XML,
+            this::extractAnalytics,
+            (request, bucket) -> request.bodyToMono(AnalyticsConfigurationCommand.class)
+                .map(cmd -> new BucketAnalyticsConfiguration(bucket.name(),
+                    firstNonBlank(cmd.id(), request.queryParam("analyticsId").orElse(null)),
+                    cmd.filter() != null ? cmd.filter().prefix() : null)),
+            (bucket, value) -> Mono.just(bucket.withAnalyticsConfiguration(value)),
+            Bucket::withAnalyticsConfigurationDeleted,
+            ac -> BucketAnalyticsQuery.from(Optional.of(ac)),
+            value -> value.analyticsId() != null && !value.analyticsId().isBlank(),
+            this::noConfigRejection
+        );
+    }
+
+    private ConfigStrategy<BucketInventoryConfiguration> inventoryStrategy() {
+        return new ConfigStrategy<>(
+            "NoSuchInventoryConfiguration",
+            "The inventory configuration does not exist",
+            MediaType.APPLICATION_XML,
+            this::extractInventory,
+            (request, bucket) -> request.bodyToMono(InventoryConfigurationCommand.class)
+                .map(cmd -> new BucketInventoryConfiguration(bucket.name(),
+                    firstNonBlank(cmd.id(), request.queryParam("inventoryId").orElse(null)),
+                    cmd.destination() != null ? cmd.destination().format() : null,
+                    cmd.schedule() != null ? cmd.schedule().frequency() : null,
+                    "Enabled".equals(cmd.enabled()) || "true".equalsIgnoreCase(cmd.enabled()))),
+            (bucket, value) -> Mono.just(bucket.withInventoryConfiguration(value)),
+            Bucket::withInventoryConfigurationDeleted,
+            ic -> BucketInventoryQuery.from(Optional.of(ic)),
+            value -> value.inventoryId() != null && !value.inventoryId().isBlank(),
+            this::noConfigRejection
+        );
+    }
+
     private Mono<ServerResponse> findBucket(ServerRequest request,
                                             Function<Bucket, Mono<ServerResponse>> handler) {
         var bucketName = request.pathVariable("bucket");
@@ -146,745 +405,444 @@ public class S3BucketConfigHandler {
             .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
     }
 
-    /** Helper for PUT config — finds bucket, parses command body, applies handler. */
-    private <T> Mono<ServerResponse> putConfig(ServerRequest request,
-                                               Class<T> commandClass,
-                                               BiFunction<Bucket, T, Mono<ServerResponse>> handler) {
-        return findBucket(request, b -> request.bodyToMono(commandClass)
-            .flatMap(cmd -> handler.apply(b, cmd)));
+    @SuppressWarnings("unchecked")
+    private <V> ConfigStrategy<V> strategy(ConfigType type) {
+        return (ConfigStrategy<V>) registry.get(type);
     }
 
-    /** Helper for PUT with String body (not a typed command). */
-    private Mono<ServerResponse> putConfigString(ServerRequest request,
-                                                 BiFunction<Bucket, String, Mono<ServerResponse>> handler) {
-        return findBucket(request, b -> request.bodyToMono(String.class)
-            .defaultIfEmpty("")
-            .flatMap(body -> handler.apply(b, body)));
+    private <V> Mono<ServerResponse> getConfig(ServerRequest request, ConfigType type) {
+        var selected = this.<V>strategy(type);
+        return findBucket(request, bucket -> getConfig(request, bucket, selected));
     }
 
-    /** Helper for GET config from a dedicated config field — checks field presence, maps to response. */
-    private <T> Mono<ServerResponse> getDedicatedConfig(ServerRequest request,
-                                                         String errorCode,
-                                                         String errorMessage,
-                                                         Function<Bucket, Optional<T>> configExtractor,
-                                                         Function<T, Mono<ServerResponse>> responseMapper) {
-        return findBucket(request, b -> {
-            var config = configExtractor.apply(b);
-            if (config.isEmpty()) {
-                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, errorCode, errorMessage);
-            }
-            return responseMapper.apply(config.get());
-        });
+    private <V> Mono<ServerResponse> getConfig(ServerRequest request, Bucket bucket, ConfigStrategy<V> selected) {
+        return selected.extractor().apply(request, bucket)
+            .filter(selected.present())
+            .map(value -> ServerResponse.ok()
+                .contentType(selected.responseType())
+                .bodyValue(selected.responseMapper().apply(value)))
+            .orElseGet(() -> S3WebSupport.xmlError(HttpStatus.NOT_FOUND,
+                selected.errorCode(), selected.errorMessage()));
     }
 
-    /** Helper for DELETE dedicated config — sets the specific config field to null via BucketConfig. */
-    private Mono<ServerResponse> deleteDedicatedConfig(ServerRequest request,
-                                                        Function<BucketConfig, BucketConfig> clearFunction) {
-        return findBucket(request, b -> {
-            var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
-            var newConfig = clearFunction.apply(baseConfig);
-            var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.updateBucket(updatedBucket)
-                .then(ServerResponse.noContent().build());
-        });
+    private <V> Mono<ServerResponse> putConfig(ServerRequest request, ConfigType type) {
+        var selected = this.<V>strategy(type);
+        return findBucket(request, bucket -> selected.reader().apply(request, bucket)
+            .flatMap(value -> selected.rejection().apply(bucket, value)
+                .switchIfEmpty(Mono.defer(() -> selected.applier().apply(bucket, value)
+                    .flatMap(bucketService::updateBucket)
+                    .then(ServerResponse.ok().build()))))
+            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.BAD_REQUEST,
+                "InvalidRequest", "Missing configuration body")));
     }
 
-    // ── CORS Configuration ──
+    private <V> Mono<ServerResponse> deleteConfig(ServerRequest request, ConfigType type) {
+        var selected = this.<V>strategy(type);
+        return findBucket(request, bucket -> bucketService.updateBucket(selected.deleter().apply(bucket))
+            .then(ServerResponse.noContent().build()));
+    }
 
-    /** GET /{bucket}?cors — GetBucketCors */
+    private <V> Optional<V> bucketConfig(Bucket bucket, Function<BucketConfig, Optional<V>> extractor) {
+        return bucket.bucketConfig() != null ? extractor.apply(bucket.bucketConfig()) : Optional.empty();
+    }
+
+    private <V> Mono<ServerResponse> noConfigRejection(Bucket bucket, V value) {
+        return Mono.empty();
+    }
+
+    // ─────────────────────────────────────────────────────
+    //  Command mapping
+    // ─────────────────────────────────────────────────────
+
+    private CorsConfiguration toCorsConfiguration(Bucket bucket, CorsConfigurationCommand command) {
+        var corsRules = list(command.corsRules()).stream()
+            .map(rule -> new CorsConfiguration.CorsRule(
+                list(rule.allowedOrigins()),
+                list(rule.allowedMethods()),
+                list(rule.allowedHeaders()),
+                rule.maxAgeSeconds() != null ? rule.maxAgeSeconds() : 0,
+                list(rule.exposeHeaders()),
+                rule.id()))
+            .toList();
+        return new CorsConfiguration(corsRules);
+    }
+
+    private BucketCorsQuery toCorsQuery(CorsConfiguration config) {
+        var rules = config.corsRules().stream()
+            .map(rule -> new BucketCorsQuery.CorsRuleEntry(
+                rule.allowedOrigins(), rule.allowedMethods(), rule.allowedHeaders(),
+                rule.maxAgeSeconds(), rule.exposeHeaders(), rule.id()))
+            .toList();
+        return new BucketCorsQuery(rules);
+    }
+
+    private BucketLifecycleConfiguration toLifecycleConfiguration(Bucket bucket, LifecycleConfigurationCommand command) {
+        var rules = list(command.rules()).stream()
+            .map(rule -> new BucketLifecycleConfiguration.LifecycleRule(
+                rule.id(), rule.status(), rule.prefix(),
+                rule.expiration() != null
+                    ? new BucketLifecycleConfiguration.Expiration(rule.expiration().days(), rule.expiration().date())
+                    : null,
+                rule.noncurrentVersionExpiration() != null
+                    ? new BucketLifecycleConfiguration.NoncurrentVersionExpiration(
+                        rule.noncurrentVersionExpiration().noncurrentDays())
+                    : null,
+                rule.abortIncompleteMultipartUpload() != null
+                    ? new BucketLifecycleConfiguration.AbortIncompleteMultipartUpload(
+                        rule.abortIncompleteMultipartUpload().daysAfterInitiation())
+                    : null))
+            .toList();
+        return new BucketLifecycleConfiguration(bucket.name(), rules);
+    }
+
+    private BucketNotificationConfiguration toNotificationConfiguration(Bucket bucket,
+                                                                          NotificationConfigurationCommand command) {
+        var events = list(command.eventConfigurations()).stream()
+            .map(eventConfig -> new BucketNotificationConfiguration.NotificationEvent(
+                eventConfig.event(), eventConfig.topicArn(), eventConfig.queueArn(), eventConfig.lambdaArn(),
+                list(eventConfig.filterRules())))
+            .toList();
+        return new BucketNotificationConfiguration(bucket.name(), events);
+    }
+
+    private BucketReplicationConfiguration toReplicationConfiguration(Bucket bucket,
+                                                                       ReplicationConfigurationCommand command) {
+        var replicationRules = list(command.rules()).stream()
+            .map(rule -> new BucketReplicationConfiguration.ReplicationRule(
+                rule.id(), rule.status(), rule.prefix(), rule.destinationBucket(),
+                rule.destinationStorageClass(), false, false))
+            .toList();
+        return new BucketReplicationConfiguration(bucket.name(), command.role(), replicationRules);
+    }
+
+    private Optional<BucketAnalyticsConfiguration> extractAnalytics(ServerRequest request, Bucket bucket) {
+        var configured = bucketConfig(bucket, BucketConfig::getAnalyticsConfiguration);
+        var requestedId = request.queryParam("analyticsId").orElse(null);
+        if (requestedId == null || requestedId.isBlank()) {
+            return configured;
+        }
+        return configured.filter(value -> requestedId.equals(value.analyticsId()));
+    }
+
+    private Optional<BucketInventoryConfiguration> extractInventory(ServerRequest request, Bucket bucket) {
+        var configured = bucketConfig(bucket, BucketConfig::getInventoryConfiguration);
+        var requestedId = request.queryParam("inventoryId").orElse(null);
+        if (requestedId == null || requestedId.isBlank()) {
+            return configured;
+        }
+        return configured.filter(value -> requestedId.equals(value.inventoryId()));
+    }
+
+    private Mono<String> readPolicyBody(ServerRequest request, Bucket bucket) {
+        return request.bodyToFlux(DataBuffer.class)
+            .map(buffer -> {
+                try {
+                    return buffer.toString(StandardCharsets.UTF_8);
+                } finally {
+                    DataBufferUtils.release(buffer);
+                }
+            })
+            .reduce(new StringBuilder(), StringBuilder::append)
+            .map(StringBuilder::toString)
+            .defaultIfEmpty("");
+    }
+
+    private Mono<ServerResponse> rejectBlockedPublicPolicy(Bucket bucket, String policy) {
+        var publicAccessBlock = bucketConfig(bucket, BucketConfig::getPublicAccessBlockConfiguration).orElse(null);
+        if (publicAccessBlock != null && publicAccessBlock.blockPublicPolicy() && isPublicPolicy(policy)) {
+            return S3WebSupport.xmlError(HttpStatus.FORBIDDEN, "AccessDenied",
+                "Public bucket policies are blocked by PublicAccessBlock");
+        }
+        return Mono.empty();
+    }
+
+    private Mono<ServerResponse> rejectOwnershipReversion(Bucket bucket, BucketOwnershipControls next) {
+        var current = bucketConfig(bucket, BucketConfig::getOwnershipControls).orElse(null);
+        if (current != null
+            && "BucketOwnerEnforced".equals(current.ownership())
+            && !"BucketOwnerEnforced".equals(next.ownership())) {
+            return S3WebSupport.xmlError(HttpStatus.CONFLICT, "OwnershipControlsNotReversible",
+                "BucketOwnerEnforced ownership controls cannot be reverted");
+        }
+        return Mono.empty();
+    }
+
+    private boolean isPublicPolicy(String policy) {
+        if (policy == null || policy.isBlank()) {
+            return false;
+        }
+        var compact = policy.replace(" ", "").replace("\n", "").replace("\r", "").replace("\t", "");
+        return compact.contains("\"Effect\":\"Allow\"")
+            && (compact.contains("\"Principal\":\"*\"")
+                || compact.contains("\"Principal\":{\"AWS\":\"*\"}"));
+    }
+
+    private static boolean bool(String value) {
+        return "true".equalsIgnoreCase(value) || "1".equals(value);
+    }
+
+    private static String firstNonBlank(String first, String second) {
+        return first != null && !first.isBlank() ? first : second;
+    }
+
+    private static <T> List<T> list(List<T> values) {
+        return values != null ? values : List.of();
+    }
+
+    // ─────────────────────────────────────────────────────
+    //  S3 singleton and multi-instance bucket configurations
+    // ─────────────────────────────────────────────────────
+
     public Mono<ServerResponse> getBucketCors(ServerRequest request) {
-        return findBucket(request, b -> {
-            var opt = b.bucketConfig() != null
-                ? b.bucketConfig().getCorsConfiguration() : Optional.<CorsConfiguration>empty();
-            if (opt.isEmpty() || opt.get().corsRules() == null || opt.get().corsRules().isEmpty()) {
-                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND,
-                    "NoSuchCorsConfiguration", "The CORS configuration is not found");
-            }
-            var corsConfig = opt.get();
-            var rules = corsConfig.corsRules().stream()
-                .map(r -> new BucketCorsQuery.CorsRuleEntry(
-                    r.allowedOrigins(), r.allowedMethods(), r.allowedHeaders(),
-                    r.maxAgeSeconds(), r.exposeHeaders(), r.id()))
-                .toList();
-            return ServerResponse.ok()
-                .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(new BucketCorsQuery(rules));
-        });
+        return getConfig(request, ConfigType.CORS);
     }
 
-    /** PUT /{bucket}?cors — PutBucketCors */
     public Mono<ServerResponse> putBucketCors(ServerRequest request) {
-        return putConfig(request, CorsConfigurationCommand.class, (b, cmd) -> {
-            var corsRules = cmd.corsRules().stream()
-                .map(r -> new CorsConfiguration.CorsRule(
-                    r.allowedOrigins(), r.allowedMethods(), r.allowedHeaders(),
-                    r.maxAgeSeconds() != null ? r.maxAgeSeconds() : 0,
-                    r.exposeHeaders(), r.id()))
-                .toList();
-            var corsConfig = new CorsConfiguration(corsRules);
-            var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
-            var newConfig = baseConfig.withCorsConfiguration(corsConfig);
-            var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.updateBucket(updatedBucket)
-                .then(ServerResponse.ok().build());
-        });
+        return putConfig(request, ConfigType.CORS);
     }
 
-    /** DELETE /{bucket}?cors — DeleteBucketCors */
     public Mono<ServerResponse> deleteBucketCors(ServerRequest request) {
-        return deleteDedicatedConfig(request,
-            bc -> new BucketConfig(
-                bc.loggingConfiguration(), bc.websiteConfiguration(), bc.notificationConfiguration(),
-                bc.accelerateConfiguration(), bc.analyticsConfiguration(), bc.inventoryConfiguration(),
-                bc.metricsConfiguration(), bc.intelligentTieringConfiguration(), bc.encryptionConfiguration(),
-                bc.lifecycleConfiguration(), bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
-                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), null, bc.bucketPolicy(),
-                null, null, null));
+        return deleteConfig(request, ConfigType.CORS);
     }
 
-    // ── Lifecycle Configuration ──
-
-    /** GET /{bucket}?lifecycle — GetBucketLifecycleConfiguration */
     public Mono<ServerResponse> getBucketLifecycle(ServerRequest request) {
-        return getDedicatedConfig(request, "NoSuchLifecycleConfiguration", "The lifecycle configuration does not exist",
-            b -> b.bucketConfig() != null ? b.bucketConfig().getLifecycleConfiguration() : Optional.<BucketLifecycleConfiguration>empty(),
-            lc -> ServerResponse.ok()
-                .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(BucketLifecycleQuery.from(Optional.of(lc))));
+        return getConfig(request, ConfigType.LIFECYCLE);
     }
 
-    /** PUT /{bucket}?lifecycle — PutBucketLifecycleConfiguration */
     public Mono<ServerResponse> putBucketLifecycle(ServerRequest request) {
-        return putConfig(request, LifecycleConfigurationCommand.class, (b, cmd) -> {
-            var rules = cmd.rules().stream()
-                .map(r -> new BucketLifecycleConfiguration.LifecycleRule(
-                    r.id(), r.status(), r.prefix(),
-                    r.expiration() != null
-                        ? new BucketLifecycleConfiguration.Expiration(r.expiration().days(), r.expiration().date())
-                        : null,
-                    r.noncurrentVersionExpiration() != null
-                        ? new BucketLifecycleConfiguration.NoncurrentVersionExpiration(
-                            r.noncurrentVersionExpiration().noncurrentDays())
-                        : null,
-                    r.abortIncompleteMultipartUpload() != null
-                        ? new BucketLifecycleConfiguration.AbortIncompleteMultipartUpload(
-                            r.abortIncompleteMultipartUpload().daysAfterInitiation())
-                        : null))
-                .toList();
-            var lifecycleConfig = new BucketLifecycleConfiguration(b.name(), rules);
-            var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
-            var newConfig = baseConfig.withLifecycleConfiguration(lifecycleConfig);
-            var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.updateBucket(updatedBucket)
-                .then(ServerResponse.ok().build());
-        });
+        return putConfig(request, ConfigType.LIFECYCLE);
     }
 
-    /** DELETE /{bucket}?lifecycle — DeleteBucketLifecycleConfiguration */
     public Mono<ServerResponse> deleteBucketLifecycle(ServerRequest request) {
-        return deleteDedicatedConfig(request,
-            bc -> new BucketConfig(
-                bc.loggingConfiguration(), bc.websiteConfiguration(), bc.notificationConfiguration(),
-                bc.accelerateConfiguration(), bc.analyticsConfiguration(), bc.inventoryConfiguration(),
-                bc.metricsConfiguration(), bc.intelligentTieringConfiguration(), bc.encryptionConfiguration(),
-                null, bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
-                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy(),
-                null, null, null));
+        return deleteConfig(request, ConfigType.LIFECYCLE);
     }
 
-    // ── Bucket Policy ──
-
-    /** GET /{bucket}?policy — GetBucketPolicy */
     public Mono<ServerResponse> getBucketPolicy(ServerRequest request) {
-        return findBucket(request, b -> {
-            var policy = b.bucketConfig() != null
-                ? b.bucketConfig().getBucketPolicy() : Optional.empty();
-            if (policy.isEmpty()) {
-                return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucketPolicy", "The bucket policy does not exist");
-            }
-            return ServerResponse.ok()
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(policy.get());
-        });
+        return getConfig(request, ConfigType.POLICY);
     }
 
-    /** PUT /{bucket}?policy — PutBucketPolicy */
     public Mono<ServerResponse> putBucketPolicy(ServerRequest request) {
-        return putConfigString(request, (b, body) -> {
-            var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
-            var newConfig = baseConfig.withBucketPolicy(body);
-            var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.updateBucket(updatedBucket)
-                .then(ServerResponse.ok().build());
-        });
+        return putConfig(request, ConfigType.POLICY);
     }
 
-    /** DELETE /{bucket}?policy — DeleteBucketPolicy */
     public Mono<ServerResponse> deleteBucketPolicy(ServerRequest request) {
-        return deleteDedicatedConfig(request,
-            bc -> new BucketConfig(
-                bc.loggingConfiguration(), bc.websiteConfiguration(), bc.notificationConfiguration(),
-                bc.accelerateConfiguration(), bc.analyticsConfiguration(), bc.inventoryConfiguration(),
-                bc.metricsConfiguration(), bc.intelligentTieringConfiguration(), bc.encryptionConfiguration(),
-                bc.lifecycleConfiguration(), bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
-                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), null,
-                null, null, null));
+        return deleteConfig(request, ConfigType.POLICY);
     }
 
-    // ── Encryption Configuration ──
-
-    /** GET /{bucket}?encryption — GetBucketEncryption */
     public Mono<ServerResponse> getBucketEncryption(ServerRequest request) {
-        return getDedicatedConfig(request, "NoSuchEncryptionConfiguration", "The encryption configuration does not exist",
-            b -> b.bucketConfig() != null ? b.bucketConfig().getEncryptionConfiguration() : Optional.<BucketEncryptionConfiguration>empty(),
-            ec -> ServerResponse.ok()
-                .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(BucketEncryptionQuery.from(Optional.of(ec))));
+        return getConfig(request, ConfigType.ENCRYPTION);
     }
 
-    /** PUT /{bucket}?encryption — PutBucketEncryption */
     public Mono<ServerResponse> putBucketEncryption(ServerRequest request) {
-        return putConfig(request, EncryptionConfigurationCommand.class, (b, cmd) -> {
-            var encryptionConfig = new BucketEncryptionConfiguration(b.name(),
-                cmd.ruleId(), cmd.algorithm(), cmd.kmsKeyId());
-            var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
-            var newConfig = baseConfig.withEncryptionConfiguration(encryptionConfig);
-            var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.updateBucket(updatedBucket)
-                .then(ServerResponse.ok().build());
-        });
+        return putConfig(request, ConfigType.ENCRYPTION);
     }
 
-    /** DELETE /{bucket}?encryption — DeleteBucketEncryption */
     public Mono<ServerResponse> deleteBucketEncryption(ServerRequest request) {
-        return deleteDedicatedConfig(request,
-            bc -> new BucketConfig(
-                bc.loggingConfiguration(), bc.websiteConfiguration(), bc.notificationConfiguration(),
-                bc.accelerateConfiguration(), bc.analyticsConfiguration(), bc.inventoryConfiguration(),
-                bc.metricsConfiguration(), bc.intelligentTieringConfiguration(), null,
-                bc.lifecycleConfiguration(), bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
-                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy(),
-                null, null, null));
+        return deleteConfig(request, ConfigType.ENCRYPTION);
     }
 
-    // ── Logging Configuration ──
-
-    /** GET /{bucket}?logging — GetBucketLogging */
     public Mono<ServerResponse> getBucketLogging(ServerRequest request) {
-        return getDedicatedConfig(request, "NoSuchLoggingConfiguration", "The logging configuration does not exist",
-            b -> b.bucketConfig() != null ? b.bucketConfig().getLoggingConfiguration() : Optional.<BucketLoggingConfiguration>empty(),
-            lc -> ServerResponse.ok()
-                .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(BucketLoggingQuery.from(Optional.of(lc))));
+        return getConfig(request, ConfigType.LOGGING);
     }
 
-    /** PUT /{bucket}?logging — PutBucketLogging */
     public Mono<ServerResponse> putBucketLogging(ServerRequest request) {
-        return putConfig(request, LoggingConfigurationCommand.class, (b, cmd) -> {
-            var loggingConfig = new BucketLoggingConfiguration(b.name(),
-                cmd.targetBucket(), cmd.targetPrefix());
-            var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
-            var newConfig = baseConfig.withLoggingConfiguration(loggingConfig);
-            var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.updateBucket(updatedBucket)
-                .then(ServerResponse.ok().build());
-        });
+        return putConfig(request, ConfigType.LOGGING);
     }
 
-    /** DELETE /{bucket}?logging — DeleteBucketLogging */
     public Mono<ServerResponse> deleteBucketLogging(ServerRequest request) {
-        return deleteDedicatedConfig(request,
-            bc -> new BucketConfig(
-                null, bc.websiteConfiguration(), bc.notificationConfiguration(),
-                bc.accelerateConfiguration(), bc.analyticsConfiguration(), bc.inventoryConfiguration(),
-                bc.metricsConfiguration(), bc.intelligentTieringConfiguration(), bc.encryptionConfiguration(),
-                bc.lifecycleConfiguration(), bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
-                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy(),
-                null, null, null));
+        return deleteConfig(request, ConfigType.LOGGING);
     }
 
-    // ── Website Configuration ──
-
-    /** GET /{bucket}?website — GetBucketWebsite */
     public Mono<ServerResponse> getBucketWebsite(ServerRequest request) {
-        return getDedicatedConfig(request, "NoSuchWebsiteConfiguration", "The website configuration does not exist",
-            b -> b.bucketConfig() != null ? b.bucketConfig().getWebsiteConfiguration() : Optional.<BucketWebsiteConfiguration>empty(),
-            wc -> ServerResponse.ok()
-                .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(BucketWebsiteQuery.from(Optional.of(wc))));
+        return getConfig(request, ConfigType.WEBSITE);
     }
 
-    /** PUT /{bucket}?website — PutBucketWebsite */
     public Mono<ServerResponse> putBucketWebsite(ServerRequest request) {
-        return putConfig(request, WebsiteConfigurationCommand.class, (b, cmd) -> {
-            var websiteConfig = new BucketWebsiteConfiguration(b.name(),
-                cmd.indexDocument(), cmd.errorDocument(),
-                cmd.redirectAllRequestsTo(), cmd.hostName(), cmd.protocol());
-            var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
-            var newConfig = baseConfig.withWebsiteConfiguration(websiteConfig);
-            var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.updateBucket(updatedBucket)
-                .then(ServerResponse.ok().build());
-        });
+        return putConfig(request, ConfigType.WEBSITE);
     }
 
-    /** DELETE /{bucket}?website — DeleteBucketWebsite */
     public Mono<ServerResponse> deleteBucketWebsite(ServerRequest request) {
-        return deleteDedicatedConfig(request,
-            bc -> new BucketConfig(
-                bc.loggingConfiguration(), null, bc.notificationConfiguration(),
-                bc.accelerateConfiguration(), bc.analyticsConfiguration(), bc.inventoryConfiguration(),
-                bc.metricsConfiguration(), bc.intelligentTieringConfiguration(), bc.encryptionConfiguration(),
-                bc.lifecycleConfiguration(), bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
-                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy(),
-                null, null, null));
+        return deleteConfig(request, ConfigType.WEBSITE);
     }
 
-    // ── Notification Configuration ──
-
-    /** GET /{bucket}?notification — GetBucketNotification */
     public Mono<ServerResponse> getBucketNotification(ServerRequest request) {
-        return getDedicatedConfig(request, "NoSuchNotificationConfiguration", "The notification configuration does not exist",
-            b -> b.bucketConfig() != null ? b.bucketConfig().getNotificationConfiguration() : Optional.<BucketNotificationConfiguration>empty(),
-            nc -> ServerResponse.ok()
-                .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(BucketNotificationQuery.from(Optional.of(nc))));
+        return getConfig(request, ConfigType.NOTIFICATION);
     }
 
-    /** PUT /{bucket}?notification — PutBucketNotification */
     public Mono<ServerResponse> putBucketNotification(ServerRequest request) {
-        return putConfig(request, NotificationConfigurationCommand.class, (b, cmd) -> {
-            var events = cmd.eventConfigurations().stream()
-                .map(ec -> new BucketNotificationConfiguration.NotificationEvent(
-                    ec.event(), ec.topicArn(), ec.queueArn(), ec.lambdaArn(),
-                    ec.filterRules() != null ? ec.filterRules() : List.of()))
-                .toList();
-            var notificationConfig = new BucketNotificationConfiguration(b.name(), events);
-            var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
-            var newConfig = baseConfig.withNotificationConfiguration(notificationConfig);
-            var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.updateBucket(updatedBucket)
-                .then(ServerResponse.ok().build());
-        });
+        return putConfig(request, ConfigType.NOTIFICATION);
     }
 
-    /** DELETE /{bucket}?notification — DeleteBucketNotification */
     public Mono<ServerResponse> deleteBucketNotification(ServerRequest request) {
-        return deleteDedicatedConfig(request,
-            bc -> new BucketConfig(
-                bc.loggingConfiguration(), bc.websiteConfiguration(), null,
-                bc.accelerateConfiguration(), bc.analyticsConfiguration(), bc.inventoryConfiguration(),
-                bc.metricsConfiguration(), bc.intelligentTieringConfiguration(), bc.encryptionConfiguration(),
-                bc.lifecycleConfiguration(), bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
-                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy(),
-                null, null, null));
+        return deleteConfig(request, ConfigType.NOTIFICATION);
     }
 
-    // ── Replication Configuration ──
-
-    /** GET /{bucket}?replication — GetBucketReplication */
     public Mono<ServerResponse> getBucketReplication(ServerRequest request) {
-        return getDedicatedConfig(request, "NoSuchReplicationConfiguration", "The replication configuration does not exist",
-            b -> b.bucketConfig() != null ? b.bucketConfig().getReplicationConfiguration() : Optional.<BucketReplicationConfiguration>empty(),
-            rc -> ServerResponse.ok()
-                .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(BucketReplicationQuery.from(Optional.of(rc))));
+        return getConfig(request, ConfigType.REPLICATION);
     }
 
-    /** PUT /{bucket}?replication — PutBucketReplication */
     public Mono<ServerResponse> putBucketReplication(ServerRequest request) {
-        return putConfig(request, ReplicationConfigurationCommand.class, (b, cmd) -> {
-            var replicationRules = cmd.rules().stream()
-                .map(r -> new BucketReplicationConfiguration.ReplicationRule(
-                    r.id(), r.status(), r.prefix(), r.destinationBucket(),
-                    r.destinationStorageClass(), false, false))
-                .toList();
-            var replicationConfig = new BucketReplicationConfiguration(b.name(),
-                cmd.role(), replicationRules);
-            var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
-            var newConfig = baseConfig.withReplicationConfiguration(replicationConfig);
-            var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.updateBucket(updatedBucket)
-                .then(ServerResponse.ok().build());
-        });
+        return putConfig(request, ConfigType.REPLICATION);
     }
 
-    /** DELETE /{bucket}?replication — DeleteBucketReplication */
     public Mono<ServerResponse> deleteBucketReplication(ServerRequest request) {
-        return deleteDedicatedConfig(request,
-            bc -> new BucketConfig(
-                bc.loggingConfiguration(), bc.websiteConfiguration(), bc.notificationConfiguration(),
-                bc.accelerateConfiguration(), bc.analyticsConfiguration(), bc.inventoryConfiguration(),
-                bc.metricsConfiguration(), bc.intelligentTieringConfiguration(), bc.encryptionConfiguration(),
-                bc.lifecycleConfiguration(), null, bc.requestPaymentConfiguration(),
-                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy(),
-                null, null, null));
+        return deleteConfig(request, ConfigType.REPLICATION);
     }
 
-    // ── Request Payment Configuration ──
-
-    /** GET /{bucket}?requestPayment — GetBucketRequestPayment */
     public Mono<ServerResponse> getBucketRequestPayment(ServerRequest request) {
-        return getDedicatedConfig(request, "NoSuchRequestPaymentConfiguration", "The request payment configuration does not exist",
-            b -> b.bucketConfig() != null ? b.bucketConfig().getRequestPaymentConfiguration() : Optional.<BucketRequestPaymentConfiguration>empty(),
-            rpc -> ServerResponse.ok()
-                .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(BucketRequestPaymentQuery.from(Optional.of(rpc))));
+        return getConfig(request, ConfigType.REQUEST_PAYMENT);
     }
 
-    /** PUT /{bucket}?requestPayment — PutBucketRequestPayment */
     public Mono<ServerResponse> putBucketRequestPayment(ServerRequest request) {
-        return putConfig(request, RequestPaymentConfigurationCommand.class, (b, cmd) -> {
-            var requestPaymentConfig = new BucketRequestPaymentConfiguration(b.name(), cmd.payer());
-            var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
-            var newConfig = baseConfig.withRequestPaymentConfiguration(requestPaymentConfig);
-            var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.updateBucket(updatedBucket)
-                .then(ServerResponse.ok().build());
-        });
+        return putConfig(request, ConfigType.REQUEST_PAYMENT);
     }
 
-    /** DELETE /{bucket}?requestPayment — DeleteBucketRequestPayment */
     public Mono<ServerResponse> deleteBucketRequestPayment(ServerRequest request) {
-        return deleteDedicatedConfig(request,
-            bc -> new BucketConfig(
-                bc.loggingConfiguration(), bc.websiteConfiguration(), bc.notificationConfiguration(),
-                bc.accelerateConfiguration(), bc.analyticsConfiguration(), bc.inventoryConfiguration(),
-                bc.metricsConfiguration(), bc.intelligentTieringConfiguration(), bc.encryptionConfiguration(),
-                bc.lifecycleConfiguration(), bc.replicationConfiguration(), null,
-                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy(),
-                null, null, null));
+        return deleteConfig(request, ConfigType.REQUEST_PAYMENT);
     }
 
-    // ── Ownership Controls ──
-
-    /** GET /{bucket}?ownershipControls — GetBucketOwnershipControls */
     public Mono<ServerResponse> getBucketOwnershipControls(ServerRequest request) {
-        return getDedicatedConfig(request, "NoSuchOwnershipControls", "The ownership controls do not exist",
-            b -> b.bucketConfig() != null ? b.bucketConfig().getOwnershipControls() : Optional.<BucketOwnershipControls>empty(),
-            oc -> ServerResponse.ok()
-                .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(BucketOwnershipControlsQuery.from(Optional.of(oc))));
+        return getConfig(request, ConfigType.OWNERSHIP_CONTROLS);
     }
 
-    /** PUT /{bucket}?ownershipControls — PutBucketOwnershipControls */
     public Mono<ServerResponse> putBucketOwnershipControls(ServerRequest request) {
-        return putConfig(request, OwnershipControlsCommand.class, (b, cmd) -> {
-            var ownershipControls = new BucketOwnershipControls(b.name(), cmd.id(), cmd.ownership());
-            var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
-            var newConfig = baseConfig.withOwnershipControls(ownershipControls);
-            var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.updateBucket(updatedBucket)
-                .then(ServerResponse.ok().build());
-        });
+        return putConfig(request, ConfigType.OWNERSHIP_CONTROLS);
     }
 
-    /** DELETE /{bucket}?ownershipControls — DeleteBucketOwnershipControls */
     public Mono<ServerResponse> deleteBucketOwnershipControls(ServerRequest request) {
-        return deleteDedicatedConfig(request,
-            bc -> new BucketConfig(
-                bc.loggingConfiguration(), bc.websiteConfiguration(), bc.notificationConfiguration(),
-                bc.accelerateConfiguration(), bc.analyticsConfiguration(), bc.inventoryConfiguration(),
-                bc.metricsConfiguration(), bc.intelligentTieringConfiguration(), bc.encryptionConfiguration(),
-                bc.lifecycleConfiguration(), bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
-                null, bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy(),
-                null, null, null));
+        return deleteConfig(request, ConfigType.OWNERSHIP_CONTROLS);
     }
 
-    // ── Public Access Block ──
-
-    /** GET /{bucket}?publicAccessBlock — GetPublicAccessBlock */
     public Mono<ServerResponse> getPublicAccessBlock(ServerRequest request) {
-        return getDedicatedConfig(request, "NoSuchPublicAccessBlockConfiguration", "The public access block configuration does not exist",
-            b -> b.bucketConfig() != null ? b.bucketConfig().getPublicAccessBlockConfiguration() : Optional.<PublicAccessBlockConfiguration>empty(),
-            pab -> ServerResponse.ok()
-                .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(PublicAccessBlockQuery.from(Optional.of(pab))));
+        return getConfig(request, ConfigType.PUBLIC_ACCESS_BLOCK);
     }
 
-    /** PUT /{bucket}?publicAccessBlock — PutPublicAccessBlock */
     public Mono<ServerResponse> putPublicAccessBlock(ServerRequest request) {
-        return putConfig(request, PublicAccessBlockCommand.class, (b, cmd) -> {
-            var publicAccessBlockConfig = new PublicAccessBlockConfiguration(b.name(),
-                "true".equals(cmd.blockPublicAcls()), "true".equals(cmd.ignorePublicAcls()),
-                "true".equals(cmd.blockPublicPolicy()), "true".equals(cmd.restrictPublicBuckets()));
-            var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
-            var newConfig = baseConfig.withPublicAccessBlock(publicAccessBlockConfig);
-            var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.updateBucket(updatedBucket)
-                .then(ServerResponse.ok().build());
-        });
+        return putConfig(request, ConfigType.PUBLIC_ACCESS_BLOCK);
     }
 
-    /** DELETE /{bucket}?publicAccessBlock — DeletePublicAccessBlock */
     public Mono<ServerResponse> deletePublicAccessBlock(ServerRequest request) {
-        return deleteDedicatedConfig(request,
-            bc -> new BucketConfig(
-                bc.loggingConfiguration(), bc.websiteConfiguration(), bc.notificationConfiguration(),
-                bc.accelerateConfiguration(), bc.analyticsConfiguration(), bc.inventoryConfiguration(),
-                bc.metricsConfiguration(), bc.intelligentTieringConfiguration(), bc.encryptionConfiguration(),
-                bc.lifecycleConfiguration(), bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
-                bc.ownershipControls(), null, bc.corsConfiguration(), bc.bucketPolicy(),
-                null, null, null));
+        return deleteConfig(request, ConfigType.PUBLIC_ACCESS_BLOCK);
     }
 
-    // ── Accelerate Configuration ──
-
-    /** GET /{bucket}?accelerate — GetBucketAccelerateConfiguration */
     public Mono<ServerResponse> getBucketAccelerate(ServerRequest request) {
-        return getDedicatedConfig(request, "NoSuchAccelerateConfiguration", "The accelerate configuration does not exist",
-            b -> b.bucketConfig() != null ? b.bucketConfig().getAccelerateConfiguration() : Optional.<BucketAccelerateConfiguration>empty(),
-            ac -> ServerResponse.ok()
-                .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(BucketAccelerateQuery.from(Optional.of(ac))));
+        return getConfig(request, ConfigType.ACCELERATE);
     }
 
-    /** PUT /{bucket}?accelerate — PutBucketAccelerateConfiguration */
     public Mono<ServerResponse> putBucketAccelerate(ServerRequest request) {
-        return putConfig(request, AccelerateConfigurationCommand.class, (b, cmd) -> {
-            var accelerateConfig = new BucketAccelerateConfiguration(b.name(), cmd.status());
-            var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
-            var newConfig = baseConfig.withAccelerateConfiguration(accelerateConfig);
-            var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.updateBucket(updatedBucket)
-                .then(ServerResponse.ok().build());
-        });
+        return putConfig(request, ConfigType.ACCELERATE);
     }
 
-    /** DELETE /{bucket}?accelerate — DeleteBucketAccelerateConfiguration */
     public Mono<ServerResponse> deleteBucketAccelerate(ServerRequest request) {
-        return deleteDedicatedConfig(request,
-            bc -> new BucketConfig(
-                bc.loggingConfiguration(), bc.websiteConfiguration(), bc.notificationConfiguration(),
-                null, bc.analyticsConfiguration(), bc.inventoryConfiguration(),
-                bc.metricsConfiguration(), bc.intelligentTieringConfiguration(), bc.encryptionConfiguration(),
-                bc.lifecycleConfiguration(), bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
-                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy(),
-                null, null, null));
+        return deleteConfig(request, ConfigType.ACCELERATE);
     }
 
-    // ─────────────────────────────────────────────────────
-    //  Analytics Configuration
-    // ─────────────────────────────────────────────────────
-
-    /** GET /{bucket}?analytics&analyticsId={id} — GetBucketAnalyticsConfiguration */
     public Mono<ServerResponse> getBucketAnalytics(ServerRequest request) {
-        return getDedicatedConfig(request, "NoSuchAnalyticsConfiguration", "The analytics configuration does not exist",
-            b -> b.bucketConfig() != null ? b.bucketConfig().getAnalyticsConfiguration() : Optional.<BucketAnalyticsConfiguration>empty(),
-            ac -> ServerResponse.ok()
-                .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(BucketAnalyticsQuery.from(Optional.of(ac))));
+        return getConfig(request, ConfigType.ANALYTICS);
     }
 
-    /** PUT /{bucket}?analytics&analyticsId={id} — PutBucketAnalyticsConfiguration */
     public Mono<ServerResponse> putBucketAnalytics(ServerRequest request) {
         var analyticsId = request.queryParam("analyticsId").orElse(null);
         if (analyticsId == null || analyticsId.isBlank()) {
             return S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "MissingAnalyticsId",
                 "The analyticsId query parameter is required");
         }
-        return putConfig(request, AnalyticsConfigurationCommand.class, (b, cmd) -> {
-            var analyticsConfig = new BucketAnalyticsConfiguration(b.name(),
-                cmd.id(), cmd.filter() != null ? cmd.filter().prefix() : null);
-            var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
-            var newConfig = baseConfig.withAnalyticsConfiguration(analyticsConfig);
-            var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.updateBucket(updatedBucket)
-                .then(ServerResponse.ok().build());
-        });
+        return putConfig(request, ConfigType.ANALYTICS);
     }
 
-    /** DELETE /{bucket}?analytics&analyticsId={id} — DeleteBucketAnalyticsConfiguration */
     public Mono<ServerResponse> deleteBucketAnalytics(ServerRequest request) {
         var analyticsId = request.queryParam("analyticsId").orElse(null);
         if (analyticsId == null || analyticsId.isBlank()) {
             return S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "MissingAnalyticsId",
                 "The analyticsId query parameter is required");
         }
-        return deleteDedicatedConfig(request,
-            bc -> new BucketConfig(
-                bc.loggingConfiguration(), bc.websiteConfiguration(), bc.notificationConfiguration(),
-                bc.accelerateConfiguration(), null, bc.inventoryConfiguration(),
-                bc.metricsConfiguration(), bc.intelligentTieringConfiguration(), bc.encryptionConfiguration(),
-                bc.lifecycleConfiguration(), bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
-                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy(),
-                null, null, null));
+        return deleteConfig(request, ConfigType.ANALYTICS);
     }
 
-    /** GET /{bucket}?analytics&list-type — ListBucketAnalyticsConfigurations */
     public Mono<ServerResponse> listBucketAnalyticsConfigurations(ServerRequest request) {
-        return getDedicatedConfig(request, "NoSuchAnalyticsConfiguration", "No analytics configurations exist",
-            b -> b.bucketConfig() != null
-                ? b.bucketConfig().getAnalyticsConfiguration().map(ac -> List.of(ac)) : Optional.<List<BucketAnalyticsConfiguration>>empty(),
-            list -> {
-                var entries = list.stream()
-                    .map(ac -> new BucketAnalyticsListQuery.AnalyticsConfigurationEntry(ac.analyticsId()))
-                    .toList();
-                return ServerResponse.ok()
-                    .contentType(MediaType.APPLICATION_XML)
-                    .bodyValue(new BucketAnalyticsListQuery(entries));
-            });
-    }
-
-    // ─────────────────────────────────────────────────────
-    //  Inventory Configuration
-    // ─────────────────────────────────────────────────────
-
-    /** GET /{bucket}?inventory&inventoryId={id} — GetBucketInventoryConfiguration */
-    public Mono<ServerResponse> getBucketInventory(ServerRequest request) {
-        return getDedicatedConfig(request, "NoSuchInventoryConfiguration", "The inventory configuration does not exist",
-            b -> b.bucketConfig() != null ? b.bucketConfig().getInventoryConfiguration() : Optional.<BucketInventoryConfiguration>empty(),
-            ic -> ServerResponse.ok()
+        return findBucket(request, bucket -> bucketConfig(bucket, BucketConfig::getAnalyticsConfiguration)
+            .filter(ac -> ac.analyticsId() != null && !ac.analyticsId().isBlank())
+            .map(ac -> ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(BucketInventoryQuery.from(Optional.of(ic))));
+                .bodyValue(new BucketAnalyticsListQuery(
+                    List.of(new BucketAnalyticsListQuery.AnalyticsConfigurationEntry(ac.analyticsId())))))
+            .orElseGet(() -> S3WebSupport.xmlError(HttpStatus.NOT_FOUND,
+                "NoSuchAnalyticsConfiguration", "No analytics configurations exist")));
     }
 
-    /** PUT /{bucket}?inventory&inventoryId={id} — PutBucketInventoryConfiguration */
+    public Mono<ServerResponse> getBucketInventory(ServerRequest request) {
+        return getConfig(request, ConfigType.INVENTORY);
+    }
+
     public Mono<ServerResponse> putBucketInventory(ServerRequest request) {
         var inventoryId = request.queryParam("inventoryId").orElse(null);
         if (inventoryId == null || inventoryId.isBlank()) {
             return S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "MissingInventoryId",
                 "The inventoryId query parameter is required");
         }
-        return putConfig(request, InventoryConfigurationCommand.class, (b, cmd) -> {
-            var inventoryConfig = new BucketInventoryConfiguration(b.name(),
-                cmd.id(), cmd.destination() != null ? cmd.destination().format() : null,
-                cmd.schedule() != null ? cmd.schedule().frequency() : null,
-                "Enabled".equals(cmd.enabled()));
-            var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
-            var newConfig = baseConfig.withInventoryConfiguration(inventoryConfig);
-            var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.updateBucket(updatedBucket)
-                .then(ServerResponse.ok().build());
-        });
+        return putConfig(request, ConfigType.INVENTORY);
     }
 
-    /** DELETE /{bucket}?inventory&inventoryId={id} — DeleteBucketInventoryConfiguration */
     public Mono<ServerResponse> deleteBucketInventory(ServerRequest request) {
         var inventoryId = request.queryParam("inventoryId").orElse(null);
         if (inventoryId == null || inventoryId.isBlank()) {
             return S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "MissingInventoryId",
                 "The inventoryId query parameter is required");
         }
-        return deleteDedicatedConfig(request,
-            bc -> new BucketConfig(
-                bc.loggingConfiguration(), bc.websiteConfiguration(), bc.notificationConfiguration(),
-                bc.accelerateConfiguration(), bc.analyticsConfiguration(), null,
-                bc.metricsConfiguration(), bc.intelligentTieringConfiguration(), bc.encryptionConfiguration(),
-                bc.lifecycleConfiguration(), bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
-                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy(),
-                null, null, null));
+        return deleteConfig(request, ConfigType.INVENTORY);
     }
 
-    /** GET /{bucket}?inventory&list-type — ListBucketInventoryConfigurations */
     public Mono<ServerResponse> listBucketInventoryConfigurations(ServerRequest request) {
-        return getDedicatedConfig(request, "NoSuchInventoryConfiguration", "No inventory configurations exist",
-            b -> b.bucketConfig() != null
-                ? b.bucketConfig().getInventoryConfiguration().map(ic -> List.of(ic)) : Optional.<List<BucketInventoryConfiguration>>empty(),
-            list -> {
-                var entries = list.stream()
-                    .map(ic -> new BucketInventoryListQuery.InventoryConfigurationEntry(ic.inventoryId()))
-                    .toList();
-                return ServerResponse.ok()
-                    .contentType(MediaType.APPLICATION_XML)
-                    .bodyValue(new BucketInventoryListQuery(entries));
-            });
+        return findBucket(request, bucket -> bucketConfig(bucket, BucketConfig::getInventoryConfiguration)
+            .filter(ic -> ic.inventoryId() != null && !ic.inventoryId().isBlank())
+            .map(ic -> ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(new BucketInventoryListQuery(
+                    List.of(new BucketInventoryListQuery.InventoryConfigurationEntry(ic.inventoryId())))))
+            .orElseGet(() -> S3WebSupport.xmlError(HttpStatus.NOT_FOUND,
+                "NoSuchInventoryConfiguration", "No inventory configurations exist")));
     }
 
-    // ─────────────────────────────────────────────────────
-    //  Metrics Configuration
-    // ─────────────────────────────────────────────────────
-
-    /** GET /{bucket}?metrics — GetBucketMetricsConfiguration */
     public Mono<ServerResponse> getBucketMetrics(ServerRequest request) {
-        return getDedicatedConfig(request, "NoSuchMetricsConfiguration", "The metrics configuration does not exist",
-            b -> b.bucketConfig() != null ? b.bucketConfig().getMetricsConfiguration() : Optional.<BucketMetricsConfiguration>empty(),
-            mc -> ServerResponse.ok()
-                .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(BucketMetricsQuery.from(Optional.of(mc))));
+        return getConfig(request, ConfigType.METRICS);
     }
 
-    /** PUT /{bucket}?metrics — PutBucketMetricsConfiguration */
     public Mono<ServerResponse> putBucketMetrics(ServerRequest request) {
-        return putConfig(request, MetricsConfigurationCommand.class, (b, cmd) -> {
-            var metricsConfig = new BucketMetricsConfiguration(b.name(),
-                cmd.id(), cmd.filter() != null ? cmd.filter().prefix() : null);
-            var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
-            var newConfig = baseConfig.withMetricsConfiguration(metricsConfig);
-            var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.updateBucket(updatedBucket)
-                .then(ServerResponse.ok().build());
-        });
+        return putConfig(request, ConfigType.METRICS);
     }
 
-    /** DELETE /{bucket}?metrics — DeleteBucketMetricsConfiguration */
     public Mono<ServerResponse> deleteBucketMetrics(ServerRequest request) {
-        return deleteDedicatedConfig(request,
-            bc -> new BucketConfig(
-                bc.loggingConfiguration(), bc.websiteConfiguration(), bc.notificationConfiguration(),
-                bc.accelerateConfiguration(), bc.analyticsConfiguration(), bc.inventoryConfiguration(),
-                null, bc.intelligentTieringConfiguration(), bc.encryptionConfiguration(),
-                bc.lifecycleConfiguration(), bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
-                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy(),
-                null, null, null));
+        return deleteConfig(request, ConfigType.METRICS);
     }
 
-    // ─────────────────────────────────────────────────────
-    //  Intelligent-Tiering Configuration
-    // ─────────────────────────────────────────────────────
-
-    /** GET /{bucket}?intelligent-tiering — GetBucketIntelligentTieringConfiguration */
     public Mono<ServerResponse> getBucketIntelligentTiering(ServerRequest request) {
-        return getDedicatedConfig(request, "NoSuchIntelligentTieringConfiguration", "The intelligent-tiering configuration does not exist",
-            b -> b.bucketConfig() != null ? b.bucketConfig().getIntelligentTieringConfiguration() : Optional.<BucketIntelligentTieringConfiguration>empty(),
-            itc -> ServerResponse.ok()
-                .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(BucketIntelligentTieringQuery.from(Optional.of(itc))));
+        return getConfig(request, ConfigType.INTELLIGENT_TIERING);
     }
 
-    /** PUT /{bucket}?intelligent-tiering — PutBucketIntelligentTieringConfiguration */
     public Mono<ServerResponse> putBucketIntelligentTiering(ServerRequest request) {
-        return putConfig(request, IntelligentTieringConfigurationCommand.class, (b, cmd) -> {
-            var intelligentTieringConfig = new BucketIntelligentTieringConfiguration(b.name(),
-                cmd.id(), cmd.tieringPolicy() != null ? cmd.tieringPolicy().tieringRule() : null,
-                cmd.autoTieringStatus());
-            var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
-            var newConfig = baseConfig.withIntelligentTieringConfiguration(intelligentTieringConfig);
-            var updatedBucket = b.withBucketConfig(newConfig).clearEvents();
-            return bucketService.updateBucket(updatedBucket)
-                .then(ServerResponse.ok().build());
-        });
+        return putConfig(request, ConfigType.INTELLIGENT_TIERING);
     }
 
-    /** DELETE /{bucket}?intelligent-tiering — DeleteBucketIntelligentTieringConfiguration */
     public Mono<ServerResponse> deleteBucketIntelligentTiering(ServerRequest request) {
-        return deleteDedicatedConfig(request,
-            bc -> new BucketConfig(
-                bc.loggingConfiguration(), bc.websiteConfiguration(), bc.notificationConfiguration(),
-                bc.accelerateConfiguration(), bc.analyticsConfiguration(), bc.inventoryConfiguration(),
-                bc.metricsConfiguration(), null, bc.encryptionConfiguration(),
-                bc.lifecycleConfiguration(), bc.replicationConfiguration(), bc.requestPaymentConfiguration(),
-                bc.ownershipControls(), bc.publicAccessBlockConfiguration(), bc.corsConfiguration(), bc.bucketPolicy(),
-                null, null, null));
+        return deleteConfig(request, ConfigType.INTELLIGENT_TIERING);
     }
 
     // ─────────────────────────────────────────────────────
     //  ABAC Configuration
     // ─────────────────────────────────────────────────────
 
-    /** GET /{bucket}?abac — GetBucketAbac */
     public Mono<ServerResponse> getBucketAbac(ServerRequest request) {
-        return findBucket(request, b -> {
-            var entries = abacConfigs.get(b.name());
+        return findBucket(request, bucket -> {
+            var entries = abacConfigs.get(bucket.name());
             if (entries == null || entries.isEmpty()) {
                 return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchAbacConfiguration",
                     "The ABAC configuration does not exist");
             }
             var rules = entries.stream()
-                .map(e -> new AbacConfigurationQuery.AbacRuleEntry(
-                    e.id(), e.principal(), e.resource(), e.action(),
-                    e.conditions().stream()
-                        .map(c -> new AbacConfigurationQuery.ConditionEntry(c.tag(), c.value()))
+                .map(entry -> new AbacConfigurationQuery.AbacRuleEntry(
+                    entry.id(), entry.principal(), entry.resource(), entry.action(),
+                    entry.conditions().stream()
+                        .map(condition -> new AbacConfigurationQuery.ConditionEntry(condition.tag(), condition.value()))
                         .toList()))
                 .toList();
             return ServerResponse.ok()
@@ -893,15 +851,33 @@ public class S3BucketConfigHandler {
         });
     }
 
+    public Mono<ServerResponse> putBucketAbac(ServerRequest request) {
+        return findBucket(request, bucket -> request.bodyToMono(AbacConfigurationCommand.class)
+            .flatMap(command -> {
+                var entries = command.rules().stream()
+                    .map(rule -> new AbacConfigEntry(
+                        rule.id(), rule.principal(), rule.resource(), rule.action(),
+                        rule.conditions() != null
+                            ? rule.conditions().stream()
+                                .map(condition -> new AbacConfigEntry.AbacCondition(condition.tag(), condition.value()))
+                                .toList()
+                            : List.of()))
+                    .toList();
+                abacConfigs.put(bucket.name(), entries);
+                return ServerResponse.ok().build();
+            })
+            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "InvalidRequest",
+                "Missing ABAC configuration body")));
+    }
+
     // ─────────────────────────────────────────────────────
     //  Object Lock Configuration
     // ─────────────────────────────────────────────────────
 
-    /** GET /{bucket}?object-lock — GetObjectLockConfiguration */
     public Mono<ServerResponse> getObjectLockConfiguration(ServerRequest request) {
         var bucketName = request.pathVariable("bucket");
         return bucketService.findByName(bucketName)
-            .flatMap(b -> {
+            .flatMap(bucket -> {
                 var config = objectLockConfigs.get(bucketName);
                 if (config == null || !config.enabled()) {
                     return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchObjectLockConfiguration",
@@ -914,20 +890,19 @@ public class S3BucketConfigHandler {
             .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
     }
 
-    /** PUT /{bucket}?object-lock — PutObjectLockConfiguration */
     public Mono<ServerResponse> putObjectLockConfiguration(ServerRequest request) {
         var bucketName = request.pathVariable("bucket");
         return bucketService.findByName(bucketName)
-            .flatMap(b -> request.bodyToMono(ObjectLockConfigurationCommand.class)
-                .flatMap(cmd -> {
-                    if (!cmd.isEnabled()) {
+            .flatMap(bucket -> request.bodyToMono(ObjectLockConfigurationCommand.class)
+                .flatMap(command -> {
+                    if (!command.isEnabled()) {
                         objectLockConfigs.remove(bucketName);
                         return ServerResponse.ok().build();
                     }
-                    var mode = cmd.rule() != null && cmd.rule().defaultRetention() != null
-                        ? cmd.rule().defaultRetention().mode() : "GOVERNANCE";
-                    var days = cmd.rule() != null && cmd.rule().defaultRetention() != null
-                        ? cmd.rule().defaultRetention().days() != null ? cmd.rule().defaultRetention().days() : 5
+                    var mode = command.rule() != null && command.rule().defaultRetention() != null
+                        ? command.rule().defaultRetention().mode() : "GOVERNANCE";
+                    var days = command.rule() != null && command.rule().defaultRetention() != null
+                        ? command.rule().defaultRetention().days() != null ? command.rule().defaultRetention().days() : 5
                         : 5;
                     objectLockConfigs.put(bucketName, new ObjectLockConfigEntry(true, mode, days));
                     return ServerResponse.ok().build();
@@ -935,41 +910,20 @@ public class S3BucketConfigHandler {
             .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
     }
 
-    /** PUT /{bucket}?abac — PutBucketAbac */
-    public Mono<ServerResponse> putBucketAbac(ServerRequest request) {
-        return findBucket(request, b -> request.bodyToMono(AbacConfigurationCommand.class)
-            .flatMap(cmd -> {
-                var entries = cmd.rules().stream()
-                    .map(r -> new AbacConfigEntry(
-                        r.id(), r.principal(), r.resource(), r.action(),
-                        r.conditions() != null
-                            ? r.conditions().stream()
-                                .map(c -> new AbacConfigEntry.AbacCondition(c.tag(), c.value()))
-                                .toList()
-                            : List.of()))
-                    .toList();
-                abacConfigs.put(b.name(), entries);
-                return ServerResponse.ok().build();
-            })
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "InvalidRequest",
-                "Missing ABAC configuration body")));
-    }
-
     // ─────────────────────────────────────────────────────
     //  Metadata Configuration
     // ─────────────────────────────────────────────────────
 
-    /** GET /{bucket}?metadata-config — GetBucketMetadataConfiguration */
     public Mono<ServerResponse> getBucketMetadataConfiguration(ServerRequest request) {
-        return findBucket(request, b -> {
-            var entry = metadataConfigs.get(b.name());
+        return findBucket(request, bucket -> {
+            var entry = metadataConfigs.get(bucket.name());
             if (entry == null || entry.rules() == null || entry.rules().isEmpty()) {
                 return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchMetadataConfiguration",
                     "The metadata configuration does not exist");
             }
             var rules = entry.rules().stream()
-                .map(r -> new MetadataConfigurationQuery.MetadataRuleEntry(
-                    r.id(), r.status(), r.metadataResourceType(), r.metadataResourceSubtype()))
+                .map(rule -> new MetadataConfigurationQuery.MetadataRuleEntry(
+                    rule.id(), rule.status(), rule.metadataResourceType(), rule.metadataResourceSubtype()))
                 .toList();
             return ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_XML)
@@ -977,25 +931,23 @@ public class S3BucketConfigHandler {
         });
     }
 
-    /** PUT /{bucket}?metadata-config — PutBucketMetadataConfiguration */
     public Mono<ServerResponse> putBucketMetadataConfiguration(ServerRequest request) {
-        return findBucket(request, b -> request.bodyToMono(MetadataConfigurationCommand.class)
-            .flatMap(cmd -> {
-                var rules = cmd.rules().stream()
-                    .map(r -> new MetadataConfigEntry.MetadataConfigRule(
-                        r.id(), r.status(), r.metadataResourceType(), r.metadataResourceSubtype()))
+        return findBucket(request, bucket -> request.bodyToMono(MetadataConfigurationCommand.class)
+            .flatMap(command -> {
+                var rules = command.rules().stream()
+                    .map(rule -> new MetadataConfigEntry.MetadataConfigRule(
+                        rule.id(), rule.status(), rule.metadataResourceType(), rule.metadataResourceSubtype()))
                     .toList();
-                metadataConfigs.put(b.name(), new MetadataConfigEntry(rules));
+                metadataConfigs.put(bucket.name(), new MetadataConfigEntry(rules));
                 return ServerResponse.ok().build();
             })
             .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "InvalidRequest",
                 "Missing metadata configuration body")));
     }
 
-    /** DELETE /{bucket}?metadata-config — DeleteBucketMetadataConfiguration */
     public Mono<ServerResponse> deleteBucketMetadataConfiguration(ServerRequest request) {
-        return findBucket(request, b -> {
-            metadataConfigs.remove(b.name());
+        return findBucket(request, bucket -> {
+            metadataConfigs.remove(bucket.name());
             return ServerResponse.noContent().build();
         });
     }
@@ -1004,17 +956,16 @@ public class S3BucketConfigHandler {
     //  Metadata Table Configuration
     // ─────────────────────────────────────────────────────
 
-    /** GET /{bucket}?metadata-table-config — GetBucketMetadataTableConfiguration */
     public Mono<ServerResponse> getBucketMetadataTableConfiguration(ServerRequest request) {
-        return findBucket(request, b -> {
-            var entry = metadataTableConfigs.get(b.name());
+        return findBucket(request, bucket -> {
+            var entry = metadataTableConfigs.get(bucket.name());
             if (entry == null || entry.rules() == null || entry.rules().isEmpty()) {
                 return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchMetadataTableConfiguration",
                     "The metadata table configuration does not exist");
             }
             var rules = entry.rules().stream()
-                .map(r -> new MetadataTableConfigurationQuery.MetadataTableRuleEntry(
-                    r.id(), r.status(), r.metadataTableName(), r.metadataTableDatabase()))
+                .map(rule -> new MetadataTableConfigurationQuery.MetadataTableRuleEntry(
+                    rule.id(), rule.status(), rule.metadataTableName(), rule.metadataTableDatabase()))
                 .toList();
             return ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_XML)
@@ -1022,25 +973,23 @@ public class S3BucketConfigHandler {
         });
     }
 
-    /** PUT /{bucket}?metadata-table-config — PutBucketMetadataTableConfiguration */
     public Mono<ServerResponse> putBucketMetadataTableConfiguration(ServerRequest request) {
-        return findBucket(request, b -> request.bodyToMono(MetadataTableConfigurationCommand.class)
-            .flatMap(cmd -> {
-                var rules = cmd.rules().stream()
-                    .map(r -> new MetadataTableConfigEntry.MetadataTableConfigRule(
-                        r.id(), r.status(), r.metadataTableName(), r.metadataTableDatabase()))
+        return findBucket(request, bucket -> request.bodyToMono(MetadataTableConfigurationCommand.class)
+            .flatMap(command -> {
+                var rules = command.rules().stream()
+                    .map(rule -> new MetadataTableConfigEntry.MetadataTableConfigRule(
+                        rule.id(), rule.status(), rule.metadataTableName(), rule.metadataTableDatabase()))
                     .toList();
-                metadataTableConfigs.put(b.name(), new MetadataTableConfigEntry(rules));
+                metadataTableConfigs.put(bucket.name(), new MetadataTableConfigEntry(rules));
                 return ServerResponse.ok().build();
             })
             .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "InvalidRequest",
                 "Missing metadata table configuration body")));
     }
 
-    /** DELETE /{bucket}?metadata-table-config — DeleteBucketMetadataTableConfiguration */
     public Mono<ServerResponse> deleteBucketMetadataTableConfiguration(ServerRequest request) {
-        return findBucket(request, b -> {
-            metadataTableConfigs.remove(b.name());
+        return findBucket(request, bucket -> {
+            metadataTableConfigs.remove(bucket.name());
             return ServerResponse.noContent().build();
         });
     }
@@ -1049,10 +998,9 @@ public class S3BucketConfigHandler {
     //  Inventory Table Configuration
     // ─────────────────────────────────────────────────────
 
-    /** GET /{bucket}?inventory-table-config — GetBucketInventoryTableConfiguration */
     public Mono<ServerResponse> getBucketInventoryTableConfiguration(ServerRequest request) {
-        return findBucket(request, b -> {
-            var entry = inventoryTableConfigs.get(b.name());
+        return findBucket(request, bucket -> {
+            var entry = inventoryTableConfigs.get(bucket.name());
             if (entry == null) {
                 return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchInventoryTableConfiguration",
                     "The inventory table configuration does not exist");
@@ -1065,13 +1013,12 @@ public class S3BucketConfigHandler {
         });
     }
 
-    /** PUT /{bucket}?inventory-table-config — PutBucketInventoryTableConfiguration */
     public Mono<ServerResponse> putBucketInventoryTableConfiguration(ServerRequest request) {
-        return findBucket(request, b -> request.bodyToMono(InventoryTableConfigurationCommand.class)
-            .flatMap(cmd -> {
-                inventoryTableConfigs.put(b.name(), new InventoryTableConfigEntry(
-                    cmd.id(), cmd.destinationFormat(), cmd.scheduleFrequency(),
-                    "true".equals(cmd.enabled())));
+        return findBucket(request, bucket -> request.bodyToMono(InventoryTableConfigurationCommand.class)
+            .flatMap(command -> {
+                inventoryTableConfigs.put(bucket.name(), new InventoryTableConfigEntry(
+                    command.id(), command.destinationFormat(), command.scheduleFrequency(),
+                    "true".equals(command.enabled())));
                 return ServerResponse.ok().build();
             })
             .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "InvalidRequest",
@@ -1082,10 +1029,9 @@ public class S3BucketConfigHandler {
     //  Journal Table Configuration
     // ─────────────────────────────────────────────────────
 
-    /** GET /{bucket}?journal-table-config — GetBucketJournalTableConfiguration */
     public Mono<ServerResponse> getBucketJournalTableConfiguration(ServerRequest request) {
-        return findBucket(request, b -> {
-            var entry = journalTableConfigs.get(b.name());
+        return findBucket(request, bucket -> {
+            var entry = journalTableConfigs.get(bucket.name());
             if (entry == null) {
                 return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchJournalTableConfiguration",
                     "The journal table configuration does not exist");
@@ -1098,13 +1044,12 @@ public class S3BucketConfigHandler {
         });
     }
 
-    /** PUT /{bucket}?journal-table-config — PutBucketJournalTableConfiguration */
     public Mono<ServerResponse> putBucketJournalTableConfiguration(ServerRequest request) {
-        return findBucket(request, b -> request.bodyToMono(JournalTableConfigurationCommand.class)
-            .flatMap(cmd -> {
-                journalTableConfigs.put(b.name(), new JournalTableConfigEntry(
-                    cmd.id(), cmd.destinationFormat(), cmd.scheduleFrequency(),
-                    "true".equals(cmd.enabled())));
+        return findBucket(request, bucket -> request.bodyToMono(JournalTableConfigurationCommand.class)
+            .flatMap(command -> {
+                journalTableConfigs.put(bucket.name(), new JournalTableConfigEntry(
+                    command.id(), command.destinationFormat(), command.scheduleFrequency(),
+                    "true".equals(command.enabled())));
                 return ServerResponse.ok().build();
             })
             .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "InvalidRequest",

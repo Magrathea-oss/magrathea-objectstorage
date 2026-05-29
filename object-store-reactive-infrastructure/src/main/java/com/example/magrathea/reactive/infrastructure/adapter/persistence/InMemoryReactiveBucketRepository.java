@@ -2,7 +2,6 @@ package com.example.magrathea.reactive.infrastructure.adapter.persistence;
 
 import com.example.magrathea.objectstore.domain.aggregate.Bucket;
 import com.example.magrathea.objectstore.domain.valueobject.AbacConfiguration;
-import com.example.magrathea.objectstore.domain.valueobject.BucketConfig;
 import com.example.magrathea.objectstore.domain.valueobject.BucketMetadataConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.BucketMetadataTableConfiguration;
 import com.example.magrathea.objectstore.reactive.repository.application.BucketCommandRepository;
@@ -26,49 +25,46 @@ public class InMemoryReactiveBucketRepository implements BucketCommandRepository
 
     @Override
     public Mono<CommandResult<Bucket>> save(Bucket bucket) {
-        return Mono.fromCallable(() -> {
+        return Mono.defer(() -> {
             boolean exists = store.containsKey(bucket.id());
             Bucket clean = bucket.clearEvents();
             store.put(bucket.id(), clean);
             long version = versionCounter.getAndIncrement();
-            if (exists) {
-                return new CommandResult.Updated<>(clean, bucket.domainEvents(), version);
-            } else {
-                return new CommandResult.Created<>(clean, bucket.domainEvents(), version);
-            }
+            CommandResult<Bucket> result = exists
+                ? new CommandResult.Updated<>(clean, bucket.domainEvents(), version)
+                : new CommandResult.Created<>(clean, bucket.domainEvents(), version);
+            return Mono.just(result);
         });
     }
 
     @Override
     public Mono<CommandResult<Bucket>> delete(Bucket bucket) {
-        return Mono.fromCallable(() -> {
+        return Mono.defer(() -> {
             Bucket removed = store.remove(bucket.id());
             if (removed == null) {
-                throw new BucketNotFoundException(bucket.id());
+                return Mono.error(new BucketNotFoundException(bucket.name()));
             }
-            return new CommandResult.Deleted<>(removed, bucket.domainEvents(), versionCounter.getAndIncrement());
+            return Mono.just(new CommandResult.Deleted<>(removed, bucket.domainEvents(), versionCounter.getAndIncrement()));
         });
     }
 
     @Override
     public Mono<Bucket> findById(Bucket.Id bucketId) {
-        return Mono.fromCallable(() -> store.get(bucketId))
-                .flatMap(Mono::justOrEmpty);
+        return Mono.defer(() -> Mono.justOrEmpty(store.get(bucketId)));
     }
 
     @Override
     public Mono<Bucket> findByName(String bucketName) {
-        return Mono.fromCallable(() ->
+        return Mono.defer(() -> Mono.justOrEmpty(
             store.values().stream()
                 .filter(b -> b.name().equals(bucketName))
                 .findFirst()
-                .orElse(null)
-        ).flatMap(Mono::justOrEmpty);
+        ));
     }
 
     @Override
     public Flux<Bucket> findAll() {
-        return Flux.fromIterable(store.values());
+        return Flux.defer(() -> Flux.fromIterable(store.values()));
     }
 
     // ── Phase F config queries ──
@@ -109,39 +105,33 @@ public class InMemoryReactiveBucketRepository implements BucketCommandRepository
     public Mono<Void> saveAbacConfiguration(String bucketName, AbacConfiguration config) {
         return findByName(bucketName)
             .flatMap(b -> {
-                var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
-                var newConfig = baseConfig.withAbacConfiguration(config);
-                var updated = b.withBucketConfig(newConfig).clearEvents();
+                var updated = b.withAbacConfiguration(config).clearEvents();
                 store.put(updated.id(), updated);
                 return Mono.<Void>empty();
             })
-            .switchIfEmpty(Mono.<Void>error(new BucketNotFoundException(Bucket.Id.of(bucketName))));
+            .switchIfEmpty(Mono.<Void>error(new BucketNotFoundException(bucketName)));
     }
 
     @Override
     public Mono<Void> saveMetadataConfiguration(String bucketName, BucketMetadataConfiguration config) {
         return findByName(bucketName)
             .flatMap(b -> {
-                var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
-                var newConfig = baseConfig.withMetadataConfiguration(config);
-                var updated = b.withBucketConfig(newConfig).clearEvents();
+                var updated = b.withMetadataConfiguration(config).clearEvents();
                 store.put(updated.id(), updated);
                 return Mono.<Void>empty();
             })
-            .switchIfEmpty(Mono.<Void>error(new BucketNotFoundException(Bucket.Id.of(bucketName))));
+            .switchIfEmpty(Mono.<Void>error(new BucketNotFoundException(bucketName)));
     }
 
     @Override
     public Mono<Void> saveMetadataTableConfiguration(String bucketName, BucketMetadataTableConfiguration config) {
         return findByName(bucketName)
             .flatMap(b -> {
-                var baseConfig = b.bucketConfig() != null ? b.bucketConfig() : BucketConfig.EMPTY;
-                var newConfig = baseConfig.withMetadataTableConfiguration(config);
-                var updated = b.withBucketConfig(newConfig).clearEvents();
+                var updated = b.withMetadataTableConfiguration(config).clearEvents();
                 store.put(updated.id(), updated);
                 return Mono.<Void>empty();
             })
-            .switchIfEmpty(Mono.<Void>error(new BucketNotFoundException(Bucket.Id.of(bucketName))));
+            .switchIfEmpty(Mono.<Void>error(new BucketNotFoundException(bucketName)));
     }
 
     public void reset() {

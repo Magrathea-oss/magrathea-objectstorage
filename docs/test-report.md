@@ -1,6 +1,6 @@
 # Magrathea ObjectStorage Test Report
 
-Generated: 2026-05-27T00:45:34+02:00
+Generated: 2026-05-27T15:07:01+02:00
 
 ## Summary
 
@@ -48,10 +48,12 @@ Bucket: `magrathea-cli-test-1779835534-245973`
 | object-store-domain | com.example.magrathea.objectstore.domain.StorageClassTest.txt | 7 | 0 | 0 | 0 | ✅ Passed |
 | object-store-domain | com.example.magrathea.objectstore.domain.UploadIdTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
 | object-store-domain | com.example.magrathea.objectstore.domain.UploadPartTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
+| **Total domain** |  | **213** | **0** | **0** | **0** | **✅ Passed** |
 | object-store-reactive-application | com.example.magrathea.reactive.application.service.CucumberTest.txt | 18 | 0 | 0 | 0 | ✅ Passed |
-| s3-reactive-api-adapter | com.example.magrathea.s3api.cucumber.ObjectStorageCucumberTest.txt | 171 | 0 | 0 | 0 | ✅ Passed |
-| s3-reactive-api-adapter | com.example.magrathea.s3api.cucumber.ObjectStoreCucumberTest.txt | 216 | 0 | 0 | 0 | ✅ Passed |
-| **Total** |  | **554** | **0** | **0** | **0** | **✅ Passed** |
+| **Total application** |  | **18** | **0** | **0** | **0** | **✅ Passed** |
+| s3-reactive-api-adapter | com.example.magrathea.s3api.cucumber.ObjectStoreCucumberTest.txt | 227 | 0 | 0 | 0 | ✅ Passed |
+| **Total Cucumber** |  | **227** | **0** | **0** | **0** | **✅ Passed** |
+| **Total** |  | **458** | **0** | **0** | **0** | **✅ Passed** |
 
 ## Clover Coverage
 

@@ -75,7 +75,7 @@ Consolidated report: `docs/test-report.md` includes AWS CLI outcomes, Surefire/J
 
 Workflow rule: every development phase includes an **AWS CLI test sub-phase** after `mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false` Cucumber coverage passes and before the phase is marked complete, whenever AWS CLI exposes the implemented operation(s).
 
-Latest Phase F verification: `mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false` => 216 tests, 0 failures, 0 errors.
+Latest verification: `mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false` => 227 tests, 0 failures, 0 errors. Domain: 213 tests. Application: 18 tests. Total: **458 tests**, 0 failures.
 
 ## Coverage Tooling
 
@@ -95,336 +95,11 @@ target/site/clover/
 
 AWS CLI compatibility tests are not run by the default `mvn test` because they require an external process (the boot application) and AWS CLI. They are available via `test-aws-cli.sh` and Maven profile `aws-cli-tests`.
 
-## S3 API Operations — Coverage and Inclusion Plan
-
-Source: https://docs.aws.amazon.com/AmazonS3/latest/API/API_Operations.md
-
-Scope: **Amazon S3 actions only**. Amazon S3 Control actions are intentionally out of scope for the object-store S3 REST API module.
-
-### Current Implemented Operations (111/111)
-
-All Amazon S3 actions in the project scope are implemented. Phase F advanced/specialized operations are tracked by [ADR 0012](docs/adr/0012-phase-f-advanced-s3-operations.md) and are Cucumber-tested.
-
-| Operation | Endpoint | Test coverage |
-|---|---|---|
-| ListBuckets | `GET /` | Cucumber + AWS CLI |
-| CreateBucket | `PUT /{bucket}` | Cucumber + AWS CLI |
-| HeadBucket | `HEAD /{bucket}` | Cucumber + AWS CLI |
-| DeleteBucket | `DELETE /{bucket}` | Cucumber + AWS CLI |
-| ListObjects | `GET /{bucket}` | Cucumber + AWS CLI |
-| PutObject | `PUT /{bucket}/{key}` | Cucumber + AWS CLI |
-| GetObject | `GET /{bucket}/{key}` | Cucumber + AWS CLI |
-| HeadObject | `HEAD /{bucket}/{key}` | Cucumber + AWS CLI |
-| DeleteObject | `DELETE /{bucket}/{key}` | Cucumber + AWS CLI |
-| ListObjectsV2 | `GET /{bucket}?list-type=2` | Cucumber + AWS CLI |
-| CopyObject | `PUT /{bucket}/{key}` with `x-amz-copy-source` | Cucumber + AWS CLI |
-| DeleteObjects | `POST /{bucket}?delete` | Cucumber + AWS CLI |
-| GetBucketLocation | `GET /{bucket}?location` | Cucumber + AWS CLI |
-| GetBucketVersioning | `GET /{bucket}?versioning` | Cucumber + AWS CLI |
-| PutBucketVersioning | `PUT /{bucket}?versioning` | Cucumber + AWS CLI |
-| ListObjectVersions | `GET /{bucket}?versions` | Cucumber + AWS CLI |
-| GetObjectAcl | `GET /{bucket}/{key}?acl` | Cucumber + AWS CLI |
-| PutObjectAcl | `PUT /{bucket}/{key}?acl` | Cucumber + AWS CLI |
-| GetObjectTagging | `GET /{bucket}/{key}?tagging` | Cucumber + AWS CLI |
-| PutObjectTagging | `PUT /{bucket}/{key}?tagging` | Cucumber + AWS CLI |
-| DeleteObjectTagging | `DELETE /{bucket}/{key}?tagging` | Cucumber + AWS CLI |
-| GetObjectAttributes | `GET /{bucket}/{key}?attributes` | Cucumber + AWS CLI |
-| GetBucketAcl | `GET /{bucket}?acl` | Cucumber + AWS CLI |
-| PutBucketAcl | `PUT /{bucket}?acl` | Cucumber + AWS CLI |
-| GetBucketTagging | `GET /{bucket}?tagging` | Cucumber + AWS CLI |
-| PutBucketTagging | `PUT /{bucket}?tagging` | Cucumber + AWS CLI |
-| DeleteBucketTagging | `DELETE /{bucket}?tagging` | Cucumber + AWS CLI |
-| GetBucketCors | `GET /{bucket}?cors` | Cucumber + AWS CLI |
-| PutBucketCors | `PUT /{bucket}?cors` | Cucumber + AWS CLI |
-| DeleteBucketCors | `DELETE /{bucket}?cors` | Cucumber + AWS CLI |
-| GetBucketLifecycleConfiguration | `GET /{bucket}?lifecycle` | Cucumber + AWS CLI |
-| PutBucketLifecycleConfiguration | `PUT /{bucket}?lifecycle` | Cucumber + AWS CLI |
-| DeleteBucketLifecycleConfiguration | `DELETE /{bucket}?lifecycle` | Cucumber + AWS CLI |
-| GetBucketPolicy | `GET /{bucket}?policy` | Cucumber + AWS CLI |
-| PutBucketPolicy | `PUT /{bucket}?policy` | Cucumber + AWS CLI |
-| DeleteBucketPolicy | `DELETE /{bucket}?policy` | Cucumber + AWS CLI |
-| GetBucketEncryption | `GET /{bucket}?encryption` | Cucumber + AWS CLI |
-| PutBucketEncryption | `PUT /{bucket}?encryption` | Cucumber + AWS CLI |
-| DeleteBucketEncryption | `DELETE /{bucket}?encryption` | Cucumber + AWS CLI |
-| GetBucketLogging | `GET /{bucket}?logging` | Cucumber + AWS CLI |
-| PutBucketLogging | `PUT /{bucket}?logging` | Cucumber + AWS CLI |
-| DeleteBucketLogging | `DELETE /{bucket}?logging` | Cucumber + AWS CLI |
-| GetBucketWebsite | `GET /{bucket}?website` | Cucumber + AWS CLI |
-| PutBucketWebsite | `PUT /{bucket}?website` | Cucumber + AWS CLI |
-| DeleteBucketWebsite | `DELETE /{bucket}?website` | Cucumber + AWS CLI |
-| GetBucketNotification | `GET /{bucket}?notification` | Cucumber + AWS CLI |
-| PutBucketNotification | `PUT /{bucket}?notification` | Cucumber + AWS CLI |
-| DeleteBucketNotification | `DELETE /{bucket}?notification` | Cucumber + AWS CLI |
-| GetBucketReplication | `GET /{bucket}?replication` | Cucumber + AWS CLI |
-| PutBucketReplication | `PUT /{bucket}?replication` | Cucumber + AWS CLI |
-| DeleteBucketReplication | `DELETE /{bucket}?replication` | Cucumber + AWS CLI |
-| GetBucketRequestPayment | `GET /{bucket}?requestPayment` | Cucumber + AWS CLI |
-| PutBucketRequestPayment | `PUT /{bucket}?requestPayment` | Cucumber + AWS CLI |
-| DeleteBucketRequestPayment | `DELETE /{bucket}?requestPayment` | Cucumber + AWS CLI |
-| GetBucketOwnershipControls | `GET /{bucket}?ownershipControls` | Cucumber + AWS CLI |
-| PutBucketOwnershipControls | `PUT /{bucket}?ownershipControls` | Cucumber + AWS CLI |
-| DeleteBucketOwnershipControls | `DELETE /{bucket}?ownershipControls` | Cucumber + AWS CLI |
-| GetPublicAccessBlock | `GET /{bucket}?publicAccessBlock` | Cucumber + AWS CLI |
-| PutPublicAccessBlock | `PUT /{bucket}?publicAccessBlock` | Cucumber + AWS CLI |
-| DeletePublicAccessBlock | `DELETE /{bucket}?publicAccessBlock` | Cucumber + AWS CLI |
-| GetBucketAccelerateConfiguration | `GET /{bucket}?accelerate` | Cucumber + AWS CLI |
-| PutBucketAccelerateConfiguration | `PUT /{bucket}?accelerate` | Cucumber + AWS CLI |
-| DeleteBucketAccelerateConfiguration | `DELETE /{bucket}?accelerate` | Cucumber + AWS CLI |
-| CreateMultipartUpload | `POST /{bucket}/{key}?uploads` | Cucumber |
-| UploadPart | `PUT /{bucket}/{key}?uploadId=...&partNumber=...` | Cucumber |
-| UploadPartCopy | `PUT /{bucket}/{key}?uploadId=...&partNumber=...` + `x-amz-copy-source` | RouterFunction |
-| CompleteMultipartUpload | `POST /{bucket}/{key}?uploadId=...` | Cucumber |
-| AbortMultipartUpload | `DELETE /{bucket}/{key}?uploadId=...` | Cucumber |
-| ListMultipartUploads | `GET /{bucket}?uploads` | Cucumber |
-| ListParts | `GET /{bucket}/{key}?uploadId=...` | Cucumber |
-| GetBucketAnalyticsConfiguration | `GET /{bucket}?analytics&analyticsId={id}` | Cucumber |
-| PutBucketAnalyticsConfiguration | `PUT /{bucket}?analytics&analyticsId={id}` | Cucumber |
-| DeleteBucketAnalyticsConfiguration | `DELETE /{bucket}?analytics&analyticsId={id}` | Cucumber |
-| ListBucketAnalyticsConfigurations | `GET /{bucket}?analytics&list-type` | Cucumber |
-| GetBucketInventoryConfiguration | `GET /{bucket}?inventory&inventoryId={id}` | Cucumber |
-| PutBucketInventoryConfiguration | `PUT /{bucket}?inventory&inventoryId={id}` | Cucumber |
-| DeleteBucketInventoryConfiguration | `DELETE /{bucket}?inventory&inventoryId={id}` | Cucumber |
-| ListBucketInventoryConfigurations | `GET /{bucket}?inventory&list-type` | Cucumber |
-| GetBucketMetricsConfiguration | `GET /{bucket}?metrics` | Cucumber |
-| PutBucketMetricsConfiguration | `PUT /{bucket}?metrics` | Cucumber |
-| DeleteBucketMetricsConfiguration | `DELETE /{bucket}?metrics` | Cucumber |
-| GetBucketIntelligentTieringConfiguration | `GET /{bucket}?intelligent-tiering` | Cucumber |
-| PutBucketIntelligentTieringConfiguration | `PUT /{bucket}?intelligent-tiering` | Cucumber |
-| DeleteBucketIntelligentTieringConfiguration | `DELETE /{bucket}?intelligent-tiering` | Cucumber |
-| CreateSession | `POST /{bucket}?session` | Cucumber (Phase F, ADR 0012) |
-| ListDirectoryBuckets | `GET /?directory-buckets` | Cucumber (Phase F, ADR 0012) |
-| GetBucketAbac | `GET /{bucket}?abac` | Cucumber (Phase F, ADR 0012) |
-| PutBucketAbac | `PUT /{bucket}?abac` | Cucumber (Phase F, ADR 0012) |
-| GetObjectLegalHold | `GET /{bucket}/{key}?legal-hold` | Cucumber (Phase F, ADR 0012) |
-| PutObjectLegalHold | `PUT /{bucket}/{key}?legal-hold` | Cucumber (Phase F, ADR 0012) |
-| GetObjectLockConfiguration | `GET /{bucket}?object-lock` | Cucumber (Phase F, ADR 0012) |
-| PutObjectLockConfiguration | `PUT /{bucket}?object-lock` | Cucumber (Phase F, ADR 0012) |
-| GetObjectRetention | `GET /{bucket}/{key}?retention` | Cucumber (Phase F, ADR 0012) |
-| PutObjectRetention | `PUT /{bucket}/{key}?retention` | Cucumber (Phase F, ADR 0012) |
-| GetObjectTorrent | `GET /{bucket}/{key}?torrent` | Cucumber (Phase F, ADR 0012) |
-| RestoreObject | `POST /{bucket}/{key}?restore` | Cucumber (Phase F, ADR 0012) |
-| SelectObjectContent | `POST /{bucket}/{key}?select` | Cucumber (Phase F, ADR 0012) |
-| RenameObject | `PUT /{bucket}/{key}?rename` | Cucumber (Phase F, ADR 0012) |
-| UpdateObjectEncryption | `PUT /{bucket}/{key}?encryption` | Cucumber (Phase F, ADR 0012) |
-| WriteGetObjectResponse | `PUT /{bucket}/{key}?x-id=WriteGetObjectResponse` | Cucumber (Phase F, ADR 0012) |
-| CreateBucketMetadataConfiguration | `PUT /{bucket}?metadata-config` | Cucumber (Phase F, ADR 0012) |
-| DeleteBucketMetadataConfiguration | `DELETE /{bucket}?metadata-config` | Cucumber (Phase F, ADR 0012) |
-| GetBucketMetadataConfiguration | `GET /{bucket}?metadata-config` | Cucumber (Phase F, ADR 0012) |
-| CreateBucketMetadataTableConfiguration | `PUT /{bucket}?metadata-table-config` | Cucumber (Phase F, ADR 0012) |
-| DeleteBucketMetadataTableConfiguration | `DELETE /{bucket}?metadata-table-config` | Cucumber (Phase F, ADR 0012) |
-| GetBucketMetadataTableConfiguration | `GET /{bucket}?metadata-table-config` | Cucumber (Phase F, ADR 0012) |
-| UpdateBucketMetadataInventoryTableConfiguration | `PUT /{bucket}?inventory-table-config` | Cucumber (Phase F, ADR 0012) |
-| UpdateBucketMetadataJournalTableConfiguration | `PUT /{bucket}?journal-table-config` | Cucumber (Phase F, ADR 0012) |
-
-### Phase A — CLI-Baseline Compatibility (completed)
-
-Goal: support common AWS CLI object workflows beyond current CRUD.
-
-| Operation | Status |
-|---|---|
-| ListObjectsV2 | Implemented |
-| CopyObject | Implemented |
-| DeleteObjects | Implemented |
-| GetBucketLocation | Implemented |
-| GetBucketVersioning | Implemented |
-| PutBucketVersioning | Implemented |
-| ListObjectVersions | Implemented |
-
-### Phase B — Object Metadata, Tagging, and ACL Compatibility (completed)
-
-| Operation | Status |
-|---|---|
-| GetObjectAcl | Implemented |
-| PutObjectAcl | Implemented |
-| GetObjectTagging | Implemented |
-| PutObjectTagging | Implemented |
-| DeleteObjectTagging | Implemented |
-| GetObjectAttributes | Implemented |
-| GetBucketAcl | Implemented |
-| PutBucketAcl | Implemented |
-| GetBucketTagging | Implemented |
-| PutBucketTagging | Implemented |
-| DeleteBucketTagging | Implemented |
-
-### Phase C — Multipart Upload (implemented)
-
-| Operation | Endpoint | Test coverage |
-|---|---|---|
-| CreateMultipartUpload | POST /{bucket}/{key}?uploads | Cucumber |
-| UploadPart | PUT /{bucket}/{key}?uploadId=...&partNumber=... | Cucumber |
-| UploadPartCopy | PUT /{bucket}/{key}?uploadId=...&partNumber=... + x-amz-copy-source | Implemented, no test |
-| CompleteMultipartUpload | POST /{bucket}/{key}?uploadId=... | Cucumber |
-| AbortMultipartUpload | DELETE /{bucket}/{key}?uploadId=... | Cucumber |
-| ListMultipartUploads | GET /{bucket}?uploads | Cucumber |
-| ListParts | GET /{bucket}/{key}?uploadId=... | Cucumber |
-
-### Phase D — Bucket Configuration APIs (completed)
-
-| Area | Operations |
-|---|---|
-| CORS | GetBucketCors ✅, PutBucketCors ✅, DeleteBucketCors ✅ |
-| Lifecycle | GetBucketLifecycle ✅, PutBucketLifecycle ✅, DeleteBucketLifecycle ✅ |
-| Policy | GetBucketPolicy ✅, PutBucketPolicy ✅, DeleteBucketPolicy ✅, GetBucketPolicyStatus ⬜ |
-| Encryption | GetBucketEncryption ✅, PutBucketEncryption ✅, DeleteBucketEncryption ✅ |
-| Logging | GetBucketLogging ✅, PutBucketLogging ✅, DeleteBucketLogging ✅ |
-| Website | GetBucketWebsite ✅, PutBucketWebsite ✅, DeleteBucketWebsite ✅ |
-| Notification | GetBucketNotification ✅, PutBucketNotification ✅, DeleteBucketNotification ✅ |
-| Replication | GetBucketReplication ✅, PutBucketReplication ✅, DeleteBucketReplication ✅ |
-| Request Payment | GetBucketRequestPayment ✅, PutBucketRequestPayment ✅, DeleteBucketRequestPayment ✅ |
-| Ownership Controls | GetBucketOwnershipControls ✅, PutBucketOwnershipControls ✅, DeleteBucketOwnershipControls ✅ |
-| Public Access Block | GetPublicAccessBlock ✅, PutPublicAccessBlock ✅, DeletePublicAccessBlock ✅ |
-| Accelerate | GetBucketAccelerateConfiguration ✅, PutBucketAccelerateConfiguration ✅, DeleteBucketAccelerateConfiguration ✅ |
-
-### Phase E — Analytics, Inventory, Metrics, Intelligent-Tiering (implemented)
-
-| Area | Operations | Status |
-|---|---|---|
-| Analytics | GetBucketAnalyticsConfiguration, PutBucketAnalyticsConfiguration, DeleteBucketAnalyticsConfiguration, ListBucketAnalyticsConfigurations | ✅ Implemented, Cucumber tested |
-| Inventory | GetBucketInventoryConfiguration, PutBucketInventoryConfiguration, DeleteBucketInventoryConfiguration, ListBucketInventoryConfigurations | ✅ Implemented, Cucumber tested |
-| Metrics | GetBucketMetricsConfiguration, PutBucketMetricsConfiguration, DeleteBucketMetricsConfiguration | ✅ Implemented, Cucumber tested |
-| Intelligent-Tiering | GetBucketIntelligentTieringConfiguration, PutBucketIntelligentTieringConfiguration, DeleteBucketIntelligentTieringConfiguration | ✅ Implemented, Cucumber tested |
-
-### Course Correction — ADR 0010
-
-ADR 0010 (2026-05-24) identified quality and completeness issues in the ADR 0009 reactive migration implementation. A full course correction is required before Phase E can be closed and before Phase F work begins.
-
-#### Derailments Identified
-
-| # | Derailment | Description |
-|---|---|---|
-| 1 | **Stub methods** | `InMemoryReactiveBucketRepository.saveConfiguration`/`deleteConfiguration` are empty stubs; other repository methods are simplistic |
-| 2 | **Aggregate root integrity** | Objects inside aggregate roots (`Bucket`, `S3Object`, `MultipartUpload`) are independent — state transitions don't pass through the main aggregate root, domain events are not notified/tracked |
-| 3 | **Reactive repository interfaces too simplistic** | Interfaces don't leverage backpressure, error handling, operator fusion, etc. |
-| 4 | **C4 diagrams not aligned** | C4 diagrams not updated to reflect current architecture state |
-| 5 | **ARC42 not aligned** | ARC42 likely out of date with current implementation |
-
-#### Corrective Actions
-
-| # | Action | Owner |
-|---|---|---|
-| 1 | All repository implementations must have real (non-stub) method bodies with proper in-memory storage and reactive patterns | java-infra-coder |
-| 2 | Aggregate roots must enforce state transitions through the main aggregate object with domain event notification | java-domain-coder |
-| 3 | Redesign reactive repository interfaces to fully leverage reactive capabilities (`Flux`/`Mono` operators, backpressure, error handling) | java-infra-coder |
-| 4 | Update C4 diagrams to reflect actual current architecture | documenter / c4model |
-| 5 | Update ARC42 to align with current state | documenter |
-| 6 | Write sophisticated tests matching real behavior | java-tester |
-
-#### Impact on Timeline
-
-- All ADR 0009 implementation code from Steps 3-5-6 needs review and rework.
-- Phase E closure was blocked until corrective actions completed.
-- Phase F proceeded after the reactive module alignment was available and is now implemented under ADR 0012.
-- Timeline impact was significant rework of the reactive migration.
-
-### Phase F — Advanced / Specialized Operations (ADR 0012)
-
-ADR: [`docs/adr/0012-phase-f-advanced-s3-operations.md`](docs/adr/0012-phase-f-advanced-s3-operations.md)
-
-Phase F implements the remaining advanced and specialized S3 API operations. All five ADR 0012 batches are implemented and Cucumber-tested.
-
-#### Batch 1 — Simple, existing patterns
-
-| Operation | Handler | New Domain Types | Status |
-|---|---|---|---|
-| RenameObject | S3ObjectOperationsHandler | None | ✅ Implemented, Cucumber-tested |
-| UpdateObjectEncryption | S3ObjectMetadataHandler | None | ✅ Implemented, Cucumber-tested |
-| GetObjectTorrent | S3ObjectOperationsHandler | None | ✅ Implemented, Cucumber-tested |
-| RestoreObject | S3ObjectOperationsHandler | None | ✅ Implemented, Cucumber-tested |
-
-#### Batch 2 — Configuration-like
-
-| Operation | Handler | New Domain Types | Status |
-|---|---|---|---|
-| CreateSession | S3SessionHandler | None | ✅ Implemented, Cucumber-tested |
-| ListDirectoryBuckets | S3BucketOperationsHandler | None | ✅ Implemented, Cucumber-tested |
-| GetBucketAbac | S3BucketConfigHandler | None | ✅ Implemented, Cucumber-tested |
-| PutBucketAbac | S3BucketConfigHandler | None | ✅ Implemented, Cucumber-tested |
-
-#### Batch 3 — Legal/Lock/Retention
-
-| Operation | Handler | New Domain Types | Status |
-|---|---|---|---|
-| GetObjectLegalHold | S3ObjectMetadataHandler | LegalHold | ✅ Implemented, Cucumber-tested |
-| PutObjectLegalHold | S3ObjectMetadataHandler | LegalHold | ✅ Implemented, Cucumber-tested |
-| GetObjectLockConfiguration | S3BucketConfigHandler | ObjectLockConfiguration | ✅ Implemented, Cucumber-tested |
-| PutObjectLockConfiguration | S3BucketConfigHandler | ObjectLockConfiguration | ✅ Implemented, Cucumber-tested |
-| GetObjectRetention | S3ObjectMetadataHandler | RetentionPeriod | ✅ Implemented, Cucumber-tested |
-| PutObjectRetention | S3ObjectMetadataHandler | RetentionPeriod | ✅ Implemented, Cucumber-tested |
-
-#### Batch 4 — Complex request/response
-
-| Operation | Handler | New Domain Types | Status |
-|---|---|---|---|
-| SelectObjectContent | S3ObjectOperationsHandler | None | ✅ Implemented, Cucumber-tested |
-| WriteGetObjectResponse | S3ObjectOperationsHandler | None | ✅ Implemented, Cucumber-tested |
-
-#### Batch 5 — Bucket metadata configurations
-
-| Operation | Handler | New Domain Types | Status |
-|---|---|---|---|
-| CreateBucketMetadataConfiguration | S3BucketConfigHandler | BucketMetadataConfiguration | ✅ Implemented, Cucumber-tested |
-| DeleteBucketMetadataConfiguration | S3BucketConfigHandler | BucketMetadataConfiguration | ✅ Implemented, Cucumber-tested |
-| GetBucketMetadataConfiguration | S3BucketConfigHandler | BucketMetadataConfiguration | ✅ Implemented, Cucumber-tested |
-| CreateBucketMetadataTableConfiguration | S3BucketConfigHandler | BucketMetadataTableConfiguration | ✅ Implemented, Cucumber-tested |
-| DeleteBucketMetadataTableConfiguration | S3BucketConfigHandler | BucketMetadataTableConfiguration | ✅ Implemented, Cucumber-tested |
-| GetBucketMetadataTableConfiguration | S3BucketConfigHandler | BucketMetadataTableConfiguration | ✅ Implemented, Cucumber-tested |
-| UpdateBucketMetadataInventoryTableConfiguration | S3BucketConfigHandler | BucketMetadataTableConfiguration | ✅ Implemented, Cucumber-tested |
-| UpdateBucketMetadataJournalTableConfiguration | S3BucketConfigHandler | BucketMetadataTableConfiguration | ✅ Implemented, Cucumber-tested |
-
-#### Phase F Implementation Notes
-
-- **Status**: ✅ Completed under ADR 0012; all five batches are implemented and Cucumber-tested.
-- **Verification**: `mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false` => 216 tests, 0 failures, 0 errors.
-- **Handler organization**: session creation uses `S3SessionHandler`; most advanced object operations use `S3ObjectOperationsHandler` and `S3ObjectMetadataHandler`; bucket metadata configuration operations use `S3BucketConfigHandler`.
-- **Storage-engine note**: Batch 5 is available through S3-compatible in-memory configuration handling; deeper storage-engine integration remains future architecture work.
-- **AWS CLI tests**: AWS CLI coverage remains limited to operations exposed by `aws s3api`; Phase F completion is verified by Cucumber.
-
-### Course Correction — ADR 0013
-
-ADR: [`docs/adr/0013-course-correction-phase-f-domain-application-ownership-and-aws-cli-verification-gate.md`](docs/adr/0013-course-correction-phase-f-domain-application-ownership-and-aws-cli-verification-gate.md)
-
-Phase F API surface is implemented and Cucumber-green, but architectural completion is blocked until ADR 0013 is addressed. The correction moves Phase F business semantics out of web handlers and into domain, application, and infrastructure ownership, while also verifying or fixing the AWS CLI Maven gate.
-
-#### Correction Work Plan
-
-| # | Work item | Owner | Required action / gate | Status |
-|---|---|---|---|---|
-| 1 | AWS CLI Maven gate verification/fix | java-tester | Run/fix `mvn -N verify -Paws-cli-tests`. | ✅ Completed |
-| 2 | Domain model for Phase F semantics | java-domain-coder | Model LegalHold, ObjectLock, Retention, Restore, Select, Object Lambda response, and Bucket Metadata config/table concepts. | ✅ Completed |
-| 3 | Application service/use-case layer | java-infra-coder | Add services/use cases and repository ports so handlers stop owning business state. | ✅ Completed |
-| 4 | Infrastructure repositories/state stores | java-infra-coder | Move handler-local `ConcurrentHashMap` state into infrastructure adapters. | ✅ Completed |
-| 5 | Handler refactor | java-infra-coder | Make handlers HTTP/XML adapters that call application services. | ✅ Completed |
-| 6 | Tests | java-tester | Keep Cucumber green, add AWS CLI coverage for exposed operations, and add domain/application tests. | ✅ Completed |
-| 7 | Documentation finalization | documenter/c4model | Update ARC42, C4, and API coverage documentation after rework. | ✅ Completed |
-
-#### Acceptance Criteria
-
-- `mvn test` passes. ✅
-- `mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false` passes. ✅
-- `mvn -N verify -Paws-cli-tests` either passes or fails only due to missing external AWS CLI/app environment with a documented actionable reason. ✅
-- `grep` shows no Phase F business state maps in web handlers except pure adapter caches if justified. ✅ (partial — see note below)
-- Phase F use cases are reachable through application services. ✅
-
-#### Implementation Notes
-
-**Partial handler refactor**: ABAC, object lock configuration, metadata configuration, metadata table configuration, inventory table configuration, and journal table configuration remain as handler-local maps in `S3BucketConfigHandler`. This is due to a domain model mismatch — these configurations operate at bucket level and would require a more comprehensive domain model for bucket-level semantics. Noted as a future improvement.
-
-**Verification**:
-- `mvn test` passes
-- `mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false` → 216 tests, 0 failures, 0 errors
-- `mvn -N verify -Paws-cli-tests` verified with wait-for-ready loop fix
-- AWS CLI gate `pom.xml` profile fixed
-- Domain value objects created for all Phase F concepts
-- Application services extended
-- Infrastructure repositories extended
-- Handlers refactored to delegate to services (partial for bucket config)
-
 ## Current API Coverage Analysis
 
-See [`docs/api-coverage.md`](docs/api-coverage.md) for detailed request/response coverage, and the Phase F section above for the ADR 0012 advanced/specialized operation closure. The implemented operation count is now **111/111**.
+See [`docs/api-coverage.md`](docs/api-coverage.md) for detailed request/response coverage. The implemented operation count is now **111/111**.
 
 The coverage documentation tracks:
-
 - request header coverage
 - query parameter coverage
 - request and response body coverage
@@ -489,496 +164,387 @@ bash test-aws-cli.sh
 mvn -N verify -Paws-cli-tests
 ```
 
-## Phase E Completion — Remaining Work
-
-Phase E implemented Analytics, Inventory, Metrics, and Intelligent-Tiering configuration operations (14 operations) in `S3BucketConfigHandler` with Cucumber tests passing. The Phase E closure list now has the following status: items 4, 5, and 7 are complete; item 3 remains the separate AWS CLI Maven-profile verification gate. Item 6 (Reactive End-to-End Migration per ADR 0009) has been started but requires rework per ADR 0010 course correction — see the Course Correction section above and the Post-ADR 0010 Status section below.
-
-### Post-ADR 0010 Status — Course Correction Required
-
-ADR 0009 is now **Accepted** (2026-05-24) but its implementation produced incomplete code with stub methods, missing aggregate root state transitions, and overly simplistic reactive patterns. ADR 0010 (2026-05-24) prescribes corrective actions (see Course Correction section above). Item 6 (Reactive End-to-End Migration) is **REWORK NEEDED** per ADR 0010.
-
-Remaining Phase E closure items:
-
-| Item | Status | Gate / verification commands |
-|---|---|---|
-| 3. Verify `mvn verify -Paws-cli-tests` after Phase E additions | Pending | Start the app with `java -jar bootstrap-application/target/bootstrap-application-1.0.0-SNAPSHOT.jar`, then run `mvn -N verify -Paws-cli-tests`. |
-| 4. New workflow rule: AWS CLI test sub-phase after Cucumber | ✅ Completed | `grep -n "AWS CLI test sub-phase" PLAN.md` |
-| 5. `api-coverage.md` complete review — headers, params, status codes | ✅ Completed | `grep -n "Status Code" docs/api-coverage.md`; manual review that operations 1–111 include required headers, params, bodies, and status codes. |
-| 6. Reactive end-to-end migration (ADR 0009 → ADR 0010) — native `Mono`/`Flux` reactive modules with CQRS | ⚠️ REWORK NEEDED | ADR 0010 course correction (2026-05-24) — see Course Correction section above |
-| 7. Status code documentation for all 111 operations | ✅ Completed | `grep -n "Status Code" docs/api-coverage.md`; manual review that every operation section contains a status-code table. |
-
-### 1. Dead Code Removal ✅ Completed — `S3BucketConfigListHandler.java`
-
-**Resolution:** File `s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/adapter/web/S3BucketConfigListHandler.java` deleted. Verified via `grep -r "S3BucketConfigListHandler" s3-reactive-api-adapter/src/ --include="*.java"` — no references remain. Class was entirely unused.
-
-### 2. AWS CLI Tests for Phase E ✅ Already Implemented
-
-
-**AWS CLI exposure mapping for Phase E:**
-
-| Operation | `aws s3api` command | Current CLI test | Required |
-|---|---|---|---|
-| GetBucketAnalyticsConfiguration | `get-bucket-analytics-configuration` | ✅ Already done | ✅ Already done |
-| PutBucketAnalyticsConfiguration | `put-bucket-analytics-configuration` | ✅ Already done | ✅ Already done |
-| DeleteBucketAnalyticsConfiguration | `delete-bucket-analytics-configuration` | ✅ Already done | ✅ Already done |
-| ListBucketAnalyticsConfigurations | `list-bucket-analytics-configurations` | ✅ Already done | ✅ Already done |
-| GetBucketInventoryConfiguration | `get-bucket-inventory-configuration` | ✅ Already done | ✅ Already done |
-| PutBucketInventoryConfiguration | `put-bucket-inventory-configuration` | ✅ Already done | ✅ Already done |
-| DeleteBucketInventoryConfiguration | `delete-bucket-inventory-configuration` | ✅ Already done | ✅ Already done |
-| ListBucketInventoryConfigurations | `list-bucket-inventory-configurations` | ✅ Already done | ✅ Already done |
-
-**Required additions to `test-aws-cli.sh`:**
-
-| # | CLI command | Success variant | Failure variant |
-|---|---|---|---|
-| 1 | `aws s3api get-bucket-analytics-configuration --bucket $BUCKET_1 --id $ANALYTICS_ID` | ✅ Completed | ✅ Completed (NoSuchBucket, invalid id) |
-| 2 | `aws s3api put-bucket-analytics-configuration --bucket $BUCKET_1 --id $ANALYTICS_ID --analytics-configuration ...` | ✅ Completed | ✅ Completed (NoSuchBucket, invalid JSON) |
-| 3 | `aws s3api delete-bucket-analytics-configuration --bucket $BUCKET_1 --id $ANALYTICS_ID` | ✅ Completed | ✅ Completed (NoSuchBucket, missing id) |
-| 4 | `aws s3api list-bucket-analytics-configurations --bucket $BUCKET_1` | ✅ Completed | ✅ Completed (NoSuchBucket) |
-| 5 | `aws s3api get-bucket-inventory-configuration --bucket $BUCKET_1 --id $INVENTORY_ID` | ✅ Completed | ✅ Completed (NoSuchBucket, invalid id) |
-| 6 | `aws s3api put-bucket-inventory-configuration --bucket $BUCKET_1 --id $INVENTORY_ID --inventory-configuration ...` | ✅ Completed | ✅ Completed (NoSuchBucket, invalid JSON) |
-| 7 | `aws s3api delete-bucket-inventory-configuration --bucket $BUCKET_1 --id $INVENTORY_ID` | ✅ Completed | ✅ Completed (NoSuchBucket, missing id) |
-| 8 | `aws s3api list-bucket-inventory-configurations --bucket $BUCKET_1` | ✅ Completed | ✅ Completed (NoSuchBucket) |
-
-**Total: 16 test variants** (8 success + 8 failure).
-
-**Note:** Metrics (`get-bucket-metrics-configuration`, `put-bucket-metrics-configuration`, `delete-bucket-metrics-configuration`) and Intelligent-Tiering (`get-bucket-intelligent-tiering-configuration`, `put-bucket-intelligent-tiering-configuration`, `delete-bucket-intelligent-tiering-configuration`) are **not** available via `aws s3api`. These operations must be tested through Cucumber only (already done).
-
 ---
 
-### 3. Verify `mvn verify -Paws-cli-tests` After Phase E Additions
+## Phase 1 — Unified Handler Refactoring: Domain Purity & Reactive Correctness
 
-**Problem:** The AWS CLI Maven profile `aws-cli-tests` has not been re-run after Phase E additions. The profile requires the application running on `localhost:8080` and `aws` CLI installed.
+### Objective
 
-**Required verification command:**
+Refactor `S3ObjectOperationsHandler`, `S3ObjectMetadataHandler`, and `S3MultipartHandler` to eliminate architectural violations in the object domain:
 
-```bash
-# Terminal 1: Start application
-java -jar bootstrap-application/target/bootstrap-application-1.0.0-SNAPSHOT.jar
+1. **S3Object state machine**: Replace random `with*` methods (`withEtag`, `withStorageClass`, `withContent`, `withLegalHold`, `withObjectLockConfiguration`, `withRetentionPeriod`, `withRestore`, `withSseHeaders`, `withEncryption`, `withKey`, `withDeleted`) with a proper workflow/state machine on `S3Object`. Each transition is a meaningful method that checks preconditions and produces domain events.
+2. **Domain purity**: No HTTP concepts in the domain layer. Remove `SseHeaders` from domain — SSE is an HTTP protocol concern. Replace with `EncryptionConfiguration` (algorithm + key reference + optional encryption context), a pure domain value object meaningful in the storage domain.
+3. **ETag**: ETag is computed by the repository when content is stored. The handler reads it from the service response and echoes as HTTP header. No handler-level ETag computation.
+4. **Checksums**: `ChecksumValue` stays in domain as a value object (algorithm + hash). The handler extracts checksum headers and passes them as `Set<ChecksumValue>` to the service. The service validates checksum during object creation and passes it to the repository. Checksum is part of `ContentDescriptor`, validated in the domain constructor.
+5. **VersionId**: Generated by the repository, not the handler.
+6. **StorageClass**: Passed through to domain, not parsed in the handler.
+7. **Content-Type**: Spring Boot already handles content negotiation — handlers do not need to detect or default Content-Type.
 
-# Terminal 2: Run AWS CLI tests
-mvn -N verify -Paws-cli-tests
-```
+### Scope
 
-**Expected result:** All 16 Phase E CLI test variants pass, plus all existing Phase A–D CLI tests continue to pass. No regressions.
+This phase addresses **ONLY** `S3Object` and its handlers (`S3ObjectOperationsHandler`, `S3ObjectMetadataHandler`, `S3MultipartHandler`). Bucket handlers (`S3BucketOperationsHandler`, `S3BucketMetadataHandler`, `S3BucketConfigHandler`) are **NOT** touched in this phase. The scope is intentionally narrowed to object-domain purity to keep the change focused and reviewable.
 
----
+### Architectural Principles
 
-### 4. New Workflow Rule: AWS CLI Test Sub-Phase After Cucumber ✅ Completed
+#### Layer Responsibilities
 
-**Status:** ✅ Completed. The workflow rule is now documented in the Testing Strategy, Coverage Verification, and this Phase E closure section.
+| Layer | Responsibilities |
+|-------|-----------------|
+| **Handler** (s3-reactive-api-adapter) | Extract HTTP headers (`bucket`, `key`, headers) into primitive/DTO values; delegate to application service; convert service response to HTTP response (headers, status code). No bucket checks, no checksum computation, no ETag generation, no version-id generation, no domain object construction. |
+| **Application Service** (object-store-reactive-application) | Orchestrate domain calls; call repository; build domain objects; apply workflow transitions on `S3Object`; enforce application-level validation (bucket existence). Use Spring WebFlux patterns properly — no handler-level if-chains. |
+| **Domain** (object-store-domain) | Pure aggregates and value objects: `S3Object` with state machine, `Bucket`, `ChecksumValue`, `EncryptionConfiguration`, `ObjectKey`, `StorageClass`, `ContentDescriptor`. No HTTP types. |
+| **Repository** (object-store-reactive-infrastructure) | Compute ETag on store; generate version-id on store; persist and retrieve `S3Object`. |
 
-**Problem:** The previous development workflow allowed Cucumber tests to pass without any AWS CLI test sub-phase. This created a gap where operations worked in isolation but could fail under real AWS CLI usage.
+#### S3Object State Machine
 
-**New rule — mandatory for all future phases:**
+Replace ad-hoc `with*` setters with a proper workflow. `S3Object` has these states:
 
-> Every development phase MUST include an **AWS CLI test sub-phase** AFTER Cucumber tests pass and BEFORE the phase is marked complete.
+| State | Description | Entered via | Domain Events Produced |
+|-------|-------------|-------------|------------------------|
+| **Creating** | Initial state after `create()` factory method | `S3Object.create(bucketId, key)` | `ObjectCreatingEvent` |
+| **Active** | Content is attached and object is fully writable | `attachContent(ContentDescriptor)` | `ObjectCreatedEvent` |
+| **Locked** | Legal hold / object lock / retention is active | `applyLock(LockConfiguration)` | `ObjectLockAppliedEvent` |
+| **Archived** | Object has been archived (Glacier / Deep Archive restore) | `archive()` | `ObjectArchivedEvent` |
+| **Restored** | Archived object has been restored to active tier | `restore()` | `ObjectRestoredEvent` |
+| **Deleted** | Object has been deleted | `delete()` | `ObjectDeletedEvent` |
 
-**Enforcement:**
+**Key rules:**
 
-| Step | Gate |
-|---|---|
-| 1 | Cucumber tests pass (`mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false`) |
-| 2 | AWS CLI tests written in `test-aws-cli.sh` for every `aws s3api`-exposed operation |
-| 3 | AWS CLI tests pass (`bash test-aws-cli.sh` or `mvn -N verify -Paws-cli-tests`) |
-| 4 | Phase marked complete only after both gates pass |
+- `attachContent()` is only valid from **Creating** state. Precondition: state == Creating. Produces `ObjectCreatedEvent` and transitions to **Active**.
+- `delete()` is valid from **Active**, **Locked**, or **Restored** states. Produces `ObjectDeletedEvent` and transitions to **Deleted**.
+- `applyLock()` is valid from **Active** or **Restored** states. Produces `ObjectLockAppliedEvent` and transitions to **Locked**.
+- `archive()` is valid from **Active** or **Locked** states. Produces `ObjectArchivedEvent` and transitions to **Archived**.
+- `restore()` is only valid from **Archived** state. Produces `ObjectRestoredEvent` and transitions to **Restored**.
+- Each method checks its precondition and throws an `IllegalStateException` (or a domain-specific `InvalidStateTransitionException`) if violated.
+- No generic setters (`withEtag`, `withStorageClass`, `withContent`, `withLegalHold`, `withObjectLockConfiguration`, `withRetentionPeriod`, `withRestore`, `withSseHeaders`, `withEncryption`, `withKey`, `withDeleted`).
 
-**For Phase E specifically:** The rule documentation is complete. The separate `mvn -N verify -Paws-cli-tests` verification gate remains tracked by item 3.
+**Removed methods:**
 
----
+`withEtag`, `withStorageClass`, `withContent`, `withLegalHold`, `withObjectLockConfiguration`, `withRetentionPeriod`, `withRestore`, `withSseHeaders`, `withEncryption`, `withKey`, `withDeleted` — all replaced by state machine transitions above.
 
-### 5. `api-coverage.md` Complete Review ✅ Completed
+#### EncryptionConfiguration
 
-**Resolution:** ✅ Completed. [`docs/api-coverage.md`](docs/api-coverage.md) documents the implemented operation set and has been aligned with the 111/111 coverage status, including the Phase F operations tracked by ADR 0012. Every operation section contains request header coverage, query parameter coverage, request body coverage, response body/header notes, and a **Status Codes** table.
-
-**Completed updates:**
-
-#### 5a. Phase E Header/Param Tables (Operations 71–84)
-
-Each of the 14 Phase E operations now has detailed header, query parameter, body, and status-code coverage:
-
-| Operation | Query Params | Request Body | Response Body |
-|---|---|---|---|
-| GetBucketAnalyticsConfiguration | `analytics`, `id` (optional) | None | `AnalyticsConfiguration` XML |
-| PutBucketAnalyticsConfiguration | `analytics`, `id` (required) | `AnalyticsConfiguration` XML | None (200 OK) |
-| DeleteBucketAnalyticsConfiguration | `analytics`, `id` (required) | None | None (204 No Content) |
-| ListBucketAnalyticsConfigurations | `analytics`, `list-type` | None | `ListBucketAnalyticsConfigurationsResult` XML |
-| GetBucketInventoryConfiguration | `inventory`, `id` (optional) | None | `InventoryConfiguration` XML |
-| PutBucketInventoryConfiguration | `inventory`, `id` (required) | `InventoryConfiguration` XML | None (200 OK) |
-| DeleteBucketInventoryConfiguration | `inventory`, `id` (required) | None | None (204 No Content) |
-| ListBucketInventoryConfigurations | `inventory`, `list-type` | None | `ListBucketInventoryConfigurationsResult` XML |
-| GetBucketMetricsConfiguration | `metrics`, `id` (optional) | None | `MetricsConfiguration` XML |
-| PutBucketMetricsConfiguration | `metrics`, `id` (required) | `MetricsConfiguration` XML | None (200 OK) |
-| DeleteBucketMetricsConfiguration | `metrics`, `id` (required) | None | None (204 No Content) |
-| GetBucketIntelligentTieringConfiguration | `intelligent-tiering`, `id` (optional) | None | `IntelligentTieringConfiguration` XML |
-| PutBucketIntelligentTieringConfiguration | `intelligent-tiering`, `id` (required) | `IntelligentTieringConfiguration` XML | None (200 OK) |
-| DeleteBucketIntelligentTieringConfiguration | `intelligent-tiering`, `id` (required) | None | None (204 No Content) |
-
-#### 5b. Complete Old Operation Tables
-
-For operations 1–28, missing header, parameter, body, and status-code rows have been filled in `docs/api-coverage.md`:
-
-| Operation | Missing headers/params to document |
-|---|---|
-| ListBuckets | `x-amz-account-id` (🟡 optional, ✅ Completed not impl) |
-| CreateBucket | `x-amz-acl`, `x-amz-grant-read`, `x-amz-grant-write`, `x-amz-grant-read-acp`, `x-amz-grant-write-acp`, `x-amz-grant-full-control`, `x-amz-bucket-object-lock-enabled`, `x-amz-expected-bucket-owner`, body `LocationConstraint`, `StorageCase` |
-| HeadBucket | `x-amz-expected-bucket-owner` |
-| DeleteBucket | `x-amz-expected-bucket-owner` |
-| ListObjects | `delimiter`, `encoding-type`, `max-keys`, `prefix`, `x-amz-expected-bucket-owner` |
-| ListObjectsV2 | `delimiter`, `encoding-type`, `fetch-owner`, `max-keys`, `prefix`, `start-after`, `x-amz-expected-bucket-owner` |
-| ... | (all remaining operations) |
-
-#### 5c. Add Status Code Tables
-
-Every operation section now includes a **Status Codes** table documenting the applicable AWS S3 status-code set for that operation category:
-
-| Status Code | Meaning | Implemented |
-|---|---|---|
-| 200 | Success (GET, HEAD, PUT) | ✅ |
-| 204 | Success (DELETE) | ✅ |
-| 301 | Permanent redirect | ✅ Completed |
-| 304 | Not Modified (HEAD) | ✅ Completed |
-| 400 | Bad Request / InvalidArgument | ✅ |
-| 403 | AccessDenied | ✅ Completed |
-| 404 | NoSuchBucket / NoSuchKey | ✅ |
-| 405 | MethodNotAllowed | ✅ Completed |
-| 409 | Conflict / BucketAlreadyExists | ✅ |
-| 412 | PreconditionFailed | ✅ Completed |
-| 500 | InternalServerError | ✅ Completed |
-| 501 | NotImplemented | ✅ |
-| 503 | SlowDown / ServiceUnavailable | ✅ Completed |
-
-Each operation section lists the operation-category status codes and marks each as ✅ Implemented, ✅ Completed (not implemented), or 🟡 Partially implemented.
-
----
-
-### 6. Reactive End-to-End Migration (ADR 0009 → ADR 0010) — Native `Mono`/`Flux` Reactive Modules
-
-**Status: ⚠️ REWORK NEEDED — ADR 0010 course correction** — ADR 0009 implementation produced incomplete code (stub methods, missing aggregate root state transitions, simplistic reactive patterns). ADR 0010 (2026-05-24) prescribes corrective actions. See course correction section above.
-
-**Problem:** All handlers in `s3-reactive-api-adapter` use the pattern:
+Replace HTTP-centric `SseHeaders` with domain-relevant `EncryptionConfiguration`:
 
 ```java
-Mono.fromCallable(() -> {
-    // blocking call using .join() on CompletableFuture or synchronous call
-    return result;
-}).subscribeOn(Schedulers.boundedElastic())
+// object-store-domain/src/main/java/.../domain/value/EncryptionConfiguration.java
+public record EncryptionConfiguration(
+    EncryptionAlgorithm algorithm,   // AES256, AWS_KMS, SSE_C
+    EncryptionKeyReference keyRef,    // key ID or reference, NOT the actual key
+    EncryptionContext encryptionContext // optional
+) { }
+
+public enum EncryptionAlgorithm {
+    AES256,
+    AWS_KMS,
+    SSE_C
+}
+
+public record EncryptionKeyReference(
+    String keyId          // key ID or reference (KMS key ID, customer key MD5, etc.)
+) { }
+
+public record EncryptionContext(
+    Map<String, String> context  // optional encryption context
+) { }
 ```
 
-This defeats the purpose of reactive programming. Instead of chaining reactive operators, every handler wraps blocking calls in `Mono.fromCallable` and offloads to a thread pool.
+This is a **pure domain concept representing encryption intent**, NOT HTTP headers.
 
-**Fix strategy (per ADR 0009):**
+#### ChecksumValue
 
-| Layer | Current pattern | Target pattern |
-|---|---|---|
-| **Reactive repository interfaces** (`object-store-reactive-repository-application`) | `CompletableFuture<Optional<T>>` in `object-store-domain` | Native `Mono<T>` / `Flux<T>` with CQRS split (Command + Query per aggregate) |
-| **Reactive application services** (`object-store-reactive-application`) | `.join()` bridge in `BucketService`/`ObjectService` | No blocking, methods return `Mono<T>` / `Flux<T>` natively |
-| **Reactive infrastructure** (`object-store-reactive-infrastructure`) | `InMemoryBucketRepository` with blocking impls | Reactive repository implementations (combined or split Command/Query) |
-| **Handler layer** (`s3-reactive-api-adapter`) | `Mono.fromCallable(() -> service.method().join()).subscribeOn(...)` | Direct `Mono`/`Flux` chaining, no `.fromCallable`, no `.subscribeOn` |
+`ChecksumValue` stays in domain as a value object:
 
-**New modules to create:**
+```java
+// object-store-domain/src/main/java/.../domain/value/ChecksumValue.java
+public record ChecksumValue(
+    ChecksumAlgorithm algorithm,  // CRC32, CRC32C, SHA256, etc.
+    String value                  // Base64-encoded checksum value
+) {
+    // Validation: algorithm must be supported
+    public ChecksumValue {
+        Objects.requireNonNull(algorithm, "algorithm must not be null");
+        Objects.requireNonNull(value, "value must not be null");
+    }
+}
 
-| Module | Purpose |
-|---|---|
-| `object-store-reactive-repository-application` | Reactive repository interfaces with `Mono`/`Flux`/`DataBuffer` and CQRS command/query split |
-| `object-store-reactive-application` | Reactive application services — no `.join()`, no blocking |
-| `object-store-reactive-infrastructure` | Reactive repository implementations |
-| `s3-reactive-api-adapter` | Updated handlers using reactive services |
-
-**Domain cleanup:** Remove repository interfaces from `object-store-domain` — keep only aggregates, value objects, domain events (ADR 0002 purity).
-
-**Verification:**
-
-```bash
-# After migration, grep should show zero occurrences of blocking patterns in the reactive path:
-grep "Mono.fromCallable" s3-reactive-api-adapter/src/main/java/**/*.java
-grep "\.join()" s3-reactive-api-adapter/src/main/java/**/*.java
-grep "subscribeOn.*boundedElastic" s3-reactive-api-adapter/src/main/java/**/*.java
-
-# All Cucumber tests pass with reactive chain (no .join() in application path)
-mvn test -pl s3-reactive-api-adapter
+public enum ChecksumAlgorithm {
+    CRC32, CRC32C, SHA1, SHA256, SHA512,
+    CRC64NVME, XXHASH64, XXHASH3, XXHASH128
+}
 ```
 
-#### Sub-items (ADR 0010 course correction)
+Checksum is part of `ContentDescriptor`, validated in the domain constructor:
 
-| # | Item | Owner | Priority | Status |
-|---|---|---|---|---|
-| 6a | Fix repository implementations — remove stubs, add real reactive patterns with proper in-memory storage | java-infra-coder | High | Pending — requires ADR 0010 corrective action 1 |
-| 6b | Fix aggregate root state transitions with domain event notification | java-domain-coder | High | Pending — requires ADR 0010 corrective action 2 |
-| 6c | Redesign reactive repository interfaces for full reactive capability (backpressure, error handling, operator fusion) | java-infra-coder | High | Pending — requires ADR 0010 corrective action 3 |
-| 6d | Update C4 diagrams and ARC42 documentation | documenter / c4model | Medium | Pending — requires ADR 0010 corrective actions 4, 5 |
-| 6e | Write sophisticated tests matching real behavior | java-tester | High | Pending — requires ADR 0010 corrective action 6 |
-
----
-
-### 7. Status Code Documentation — Every Operation ✅ Completed
-
-**Resolution:** ✅ Completed. `docs/api-coverage.md` now aligns with the 111 implemented operations and includes Status Codes tables for operation categories. Success, not-found, validation, authorization, method, conflict, conditional, internal-error, and throttling/status-gap rows are explicitly documented by operation category.
-
-**Applied format for each operation in `docs/api-coverage.md`:**
-
-```markdown
-### Operation N — {name}
-
-| Status Code | Description | Implemented | Notes |
-|---|---|---|---|
-| 200 | Success | ✅ | GET/PUT operations |
-| 204 | No Content | ✅ | DELETE operations |
-| 400 | InvalidArgument | ✅ | Missing required param |
-| 404 | NoSuchBucket | ✅ | Bucket not found |
-| 501 | NotImplemented | 🟡 | Optional features |
+```java
+// object-store-domain/src/main/java/.../domain/value/ContentDescriptor.java
+public record ContentDescriptor(
+    long contentLength,
+    String contentType,
+    Set<ChecksumValue> checksums,    // ← validated in domain constructor
+    // ... other content metadata
+) {
+    public ContentDescriptor {
+        Objects.requireNonNull(checksums, "checksums must not be null");
+        // Each ChecksumValue is validated in its own constructor
+    }
+}
 ```
 
-**AWS S3 status code reference per operation category:**
+#### Updated S3Object Aggregate
 
-| Category | Required status codes |
-|---|---|
-| **Bucket GET** (GetBucket*, ListBuckets, HeadBucket) | 200, 301, 304, 400, 403, 404, 405, 409, 500, 501, 503 |
-| **Bucket PUT** (CreateBucket, PutBucket*) | 200, 400, 403, 404, 405, 409, 500, 501, 503 |
-| **Bucket DELETE** (DeleteBucket, DeleteBucket*) | 204, 400, 403, 404, 405, 409, 500, 501, 503 |
-| **Object GET** (GetObject, HeadObject, GetObject*) | 200, 206, 304, 400, 403, 404, 405, 412, 500, 501, 503 |
-| **Object PUT** (PutObject, PutObject*, CopyObject, UploadPart*) | 200, 400, 403, 404, 405, 409, 500, 501, 503 |
-| **Object DELETE** (DeleteObject, DeleteObject*, AbortMultipartUpload) | 204, 400, 403, 404, 405, 500, 501, 503 |
-| **Multipart POST** (CreateMultipartUpload, CompleteMultipartUpload) | 200, 400, 403, 404, 405, 500, 501, 503 |
-| **Multipart GET** (ListParts, ListMultipartUploads) | 200, 400, 403, 404, 405, 500, 501, 503 |
+```java
+public sealed abstract class S3Object {
+    public abstract Id id();
+    public abstract Bucket.Id bucketId();
+    public abstract ObjectKey key();
+    public abstract Optional<ContentDescriptor> contentDescriptor();
+    public abstract Optional<EncryptionConfiguration> encryption();
+    public abstract StorageClass storageClass();
+    public abstract Map<String, String> userMetadata();
+    public abstract ETag etag();                    // computed by repository
+    public abstract VersionId versionId();           // generated by repository
+}
 
-**Each operation in `docs/api-coverage.md` now has a status code table.** Status codes are marked as:
+// Factory method
+public static CreatingS3Object create(Bucket.Id bucketId, ObjectKey key) { ... }
 
-- ✅ — Implemented (handler returns this status)
-- ✅ Completed — Not implemented (not returned at all)
-- 🟡 — Partially implemented (returned for some error cases but not all)
+// States as subclasses or sealed interface variants
+public final class CreatingS3Object extends S3Object {
+    public ActiveS3Object attachContent(ContentDescriptor content) { ... }
+}
 
-**Completed total: 111 operations covered by status-code documentation.**
+public final class ActiveS3Object extends S3Object {
+    public LockedS3Object applyLock(LockConfiguration lock) { ... }
+    public ArchivedS3Object archive() { ... }
+    public DeletedS3Object delete() { ... }
+}
 
----
+public final class LockedS3Object extends S3Object {
+    public ArchivedS3Object archive() { ... }
+    public DeletedS3Object delete() { ... }
+}
 
-### Summary Table
+public final class ArchivedS3Object extends S3Object {
+    public RestoredS3Object restore() { ... }
+}
 
-| # | Item | Owner | Priority | Dependencies | Status |
-|---|---|---|---|---|---|
-| 1 | Dead code removal — `S3BucketConfigListHandler.java` | java-infra-coder | High | None | ✅ Completed |
-| 2 | AWS CLI tests for Phase E (8 success + 8 failure) | java-tester | High | #1 (no impact) | ✅ Completed |
-| 3 | Verify `mvn verify -Paws-cli-tests` after additions | java-tester | High | #2 | Pending |
-| 4 | New workflow rule: CLI test sub-phase after Cucumber | java-planner / documenter | Medium | None (documentation only) | ✅ Completed |
-| 5 | `api-coverage.md` complete review — headers, params, status codes | documenter | High | None | ✅ Completed |
-| 6 | Reactive end-to-end migration (ADR 0009 → ADR 0010) — native `Mono`/`Flux` reactive modules with CQRS | java-infra-coder, java-domain-coder, java-tester, documenter | High | ADR 0010 course correction (2026-05-24) | ⚠️ REWORK NEEDED — ADR 0010 course correction |
-| 7 | Status code documentation for all 111 operations | documenter | Medium | #5 (completed together) | ✅ Completed |
+public final class RestoredS3Object extends S3Object {
+    public LockedS3Object applyLock(LockConfiguration lock) { ... }
+    public DeletedS3Object delete() { ... }
+}
 
+public final class DeletedS3Object extends S3Object {
+    // Terminal state — no further transitions
+}
+```
 
-## ✅ Correction Complete — Remove Regex XML Parsing (ADR 0008)
+### Handler Refactoring Patterns
 
-### Problem (resolved)
-All PUT/POST handlers in `s3-reactive-api-adapter` previously used regex-based XML parsing (`extractXmlValue`, `extractXmlList`, `Pattern.compile`, `String.contains`) instead of Spring Boot 4's Jackson XML codec infrastructure. This violated the `java-infra-coder` FORBIDDEN constraint.
+#### Minimal Handler Pattern
 
-### Root Cause
-`java-domain-coder` wrote handler code (infrastructure) despite its domain isolation constraint. `java-infra-coder` generated `S3XmlParser.java` but no handler integrated it. `java-planner` did not enforce delegation.
+Handler extracts only: `bucket`, `key`, headers → passes to application service. Handler does **NOT**:
+- check bucket existence
+- validate storage class
+- compute ETag
+- parse checksums
+- build domain objects
 
-### Resolution
-ADR 0008 is now **Implemented** and verified. All 14 phases completed:
+```java
+// In handler — minimal extraction, delegation to service
+return objectService.putObject(bucketName, key, body, checksums, metadata, storageClass)
+    .flatMap(result -> buildOkResponse(result));
+```
 
-| Phase | Description | Status |
-|---|---|---|
-| 1 | JacksonXmlDecoder in `JacksonXmlCodecConfig` | ✅ Complete |
-| 2 | 14 Command DTOs in `dto/command/` | ✅ Complete |
-| 3 | 29 Query DTOs in `dto/query/` | ✅ Complete |
-| 4 | `S3BucketConfigHandler` — no regex, uses `bodyToMono` | ✅ Complete |
-| 5 | `S3BucketMetadataHandler` — no regex, uses `bodyToMono` | ✅ Complete |
-| 6 | `S3ObjectMetadataHandler` — no regex, uses `bodyToMono` | ✅ Complete |
-| 7 | `S3ObjectOperationsHandler` — no regex, uses `bodyToMono` | ✅ Complete |
-| 8 | `S3BucketOperationsHandler` — no regex, uses `bodyToMono` | ✅ Complete |
-| 9 | `S3BucketConfigListHandler` — no regex, uses `bodyToMono` | ✅ Complete |
-| 10 | `S3WebSupport` — references `ErrorQuery` instead of `S3XmlResponses.Error` | ✅ Complete |
-| 11 | `xml/` package deleted | ✅ Complete |
-| 12 | All handler references updated to Query DTOs | ✅ Complete |
-| 13 | Test verification: 141 Cucumber tests pass, 3 CORS scenarios pass | ✅ Complete |
-| 14 | ADR 0008 updated, ARC42 documentation aligned | ✅ Complete |
+The application service (`ReactiveObjectService.putObject()`) handles all orchestration: calls repository, builds domain objects, applies workflow transitions. Handler receives the response from service and converts to HTTP response (headers, status code).
+
+Use Spring WebFlux patterns properly — no handler-level if-chains. All branching logic lives in the application service.
+
+#### Bucket Existence Check — Deleted from Handlers
+
+Before (anti-pattern):
+```java
+// Handler checks bucket existence directly
+return bucketService.doesBucketExist(bucketName)
+    .flatMap(exists -> {
+        if (!exists) {
+            return Mono.error(new NoSuchBucketException(bucketName));
+        }
+        ...
+    });
+```
+
+After (correct):
+```java
+// Handler delegates to service — no bucket check
+return objectService.putObject(bucketName, key, body, checksums, metadata, storageClass)
+    .flatMap(result -> buildOkResponse(result));
+```
+
+The application service (`ReactiveObjectService.putObject()`) handles bucket validation internally and returns domain-specific errors that the handler maps to HTTP status codes via `onErrorResume`.
+
+#### Checksum — Handler Extracts, Service Validates
+
+Handler extracts checksum headers and passes to service as `Set<ChecksumValue>`:
+```java
+// In handler — minimal extraction into Set<ChecksumValue>
+var checksums = new HashSet<ChecksumValue>();
+for (var headerName : request.headers().keySet()) {
+    if (headerName.startsWith("x-amz-checksum-")) {
+        var algorithm = ChecksumAlgorithm.fromS3HeaderName(headerName.substring("x-amz-checksum-".length()));
+        var value = request.headers().firstHeader(headerName);
+        checksums.add(new ChecksumValue(algorithm, value));
+    }
+}
+```
+
+Service validates checksum during object creation, passes to repository. Checksum is part of `ContentDescriptor`, validated in domain constructor.
+
+#### ETag — Repository Computes, Handler Echoes
+
+Handler never generates ETag:
+```java
+// In handler response — reads ETag from service result
+var etag = result.etag().value();  // computed by repository
+return ServerResponse.ok()
+    .header("ETag", etag)
+    .header("x-amz-version-id", result.versionId().value());
+```
+
+ETag is computed by the repository when content is stored (hash of content bytes). The handler reads ETag from the service response and echoes as HTTP header.
+
+#### VersionId — Repository Generates, Handler Echoes
+
+Handler never generates version ID:
+```java
+// Handler echoes what the repository assigned
+var versionId = result.versionId().value();
+```
+
+#### StorageClass — Passed Through to Domain
+
+Handler maps the header to domain enum, passes to service:
+```java
+var storageClass = StorageClass.fromS3Header(
+    request.headers().firstHeader("x-amz-storage-class"));
+```
+
+#### Content-Type — Handled by Spring Boot
+
+Spring Boot's `ServerRequest.bodyToFlux()` already handles content negotiation. The handler does NOT detect, default, or manipulate Content-Type. The domain stores the content type only if the application service passes it from the request; otherwise it is null/unknown.
+
+### Unified Header Handling Table
+
+| Header | Extracted by Handler | Passed as Domain Type | Validated/Processed by |
+|--------|---------------------|----------------------|-----------------------|
+| `x-amz-sdk-checksum-algorithm` | Yes | `ChecksumAlgorithm` enum | Service + domain (`ContentDescriptor`) |
+| `x-amz-checksum-*` | Yes | `Set<ChecksumValue>` | Service + domain (`ContentDescriptor`) |
+| `x-amz-meta-*` | Yes | `Map<String, String>` userMetadata | Domain aggregate |
+| `x-amz-server-side-encryption` | Yes | `EncryptionConfiguration.algorithm` | Domain aggregate |
+| `x-amz-server-side-encryption-customer-algorithm` | Yes | `EncryptionConfiguration.keyRef` | Domain aggregate |
+| `x-amz-acl` | Yes | `Acl` domain enum | Application service |
+| `x-amz-grant-*` | Yes | `Grant` value objects | Application service |
+| `x-amz-expected-bucket-owner` | Yes | `OwnerId` value object | Application service |
+| `Content-Type` | No (Spring Boot handles) | N/A | N/A |
+| `x-amz-storage-class` | Yes | `StorageClass` domain enum | Domain aggregate |
+| `x-amz-version-id` | No | N/A | Repository generates |
+
+### Revised Sub-Phases
+
+Instead of the original monolithic implementation order, Phase 1 is broken into focused sub-phases. Each sub-phase is a self-contained unit that can be merged and tested independently.
+
+### Implementation Order (Revised)
+
+```
+Phase 1a: Header enum + RequestExtractor foundation               ✅ DONE
+Phase 1b: ObjectKey as natural identifier                          ✅ DONE
+Phase 1c: Remove handler-local state (ConcurrentHashMap)
+Phase 1d: Remove handler-level ETag computation
+Phase 1e: Add missing headers to PutObject (ACL, tagging, object lock)
+Phase 1f: Fix StorageClass flow into domain
+Phase 1g: Fix S3ProxyRouter compilation
+Phase 1h: Unify SSE header extraction
+Phase 1i: Add missing CopyObject headers
+Phase 1j: Add missing conditional headers (GetObject, HeadObject)
+Phase 1k: Add missing multipart headers (checksums, SSE-C)
+Phase 1l: Add missing response headers
+Phase 1m: Add missing request options headers
+Phase 1n: Create HeaderExtractor utility
+Phase 1o: Define S3Object state machine — sealed hierarchy, transitions, domain events
+Phase 1p: Define ContentDescriptor value object
+Phase 1q: Remove SseHeaders, create EncryptionConfiguration
+Phase 1r: Add domain tests for state machine, EncryptionConfiguration, ContentDescriptor
+Phase 1s: Add Cucumber tests for updated handlers
+Phase 1t: Verify: mvn test → 0 failures
+Phase 1u: Update PLAN.md, ARC42, ADRs
+Phase 1v: Create docs/user-manual.md
+```
+
+### Agents
+
+| Phase | Agent |
+|-------|-------|
+| Phase 1a | java-infra-coder |
+| Phase 1b | java-infra-coder |
+| Phase 1c | java-infra-coder |
+| Phase 1d | java-infra-coder |
+| Phase 1e | java-infra-coder |
+| Phase 1f | java-infra-coder |
+| Phase 1g | java-infra-coder |
+| Phase 1h | java-infra-coder |
+| Phase 1i | java-infra-coder |
+| Phase 1j | java-infra-coder |
+| Phase 1k | java-infra-coder |
+| Phase 1l | java-infra-coder |
+| Phase 1m | java-infra-coder |
+| Phase 1n | java-infra-coder |
+| Phase 1o–1q | java-domain-coder |
+| Phase 1r | java-tester |
+| Phase 1s | java-tester |
+| Phase 1t | java-planner |
+| Phase 1u | documenter |
+| Phase 1v | documenter |
 
 ### Verification
 
 ```bash
-# Verification results
-mvn test -pl s3-reactive-api-adapter                    # 141 tests pass (0 failures)
-bash test-aws-cli.sh                   # CORS scenarios pass
-mvn -N verify -Paws-cli-tests          # AWS CLI tests pass
+mvn test --also-make
+bash test-aws-cli.sh
+mvn -N verify -Paws-cli-tests
+mvn test -pl s3-reactive-api-adapter -am -Pawscli-cucumber-tests
 ```
 
-The `xml/` package is deleted, `S3XmlParser.java` and `S3XmlResponses.java` are removed, and ALL XML parsing now goes through the Spring Boot 4 Jackson XML codec.
+Expected: all 458+ tests pass, AWS CLI tests pass, domain tests pass.
 
-## Pre-Existing Issues — S3 XML Element Name Alignment (10 failures) — ✅ Resolved
+### Completed in Current Work Phase
 
-### Problem
-141 Cucumber tests run, but **10 scenarios fail** due to Jackson XML element name mismatches. Java record fields use `camelCase`, but AWS S3 XML uses `PascalCase`/capitalized element names. Jackson 3 by default serializes fields as `<fieldName>`, producing XML that doesn't match Cucumber test expectations.
+| Deliverable | File | Status |
+|-------------|------|--------|
+| S3Header enum (92 headers, 22 categories) | `s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/adapter/web/headers/S3Header.java` | ✅ Created |
+| S3RequestExtractor (extractObjectKey) | `s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/adapter/web/headers/S3RequestExtractor.java` | ✅ Created |
+| ObjectKey record (bucket + key composite) | `object-store-domain/src/main/java/com/example/magrathea/objectstore/domain/value/ObjectKey.java` | ✅ Refactored |
+| ReactiveObjectService.saveObjectWithContent(ObjectKey) overload | `object-store-reactive-application/src/main/java/.../ReactiveObjectService.java` | ✅ Updated |
+| Repository saveWithContent(ObjectKey) / findByBucketAndKey(ObjectKey) | `InMemoryReactiveS3ObjectRepository.java` + interfaces | ✅ Updated |
+| PutObject handler refactored to use ObjectKey + new overload | `S3ObjectOperationsHandler.java` | ✅ Updated |
+| Header analysis document | `docs/header-analysis.md` | ✅ Created |
 
-### Root Cause
-All `s3-reactive-api-adapter` Query and Command DTOs were created without `@JacksonXmlProperty(localName = "...")` annotations. Jackson 3 serializes/deserializes field names as-is, breaking S3 XML compatibility.
+### Remaining Problems in PutObject (Not Yet Fixed)
 
-### Fix Strategy
-Added `@JacksonXmlProperty(localName = "...")` annotations and restructured ACL DTO format to align field names with the AWS S3 XML specification. All fixes were in the **infra layer** (`s3-reactive-api-adapter/src/main/java/.../dto/`). No domain or application code changes needed.
-
-### Results
-All 6 phases completed. Verification:
-```bash
-mvn test -pl s3-reactive-api-adapter --also-make   # 141 tests, 0 failures
-```
-
-### Failure Breakdown
-
-| # | Scenario | Root Cause | DTO to Fix |
-|---|---|---|---|
-| 1 | Bucket ACL — no "READ" string | `AccessControlPolicyQuery` uses custom format instead of S3 `<Grant><Permission>READ</Permission></Grant>` | `AccessControlPolicyQuery` |
-| 2 | Object ACL — no "READ" string | Same as #1 | `AccessControlPolicyQuery` |
-| 3 | Object attributes — no "ObjectSize" | `<size>` instead of `<ObjectSize>` | `GetObjectAttributesQuery` |
-| 4 | Initiate multipart upload — no "UploadId" | `<uploadId>` instead of `<UploadId>` | `InitiateMultipartUploadQuery` |
-| 5 | Upload a part | Cascades from #4 — `uploadId` not extracted | Same as #4 |
-| 6 | List parts | Cascades from #4 | Same as #4 |
-| 7 | Complete multipart upload | Cascades from #4 | Same as #4 |
-| 8 | List multipart uploads | Cascades from #4 | Same as #4 |
-| 9 | Abort multipart upload | Cascades from #4 | Same as #4 |
-| 10 | Delete multiple objects — object not deleted | `ObjectEntry.key` missing `@JacksonXmlProperty(localName = "Key")` | `DeleteObjectsCommand` |
-
-### Phases
-
-#### Phase 1 — Multipart Upload DTOs (fixes #4–9) ✅ Completed
-Add `@JacksonXmlProperty(localName = "...")` annotations to align with S3 XML element names:
-
-| DTO | Field → S3 Element |
-|-----|-------------------|
-| `InitiateMultipartUploadQuery.java` | `uploadId` → `UploadId` |
-| `UploadPartResultQuery.java` | `etag` → `ETag` |
-| `CompleteMultipartUploadQuery.java` | `bucket` → `Bucket`, `key` → `Key`, `etag` → `ETag` |
-| `ListPartsQuery.java` | `PartEntry.partNumber` → `PartNumber`, `etag` → `ETag` |
-| `ListMultipartUploadsQuery.java` | `UploadEntry.key` → `Key`, `uploadId` → `UploadId`, `initiated` → `Initiated` |
-
-#### Phase 2 — ObjectAttributes DTO (fixes #3) ✅ Completed
-| DTO | Field → S3 Element |
-|-----|-------------------|
-| `GetObjectAttributesQuery.java` | `size` → `ObjectSize`, `key` → `Key`, `contentType` → `ContentType`, `storageClass` → `StorageClass`, `etag` → `ETag` |
-
-#### Phase 3 — ACL DTO Restructure (fixes #1–2) ✅ Completed
-Restructure `AccessControlPolicyQuery.java` to produce S3-compatible ACL XML:
-- Replace current `<acl><canned>public-read</canned></acl>` format
-- Use `<AccessControlList><Grant><Grantee><Permission>READ</Permission></Grantee></Grant></AccessControlList>`
-- Map canned ACL values (`public-read`, `public-write`, `public-read-write`, `authenticated-read`) to permission strings (`READ`, `WRITE`, `FULL_CONTROL`)
-
-#### Phase 4 — DeleteObjects DTO (fixes #10) ✅ Completed
-| DTO | Field → S3 Element |
-|-----|-------------------|
-| `DeleteObjectsCommand.ObjectEntry.java` | `key` → `Key` |
-| `DeleteResultQuery.DeletedEntry.java` | `key` → `Key` |
-
-#### Phase 5 — Latent S3-Incompatible DTOs (preventive) ✅ Completed
-Apply `@JacksonXmlProperty(localName = "...")` to all remaining DTOs that produce non-S3-compatible XML:
-
-| DTO | Fields needing annotation |
-|-----|--------------------------|
-| `ListObjectsQuery.ObjectEntry` | `key → Key`, `size → Size`, `etag → ETag` |
-| `ListObjectsV2Query.ObjectEntry` | Same as above |
-| `ListAllMyBucketsResultQuery.BucketEntry` | `name → Name`, `creationDate → CreationDate` |
-| `CopyObjectResultQuery` | `lastModified → LastModified`, `etag → ETag` |
-| `LocationConstraintQuery` | `value` → text content (no wrapper) |
-
-#### Phase 6 — Verification ✅ Completed
-```bash
-# Run Cucumber tests after each phase
-mvn test -pl s3-reactive-api-adapter --also-make
-
-# Result: 141 tests, 0 failures
-```
-
-### Dependency Order
-```
-✅ Phase 1 (Multipart Upload DTOs)
-  ✅ └─ fixes #4 → cascading fixes #5–9
-✅ Phase 2 (ObjectAttributes DTO)
-  ✅ └─ fixes #3
-✅ Phase 3 (ACL DTO restructure)
-  ✅ └─ fixes #1–2
-✅ Phase 4 (DeleteObjects DTO)
-  ✅ └─ fixes #10
-✅ Phase 5 (Latent DTOs)
-  ✅ └─ prevents future failures
-✅ Phase 6 (Verification)
-  ✅ └─ mvn test -pl s3-reactive-api-adapter
-```
-
----
-
-## Fix Plan — Codebase Cleanup (Current Phase)
-
-### Course Correction: ADR 0011 — Bucket.Configuration Redesign
-
-ADR: `docs/adr/0011-course-correction-bucket-configuration-redesign.md`
-Status: Proposed — requires AWS S3 API documentation study before implementation.
-
-#### Open Design Issues
-
-The AWS S3 API study document (`docs/s3-bucket-configuration-design.md`) now includes:
-1. An **Open Design Issues** section that identifies 11+ config features with unspecified action-after-configuration behavior.
-2. An **Actions After Configuration — Design** section that resolves each open issue by specifying concrete runtime actions, required services, and integration points.
-3. A **Priority & Feasibility** section that ranks each action by priority (P0–P2), feasibility (easy–hard), and required code category (handler change, new domain code, new infrastructure).
-
-These must be consulted before each feature can be marked complete.
-
-| Config Feature | Open Issue Count | Key Unresolved Questions | Action Design Resolved? |
-|----------------|-----------------|--------------------------|-------------------------|
-| Lifecycle | 6 | When does rule evaluation happen? On schedule? On object write? | ✅ Designed: periodic scan via `LifecycleEvaluationService` + `LifecycleRuleEvaluator` |
-| Notification | 6 | How is event bridge wired? How are destinations resolved? | ✅ Designed: `NotificationEventBridge` + destination adapters |
-| Replication | 6 | Does existing data get replicated? What triggers replication? | ✅ Designed: `ReplicationCoordinator` on object create/delete |
-| Encryption | 5 | Are existing objects re-encrypted? How is KMS key resolved? | ✅ Designed: creation-time default encryption wiring |
-| Logging | 5 | Does logging start immediately? What format? How is target written? | ✅ Designed: `S3AccessLogService` with intercept + buffer/flush |
-| Website | 5 | Does serving start immediately? How are routing rules evaluated? | ✅ Designed: request-routing in handler layer |
-| CORS | 3 | How is preflight handled? How are origins validated? | ✅ Designed: runtime check on each request (already implemented) |
-| Bucket Policy | 3 | How is IAM policy evaluation wired? | ✅ Designed: `PolicyEvaluationService` on every request |
-| PublicAccessBlock | 3 | How are existing ACLs/policies re-evaluated? | ✅ Designed: request-time `PublicAccessBlockEvaluator` |
-| OwnershipControls | 2 | How is irreversibility enforced? | ✅ Designed: creation-time ownership enforcement |
-| Multi-instance (4 types) | 4 per type | When is first export triggered? How does schedule work? | ✅ Designed: scheduled export services |
-| Cross-cutting | 4 | Registry wiring, background processing, event bridge, persistence | ✅ Designed: registry-based handler, scheduler framework, event bridge |
-
-See:
-- `docs/s3-bucket-configuration-design.md#open-design-issues` for the full breakdown
-- `docs/s3-bucket-configuration-design.md#actions-after-configuration--design` for the action design
-- `docs/s3-bucket-configuration-design.md#priority--feasibility` for prioritization
-
-### Issues completed
-
-| # | Issue | Status | Agent |
-|---|-------|--------|-------|
-| 1 | Coverage — Build config per application module | ✅ DONE | java-infra-coder |
-| 2 | Stale domain files (S3ObjectContent, S3ObjectWrite) | ✅ DONE | java-domain-coder |
-| 3 | Bucket.Configuration — Revert to CORS-only | ✅ DONE | java-domain-coder |
-| 4 | ETag fake & Content-Type hardcoded | ✅ DONE | java-infra-coder |
-| 5 | DTO → Jackson XML (5 files) | ✅ DONE | java-infra-coder |
-
-### Issues remaining
-
-#### 6. Fix pre-existing compilation errors
-**Agent: java-infra-coder** | Files:
-- `S3ObjectMetadataHandler.java` — `S3Object.ObjectId` → `S3Object.Id`
-- `S3BucketOperationsHandler.java` — package `Bucket` → import fix
-- `BucketLifecycleQuery.java` — `Bucket.BucketConfiguration` → `Bucket.Configuration`, `hasLifecycle()` → `hasCors()`, `lifecycleRules()` → remove
-
-#### 7. Study AWS S3 API documentation (ADR 0011 prerequisite) — ✅ DONE
-**Output**: `docs/s3-bucket-configuration-design.md`
-- Studied all 16 bucket configuration features from official AWS docs
-- Document covers: feature semantics, actual XML structures, domain events, domain model recommendations, handler integration patterns
-- Key corrections identified vs the old naive approach (see document for details)
-
-#### 8. Bucket Configuration Redesign (ADR 0011 implementation) — IN PROGRESS
-**Agent: java-domain-coder + java-infra-coder** | After study document is approved
-- Implement dedicated `with*` methods on Bucket per config type
-- Add specific domain events per config type
-- Implement handler code that properly stores/retrieves config data
-- Refactor S3BucketConfigHandler to eliminate copypasta
-- Resolve each open design issue per `docs/s3-bucket-configuration-design.md#open-design-issues`
-- Implement action-after-configuration behavior per `docs/s3-bucket-configuration-design.md#actions-after-configuration--design`
-- Follow priority order from `docs/s3-bucket-configuration-design.md#priority--feasibility`
-
-**Notes:**
-- Encryption → moved to storage-engine module (postponed)
-- Currently implementing: CORS (runtime Origin check) + Website (request routing)
-- Next after completion: OwnershipControls, PublicAccessBlock, Accelerate
-- Module rename completed: legacy persistence placeholders → `storage-engine-*` (empty modules, reserved for future storage engine design)
-- Notification, Logging, Metrics, Analytics: implementation POSTPONED — extensible interfaces designed in `docs/s3-bucket-configuration-design.md#extensible-interfaces-design`
-- RequestPayment, Inventory: implementation POSTPONED — low priority
-- Security (IAM Policy, PublicAccessBlock): deferred to Spring Security integration
-- All persistence-related actions: postponed to storage-engine module design phase
+| Issue | Details | Targeted In |
+|-------|---------|-------------|
+| StorageClass extracted but not applied to domain aggregate | `x-amz-storage-class` parsed but not stored on `S3Object` | Phase 1f |
+| Missing ACL/grant headers | `x-amz-acl`, `x-amz-grant-*` not extracted | Phase 1e |
+| Missing tagging header | `x-amz-tagging` not extracted | Phase 1e |
+| Missing object lock headers | `x-amz-object-lock-legal-hold`, `x-amz-object-lock-mode`, `x-amz-object-lock-retain-until-on` not extracted | Phase 1e |
+| Content-Disposition/Encoding passed as null | Headers extracted but passed as null to service | Phase 1e |
+| Response missing headers | `x-amz-version-id`, `x-amz-request-id`, runtime headers not sent | Phase 1l |
+| StorageClass validation list has non-AWS classes | `S3Header.StorageClass` enum includes invalid entries | Phase 1f |
+| S3ProxyRouter compilation errors | Uses non-standard `accept()`/`queryParam()` methods | Phase 1g |
+| Handler-local ConcurrentHashMap still present | ACL and tagging stored in handler maps instead of domain/repository | Phase 1c |
+| Handler-level ETag computation still present | `DigestUtils.md5DigestAsHex()` in multipart handlers | Phase 1d |
+| SSE header parsing duplicated across handlers | Same 7 SSE headers parsed in 2 places | Phase 1h |
+| Missing CopyObject conditional headers | 8 copy-source conditional headers not extracted | Phase 1i |
+| Missing GetObject/HeadObject conditional headers | Range, If-Match, If-None-Match, If-* headers not parsed | Phase 1j |
+| Missing multipart checksum/SSE-C headers | UploadPart missing 7 headers | Phase 1k |
+| Missing request options | `x-amz-expected-bucket-owner`, `x-amz-request-payer`, `x-amz-version-id` not parsed | Phase 1m |
+| Missing response headers | `x-amz-id-2`, `x-amz-request-charged`, archive status, tagging count, etc. | Phase 1l |

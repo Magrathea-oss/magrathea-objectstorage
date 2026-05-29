@@ -1,22 +1,32 @@
 package com.example.magrathea.reactive.application.service;
 
+import com.example.magrathea.objectstore.domain.aggregate.ActiveS3Object;
 import com.example.magrathea.objectstore.domain.aggregate.Bucket;
+import com.example.magrathea.objectstore.domain.aggregate.CreatingS3Object;
+import com.example.magrathea.objectstore.domain.aggregate.LockedS3Object;
+import com.example.magrathea.objectstore.domain.aggregate.RestoredS3Object;
 import com.example.magrathea.objectstore.domain.aggregate.S3Object;
+import com.example.magrathea.objectstore.domain.valueobject.EncryptionConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.LegalHold;
+import com.example.magrathea.objectstore.domain.valueobject.ObjectChecksum;
 import com.example.magrathea.objectstore.domain.valueobject.ObjectKey;
 import com.example.magrathea.objectstore.domain.valueobject.ObjectLockConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.ObjectLambdaResponse;
 import com.example.magrathea.objectstore.domain.valueobject.RestoreConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.SelectRequest;
 import com.example.magrathea.objectstore.domain.valueobject.SelectResponse;
+import com.example.magrathea.objectstore.domain.valueobject.UserMetadata;
 import com.example.magrathea.objectstore.reactive.repository.application.BucketQueryRepository;
 import com.example.magrathea.objectstore.reactive.repository.application.S3ObjectCommandRepository;
 import com.example.magrathea.objectstore.reactive.repository.application.S3ObjectQueryRepository;
 import com.example.magrathea.objectstore.reactive.repository.application.CommandResult;
+import com.example.magrathea.reactive.infrastructure.adapter.persistence.BucketNotFoundException;
 import org.springframework.core.io.buffer.DataBuffer;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Flux;
 import org.springframework.stereotype.Service;
+
+import java.util.Map;
 
 @Service
 public class ReactiveObjectService {
@@ -35,12 +45,118 @@ public class ReactiveObjectService {
 
     // ── Core object operations ──
 
+    /**
+     * Save an S3Object (metadata-only, no content).
+     */
     public Mono<CommandResult<S3Object>> saveObject(S3Object object) {
         return commandRepository.save(object);
     }
 
+    /**
+     * Save an S3Object with streaming content.
+     * Creates a CreatingS3Object via the domain factory, then delegates to the repository
+     * which computes ETag, versionId, and transitions to ActiveS3Object.
+     */
+    public Mono<CommandResult<S3Object>> saveObjectWithContent(
+            S3Object.Id id, Bucket.Id bucketId, ObjectKey key,
+            String contentType, String contentDisposition, String contentEncoding,
+            long contentLength, Map<String, String> userMetadata,
+            EncryptionConfiguration encryption,
+            String storageClass,
+            Flux<DataBuffer> content) {
+        var creating = S3Object.create(id, bucketId, key, contentType,
+            contentDisposition, contentEncoding, contentLength, userMetadata, encryption);
+        return commandRepository.saveWithContent(creating, content, storageClass);
+    }
+
+    /**
+     * Save an S3Object with streaming content (accepts pre-built S3Object).
+     */
+    public Mono<CommandResult<S3Object>> saveObjectWithContent(S3Object object, Flux<DataBuffer> content,
+                                                                 String storageClass) {
+        return commandRepository.saveWithContent(object, content, storageClass);
+    }
+
+    /**
+     * Save an S3Object with streaming content, identified by its natural key.
+     * The ObjectKey carries both bucket name and object key, which is the
+     * true identity of an S3 object. The service looks up the bucket and creates
+     * the domain aggregate internally.
+     */
+    public Mono<CommandResult<S3Object>> saveObjectWithContent(
+            ObjectKey objectKey,
+            String contentType, String contentDisposition, String contentEncoding,
+            long contentLength, Map<String, String> userMetadata,
+            EncryptionConfiguration encryption,
+            String storageClass,
+            Flux<DataBuffer> content) {
+        var id = S3Object.Id.generate();
+        return bucketQueryRepository.findByName(objectKey.bucket())
+            .flatMap(bucket -> {
+                var creating = S3Object.create(id, bucket.id(), objectKey, contentType,
+                    contentDisposition, contentEncoding, contentLength, userMetadata, encryption);
+                return commandRepository.saveWithContent(creating, content, storageClass);
+            })
+            .switchIfEmpty(Mono.error(
+                new BucketNotFoundException(objectKey.bucket())));
+    }
+
+    /**
+     * Save an S3Object with streaming content, using the new domain container types
+     * ({@link ObjectChecksum}, {@link UserMetadata}).
+     * <p>
+     * The {@code ObjectKey} carries both bucket name and object key. The service looks
+     * up the bucket, creates the domain aggregate internally, and delegates to the
+     * repository for persistence.
+     * </p>
+     * <p>
+     * <strong>Note:</strong> The {@code checksum} parameter is accepted but not yet
+     * validated against the computed checksum. The repository computes checksums
+     * internally.
+     * </p>
+     */
+    public Mono<CommandResult<S3Object>> saveObjectWithContent(
+            ObjectKey objectKey,
+            String storageClass,
+            ObjectChecksum checksum,
+            EncryptionConfiguration encryption,
+            String contentType,
+            long contentLength,
+            UserMetadata userMetadata,
+            Flux<DataBuffer> content) {
+        var id = S3Object.Id.generate();
+        return bucketQueryRepository.findByName(objectKey.bucket())
+            .flatMap(bucket -> {
+                var userMetadataMap = userMetadata.entries();
+                var creating = S3Object.create(id, bucket.id(), objectKey, contentType,
+                    null, null, contentLength, userMetadataMap, encryption);
+                return commandRepository.saveWithContent(creating, content, storageClass);
+            })
+            .switchIfEmpty(Mono.error(
+                new BucketNotFoundException(objectKey.bucket())));
+        // TODO: Use ObjectChecksum for future validation/verification against
+        //       the internally-computed checksum.
+    }
+
+    /**
+     * Save an S3Object with streaming content (legacy signature for backward compat).
+     */
+    public Mono<CommandResult<S3Object>> saveObjectWithContent(S3Object object, Flux<DataBuffer> content) {
+        return commandRepository.saveWithContent(object, content, null);
+    }
+
+    /**
+     * Delete an S3Object via state machine transition.
+     */
     public Mono<CommandResult<S3Object>> deleteObject(S3Object object) {
-        return commandRepository.delete(object.withDeleted());
+        var deleted = switch (object) {
+            case ActiveS3Object a -> a.delete();
+            case CreatingS3Object c -> c.delete();
+            case LockedS3Object l -> l.delete();
+            case RestoredS3Object r -> r.delete();
+            default -> object; // Archived or Deleted
+        };
+        return commandRepository.delete(deleted);
     }
 
     public Mono<S3Object> findById(S3Object.Id objectId) {
@@ -51,120 +167,167 @@ public class ReactiveObjectService {
         return queryRepository.findByBucketAndKey(bucketId, key);
     }
 
+    /**
+     * Find an S3Object by its natural key (ObjectKey carries both bucket name and key).
+     */
+    public Mono<S3Object> findByBucketAndKey(ObjectKey key) {
+        return queryRepository.findByBucketAndKey(key);
+    }
+
     public Flux<S3Object> findByBucket(Bucket.Id bucketId) {
         return queryRepository.findByBucket(bucketId);
     }
 
-    public Flux<Byte> getContent(S3Object.Id objectId) {
+    public Flux<DataBuffer> getContent(S3Object.Id objectId) {
         return queryRepository.getContent(objectId);
+    }
+
+    /**
+     * Check if a bucket exists by name. Returns error Mono if not found.
+     */
+    public Mono<Bucket> verifyBucketExists(String bucketName) {
+        return bucketQueryRepository.findByName(bucketName)
+            .switchIfEmpty(Mono.error(new BucketNotFoundException(bucketName)));
     }
 
     // ── Phase F: Legal hold ──
 
-    /**
-     * Get legal hold status for an object.
-     */
     public Mono<LegalHold> getObjectLegalHold(String bucketName, ObjectKey key) {
         return queryRepository.findLegalHold(bucketName, key);
     }
 
-    /**
-     * Set legal hold status for an object.
-     */
     public Mono<Void> putObjectLegalHold(String bucketName, ObjectKey key, LegalHold hold) {
         return commandRepository.saveLegalHold(bucketName, key, hold);
     }
 
     // ── Phase F: Object lock configuration ──
 
-    /**
-     * Get object lock configuration for an object.
-     */
     public Mono<ObjectLockConfiguration> getObjectLockConfiguration(String bucketName, ObjectKey key) {
         return queryRepository.findObjectLockConfiguration(bucketName, key);
     }
 
-    /**
-     * Set object lock configuration for an object.
-     */
     public Mono<Void> putObjectLockConfiguration(String bucketName, ObjectKey key, ObjectLockConfiguration config) {
         return commandRepository.saveObjectLockConfiguration(bucketName, key, config);
     }
 
     // ── Phase F: Retention ──
 
-    /**
-     * Get retention period for an object.
-     */
     public Mono<ObjectLockConfiguration.RetentionPeriod> getObjectRetention(String bucketName, ObjectKey key) {
         return queryRepository.findRetention(bucketName, key);
     }
 
-    /**
-     * Set retention period for an object.
-     */
     public Mono<Void> putObjectRetention(String bucketName, ObjectKey key, ObjectLockConfiguration.RetentionPeriod retention) {
         return commandRepository.saveRetention(bucketName, key, retention);
     }
 
     // ── Phase F: Restore ──
 
-    /**
-     * Restore an archived object.
-     */
     public Mono<Void> restoreObject(String bucketName, ObjectKey key, RestoreConfiguration config) {
         return commandRepository.saveRestore(bucketName, key, config);
     }
 
     // ── Phase F: Encryption update ──
 
-    /**
-     * Update server-side encryption for an object.
-     */
-    public Mono<Void> updateObjectEncryption(String bucketName, ObjectKey key, String encryption) {
+    public Mono<Void> updateObjectEncryption(String bucketName, ObjectKey key, EncryptionConfiguration encryption) {
         return commandRepository.saveEncryption(bucketName, key, encryption);
     }
 
     // ── Phase F: Rename ──
 
-    /**
-     * Rename an object (change its key).
-     */
     public Mono<Void> renameObject(String bucketName, ObjectKey sourceKey, ObjectKey destinationKey) {
         return commandRepository.renameObject(bucketName, sourceKey, destinationKey);
     }
 
     // ── Phase F: Torrent ──
 
-    /**
-     * Get torrent file for an object.
-     */
-    public Mono<Flux<DataBuffer>> getObjectTorrent(String bucketName, ObjectKey key) {
+    public Flux<DataBuffer> getObjectTorrent(String bucketName, ObjectKey key) {
         return queryRepository.findTorrent(bucketName, key);
     }
 
     // ── Phase F: Select content ──
 
-    /**
-     * Select object content using SQL-like query.
-     * Returns a SelectResponse with metadata about the query result.
-     */
     public Mono<SelectResponse> selectObjectContent(String bucketName, ObjectKey key, SelectRequest request) {
-        // Resolve bucket name to Bucket.Id, then look up the object
         return bucketQueryRepository.findByName(bucketName)
-            .flatMap(bucket -> queryRepository.findByBucketAndKey(bucket.id(), key))
-            .flatMap(obj -> Mono.just(SelectResponse.of(obj.size(), "OK", "placeholder-request-id")))
+            .flatMap(bucket -> queryRepository.findByBucketAndKey(key))
+            .map(obj -> SelectResponse.of(obj.contentDescriptor() != null ? obj.contentDescriptor().size() : 0L, "OK", "placeholder-request-id"))
             .switchIfEmpty(Mono.just(SelectResponse.of(0L, "NoSuchKey", "placeholder-request-id")));
     }
 
     // ── Phase F: Object Lambda response ──
 
-    /**
-     * Write the response from an Object Lambda function.
-     */
     public Mono<ObjectLambdaResponse> writeGetObjectResponse(ObjectLambdaResponse response) {
-        // Domain-level validation and orchestration.
-        // The actual write is handled by infrastructure.
         return Mono.just(response);
+    }
+
+    // ── ObjectKey-based convenience methods ──
+
+    /**
+     * Simple record holding both an S3Object and its streaming content.
+     */
+    public record ObjectWithContent(S3Object object, Flux<DataBuffer> content) {}
+
+    /**
+     * Delete an object identified by its natural {@link ObjectKey}.
+     * Looks up the bucket internally.
+     * <p>If the bucket is not found, returns {@code Mono.error(BucketNotFoundException)}.
+     * If the object is not found, returns {@code Mono.empty()}.</p>
+     */
+    public Mono<Void> deleteObject(ObjectKey objectKey) {
+        return bucketQueryRepository.findByName(objectKey.bucket())
+            .switchIfEmpty(Mono.error(new BucketNotFoundException(objectKey.bucket())))
+            .flatMap(bucket -> queryRepository.findByBucketAndKey(bucket.id(), objectKey))
+            .flatMap(obj -> commandRepository.delete(obj).then());
+    }
+
+    /**
+     * Get an object identified by its natural {@link ObjectKey}.
+     * Looks up the bucket internally.
+     * <p>If the bucket is not found, returns {@code Mono.error(BucketNotFoundException)}.
+     * If the object is not found, returns {@code Mono.empty()}.</p>
+     */
+    public Mono<S3Object> getObject(ObjectKey objectKey) {
+        return bucketQueryRepository.findByName(objectKey.bucket())
+            .switchIfEmpty(Mono.error(new BucketNotFoundException(objectKey.bucket())))
+            .flatMap(bucket -> queryRepository.findByBucketAndKey(bucket.id(), objectKey));
+    }
+
+    /**
+     * Get an object with its streaming content, identified by its natural {@link ObjectKey}.
+     * Looks up the bucket internally.
+     * <p>If the bucket is not found, returns {@code Mono.error(BucketNotFoundException)}.
+     * If the object is not found, returns {@code Mono.empty()}.</p>
+     */
+    public Mono<ObjectWithContent> getObjectWithContent(ObjectKey objectKey) {
+        return bucketQueryRepository.findByName(objectKey.bucket())
+            .switchIfEmpty(Mono.error(new BucketNotFoundException(objectKey.bucket())))
+            .flatMap(bucket -> queryRepository.findByBucketAndKey(bucket.id(), objectKey))
+            .flatMap(obj -> Mono.just(new ObjectWithContent(obj, queryRepository.getContent(obj.id()))));
+    }
+
+    /**
+     * Get torrent data for an object identified by its natural {@link ObjectKey}.
+     * Looks up the bucket internally.
+     * <p>If the bucket is not found, returns {@code Mono.error(BucketNotFoundException)}.
+     * If the object is not found, returns {@code Mono.empty()}.</p>
+     */
+    public Mono<Flux<DataBuffer>> getObjectTorrent(ObjectKey objectKey) {
+        return bucketQueryRepository.findByName(objectKey.bucket())
+            .switchIfEmpty(Mono.error(new BucketNotFoundException(objectKey.bucket())))
+            .flatMap(bucket -> queryRepository.findByBucketAndKey(bucket.id(), objectKey))
+            .flatMap(obj -> Mono.just(queryRepository.findTorrent(objectKey.bucket(), objectKey)));
+    }
+
+    /**
+     * Check whether an object exists by its natural {@link ObjectKey}.
+     * Looks up the bucket internally.
+     * <p>If the bucket is not found, returns {@code Mono.error(BucketNotFoundException)}.
+     * If the object is not found, returns {@code Mono.just(false)}.</p>
+     */
+    public Mono<Boolean> objectExists(ObjectKey objectKey) {
+        return bucketQueryRepository.findByName(objectKey.bucket())
+            .switchIfEmpty(Mono.error(new BucketNotFoundException(objectKey.bucket())))
+            .flatMap(bucket -> queryRepository.findByBucketAndKey(bucket.id(), objectKey))
+            .map(obj -> true)
+            .switchIfEmpty(Mono.just(false));
     }
 }

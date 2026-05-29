@@ -168,10 +168,165 @@ The application layer separates write and read concerns at the repository level:
 
 This enables independent optimization of read and write paths, and aligns with CQS principles at the persistence boundary.
 
+=== Reactive Error Handling
+
+Error handling follows the reactive pattern with typed exceptions and S3 XML error serialization:
+
+==== Exception Hierarchy
+
+```
+S3Exception (abstract)
+├── NoSuchBucketException     → 404 NoSuchBucket
+├── NoSuchKeyException        → 404 NoSuchKey
+├── BucketAlreadyExistsException → 409 BucketAlreadyExists
+├── InvalidArgumentException  → 400 InvalidArgument
+├── AccessDeniedException     → 403 AccessDenied
+└── InternalServerException   → 500 InternalServerError
+```
+
+==== Handler Error Chain
+
+```java
+// Handler-level error handling
+public Mono<ServerResponse> handleGet(ServerRequest request) {
+    return service.findBucket(name)
+        .flatMap(bucket -> service.getObject(bucket, key))
+        .map(object -> buildResponse(object))
+        .onErrorResume(NoSuchBucketException.class, e -> errorResponse(404, "NoSuchBucket"))
+        .onErrorResume(NoSuchKeyException.class, e -> errorResponse(404, "NoSuchKey"))
+        .onErrorResume(InvalidArgumentException.class, e -> errorResponse(400, "InvalidArgument"))
+        .onErrorResume(throwable -> errorResponse(500, "InternalError"));
+}
+```
+
+All error responses use `S3WebSupport.errorResponse()` which creates a Jackson 3 XML annotated `S3Error` record.
+
+=== Domain Events and State Transitions (Detailed)
+
+==== Aggregate Root Pattern
+
+All three aggregates (Bucket, S3Object, MultipartUpload) follow the same pattern:
+
+1. State transitions return NEW immutable instances — no mutation
+2. Each transition records a domain event in an accumulated list
+3. `domainEvents()` retrieves pending events
+4. `clearEvents()` returns a clean instance ready for persistence
+
+==== Bucket Events
+
+```
+ObjectStoreEvent (sealed interface)
+├── BucketCreated
+├── BucketDeleted
+├── BucketVersioningEnabled
+├── BucketVersioningSuspended
+├── BucketEncryptionEnabled
+├── BucketCorsConfigurationChanged      (carries CorsConfiguration)
+├── BucketLifecycleConfigurationChanged (carries BucketLifecycleConfiguration)
+├── BucketEncryptionConfigurationChanged (carries BucketEncryptionConfiguration)
+├── BucketLoggingConfigurationChanged    (carries BucketLoggingConfiguration)
+├── BucketWebsiteConfigurationChanged    (carries BucketWebsiteConfiguration)
+├── BucketNotificationConfigurationChanged (carries BucketNotificationConfiguration)
+├── BucketReplicationConfigurationChanged (carries BucketReplicationConfiguration)
+├── BucketPolicyChanged                 (carries BucketPolicy)
+├── BucketPublicAccessBlockChanged      (carries PublicAccessBlockConfiguration)
+├── BucketOwnershipControlsChanged      (carries BucketOwnershipControls)
+├── BucketRequestPaymentChanged         (carries BucketRequestPaymentConfiguration)
+├── BucketAccelerateConfigurationChanged (carries BucketAccelerateConfiguration)
+├── BucketAnalyticsConfigurationAdded   (carries BucketAnalyticsConfiguration)
+├── BucketAnalyticsConfigurationRemoved
+├── BucketInventoryConfigurationAdded   (carries BucketInventoryConfiguration)
+├── BucketInventoryConfigurationRemoved
+├── BucketMetricsConfigurationAdded     (carries BucketMetricsConfiguration)
+├── BucketMetricsConfigurationRemoved
+├── BucketIntelligentTieringConfigurationAdded (carries BucketIntelligentTieringConfiguration)
+├── BucketIntelligentTieringConfigurationRemoved
+```
+
+==== S3Object Events
+
+```
+ObjectStoreEvent (sealed interface)
+├── ObjectCreated                      (carries S3Object)
+├── ObjectDeleted
+├── ObjectEtagUpdated                  (carries String etag)
+├── ObjectStorageClassChanged          (carries StorageClass)
+├── ObjectAclChanged                   (carries AccessControlPolicy)
+├── ObjectTaggingChanged               (carries Map<String,String>)
+├── ObjectLegalHoldChanged             (carries LegalHold)
+├── ObjectLegalHoldRemoved
+├── ObjectRetentionChanged             (carries RetentionPeriod)
+├── ObjectRetentionRemoved
+├── ObjectEncryptionChanged            (carries EncryptionConfiguration)
+├── ObjectEncryptionRemoved
+```
+
+==== MultipartUpload Events
+
+```
+ObjectStoreEvent (sealed interface)
+├── ContentDescriptorCreated           (carries MultipartUpload)
+├── PartUploaded                       (carries UploadPart)
+├── MultipartUploadCreated
+├── MultipartUploadCompleted
+├── MultipartUploadAborted
+```
+
+=== AWS CLI Header Compatibility
+
+The system must handle headers that the AWS CLI v2 sends by default on every `aws s3api put-object` request. These headers are critical for AWS CLI compatibility but are currently ignored by the handler.
+
+==== Default Headers Sent by AWS CLI v2
+
+| Header | Value | Purpose | Handler Status |
+|--------|-------|---------|----------------|
+| `x-amz-sdk-checksum-algorithm` | `crc64nvme` (default) | Identifies the checksum algorithm used | ❌ Not read |
+| `x-amz-checksum-crc64nvme` | BASE64 CRC64-NVME hash | Payload integrity hash computed automatically by AWS CLI | ❌ Not validated |
+| `X-Amz-Date` | ISO 8601 timestamp | SigV4 signing timestamp | ❌ Not validated |
+| `X-Amz-Content-SHA256` | SHA256 hex string | SigV4 payload hash | ❌ Not validated |
+| `Authorization` | SigV4 signature string | SigV4 signature | ❌ Not validated |
+| `User-Agent` | SDK identifier string | Client identification | ❌ Not read |
+| `Expect` | `100-continue` | Hop-by-hop header for large payloads | ❌ Not read |
+
+==== Checksum Algorithm Mapping
+
+When `--checksum-algorithm <alg>` is specified, AWS CLI v2 **automatically computes** the hash and sends it in the corresponding header:
+
+| CLI `--checksum-algorithm` | Header Sent | Automatic Computation |
+|---------------------------|-------------|---------------------|
+| `crc64nvme` (default) | `x-amz-checksum-crc64nvme` | ✅ Yes — AWS CLI computes CRC64-NVME |
+| `crc32` | `x-amz-checksum-crc32` | ✅ Yes |
+| `crc32c` | `x-amz-checksum-crc32c` | ✅ Yes |
+| `sha1` | `x-amz-checksum-sha1` | ✅ Yes |
+| `sha256` | `x-amz-checksum-sha256` | ✅ Yes |
+| `sha512` | `x-amz-checksum-sha512` | ✅ Yes |
+| `xxhash64` | `x-amz-checksum-xxhash64` | ✅ Yes |
+| `xxhash3` | `x-amz-checksum-xxhash3` | ✅ Yes |
+| `xxhash128` | `x-amz-checksum-xxhash128` | ✅ Yes |
+
+The server must read `x-amz-sdk-checksum-algorithm`, re-compute the hash of the received body with that algorithm, and compare against the corresponding `x-amz-checksum-<alg>` header. A mismatch must return `400 InvalidArgument (ChecksumMismatch)`.
+
+==== Content-Type Handling
+
+AWS CLI v2 does NOT send `Content-Type` by default unless `--content-type` is explicitly passed. The handler currently falls back to `application/octet-stream`. When AWS CLI is used, the stored content-type is incorrect — the object will be served with `application/octet-stream` instead of the actual content type.
+
+==== Current Gap Summary
+
+| Gap | Impact | Severity |
+|-----|--------|---------|
+| Checksum headers ignored | No data integrity validation — corrupted payloads accepted silently | 🔴 High |
+| SigV4 headers ignored | No authentication — anyone can write/read objects | 🔴 High |
+| Content-Type not sent by AWS CLI | Wrong content-type stored when using AWS CLI | 🟡 Medium |
+| User-Agent ignored | No client identification for analytics | 🟢 Low |
+| Expect ignored | No 100-continue optimization | 🟢 Low |
+
 === Testing Strategy
 
 Three levels of testing:
 
-1. **Domain:** Pure JUnit, zero Spring — test invariants and business rules
-2. **S3 Integration:** Cucumber BDD with WebTestClient — verify HTTP endpoints
-3. **AWS CLI Compatibility:** `test-aws-cli.sh` bash script + `mvn verify -Paws-cli-tests`
+1. **Domain:** Pure JUnit, zero Spring — test invariants and business rules (213 tests)
+2. **Application:** Reactive application service tests (18 tests)
+3. **S3 Integration:** Cucumber BDD with WebTestClient — verify HTTP endpoints (227 tests)
+4. **AWS CLI Compatibility:** `test-aws-cli.sh` bash script + `mvn verify -Paws-cli-tests`
+
+Total: **479 tests**, 12 failures (12 anomaly tests documenting known bugs in put_object handler — see PLAN.md Phase 0 for details).

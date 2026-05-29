@@ -25,6 +25,7 @@ import java.util.UUID;
 
 /**
  * Multipart upload S3 operations handler.
+ * Minimal handler — delegates bucket existence checks to service, removes handler-level checks.
  * POST /{bucket}/{key}?uploads — CreateMultipartUpload
  * PUT /{bucket}/{key}?uploadId=...&partNumber=... — UploadPart
  * PUT /{bucket}/{key}?uploadId=...&partNumber=...&x-amz-copy-source — UploadPartCopy
@@ -52,7 +53,7 @@ public class S3MultipartHandler {
             .flatMap(b -> {
                 var uploadId = UploadId.generate();
                 var upload = MultipartUpload.create(
-                    MultipartUpload.Id.generate(), b.id(), ObjectKey.of(key), uploadId
+                    MultipartUpload.Id.generate(), b.id(), ObjectKey.of(bucket, key), uploadId
                 );
                 return multipartUploadService.saveUpload(upload)
                     .then(ServerResponse.ok()
@@ -60,7 +61,7 @@ public class S3MultipartHandler {
                         .bodyValue(InitiateMultipartUploadQuery.from(
                             bucket, key, upload.uploadId().value())));
             })
-            .switchIfEmpty(ServerResponse.status(HttpStatus.NOT_FOUND)
+            .onErrorResume(ex -> ServerResponse.status(HttpStatus.NOT_FOUND)
                 .contentType(MediaType.APPLICATION_XML)
                 .bodyValue(ErrorQuery.from("NoSuchBucket", "Bucket not found")));
     }
@@ -166,14 +167,14 @@ public class S3MultipartHandler {
             .flatMap(b -> {
                 Flux<ListMultipartUploadsQuery.UploadEntry> entries = multipartUploadService.findByBucket(b.id())
                     .map(u -> ListMultipartUploadsQuery.UploadEntry.from(
-                        u.key().value(), u.uploadId().value(), u.initiated()
+                        u.key().key(), u.uploadId().value(), u.initiated()
                     ));
                 return ListMultipartUploadsQuery.from(bucket, entries)
                     .flatMap(result -> ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_XML)
                         .bodyValue(result));
             })
-            .switchIfEmpty(ServerResponse.status(HttpStatus.NOT_FOUND)
+            .onErrorResume(ex -> ServerResponse.status(HttpStatus.NOT_FOUND)
                 .contentType(MediaType.APPLICATION_XML)
                 .bodyValue(ErrorQuery.from("NoSuchBucket", "Bucket not found")));
     }

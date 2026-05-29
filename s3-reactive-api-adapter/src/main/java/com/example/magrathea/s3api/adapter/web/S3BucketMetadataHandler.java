@@ -34,7 +34,8 @@ public class S3BucketMetadataHandler {
         return bucketService.findByName(bucket)
             .flatMap(b -> ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(AccessControlPolicyQuery.canned(bucketAclStore.getOrDefault(bucket, "private"))))
+                .bodyValue(AccessControlPolicyQuery.canned(
+                    S3WebSupport.visibleAcl(b, bucketAclStore.getOrDefault(bucket, "private")))))
             .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
     }
 
@@ -43,10 +44,14 @@ public class S3BucketMetadataHandler {
         var bucket = request.pathVariable("bucket");
         return bucketService.findByName(bucket)
             .flatMap(b -> {
-                bucketAclStore.put(bucket, request.headers().firstHeader("x-amz-acl") != null
+                var acl = request.headers().firstHeader("x-amz-acl") != null
                     ? request.headers().firstHeader("x-amz-acl")
-                    : "private");
-                return ServerResponse.ok().build();
+                    : "private";
+                return S3WebSupport.validatePublicAclMutation(b, acl)
+                    .switchIfEmpty(Mono.defer(() -> {
+                        bucketAclStore.put(bucket, acl);
+                        return ServerResponse.ok().build();
+                    }));
             })
             .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
     }

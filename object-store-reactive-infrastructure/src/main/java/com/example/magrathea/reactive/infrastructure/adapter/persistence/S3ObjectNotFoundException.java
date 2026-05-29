@@ -1,14 +1,14 @@
 package com.example.magrathea.reactive.infrastructure.adapter.persistence;
 
-import com.example.magrathea.objectstore.domain.aggregate.S3Object;
+import com.example.magrathea.objectstore.domain.valueobject.ObjectKey;
 
 public class S3ObjectNotFoundException extends RuntimeException {
-    private final S3Object.Id objectId;
+    private final ObjectKey objectKey;
 
-    public S3ObjectNotFoundException(S3Object.Id objectId) {
-        super("S3Object not found: " + objectId.value());
-        this.objectId = objectId;
+    public S3ObjectNotFoundException(ObjectKey objectKey) {
+        super("S3Object not found: " + objectKey);
+        this.objectKey = objectKey;
     }
 
-    public S3Object.Id objectId() { return objectId; }
+    public ObjectKey objectKey() { return objectKey; }
 }

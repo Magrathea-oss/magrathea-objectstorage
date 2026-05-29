@@ -4,7 +4,6 @@ import com.example.magrathea.reactive.infrastructure.adapter.persistence.InMemor
 import com.example.magrathea.reactive.infrastructure.adapter.persistence.InMemoryReactiveMultipartUploadRepository;
 import com.example.magrathea.reactive.infrastructure.adapter.persistence.InMemoryReactiveS3ObjectRepository;
 import com.example.magrathea.s3api.adapter.web.S3BucketConfigHandler;
-import com.example.magrathea.s3api.adapter.web.S3ObjectOperationsHandler;
 import io.cucumber.java.Before;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -29,16 +28,12 @@ public class RepositoryResetSteps {
     @Autowired
     private S3BucketConfigHandler bucketConfigHandler;
 
-    @Autowired
-    private S3ObjectOperationsHandler objectOperationsHandler;
-
     @Before
     public void resetRepositories() {
         bucketRepository.reset();
         objectRepository.reset();
         multipartUploadRepository.reset();
         bucketConfigHandler.resetInMemoryConfigurations();
-        objectOperationsHandler.resetInMemoryContent();
         commonSteps.reset();
     }
 }

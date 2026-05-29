@@ -16,7 +16,7 @@ class MultipartUploadTest {
     void shouldCreateMultipartUpload() {
         MultipartUpload.Id id = MultipartUpload.Id.generate();
         Bucket.Id bucketId = Bucket.Id.generate();
-        ObjectKey key = ObjectKey.of("test-key.txt");
+        ObjectKey key = ObjectKey.of("test-bucket", "test-key.txt");
         UploadId uploadId = UploadId.generate();
         MultipartUpload upload = MultipartUpload.create(id, bucketId, key, uploadId);
 
@@ -89,7 +89,7 @@ class MultipartUploadTest {
     void shouldRestoreFromPersistence() {
         MultipartUpload.Id id = MultipartUpload.Id.generate();
         Bucket.Id bucketId = Bucket.Id.generate();
-        ObjectKey key = ObjectKey.of("key");
+        ObjectKey key = ObjectKey.of("test-bucket", "key");
         UploadId uploadId = UploadId.generate();
         UploadPart part = UploadPart.create(PartNumber.of(1), "\"etag\"", 100);
 
@@ -104,7 +104,7 @@ class MultipartUploadTest {
         return MultipartUpload.create(
             MultipartUpload.Id.generate(),
             Bucket.Id.generate(),
-            ObjectKey.of("test-key.txt"),
+            ObjectKey.of("test-bucket", "test-key.txt"),
             UploadId.generate()
         );
     }

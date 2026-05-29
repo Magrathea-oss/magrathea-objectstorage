@@ -1,14 +1,12 @@
 package com.example.magrathea.reactive.infrastructure.adapter.persistence;
 
-import com.example.magrathea.objectstore.domain.aggregate.Bucket;
-
 public class BucketNotFoundException extends RuntimeException {
-    private final Bucket.Id bucketId;
+    private final String bucketName;
 
-    public BucketNotFoundException(Bucket.Id bucketId) {
-        super("Bucket not found: " + bucketId.value());
-        this.bucketId = bucketId;
+    public BucketNotFoundException(String bucketName) {
+        super("Bucket not found: " + bucketName);
+        this.bucketName = bucketName;
     }
 
-    public Bucket.Id bucketId() { return bucketId; }
+    public String bucketName() { return bucketName; }
 }

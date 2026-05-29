@@ -35,7 +35,7 @@ public record ListVersionsQuery(
     public static Mono<ListVersionsQuery> from(String bucket, Flux<S3Object> objects) {
         return objects
             .map(o -> new VersionEntry(
-                o.key().value(),
+                o.key().key(),
                 "\"\""
             ))
             .collectList()
@@ -49,7 +49,7 @@ public record ListVersionsQuery(
     public static ListVersionsQuery from(String bucket, List<S3Object> objects) {
         List<VersionEntry> entries = objects.stream()
             .map(o -> new VersionEntry(
-                o.key().value(),
+                o.key().key(),
                 "\"\""
             ))
             .toList();

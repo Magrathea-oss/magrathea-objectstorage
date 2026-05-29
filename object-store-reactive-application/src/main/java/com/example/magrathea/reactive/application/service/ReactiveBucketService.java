@@ -167,6 +167,6 @@ public class ReactiveBucketService {
      * Create a new session token.
      */
     public Mono<SessionToken> createSession() {
-        return Mono.fromCallable(() -> SessionToken.of(UUID.randomUUID().toString()));
+        return Mono.defer(() -> Mono.just(SessionToken.of(UUID.randomUUID().toString())));
     }
 }

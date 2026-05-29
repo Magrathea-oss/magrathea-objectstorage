@@ -125,6 +125,127 @@ image::../../c4/images/ReactiveInfrastructureComponents.png[Reactive Infrastruct
 | `InMemoryReactiveS3ObjectRepository` | In-memory reactive S3ObjectRepository: ConcurrentHashMap for metadata and raw bytes via Mono/Flux |
 | `InMemoryReactiveMultipartUploadRepository` | In-memory reactive MultipartUploadRepository: ConcurrentHashMap for upload sessions via Mono/Flux |
 
+=== Level 3 — Code View (Aggregate Root Patterns)
+
+The domain aggregates follow a strict state transition pattern:
+
+==== Bucket Aggregate
+
+`Bucket` is the root aggregate for bucket management. It enforces all state transitions through dedicated `with*()` methods:
+
+```java
+public interface Bucket {
+    // Lifecycle
+    Bucket withVersioningEnabled();
+    Bucket withVersioningSuspended();
+    Bucket withDeleted();
+
+    // Configuration (one per config type)
+    Bucket withCorsConfiguration(CorsConfiguration cors);
+    Bucket withoutCorsConfiguration();
+    Bucket withLifecycleConfiguration(BucketLifecycleConfiguration lifecycle);
+    Bucket withoutLifecycleConfiguration();
+    Bucket withEncryptionConfiguration(BucketEncryptionConfiguration encryption);
+    Bucket withoutEncryptionConfiguration();
+    Bucket withLoggingConfiguration(BucketLoggingConfiguration logging);
+    Bucket withoutLoggingConfiguration();
+    Bucket withWebsiteConfiguration(BucketWebsiteConfiguration website);
+    Bucket withoutWebsiteConfiguration();
+    Bucket withNotificationConfiguration(BucketNotificationConfiguration notification);
+    Bucket withoutNotificationConfiguration();
+    Bucket withReplicationConfiguration(BucketReplicationConfiguration replication);
+    Bucket withoutReplicationConfiguration();
+    Bucket withPolicy(BucketPolicy policy);
+    Bucket withoutPolicy();
+    Bucket withPublicAccessBlockConfiguration(PublicAccessBlockConfiguration publicAccessBlock);
+    Bucket withoutPublicAccessBlockConfiguration();
+    Bucket withOwnershipControls(BucketOwnershipControls ownershipControls);
+    Bucket withoutOwnershipControls();
+    Bucket withRequestPaymentConfiguration(BucketRequestPaymentConfiguration requestPayment);
+    Bucket withoutRequestPaymentConfiguration();
+    Bucket withAccelerateConfiguration(BucketAccelerateConfiguration accelerate);
+    Bucket withoutAccelerateConfiguration();
+
+    // Multi-instance config (analytics, inventory, metrics, intelligent-tiering)
+    Bucket withAnalyticsConfiguration(String id, BucketAnalyticsConfiguration analytics);
+    Bucket withoutAnalyticsConfiguration(String id);
+    Bucket withInventoryConfiguration(String id, BucketInventoryConfiguration inventory);
+    Bucket withoutInventoryConfiguration(String id);
+    Bucket withMetricsConfiguration(String id, BucketMetricsConfiguration metrics);
+    Bucket withoutMetricsConfiguration(String id);
+    Bucket withIntelligentTieringConfiguration(String id, BucketIntelligentTieringConfiguration tiering);
+    Bucket withoutIntelligentTieringConfiguration(String id);
+
+    // Domain event access
+    List<ObjectStoreEvent> domainEvents();
+    Bucket clearEvents();
+}
+```
+
+==== S3Object Aggregate
+
+`S3Object` enforces state transitions for object lifecycle, metadata, ACL, tagging, legal hold, retention, and encryption:
+
+```java
+public interface S3Object {
+    S3Object withDeleted();
+    S3Object withEtag(String etag);
+    S3Object withStorageClass(StorageClass storageClass);
+    S3Object withAcl(AccessControlPolicy acl);
+    S3Object withTagging(Map<String, String> tagging);
+    S3Object withLegalHold(LegalHold legalHold);
+    S3Object withoutLegalHold();
+    S3Object withRetention(RetentionPeriod retention);
+    S3Object withoutRetention();
+    S3Object withEncryption(EncryptionConfiguration encryption);
+    S3Object withoutEncryption();
+    List<ObjectStoreEvent> domainEvents();
+    S3Object clearEvents();
+}
+```
+
+==== MultipartUpload Aggregate
+
+`MultipartUpload` enforces multipart upload lifecycle transitions:
+
+```java
+public interface MultipartUpload {
+    MultipartUpload withPartUploaded(UploadPart part);
+    MultipartUpload withCompleted();
+    MultipartUpload withAborted();
+    List<ObjectStoreEvent> domainEvents();
+    MultipartUpload clearEvents();
+}
+```
+
+=== Registry-Based Handler Dispatch
+
+The `S3BucketConfigHandler` uses a registry/strategy pattern to dispatch configuration operations:
+
+```java
+public class S3BucketConfigHandler {
+    private final ConfigHandlerRegistry registry;
+
+    Mono<ServerResponse> handleGet(ServerRequest request, ConfigType type) {
+        ConfigHandlerStrategy strategy = registry.lookup(type);
+        // strategy performs GET using typed methods
+        return strategy.handleGet(request);
+    }
+
+    Mono<ServerResponse> handlePut(ServerRequest request, ConfigType type) {
+        ConfigHandlerStrategy strategy = registry.lookup(type);
+        // strategy performs PUT using typed methods
+        return strategy.handlePut(request);
+    }
+
+    Mono<ServerResponse> handleDelete(ServerRequest request, ConfigType type) {
+        ConfigHandlerStrategy strategy = registry.lookup(type);
+        // strategy performs DELETE using typed methods
+        return strategy.handleDelete(request);
+    }
+}
+```
+
 === Important Interfaces
 
 | Interface | Description | Connected Containers |

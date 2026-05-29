@@ -14,7 +14,6 @@ import org.springframework.stereotype.Repository;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
 
 @Repository
 public class InMemoryReactiveMultipartUploadRepository implements MultipartUploadCommandRepository, MultipartUploadQueryRepository {
@@ -24,52 +23,49 @@ public class InMemoryReactiveMultipartUploadRepository implements MultipartUploa
 
     @Override
     public Mono<CommandResult<MultipartUpload>> save(MultipartUpload upload) {
-        return Mono.fromCallable(() -> {
+        return Mono.defer(() -> {
             boolean exists = store.containsKey(upload.uploadId());
             MultipartUpload clean = upload.clearEvents();
             store.put(upload.uploadId(), clean);
             long version = versionCounter.getAndIncrement();
-            if (exists) {
-                return new CommandResult.Updated<>(clean, upload.domainEvents(), version);
-            } else {
-                return new CommandResult.Created<>(clean, upload.domainEvents(), version);
-            }
+            CommandResult<MultipartUpload> result = exists
+                ? new CommandResult.Updated<>(clean, upload.domainEvents(), version)
+                : new CommandResult.Created<>(clean, upload.domainEvents(), version);
+            return Mono.just(result);
         });
     }
 
     @Override
     public Mono<CommandResult<MultipartUpload>> delete(MultipartUpload upload) {
-        return Mono.fromCallable(() -> {
+        return Mono.defer(() -> {
             MultipartUpload removed = store.remove(upload.uploadId());
             if (removed == null) {
-                throw new MultipartUploadNotFoundException(upload.uploadId());
+                return Mono.error(new MultipartUploadNotFoundException(upload.uploadId()));
             }
-            return new CommandResult.Deleted<>(removed, upload.domainEvents(), versionCounter.getAndIncrement());
+            return Mono.just(new CommandResult.Deleted<>(removed, upload.domainEvents(), versionCounter.getAndIncrement()));
         });
     }
 
     @Override
     public Mono<MultipartUpload> findById(UploadId uploadId) {
-        return Mono.fromCallable(() -> store.get(uploadId))
-                .flatMap(Mono::justOrEmpty);
+        return Mono.defer(() -> Mono.justOrEmpty(store.get(uploadId)));
     }
 
     @Override
     public Flux<MultipartUpload> findByBucket(Bucket.Id bucketId) {
-        return Flux.fromIterable(
-            store.values().stream()
-                .filter(u -> u.bucketId().equals(bucketId))
-                .collect(Collectors.toList())
-        );
+        return Flux.defer(() -> Flux.fromIterable(store.values())
+            .filter(u -> u.bucketId().equals(bucketId)));
     }
 
     @Override
     public Flux<UploadPart> findParts(UploadId uploadId) {
-        MultipartUpload upload = store.get(uploadId);
-        if (upload == null) {
-            return Flux.empty();
-        }
-        return Flux.fromIterable(upload.parts());
+        return Flux.defer(() -> {
+            MultipartUpload upload = store.get(uploadId);
+            if (upload == null) {
+                return Flux.empty();
+            }
+            return Flux.fromIterable(upload.parts());
+        });
     }
 
     public void reset() {

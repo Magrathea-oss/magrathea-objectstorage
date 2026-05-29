@@ -1,5 +1,6 @@
 package com.example.magrathea.s3api.cucumber.steps;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 
 import java.util.HashMap;
@@ -13,6 +14,7 @@ public class CommonSteps {
 
     private HttpStatusCode responseStatus;
     private String responseBody;
+    private HttpHeaders responseHeaders = HttpHeaders.EMPTY;
     private final Map<String, String> sharedState = new HashMap<>();
 
     public void setResponseStatus(HttpStatusCode status) {
@@ -35,6 +37,18 @@ public class CommonSteps {
         return responseBody;
     }
 
+    public void setResponseHeaders(HttpHeaders headers) {
+        this.responseHeaders = headers;
+    }
+
+    public HttpHeaders getResponseHeaders() {
+        return responseHeaders;
+    }
+
+    public String getResponseHeader(String name) {
+        return responseHeaders.getFirst(name);
+    }
+
     public void set(String key, String value) {
         sharedState.put(key, value);
     }
@@ -46,6 +60,7 @@ public class CommonSteps {
     public void reset() {
         this.responseStatus = null;
         this.responseBody = null;
+        this.responseHeaders = HttpHeaders.EMPTY;
         sharedState.clear();
     }
 }

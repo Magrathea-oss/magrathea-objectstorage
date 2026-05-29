@@ -33,45 +33,47 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
       tags "external-system"
     }
 
-
     magrathea = softwareSystem "Magrathea ObjectStore" "AWS S3-compatible object storage built with Spring Boot 4 WebFlux and Java 21." {
       s3ReactiveApiAdapter = container "s3-reactive-api-adapter" "HTTP adapter that exposes the S3-compatible REST API and translates HTTP/XML/binary requests into reactive application use cases." "Spring Boot 4 WebFlux, RouterFunction, Java 21, Jackson XML" {
-        bucketOperationsHandler = component "S3BucketOperationsHandler" "Handles bucket lifecycle endpoints: create, delete, head, list, location and versioning." "Java WebFlux handler"
+        bucketOperationsHandler = component "S3BucketOperationsHandler" "Handles bucket lifecycle endpoints: create, delete, head, list, location, versioning and directory-bucket listing." "Java WebFlux handler"
         bucketMetadataHandler = component "S3BucketMetadataHandler" "Handles bucket metadata endpoints such as ACL and tagging." "Java WebFlux handler"
-        bucketConfigHandler = component "S3BucketConfigHandler" "Handles bucket configuration endpoints: CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate, analytics, inventory, metrics, intelligent-tiering configuration." "Java WebFlux handler"
-        objectOperationsHandler = component "S3ObjectOperationsHandler" "Handles object operations: put, get, head, delete, copy and multi-delete." "Java WebFlux handler"
-        objectMetadataHandler = component "S3ObjectMetadataHandler" "Handles object metadata endpoints such as ACL, tagging and attributes." "Java WebFlux handler"
+        bucketConfigHandler = component "S3BucketConfigHandler" "Handles bucket configuration endpoints using registry/strategy dispatch pattern: CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate, analytics, inventory, metrics, intelligent-tiering, ABAC, object lock, bucket metadata configuration, metadata table configuration, inventory table configuration, journal table configuration." "Java WebFlux handler, ConfigHandlerRegistry"
+        objectOperationsHandler = component "S3ObjectOperationsHandler" "Handles object operations: put, get, head, delete, copy, multi-delete, rename, torrent, restore, select, and Object Lambda response." "Java WebFlux handler"
+        objectMetadataHandler = component "S3ObjectMetadataHandler" "Handles object metadata endpoints such as ACL, tagging, attributes, legal hold, retention, and encryption metadata." "Java WebFlux handler"
         multipartHandler = component "S3MultipartHandler" "Handles multipart upload lifecycle: initiate, upload part, list parts, complete, abort and list uploads." "Java WebFlux handler"
+        sessionHandler = component "S3SessionHandler" "Handles CreateSession for Phase F session management." "Java WebFlux handler"
+        s3ProxyRouter = component "S3ProxyRouter" "Entry point RouterFunction: defines all S3 routes and dispatches requests to handlers based on HTTP method, path, query parameters, and headers." "RouterFunction"
+        s3WebSupport = component "S3WebSupport" "Shared request predicates, XML parsing, error response helpers, and S3 error serialization." "Java utility"
       }
 
-      reactiveObjectStore = container "reactive-object-store" "Reactive object storage capability: object upload, download, metadata lookup, deletion and multipart object workflows using reactive services and domain aggregates." "Java 21 reactive application/domain services" {
-        reactiveObjectService = component "ReactiveObjectService" "Reactive application service for object CRUD, metadata lookup, object listing and binary content retrieval." "Spring @Service"
+      reactiveObjectStore = container "reactive-object-store" "Reactive object storage capability: object upload, download, metadata lookup, deletion, multipart object workflows, Phase F advanced operations (legal hold, retention, torrent, restore, select, Object Lambda, encryption update) using reactive services and domain aggregates." "Java 21 reactive application/domain services" {
+        reactiveObjectService = component "ReactiveObjectService" "Reactive application service for object CRUD, metadata lookup, object listing, binary content retrieval, and Phase F operations (legal hold, retention, torrent, restore, select, Object Lambda, rename, encryption update)." "Spring @Service"
         reactiveMultipartUploadService = component "ReactiveMultipartUploadService" "Reactive application service for multipart upload sessions and part lifecycle." "Spring @Service"
-        s3Object = component "S3Object" "Domain aggregate for object identity, bucket id, key, ETag, storage class and content metadata." "Domain aggregate"
-        multipartUpload = component "MultipartUpload" "Domain aggregate for multipart upload state, uploaded parts and completion/abort status." "Domain aggregate"
-        s3ObjectRepositoryPort = component "S3ObjectRepository port" "Domain repository port for object metadata and binary content persistence." "Domain repository interface"
+        s3Object = component "S3Object" "Domain aggregate for object identity, bucket id, key, ETag, storage class, content metadata, legal hold, retention, and encryption. Enforces state transitions with withLegalHold/withoutLegalHold, withRetention/withoutRetention, withEncryption/withoutEncryption. Emits ObjectStoreEvent domain events on transitions." "Domain aggregate"
+        multipartUpload = component "MultipartUpload" "Domain aggregate for multipart upload state, uploaded parts and completion/abort status. Emits ObjectStoreEvent domain events on transitions." "Domain aggregate"
+        s3ObjectRepositoryPort = component "S3ObjectRepository port" "Domain repository port for object metadata and binary content persistence (including legal hold, retention, restore, select data)." "Domain repository interface"
         multipartUploadRepositoryPort = component "MultipartUploadRepository port" "Domain repository port for multipart upload persistence." "Domain repository interface"
         contentBoundary = component "DefaultS3ObjectWrite / DefaultS3ObjectContent" "Application-layer content boundary for carrying Flux<DataBuffer> without leaking reactive types into the domain model." "Java adapter"
       }
 
-      reactiveBucketManagement = container "reactive-bucket-management" "Reactive bucket management capability: bucket lifecycle, metadata, configuration, CORS/versioning and bucket-level operations." "Java 21 reactive application/domain services" {
-        reactiveBucketService = component "ReactiveBucketService" "Reactive application service for bucket lifecycle, versioning, CORS, analytics, inventory, metrics, intelligent-tiering configuration." "Spring @Service"
-        bucket = component "Bucket" "Domain aggregate root for bucket identity, name, region, storage class, versioning/encryption state and inline Configuration. Emits ObjectStoreEvent domain events on state transitions (withVersioningEnabled, withVersioningSuspended, withEncryptionEnabled, withConfiguration)." "Domain aggregate root"
-        bucketRepositoryPort = component "BucketRepository port" "Domain repository port for bucket aggregate persistence." "Domain repository interface"
+      reactiveBucketManagement = container "reactive-bucket-management" "Reactive bucket management capability: bucket lifecycle, metadata, configuration, CORS/versioning, bucket-level operations, and Phase F advanced bucket config (ABAC, object lock, metadata config, table config)." "Java 21 reactive application/domain services" {
+        reactiveBucketService = component "ReactiveBucketService" "Reactive application service for bucket lifecycle, versioning, CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate, analytics, inventory, metrics, intelligent-tiering, ABAC, object lock, bucket metadata configuration, metadata table configuration, inventory table configuration, journal table configuration, and session management." "Spring @Service"
+        bucket = component "Bucket" "Domain aggregate root for bucket identity, name, region, storage class, versioning/encryption state and dedicated configuration fields per config type (CorsConfiguration, BucketLifecycleConfiguration, BucketEncryptionConfiguration, BucketLoggingConfiguration, BucketWebsiteConfiguration, BucketNotificationConfiguration, BucketReplicationConfiguration, BucketPolicy, PublicAccessBlockConfiguration, BucketOwnershipControls, BucketRequestPaymentConfiguration, BucketAccelerateConfiguration, plus multi-instance maps for Analytics, Inventory, Metrics, Intelligent-Tiering). Each config feature has a dedicated with*() / without*() method. Emits specific ObjectStoreEvent subtypes per config change (BucketConfigurationChanged with full BucketConfig payload)." "Domain aggregate root"
+        bucketRepositoryPort = component "BucketRepository port" "Domain repository port for bucket aggregate persistence (including ABAC, object lock, metadata/table configuration storage)." "Domain repository interface"
       }
 
       reactiveRepositoryApplication = container "reactive-repository-application" "Command/Query repository interfaces: BucketCommandRepository, BucketQueryRepository, S3ObjectCommandRepository, S3ObjectQueryRepository, MultipartUploadCommandRepository, MultipartUploadQueryRepository." "Java 21 CQS interfaces" {
         bucketCommandRepository = component "BucketCommandRepository" "Write-side repository interface for bucket aggregate persistence." "CQS command interface"
         bucketQueryRepository = component "BucketQueryRepository" "Read-side repository interface for bucket aggregate queries." "CQS query interface"
-        s3ObjectCommandRepository = component "S3ObjectCommandRepository" "Write-side repository interface for S3Object aggregate persistence." "CQS command interface"
+        s3ObjectCommandRepository = component "S3ObjectCommandRepository" "Write-side repository interface for S3Object aggregate persistence (including legal hold, retention, restore, select data)." "CQS command interface"
         s3ObjectQueryRepository = component "S3ObjectQueryRepository" "Read-side repository interface for S3Object aggregate queries." "CQS query interface"
         multipartUploadCommandRepository = component "MultipartUploadCommandRepository" "Write-side repository interface for MultipartUpload aggregate persistence." "CQS command interface"
         multipartUploadQueryRepository = component "MultipartUploadQueryRepository" "Read-side repository interface for MultipartUpload aggregate queries." "CQS query interface"
       }
 
       reactiveInfrastructure = container "reactive-infrastructure" "Reactive in-memory persistence: InMemoryReactiveBucketRepository, InMemoryReactiveS3ObjectRepository, InMemoryReactiveMultipartUploadRepository." "Java 21, Reactor, ConcurrentHashMap" "Database" {
-        inMemoryReactiveBucketRepository = component "InMemoryReactiveBucketRepository" "In-memory reactive implementation of BucketCommandRepository and BucketQueryRepository. Internally stores bucket aggregates in ConcurrentHashMap structures." "Spring @Repository"
-        inMemoryReactiveS3ObjectRepository = component "InMemoryReactiveS3ObjectRepository" "In-memory reactive implementation of S3ObjectCommandRepository and S3ObjectQueryRepository. Internally stores object metadata and raw object bytes in ConcurrentHashMap structures." "Spring @Repository"
+        inMemoryReactiveBucketRepository = component "InMemoryReactiveBucketRepository" "In-memory reactive implementation of BucketCommandRepository and BucketQueryRepository. Internally stores bucket aggregates in ConcurrentHashMap structures. Extended to support session, ABAC, object lock, and metadata/table configuration storage." "Spring @Repository"
+        inMemoryReactiveS3ObjectRepository = component "InMemoryReactiveS3ObjectRepository" "In-memory reactive implementation of S3ObjectCommandRepository and S3ObjectQueryRepository. Internally stores object metadata and raw object bytes in ConcurrentHashMap structures. Extended to support legal hold, retention, restore, and select request/response storage." "Spring @Repository"
         inMemoryReactiveMultipartUploadRepository = component "InMemoryReactiveMultipartUploadRepository" "In-memory reactive implementation of MultipartUploadCommandRepository and MultipartUploadQueryRepository. Internally stores multipart upload sessions in a ConcurrentHashMap structure." "Spring @Repository"
       }
 
@@ -90,25 +92,34 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
     user -> magrathea.s3ReactiveApiAdapter.objectOperationsHandler "Sends S3 object operations requests" "HTTP"
     user -> magrathea.s3ReactiveApiAdapter.objectMetadataHandler "Sends S3 object metadata requests" "HTTP"
     user -> magrathea.s3ReactiveApiAdapter.multipartHandler "Sends S3 multipart upload requests" "HTTP"
+    user -> magrathea.s3ReactiveApiAdapter.sessionHandler "Sends S3 session management requests" "HTTP"
 
-    magrathea.s3ReactiveApiAdapter.bucketOperationsHandler -> magrathea.reactiveBucketManagement.reactiveBucketService "Calls bucket lifecycle and listing use cases" "Java service calls"
+    magrathea.s3ReactiveApiAdapter.bucketOperationsHandler -> magrathea.reactiveBucketManagement.reactiveBucketService "Calls bucket lifecycle, listing, directory-bucket use cases" "Java service calls"
     magrathea.s3ReactiveApiAdapter.bucketOperationsHandler -> magrathea.reactiveObjectStore.reactiveObjectService "Calls object listing use cases" "Java service calls"
     magrathea.s3ReactiveApiAdapter.bucketMetadataHandler -> magrathea.reactiveBucketManagement.reactiveBucketService "Calls bucket metadata use cases" "Java service calls"
-    magrathea.s3ReactiveApiAdapter.bucketConfigHandler -> magrathea.reactiveBucketManagement.reactiveBucketService "Calls bucket CORS/lifecycle/policy/encryption/logging/website/notification/replication/request-payment/ownership-controls/public-access-block/accelerate/analytics/inventory/metrics/intelligent-tiering use cases" "Java service calls"
+    magrathea.s3ReactiveApiAdapter.bucketConfigHandler -> magrathea.reactiveBucketManagement.reactiveBucketService "Calls bucket CORS/lifecycle/policy/encryption/logging/website/notification/replication/request-payment/ownership-controls/public-access-block/accelerate/analytics/inventory/metrics/intelligent-tiering/ABAC/object-lock/metadata-config/table-config use cases (registry dispatch)" "Java service calls"
     magrathea.s3ReactiveApiAdapter.objectOperationsHandler -> magrathea.reactiveBucketManagement.reactiveBucketService "Checks bucket existence" "Java service calls"
-    magrathea.s3ReactiveApiAdapter.objectOperationsHandler -> magrathea.reactiveObjectStore.reactiveObjectService "Calls object CRUD/content use cases" "Java service calls"
+    magrathea.s3ReactiveApiAdapter.objectOperationsHandler -> magrathea.reactiveObjectStore.reactiveObjectService "Calls object CRUD/content/rename/torrent/restore/select/Object-Lambda use cases" "Java service calls"
     magrathea.s3ReactiveApiAdapter.objectMetadataHandler -> magrathea.reactiveBucketManagement.reactiveBucketService "Checks bucket existence" "Java service calls"
-    magrathea.s3ReactiveApiAdapter.objectMetadataHandler -> magrathea.reactiveObjectStore.reactiveObjectService "Calls object metadata use cases" "Java service calls"
+    magrathea.s3ReactiveApiAdapter.objectMetadataHandler -> magrathea.reactiveObjectStore.reactiveObjectService "Calls object metadata/legal-hold/retention/encryption-update use cases" "Java service calls"
     magrathea.s3ReactiveApiAdapter.multipartHandler -> magrathea.reactiveObjectStore.reactiveMultipartUploadService "Calls multipart upload use cases" "Java service calls"
+    magrathea.s3ReactiveApiAdapter.sessionHandler -> magrathea.reactiveBucketManagement.reactiveBucketService "Calls session management use cases" "Java service calls"
+    magrathea.s3ReactiveApiAdapter.s3ProxyRouter -> magrathea.s3ReactiveApiAdapter.bucketOperationsHandler "Dispatches bucket lifecycle routes" "Java calls"
+    magrathea.s3ReactiveApiAdapter.s3ProxyRouter -> magrathea.s3ReactiveApiAdapter.bucketMetadataHandler "Dispatches bucket metadata routes" "Java calls"
+    magrathea.s3ReactiveApiAdapter.s3ProxyRouter -> magrathea.s3ReactiveApiAdapter.bucketConfigHandler "Dispatches bucket config routes" "Java calls"
+    magrathea.s3ReactiveApiAdapter.s3ProxyRouter -> magrathea.s3ReactiveApiAdapter.objectOperationsHandler "Dispatches object operation routes" "Java calls"
+    magrathea.s3ReactiveApiAdapter.s3ProxyRouter -> magrathea.s3ReactiveApiAdapter.objectMetadataHandler "Dispatches object metadata routes" "Java calls"
+    magrathea.s3ReactiveApiAdapter.s3ProxyRouter -> magrathea.s3ReactiveApiAdapter.multipartHandler "Dispatches multipart routes" "Java calls"
+    magrathea.s3ReactiveApiAdapter.s3ProxyRouter -> magrathea.s3ReactiveApiAdapter.sessionHandler "Dispatches session routes" "Java calls"
 
     magrathea.reactiveObjectStore.reactiveObjectService -> magrathea.reactiveObjectStore.s3ObjectRepositoryPort "Persists and loads objects/content via domain repository port" "Repository interfaces"
-    magrathea.reactiveObjectStore.reactiveObjectService -> magrathea.reactiveObjectStore.s3Object "Creates/restores object metadata" "Java calls"
+    magrathea.reactiveObjectStore.reactiveObjectService -> magrathea.reactiveObjectStore.s3Object "Creates/restores object metadata with legal hold, retention, encryption transitions" "Java calls"
     magrathea.reactiveObjectStore.reactiveObjectService -> magrathea.reactiveObjectStore.contentBoundary "Wraps upload/download content" "Java calls"
     magrathea.reactiveObjectStore.reactiveMultipartUploadService -> magrathea.reactiveObjectStore.multipartUploadRepositoryPort "Persists and loads multipart uploads via domain repository port" "Repository interfaces"
-    magrathea.reactiveObjectStore.reactiveMultipartUploadService -> magrathea.reactiveObjectStore.multipartUpload "Creates/updates multipart upload state" "Java calls"
+    magrathea.reactiveObjectStore.reactiveMultipartUploadService -> magrathea.reactiveObjectStore.multipartUpload "Creates/updates multipart upload state with domain events" "Java calls"
 
     magrathea.reactiveBucketManagement.reactiveBucketService -> magrathea.reactiveBucketManagement.bucketRepositoryPort "Persists and loads bucket aggregates via domain repository port" "Repository interfaces"
-    magrathea.reactiveBucketManagement.reactiveBucketService -> magrathea.reactiveBucketManagement.bucket "Creates/updates bucket aggregate root (emits ObjectStoreEvent on state transitions)" "Java calls"
+    magrathea.reactiveBucketManagement.reactiveBucketService -> magrathea.reactiveBucketManagement.bucket "Creates/updates bucket aggregate root with dedicated with* config methods (emits specific ObjectStoreEvent subtypes)" "Java calls"
 
     magrathea.reactiveObjectStore.s3ObjectRepositoryPort -> magrathea.reactiveRepositoryApplication.s3ObjectCommandRepository "CQS command interface for S3Object persistence" "Implemented by"
     magrathea.reactiveObjectStore.s3ObjectRepositoryPort -> magrathea.reactiveRepositoryApplication.s3ObjectQueryRepository "CQS query interface for S3Object reads" "Implemented by"
@@ -157,7 +168,7 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
 
     container magrathea "Container" {
       title "C2 Container: Magrathea ObjectStore"
-      description "s3-reactive-api-adapter exposes the S3 API, reactive-object-store and reactive-bucket-management implement core reactive capabilities, reactive-repository-application provides CQS interfaces, reactive-infrastructure persists state reactively in-process, and storage-engine provides extensible interfaces for notification, logging, metrics, and analytics."
+      description "s3-reactive-api-adapter exposes the S3 API with RouterFunction dispatch; reactive-object-store and reactive-bucket-management implement core reactive capabilities with Phase F advanced operations; reactive-repository-application provides CQS interfaces; reactive-infrastructure persists state reactively in-process; and storage-engine provides extensible interfaces for notification, logging, metrics, and analytics."
       include user
       include magrathea.s3ReactiveApiAdapter
       include magrathea.reactiveObjectStore
@@ -179,7 +190,7 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
 
     component magrathea.s3ReactiveApiAdapter "S3ReactiveApiAdapterComponents" {
       title "C3 Component: s3-reactive-api-adapter"
-      description "RouterFunction and handler components that expose the S3-compatible HTTP protocol."
+      description "RouterFunction and handler components that expose the S3-compatible HTTP protocol. Includes S3ProxyRouter, S3SessionHandler, S3WebSupport, and all six handler components with registry dispatch in S3BucketConfigHandler."
       include user
       include *
       include magrathea.reactiveObjectStore
@@ -189,7 +200,7 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
 
     component magrathea.reactiveObjectStore "ReactiveObjectStoreComponents" {
       title "C3 Component: reactive-object-store"
-      description "Reactive object and multipart upload application services, domain aggregates and repository ports."
+      description "Reactive object and multipart upload application services, domain aggregates with state transitions and domain events, repository ports, and content boundary. Supports Phase F advanced operations (legal hold, retention, torrent, restore, select, Object Lambda, encryption update)."
       include magrathea.s3ReactiveApiAdapter
       include *
       include magrathea.reactiveBucketManagement
@@ -200,7 +211,7 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
 
     component magrathea.reactiveBucketManagement "ReactiveBucketManagementComponents" {
       title "C3 Component: reactive-bucket-management"
-      description "Reactive bucket management service, bucket aggregate root with domain events and inline Configuration, and repository port."
+      description "Reactive bucket management service, bucket aggregate root with dedicated with* methods per config type and specific ObjectStoreEvent subtypes, and repository port. Supports Phase F advanced bucket config (ABAC, object lock, metadata/table config)."
       include magrathea.s3ReactiveApiAdapter
       include magrathea.reactiveObjectStore
       include *
@@ -221,7 +232,7 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
 
     component magrathea.reactiveInfrastructure "ReactiveInfrastructureComponents" {
       title "C3 Component: reactive-infrastructure"
-      description "Reactive repository adapters used by the application capabilities. Internal ConcurrentHashMap structures are intentionally not shown as C4 components."
+      description "Reactive repository adapters used by the application capabilities. Extended to support session, ABAC, object lock, metadata/table configuration, legal hold, retention, restore, and select data. Internal ConcurrentHashMap structures are intentionally not shown as C4 components."
       include magrathea.reactiveObjectStore
       include magrathea.reactiveBucketManagement
       include magrathea.reactiveRepositoryApplication
@@ -299,6 +310,40 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
       autolayout lr
     }
 
+    dynamic magrathea.s3ReactiveApiAdapter "BucketConfigurationRuntime" {
+      title "Runtime: Bucket Configuration"
+      description "GET/PUT/DELETE /{bucket}?{config} dispatches to S3BucketConfigHandler which uses registry/strategy pattern to call ReactiveBucketService methods that update the Bucket aggregate root with dedicated with* config methods."
+      user -> magrathea.s3ReactiveApiAdapter.bucketConfigHandler "1. GET/PUT/DELETE /{bucket}?{config}" "HTTP"
+      magrathea.s3ReactiveApiAdapter.bucketConfigHandler -> magrathea.reactiveBucketManagement.reactiveBucketService "2. Dispatch to {get|put|delete}{Config} via registry strategy" "Java service calls"
+      magrathea.reactiveBucketManagement.reactiveBucketService -> magrathea.reactiveBucketManagement.bucket "3. Read/update Bucket aggregate root with dedicated with* config method" "Java calls"
+      magrathea.reactiveBucketManagement.reactiveBucketService -> magrathea.reactiveBucketManagement.bucketRepositoryPort "4. Persist Bucket aggregate via domain repository port" "Repository interfaces"
+      magrathea.reactiveBucketManagement.bucketRepositoryPort -> magrathea.reactiveRepositoryApplication.bucketCommandRepository "5. CQS command interface" "Implemented by"
+      magrathea.reactiveRepositoryApplication.bucketCommandRepository -> magrathea.reactiveInfrastructure.inMemoryReactiveBucketRepository "6. Persist updated Bucket aggregate with configuration" "Implements"
+      autolayout lr
+    }
+
+    dynamic magrathea.s3ReactiveApiAdapter "PhaseFAdvancedOperationsRuntime" {
+      title "Runtime: Phase F Advanced Operations"
+      description "Phase F advanced operations (legal hold, retention, torrent, restore, select, Object Lambda, rename, encryption update, ABAC, object lock, session, metadata/table config) follow the established RouterFunction dispatch and service delegation pattern."
+      user -> magrathea.s3ReactiveApiAdapter.objectOperationsHandler "1. Advanced object request (rename, torrent, restore, select, Object Lambda)" "HTTP"
+      user -> magrathea.s3ReactiveApiAdapter.objectMetadataHandler "2. Advanced metadata request (legal hold, retention, encryption update)" "HTTP"
+      user -> magrathea.s3ReactiveApiAdapter.sessionHandler "3. CreateSession request" "HTTP"
+      user -> magrathea.s3ReactiveApiAdapter.bucketConfigHandler "4. Advanced config request (ABAC, object lock, metadata/table config)" "HTTP"
+      magrathea.s3ReactiveApiAdapter.objectOperationsHandler -> magrathea.reactiveObjectStore.reactiveObjectService "5. Delegate object operations to ReactiveObjectService" "Java service calls"
+      magrathea.s3ReactiveApiAdapter.objectMetadataHandler -> magrathea.reactiveObjectStore.reactiveObjectService "6. Delegate metadata operations to ReactiveObjectService" "Java service calls"
+      magrathea.s3ReactiveApiAdapter.sessionHandler -> magrathea.reactiveBucketManagement.reactiveBucketService "7. Delegate session creation to ReactiveBucketService" "Java service calls"
+      magrathea.s3ReactiveApiAdapter.bucketConfigHandler -> magrathea.reactiveBucketManagement.reactiveBucketService "8. Delegate advanced config to ReactiveBucketService" "Java service calls"
+      magrathea.reactiveObjectStore.reactiveObjectService -> magrathea.reactiveObjectStore.s3ObjectRepositoryPort "9. Persist/load object data via repository port" "Repository interfaces"
+      magrathea.reactiveBucketManagement.reactiveBucketService -> magrathea.reactiveBucketManagement.bucketRepositoryPort "10. Persist/load bucket data via repository port" "Repository interfaces"
+      magrathea.reactiveObjectStore.s3ObjectRepositoryPort -> magrathea.reactiveRepositoryApplication.s3ObjectCommandRepository "11. CQS command interface" "Implemented by"
+      magrathea.reactiveObjectStore.s3ObjectRepositoryPort -> magrathea.reactiveRepositoryApplication.s3ObjectQueryRepository "12. CQS query interface" "Implemented by"
+      magrathea.reactiveBucketManagement.bucketRepositoryPort -> magrathea.reactiveRepositoryApplication.bucketCommandRepository "13. CQS command interface" "Implemented by"
+      magrathea.reactiveBucketManagement.bucketRepositoryPort -> magrathea.reactiveRepositoryApplication.bucketQueryRepository "14. CQS query interface" "Implemented by"
+      magrathea.reactiveRepositoryApplication.s3ObjectCommandRepository -> magrathea.reactiveInfrastructure.inMemoryReactiveS3ObjectRepository "15. Persist/load S3Object data" "Implements"
+      magrathea.reactiveRepositoryApplication.bucketCommandRepository -> magrathea.reactiveInfrastructure.inMemoryReactiveBucketRepository "16. Persist/load bucket data" "Implements"
+      autolayout lr
+    }
+
     styles {
       element "Person" {
         shape person
@@ -328,9 +373,9 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
         color #000000
       }
       element "planned" {
-        stroke dashed
         background #b8cce4
         color #000000
+        border dashed
       }
     }
 

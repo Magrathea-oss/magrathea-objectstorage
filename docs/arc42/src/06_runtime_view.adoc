@@ -108,7 +108,68 @@ image::../../c4/images/BucketConfigurationRuntime.png[Bucket Configuration Runti
 
 **Verification:** Phase F is Cucumber-tested; `mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false` completed with 216 tests, 0 failures, and 0 errors.
 
-=== Scenario 5 — Error Handling
+=== Scenario 5 — Reactive Chain Pattern
+
+**Description:** The reactive chain pattern used throughout the application layer. No blocking `.join()`, no `Mono.fromCallable`, no `.subscribeOn(Schedulers.boundedElastic())`.
+
+**Flow:**
+1. Handler receives `ServerRequest`
+2. Handler calls reactive service method — returns `Mono<T>` or `Flux<T>`
+3. Service method composes repository operations using `Mono.defer`, `Mono.just`, `Mono.justOrEmpty`, `Flux.defer`, `Flux.fromIterable`
+4. Repository operations use native `ConcurrentHashMap` lookups wrapped in `Mono.just`/`Mono.justOrEmpty`
+5. Handler chains operators: `.flatMap(service::method)`, `.flatMap(service::method2)`, `.map(domain::toDto)`
+6. Handler returns `ServerResponse.ok().body(...)` or `ServerResponse.status(code).body(...)`
+
+**Example:**
+```java
+// Handler — no blocking, no thread pool offload
+public Mono<ServerResponse> handleGet(ServerRequest request) {
+    return bucketService.findBucket(bucketName)
+        .flatMap(bucket -> {
+            CorsConfiguration config = bucket.corsConfiguration();
+            return Mono.justOrEmpty(config)
+                .map(GetBucketCorsQuery::from);
+        })
+        .flatMap(query -> ok().body(BodyInserters.fromValue(query)))
+        .switchIfEmpty(Mono.defer(() -> errorResponse(404, "NoSuchBucket")));
+}
+```
+
+=== Scenario 6 — Runtime Effects
+
+**Description:** Runtime effects that execute during request processing to enforce S3 semantics.
+
+==== CORS Validation
+
+**Trigger:** Any request with `Origin` header.
+**Behavior:** `S3BucketConfigHandler` checks bucket CORS configuration. If the origin is not allowed, returns `403 Forbidden` with `AccessForbidden` error. If CORS preflight (`OPTIONS`), validates method, headers, and origin.
+
+==== Website Routing
+
+**Trigger:** Request to a bucket configured as a website (`?website`).
+**Behavior:** `S3BucketOperationsHandler` redirects `GET /{bucket}` to the configured website endpoint if the bucket has website configuration.
+
+==== OwnershipControls Enforcement
+
+**Trigger:** `PutObject`, `PutObjectAcl` requests.
+**Behavior:** If bucket has `OwnershipControls` with `ObjectOwnerRequired`, the request must include `x-amz-object-ownership` header.
+
+==== PublicAccessBlock Evaluation
+
+**Trigger:** ACL or policy modification requests.
+**Behavior:** If `PublicAccessBlock` is enabled, blocks public ACLs or public bucket policies.
+
+==== Accelerate Header Injection
+
+**Trigger:** Response to `GetObject`, `HeadObject`, `GetBucketAccelerateConfiguration`.
+**Behavior:** If bucket has accelerate configuration, response includes `x-amz-accelerate-result` header.
+
+==== RequestPayment Enforcement
+
+**Trigger:** Requests to buckets with `RequestPayment` configured.
+**Behavior:** If bucket has `RequesterPays` enabled, requests must include `x-amz-request-payer` header or return `403 AccessDenied`.
+
+=== Scenario 7 — Error Handling
 
 **Description:** System behavior for error conditions.
 
@@ -117,4 +178,4 @@ image::../../c4/images/BucketConfigurationRuntime.png[Bucket Configuration Runti
 - **BucketAlreadyExists:** Handler returns `409 Conflict` with S3 XML `<Error><Code>BucketAlreadyExists</Code>...`
 - **InvalidArgument:** Handler returns `400 Bad Request` with S3 XML `<Error><Code>InvalidArgument</Code>...`
 
-All error responses use `S3WebSupport.errorResponse()` which creates a Jackson 3 XML annotated `S3Error` record and serializes it via the registered `JacksonXmlEncoder`.
+All error responses use `S3WebSupport.errorResponse()` which creates a Jackson 3 XML annotated `S3Error` record and serializes it via the registered `JacksonXmlEncoder`. Reactive error handling uses `Mono.error()` and `Flux.error()` with custom exception classes, caught at the handler level and mapped to S3 XML error responses.

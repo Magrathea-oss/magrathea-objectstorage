@@ -2,8 +2,8 @@ package com.example.magrathea.s3api.adapter.web;
 
 import com.example.magrathea.objectstore.domain.aggregate.Bucket;
 import com.example.magrathea.objectstore.domain.aggregate.S3Object;
-import com.example.magrathea.objectstore.domain.valueobject.BucketConfig;
 import com.example.magrathea.objectstore.domain.valueobject.BucketWebsiteConfiguration;
+import com.example.magrathea.objectstore.domain.valueobject.CorsConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.ObjectKey;
 import com.example.magrathea.reactive.application.service.ReactiveBucketService;
 import com.example.magrathea.reactive.application.service.ReactiveObjectService;
@@ -16,42 +16,13 @@ import reactor.core.publisher.Mono;
 
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
+import java.util.StringJoiner;
 
 final class S3WebSupport {
 
     private S3WebSupport() {
-    }
-
-    static boolean acceptXml(ServerRequest request) {
-        var accept = request.headers().accept();
-        if (accept.isEmpty()) {
-            return true;
-        }
-        return accept.stream()
-            .anyMatch(mediaType -> mediaType.equals(MediaType.ALL)
-                || mediaType.equals(MediaType.APPLICATION_XML)
-                || mediaType.includes(MediaType.APPLICATION_XML));
-    }
-
-    static boolean acceptJson(ServerRequest request) {
-        return request.headers().accept().stream()
-            .anyMatch(mediaType -> mediaType.equals(MediaType.APPLICATION_JSON));
-    }
-
-    static boolean hasQuery(ServerRequest request, String key) {
-        var rawQuery = request.uri().getRawQuery();
-        if (rawQuery == null || rawQuery.isBlank()) {
-            return false;
-        }
-        for (var part : rawQuery.split("&")) {
-            var name = part.contains("=") ? part.substring(0, part.indexOf('=')) : part;
-            if (URLDecoder.decode(name, StandardCharsets.UTF_8).equals(key)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**
@@ -64,39 +35,8 @@ final class S3WebSupport {
     /**
      * Reactive lookup — finds an object by bucket and key using ReactiveObjectService.
      */
-    static Mono<S3Object> findObjectReactive(ReactiveObjectService objectService, Bucket.Id bucketId, String key) {
-        return objectService.findByBucketAndKey(bucketId, ObjectKey.of(key));
-    }
-
-    /**
-     * Checks if the request has no S3-specific query parameters.
-     * Used to detect "plain" GETs that may be website hosting requests.
-     */
-    static boolean isPlainGet(ServerRequest request) {
-        var rawQuery = request.uri().getRawQuery();
-        if (rawQuery == null || rawQuery.isBlank()) {
-            return true;
-        }
-        // S3 API query parameters that indicate S3 operations
-        var s3Params = Set.of("acl", "tagging", "location", "versioning", "versions",
-            "list-type", "cors", "lifecycle", "policy", "encryption", "logging",
-            "website", "notification", "replication", "requestPayment",
-            "ownershipControls", "publicAccessBlock", "accelerate", "analytics",
-            "inventory", "metrics", "intelligent-tiering", "uploads", "uploadId",
-            "delete", "attributes", "session", "abac", "directory-buckets",
-            "legal-hold", "retention", "object-lock",
-            "metadata-config", "metadata-table-config",
-            "inventory-table-config", "journal-table-config",
-            "select", "x-id");
-        for (var part : rawQuery.split("&")) {
-            var name = part.contains("?") ? part.substring(part.indexOf('?') + 1) : part;
-            name = name.contains("=") ? name.substring(0, name.indexOf('=')) : name;
-            name = URLDecoder.decode(name, StandardCharsets.UTF_8);
-            if (s3Params.contains(name)) {
-                return false;
-            }
-        }
-        return true;
+    static Mono<S3Object> findObjectReactive(ReactiveObjectService objectService, Bucket.Id bucketId, String bucketName, String key) {
+        return objectService.findByBucketAndKey(bucketId, ObjectKey.of(bucketName, key));
     }
 
     static Optional<String[]> decodeCopySource(String header) {
@@ -116,6 +56,157 @@ final class S3WebSupport {
         return ServerResponse.status(status)
             .contentType(MediaType.APPLICATION_XML)
             .bodyValue(ErrorQuery.from(code, message));
+    }
+
+    // ─────────────────────────────────────────────────────
+    //  Runtime bucket configuration effects
+    // ─────────────────────────────────────────────────────
+
+    static Mono<ServerResponse> validateRuntimeRequest(ServerRequest request, Bucket bucket) {
+        return validateCorsOrigin(request, bucket)
+            .switchIfEmpty(Mono.defer(() -> validateRequestPayment(request, bucket)))
+            .switchIfEmpty(Mono.defer(() -> validatePublicAccessBlockRequest(request, bucket)));
+    }
+
+    static void applyRuntimeHeaders(ServerResponse.HeadersBuilder<?> builder,
+                                    ServerRequest request,
+                                    Bucket bucket) {
+        applyCorsHeaders(builder, request, bucket);
+        applyAccelerateHeaders(builder, bucket);
+    }
+
+    static Mono<ServerResponse> validatePublicAclMutation(Bucket bucket, String acl) {
+        var publicAccessBlock = bucket.bucketConfig() != null
+            ? bucket.bucketConfig().getPublicAccessBlockConfiguration().orElse(null) : null;
+        if (publicAccessBlock != null && publicAccessBlock.blockPublicAcls() && isPublicAcl(acl)) {
+            return xmlError(HttpStatus.FORBIDDEN, "AccessDenied",
+                "Public ACLs are blocked by PublicAccessBlock");
+        }
+        return Mono.empty();
+    }
+
+    static String visibleAcl(Bucket bucket, String acl) {
+        var publicAccessBlock = bucket.bucketConfig() != null
+            ? bucket.bucketConfig().getPublicAccessBlockConfiguration().orElse(null) : null;
+        if (publicAccessBlock != null && publicAccessBlock.ignorePublicAcls() && isPublicAcl(acl)) {
+            return "private";
+        }
+        return acl;
+    }
+
+    static Map<String, String> objectOwnershipMetadata(Bucket bucket, ServerRequest request) {
+        var configured = bucket.bucketConfig() != null
+            ? bucket.bucketConfig().getOwnershipControls().orElse(null) : null;
+        var ownership = configured != null && configured.ownership() != null && !configured.ownership().isBlank()
+            ? configured.ownership() : "ObjectWriter";
+        var owner = switch (ownership) {
+            case "BucketOwnerEnforced", "BucketOwnerPreferred" -> bucket.name();
+            default -> Optional.ofNullable(request.headers().firstHeader("x-amz-account-id"))
+                .filter(value -> !value.isBlank())
+                .orElse("object-writer");
+        };
+        return Map.of("x-amz-object-ownership", ownership, "x-amz-object-owner", owner);
+    }
+
+    private static Mono<ServerResponse> validateRequestPayment(ServerRequest request, Bucket bucket) {
+        var requestPayment = bucket.bucketConfig() != null
+            ? bucket.bucketConfig().getRequestPaymentConfiguration().orElse(null) : null;
+        if (requestPayment == null || !"Requester".equals(requestPayment.payer())) {
+            return Mono.empty();
+        }
+        var payer = request.headers().firstHeader("x-amz-request-payer");
+        if (payer != null && "requester".equalsIgnoreCase(payer)) {
+            return Mono.empty();
+        }
+        return xmlError(HttpStatus.FORBIDDEN, "AccessDenied",
+            "Requester pays bucket requires x-amz-request-payer: requester");
+    }
+
+    private static Mono<ServerResponse> validatePublicAccessBlockRequest(ServerRequest request, Bucket bucket) {
+        var publicAccessBlock = bucket.bucketConfig() != null
+            ? bucket.bucketConfig().getPublicAccessBlockConfiguration().orElse(null) : null;
+        var policy = bucket.bucketConfig() != null
+            ? bucket.bucketConfig().getBucketPolicy().orElse(null) : null;
+        if (publicAccessBlock != null
+            && publicAccessBlock.restrictPublicBuckets()
+            && isPublicPolicy(policy)
+            && request.headers().firstHeader("Authorization") == null) {
+            return xmlError(HttpStatus.FORBIDDEN, "AccessDenied",
+                "Public bucket access is restricted by PublicAccessBlock");
+        }
+        return Mono.empty();
+    }
+
+    private static boolean isPublicAcl(String acl) {
+        if (acl == null) {
+            return false;
+        }
+        return switch (acl) {
+            case "public-read", "public-read-write", "authenticated-read" -> true;
+            default -> false;
+        };
+    }
+
+    private static boolean isPublicPolicy(String policy) {
+        if (policy == null || policy.isBlank()) {
+            return false;
+        }
+        var compact = policy.replace(" ", "").replace("\n", "").replace("\r", "").replace("\t", "");
+        return compact.contains("\"Effect\":\"Allow\"")
+            && (compact.contains("\"Principal\":\"*\"")
+                || compact.contains("\"Principal\":{\"AWS\":\"*\"}"));
+    }
+
+    private static void applyCorsHeaders(ServerResponse.HeadersBuilder<?> builder,
+                                         ServerRequest request,
+                                         Bucket bucket) {
+        var origin = request.headers().firstHeader("Origin");
+        if (origin == null || origin.isBlank()) {
+            return;
+        }
+        var corsConfig = bucket.bucketConfig() != null
+            ? bucket.bucketConfig().getCorsConfiguration().orElse(null) : null;
+        var rule = matchingCorsRule(corsConfig, origin).orElse(null);
+        if (rule == null) {
+            return;
+        }
+        builder.header("Access-Control-Allow-Origin", origin);
+        if (rule.allowedMethods() != null && !rule.allowedMethods().isEmpty()) {
+            builder.header("Access-Control-Allow-Methods", commaSeparated(rule.allowedMethods()));
+        }
+        if (rule.allowedHeaders() != null && !rule.allowedHeaders().isEmpty()) {
+            builder.header("Access-Control-Allow-Headers", commaSeparated(rule.allowedHeaders()));
+        }
+        if (rule.exposeHeaders() != null && !rule.exposeHeaders().isEmpty()) {
+            builder.header("Access-Control-Expose-Headers", commaSeparated(rule.exposeHeaders()));
+        }
+        if (rule.maxAgeSeconds() > 0) {
+            builder.header("Access-Control-Max-Age", String.valueOf(rule.maxAgeSeconds()));
+        }
+    }
+
+    private static void applyAccelerateHeaders(ServerResponse.HeadersBuilder<?> builder, Bucket bucket) {
+        var accelerate = bucket.bucketConfig() != null
+            ? bucket.bucketConfig().getAccelerateConfiguration().orElse(null) : null;
+        if (accelerate != null && "Enabled".equalsIgnoreCase(accelerate.status())) {
+            builder.header("x-amz-transfer-acceleration", "Enabled");
+        }
+    }
+
+    private static Optional<CorsConfiguration.CorsRule> matchingCorsRule(CorsConfiguration corsConfig, String origin) {
+        if (corsConfig == null || corsConfig.corsRules() == null || corsConfig.corsRules().isEmpty()) {
+            return Optional.empty();
+        }
+        return corsConfig.corsRules().stream()
+            .filter(rule -> rule.allowedOrigins() != null
+                && rule.allowedOrigins().stream().anyMatch(allowed -> originMatches(origin, allowed)))
+            .findFirst();
+    }
+
+    private static String commaSeparated(Iterable<String> values) {
+        var builder = new StringJoiner(", ");
+        values.forEach(builder::add);
+        return builder.toString();
     }
 
     // ─────────────────────────────────────────────────────
@@ -196,15 +287,15 @@ final class S3WebSupport {
                         builder.header("Access-Control-Allow-Origin", origin);
                         if (!rule.allowedMethods().isEmpty()) {
                             builder.header("Access-Control-Allow-Methods",
-                                String.join(", ", rule.allowedMethods()));
+                                commaSeparated(rule.allowedMethods()));
                         }
                         if (rule.allowedHeaders() != null && !rule.allowedHeaders().isEmpty()) {
                             builder.header("Access-Control-Allow-Headers",
-                                String.join(", ", rule.allowedHeaders()));
+                                commaSeparated(rule.allowedHeaders()));
                         }
                         if (rule.exposeHeaders() != null && !rule.exposeHeaders().isEmpty()) {
                             builder.header("Access-Control-Expose-Headers",
-                                String.join(", ", rule.exposeHeaders()));
+                                commaSeparated(rule.exposeHeaders()));
                         }
                         if (rule.maxAgeSeconds() > 0) {
                             builder.header("Access-Control-Max-Age", String.valueOf(rule.maxAgeSeconds()));
@@ -223,31 +314,13 @@ final class S3WebSupport {
 
     /**
      * Handles website routing for a bucket with website configuration.
-     * <p>
-     * Checks if the bucket has website configuration and applies:
-     * <ul>
-     *   <li>IndexDocument redirect (for root or trailing-slash paths)</li>
-     *   <li>ErrorDocument serving (for 404s)</li>
-     *   <li>RedirectAllRequestsTo</li>
-     *   <li>RoutingRules condition matching</li>
-     * </ul>
-     * <p>
-     * Returns {@code Mono.empty()} if no website configuration is found — the caller
-     * should fall through to normal S3 handling.
-     * <p>
-     * NOTE: The current domain model does not store website configuration on
-     * {@link BucketConfig}. Once ADR 0011 is resolved and website fields
-     * are added to {@link BucketConfig} or stored via
-     * {@link BucketWebsiteConfiguration}, this method will activate the routing logic.
-     *
-     * @param request the incoming HTTP request
-     * @param bucket  the bucket aggregate
-     * @return a Mono resolving to a redirect or error response, or Mono.empty() if no website config
+     * Returns {@code Mono.empty()} when the bucket has no website runtime config,
+     * letting the caller fall through to normal S3 handling.
      */
     static Mono<ServerResponse> handleWebsiteRequest(ServerRequest request, Bucket bucket) {
-        // Website config is not stored on BucketConfig in the current domain model.
-        // Always returns Mono.empty() until ADR 0011 adds website fields.
-        return Mono.empty();
+        var websiteConfig = bucket.bucketConfig() != null
+            ? bucket.bucketConfig().getWebsiteConfiguration().orElse(null) : null;
+        return handleWebsiteRequest(request, bucket, websiteConfig);
     }
 
     /**
@@ -261,7 +334,7 @@ final class S3WebSupport {
      */
     static Mono<ServerResponse> handleWebsiteRequest(ServerRequest request, Bucket bucket,
                                                       BucketWebsiteConfiguration websiteConfig) {
-        if (websiteConfig == null || !websiteConfig.hasWebsite()) {
+        if (!hasWebsiteRuntimeConfig(websiteConfig)) {
             return Mono.empty();
         }
         return doWebsiteRouting(request, bucket, websiteConfig);
@@ -279,7 +352,10 @@ final class S3WebSupport {
         // RedirectAllRequestsTo — redirect all requests to a specific hostname
         var redirectAll = websiteConfig.redirectAllRequestsTo();
         if (redirectAll != null && !redirectAll.isBlank()) {
-            var redirectUri = "http://" + redirectAll + path;
+            var protocol = websiteConfig.routingRuleRedirectProtocol() != null
+                && !websiteConfig.routingRuleRedirectProtocol().isBlank()
+                    ? websiteConfig.routingRuleRedirectProtocol() : "http";
+            var redirectUri = protocol + "://" + redirectAll + path;
             return ServerResponse.status(HttpStatus.FOUND)
                 .header("Location", redirectUri)
                 .build();
@@ -300,7 +376,10 @@ final class S3WebSupport {
         // Routing rules redirect host/protocol
         var redirectHost = websiteConfig.routingRuleRedirectHost();
         if (redirectHost != null && !redirectHost.isBlank()) {
-            var redirectUri = "http://" + redirectHost + path;
+            var protocol = websiteConfig.routingRuleRedirectProtocol() != null
+                && !websiteConfig.routingRuleRedirectProtocol().isBlank()
+                    ? websiteConfig.routingRuleRedirectProtocol() : "http";
+            var redirectUri = protocol + "://" + redirectHost + path;
             return ServerResponse.status(HttpStatus.FOUND)
                 .header("Location", redirectUri)
                 .build();
@@ -309,17 +388,12 @@ final class S3WebSupport {
         return Mono.empty();
     }
 
-    /**
-     * Checks if the bucket configuration has website configuration.
-     * <p>
-     * Currently returns false because the domain model's {@link BucketConfig}
-     * does not yet have website fields. Once ADR 0011 adds website fields to
-     * {@code BucketConfig}, this method will check for them.
-     */
-    private static boolean hasWebsiteConfig(BucketConfig config) {
-        // Future: config.websiteConfiguration() != null
-        // ADR 0011 scope — domain model needs website fields on BucketConfig
-        return false;
+    private static boolean hasWebsiteRuntimeConfig(BucketWebsiteConfiguration config) {
+        return config != null
+            && ((config.indexDocument() != null && !config.indexDocument().isBlank())
+                || (config.errorDocument() != null && !config.errorDocument().isBlank())
+                || (config.redirectAllRequestsTo() != null && !config.redirectAllRequestsTo().isBlank())
+                || (config.routingRuleRedirectHost() != null && !config.routingRuleRedirectHost().isBlank()));
     }
 
     /**

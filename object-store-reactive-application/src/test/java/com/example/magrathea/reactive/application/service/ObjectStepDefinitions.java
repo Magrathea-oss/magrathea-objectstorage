@@ -1,6 +1,8 @@
 package com.example.magrathea.reactive.application.service;
 
+import com.example.magrathea.objectstore.domain.aggregate.ActiveS3Object;
 import com.example.magrathea.objectstore.domain.aggregate.Bucket;
+import com.example.magrathea.objectstore.domain.aggregate.CreatingS3Object;
 import com.example.magrathea.objectstore.domain.aggregate.S3Object;
 import com.example.magrathea.objectstore.domain.event.ObjectStoreEvent;
 import com.example.magrathea.objectstore.domain.valueobject.ContentDescriptor;
@@ -59,7 +61,7 @@ public class ObjectStepDefinitions {
     public void objectExists(String objectKey) {
         assertNotNull(testBucketId);
         S3Object.Id id = S3Object.Id.generate();
-        S3Object object = S3Object.create(id, testBucketId, ObjectKey.of(objectKey), "text/plain", null, null, 1024, Map.of());
+        S3Object object = S3Object.create(id, testBucketId, ObjectKey.of(objectKey), "text/plain", null, null, 1024, Map.of(), null);
         objectRepository.save(object).block();
     }
 
@@ -67,9 +69,9 @@ public class ObjectStepDefinitions {
     public void createObjectWithContentDescriptor(String objectKey, long size) {
         assertNotNull(testBucketId);
         S3Object.Id id = S3Object.Id.generate();
-        S3Object object = S3Object.create(id, testBucketId, ObjectKey.of(objectKey), "text/plain", null, null, size, Map.of());
+        CreatingS3Object creating = S3Object.create(id, testBucketId, ObjectKey.of(objectKey), "text/plain", null, null, size, Map.of(), null);
         ContentDescriptor descriptor = ContentDescriptor.of(size, "abc123", "content-" + id.value());
-        S3Object withContent = object.withContent(descriptor);
+        ActiveS3Object withContent = creating.attachContent(descriptor);
         result = service.saveObject(withContent).cache();
     }
 
@@ -144,7 +146,7 @@ public class ObjectStepDefinitions {
         if (found != null) {
             result = service.deleteObject(found).cache();
         } else {
-            S3Object dummy = S3Object.create(S3Object.Id.generate(), testBucketId, ObjectKey.of(objectKey), null, null, null, 0, Map.of());
+            S3Object dummy = S3Object.create(S3Object.Id.generate(), testBucketId, ObjectKey.of(objectKey), null, null, null, 0, Map.of(), null);
             result = service.deleteObject(dummy).cache();
         }
     }

@@ -52,6 +52,51 @@ Revert `Bucket.Configuration` to CORS-only (its original scope). Model each rema
 
 See `docs/s3-bucket-configuration-design.md#open-design-issues` for a complete list of unresolved action-after-configuration behaviors per feature. These must be resolved before each feature is marked complete.
 
+=== Reactive Migration (ADR 0010)
+
+ADR 0010 records a course correction that completed the reactive migration from ADR 0009.
+
+==== Problem
+
+The initial ADR 0009 implementation produced incomplete code with stub repository methods, missing aggregate root state transitions, simplistic reactive patterns (`Mono.fromCallable` wrappers), and blocking `.join()` calls in application services.
+
+==== Corrective Actions
+
+| # | Action | Resolution |
+|---|---|---|
+| 1 | Repository implementations must have real (non-stub) method bodies with proper in-memory storage and reactive patterns | Implemented: `InMemoryReactiveBucketRepository`, `InMemoryReactiveS3ObjectRepository`, `InMemoryReactiveMultipartUploadRepository` use `Mono.defer`, `Mono.just`, `Mono.justOrEmpty`, `Flux.defer`, `Flux.fromIterable` natively |
+| 2 | Aggregate roots must enforce state transitions through the main aggregate object with domain event notification | Implemented: Bucket, S3Object, MultipartUpload aggregates enforce transitions via `with*` methods that return new instances with accumulated sealed `ObjectStoreEvent` records |
+| 3 | Reactive repository interfaces must leverage full reactive capabilities (backpressure, error handling, operator fusion) | Implemented: CQS split (Command + Query per aggregate) with native `Mono<T>`/`Flux<T>` interfaces |
+| 4 | C4 diagrams must be updated | Completed: diagrams aligned with current architecture |
+| 5 | ARC42 must be updated | Completed: this document reflects current state |
+| 6 | Tests must be more sophisticated | Completed: domain tests increased from 149 to 213; total test suite at 458 |
+
+==== Resulting Architecture
+
+- All application services return `Mono<T>` or `Flux<T>` natively — no `.join()` calls
+- Handlers chain reactive operators directly — no `.subscribeOn(Schedulers.boundedElastic())`
+- Repository implementations are fully reactive — no `Mono.fromCallable` stubs
+- Runtime effects added: CORS validation, Website routing, OwnershipControls enforcement, PublicAccessBlock evaluation, Accelerate headers, RequestPayment enforcement
+
+=== Registry-Based Handler Dispatch (ADR 0011)
+
+ADR 0011 records a course correction for the Bucket aggregate's configuration design and the `S3BucketConfigHandler` refactoring into a registry/strategy pattern.
+
+==== Components
+
+| Component | Responsibility |
+|-----------|---------------|
+| `ConfigType` | Enum or sealed interface identifying the configuration type |
+| `ConfigHandlerStrategy` | Interface with methods for extracting config from Bucket aggregate, applying config change, serializing to Query DTO, deserializing from Command DTO |
+| `ConfigHandlerRegistry` | A `Map<ConfigType, ConfigHandlerStrategy>` populated at startup |
+
+==== Benefits
+
+- Adding a new config type = write one strategy class + register it
+- No copypasta — every config type uses the same delegation pattern
+- Each strategy is independently testable
+- The Bucket aggregate stays decoupled from handler concerns
+
 === Quality Strategy
 
 - **Testability**: domain tested with pure JUnit (no Spring), integration tested with Cucumber BDD, S3 compatibility verified with AWS CLI

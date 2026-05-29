@@ -44,9 +44,8 @@ public class S3ApiConfig {
     }
 
     @Bean
-    public S3ObjectOperationsHandler s3ObjectOperationsHandler(ReactiveBucketService bucketService,
-                                                               ReactiveObjectService objectService) {
-        return new S3ObjectOperationsHandler(bucketService, objectService);
+    public S3ObjectOperationsHandler s3ObjectOperationsHandler(ReactiveObjectService objectService) {
+        return new S3ObjectOperationsHandler(objectService);
     }
 
     @Bean

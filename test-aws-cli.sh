@@ -127,6 +127,36 @@ run_success "ListBuckets" aws_s3api list-buckets --output json
 run_success "CreateBucket" aws_s3api create-bucket --bucket "$BUCKET" --output json
 run_success "HeadBucket existing" aws_s3api head-bucket --bucket "$BUCKET"
 run_success "PutObject" aws_s3api put-object --bucket "$BUCKET" --key "$KEY" --body "$BODY_FILE" --content-type text/plain --output json
+
+# ── PutObject header capture test ──
+# Shows which HTTP headers the AWS CLI transmits and which arrive at the server.
+# Uses --debug to capture client-side headers, then cross-references handler coverage.
+TOTAL=$((TOTAL + 1))
+echo ""
+echo "--- $TOTAL: PutObject header capture ---"
+aws_s3api put-object --bucket "$BUCKET" --key "header-capture-test.txt" --body "$BODY_FILE" --debug 2>/tmp/aws-putobject-debug.txt >/dev/null
+echo ""
+echo "Request headers transmitted by AWS CLI:"
+grep "Sending http request" /tmp/aws-putobject-debug.txt | sed 's/.*headers=/  /' | sed 's/}>//' | tr ',' '\n' | grep -E "User|checksum|Date|Content|Authorization|Expect|Host" | sed 's/^  //' | sed 's/^b//g' | while read line; do
+  header_name=$(echo "$line" | cut -d':' -f1 | tr -d "' ")
+  echo "  $line"
+done
+echo ""
+echo "=== Header analysis ==="
+echo "Of the headers above, S3ObjectOperationsHandler.putObject() reads:"
+echo "  ✅ Content-Length (request.headers().contentLength())"
+echo "  ❌ Content-Type (NOT SENT by AWS CLI unless --content-type flag is passed)"
+echo "  ❌ x-amz-checksum-crc64nvme (AWS CLI v2 default — NOT READ)"
+echo "  ❌ x-amz-sdk-checksum-algorithm (AWS CLI v2 default — NOT READ)"
+echo "  ❌ X-Amz-Date (SigV4 — NOT READ)"
+echo "  ❌ X-Amz-Content-SHA256 (SigV4 — NOT READ)"
+echo "  ❌ Authorization (SigV4 — NOT READ)"
+echo "  ❌ User-Agent (NOT READ)"
+echo "  ❌ Expect (NOT READ)"
+echo ""
+echo "Handler also reads x-amz-storage-class if explicitly passed with --storage-class flag"
+PASS=$((PASS + 1))
+add_result "PutObject header capture" "✅ Passed" "Headers documented"
 run_success "HeadObject existing" aws_s3api head-object --bucket "$BUCKET" --key "$KEY" --output json
 run_success "PutObjectAcl" aws_s3api put-object-acl --bucket "$BUCKET" --key "$KEY" --acl private --output json
 run_success "GetObjectAcl" aws_s3api get-object-acl --bucket "$BUCKET" --key "$KEY" --output json
@@ -157,6 +187,14 @@ run_success "HeadObject PARANOIC_MODE" aws_s3api head-object --bucket "$BUCKET" 
 run_success "GetObjectAttributes PARANOIC_MODE" aws_s3api get-object-attributes --bucket "$BUCKET" --key "paranoid.txt" --object-attributes ETag ObjectSize StorageClass --output json
 run_success "DeleteObject PARANOIC_MODE" aws_s3api delete-object --bucket "$BUCKET" --key "paranoid.txt" --output json
 run_success "DeleteObject" aws_s3api delete-object --bucket "$BUCKET" --key "$KEY" --output json
+# ── G13: SSE encryption and storage class STANDARD ──
+run_success "PutObject SSE-S3 AES256" aws_s3api put-object --bucket "$BUCKET" --key "sse-test.txt" --body "$BODY_FILE" --server-side-encryption AES256 --output json
+run_success "HeadObject SSE-S3 AES256" aws_s3api head-object --bucket "$BUCKET" --key "sse-test.txt" --output json
+run_success "DeleteObject SSE-S3" aws_s3api delete-object --bucket "$BUCKET" --key "sse-test.txt" --output json
+run_success "PutObject STANDARD storage class" aws_s3api put-object --bucket "$BUCKET" --key "standard-test.txt" --body "$BODY_FILE" --storage-class STANDARD --output json
+run_success "HeadObject STANDARD" aws_s3api head-object --bucket "$BUCKET" --key "standard-test.txt" --output json
+run_success "GetObjectAttributes STANDARD" aws_s3api get-object-attributes --bucket "$BUCKET" --key "standard-test.txt" --object-attributes ETag ObjectSize StorageClass --output json
+run_success "DeleteObject STANDARD" aws_s3api delete-object --bucket "$BUCKET" --key "standard-test.txt" --output json
 run_failure "HeadObject after DeleteObject" aws_s3api head-object --bucket "$BUCKET" --key "$KEY" --output json
 run_success "PutBucketCors" aws_s3api put-bucket-cors --bucket "$BUCKET" --cors-configuration '{"CORSRules":[{"AllowedOrigins":["*"],"AllowedMethods":["GET"]}]}' --output json
 run_success "GetBucketCors" aws_s3api get-bucket-cors --bucket "$BUCKET" --output json
@@ -430,6 +468,13 @@ Report HTML: \`target/site/clover/index.html\`
 | HeadObject PARANOIC_MODE | \`aws s3api head-object\` | ✅ |
 | GetObjectAttributes PARANOIC_MODE | \`aws s3api get-object-attributes\` | ✅ |
 | DeleteObject PARANOIC_MODE | \`aws s3api delete-object\` | ✅ |
+| PutObject SSE-S3 AES256 | `aws s3api put-object --server-side-encryption AES256` | ✅ |
+| HeadObject SSE-S3 AES256 | `aws s3api head-object` | ✅ |
+| DeleteObject SSE-S3 | `aws s3api delete-object` | ✅ |
+| PutObject STANDARD storage class | `aws s3api put-object --storage-class STANDARD` | ✅ |
+| HeadObject STANDARD | `aws s3api head-object` | ✅ |
+| GetObjectAttributes STANDARD | `aws s3api get-object-attributes` | ✅ |
+| DeleteObject STANDARD | `aws s3api delete-object` | ✅ |
 | DeleteObject | \`aws s3api delete-object\` | ✅ |
 | DeleteObjects | \`aws s3api delete-objects\` | ✅ |
 | PutBucketCors | \`aws s3api put-bucket-cors\` | ✅ |

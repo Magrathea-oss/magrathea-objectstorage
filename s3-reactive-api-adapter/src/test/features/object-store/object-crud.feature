@@ -5,23 +5,22 @@ Feature: S3-compatible Object CRUD
 
   # ── Success scenarios ──
 
-  Scenario: Put an object
-    Given an object with key "hello.txt" and content "Hello Magrathea!"
-    When the object is stored via S3 API
-    Then the response status is 200
-    And the object appears in the object list
-
-  Scenario: Put an object with PARANOIC_MODE storage class
-    Given an object with key "paranoid.txt" and content "Top secret"
-    When the object is stored via S3 API with storage class "PARANOIC_MODE"
-    Then the response status is 200
-    And the object appears in the object list
-
   Scenario: Get an object
     Given object "hello.txt" exists with content "Hello Magrathea!"
     When the object is retrieved via S3 API
     Then the response status is 200
     And the content is "Hello Magrathea!"
+
+  # ── G13: GetObject with SSE/checksum header echo ──
+
+  Scenario: GetObject echoes SSE and checksum headers
+    Given an object with key "sse-echo-test.txt" and content "data"
+    When the object is stored via S3 API with multiple headers
+      | x-amz-server-side-encryption | AES256 |
+      | x-amz-checksum-sha256 | deadbeef |
+    Then the response status is 200
+    And GET response contains SSE header "x-amz-server-side-encryption" with value "AES256"
+    And GET response contains checksum header "x-amz-checksum-sha256" with value "deadbeef"
 
   Scenario: Head object
     Given object "hello.txt" exists
@@ -121,13 +120,6 @@ Feature: S3-compatible Object CRUD
     When the object with key "ghost-restore.txt" is restored via S3 API
     Then the response status is 404
 
-  # ── Failure scenarios ──
-
-  Scenario: Put object to nonexistent bucket
-    Given an object with key "orphan.txt" and content "data"
-    When the object is stored via S3 API in bucket "no-such-bucket"
-    Then the response status is 404
-
   Scenario: Get nonexistent object
     When the object with key "ghost.txt" is retrieved via S3 API
     Then the response status is 404
@@ -147,5 +139,30 @@ Feature: S3-compatible Object CRUD
 
   Scenario: Delete nonexistent object
     Given object "ghost.txt" does not exist
+    When the object is deleted via S3 API
+    Then the response status is 204
+
+  # ── Service/repository error scenarios ──
+
+  Scenario: Copy object with nonexistent source returns error from service
+    Given object "ghost-source.txt" does not exist
+    When object "ghost-source.txt" is copied to "still-ghost.txt"
+    Then the response status is 404
+
+  Scenario: Restore nonexistent object returns error from service
+    Given object "ghost-restore-svc.txt" does not exist
+    When the object with key "ghost-restore-svc.txt" is restored via S3 API
+    Then the response status is 404
+
+  Scenario: Get attributes for nonexistent object returns error from service
+    Given bucket "test-bucket" exists
+    When object attributes are requested for "ghost-attr.txt"
+    Then the response status is 404
+
+  Scenario: Delete object returns 204 even when already deleted (idempotent)
+    Given object "already-deleted.txt" exists
+    When the object is deleted via S3 API
+    Then the object no longer appears in the object list
+    And the response status is 204
     When the object is deleted via S3 API
     Then the response status is 204

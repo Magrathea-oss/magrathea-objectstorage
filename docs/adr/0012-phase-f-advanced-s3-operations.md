@@ -109,7 +109,7 @@ Phase F is implemented and Cucumber-tested across all five batches:
 4. Batch 4 added SelectObjectContent and WriteGetObjectResponse using existing object operation handler infrastructure.
 5. Batch 5 added bucket metadata and metadata table configuration operations in `S3BucketConfigHandler`.
 
-Verification result: `mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false` => 216 tests, 0 failures, 0 errors.
+Verification result: `mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false` => 227 tests, 0 failures, 0 errors.
 
 ## Status
 
