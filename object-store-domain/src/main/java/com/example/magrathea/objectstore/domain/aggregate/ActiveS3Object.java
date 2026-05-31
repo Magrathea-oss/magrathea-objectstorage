@@ -1,12 +1,13 @@
 package com.example.magrathea.objectstore.domain.aggregate;
 
+import com.example.magrathea.objectstore.domain.IllegalStateTransitionException;
 import com.example.magrathea.objectstore.domain.event.ObjectStoreEvent;
-import com.example.magrathea.objectstore.domain.valueobject.ContentDescriptor;
 import com.example.magrathea.objectstore.domain.valueobject.EncryptionConfiguration;
+import com.example.magrathea.objectstore.domain.valueobject.ObjectChecksum;
 import com.example.magrathea.objectstore.domain.valueobject.ObjectKey;
 import com.example.magrathea.objectstore.domain.valueobject.ObjectLockConfiguration;
 
-import java.time.Instant;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -22,12 +23,11 @@ import java.util.Objects;
  */
 public final class ActiveS3Object extends S3Object {
 
-    ActiveS3Object(S3Object.Id id, Bucket.Id bucketId, ObjectKey key, String storageClass,
-                   Map<String, String> userMetadata, ContentDescriptor contentDescriptor,
-                   EncryptionConfiguration encryption, String etag, String versionId,
+    ActiveS3Object(ObjectKey key, String storageClass,
+                   Map<String, String> userMetadata, EncryptionConfiguration encryption,
+                   ObjectChecksum checksum, long size, ZonedDateTime createdAt,
                    List<ObjectStoreEvent> events) {
-        super(id, bucketId, key, storageClass, userMetadata, contentDescriptor,
-            encryption, etag, versionId, events);
+        super(key, storageClass, userMetadata, encryption, checksum, size, createdAt, events);
     }
 
     /**
@@ -35,14 +35,18 @@ public final class ActiveS3Object extends S3Object {
      *
      * @param lockConfiguration the lock configuration to apply
      * @return a new {@code LockedS3Object} with an {@code ObjectLockConfigured} event
+     * @throws IllegalStateTransitionException if lockConfiguration is null
      */
     public LockedS3Object applyLock(ObjectLockConfiguration lockConfiguration) {
-        Objects.requireNonNull(lockConfiguration, "lockConfiguration must not be null");
+        if (lockConfiguration == null) {
+            throw new IllegalStateTransitionException(
+                "Cannot apply lock: lockConfiguration must not be null");
+        }
         var newEvents = appendEvent(domainEvents(),
-            new ObjectStoreEvent.ObjectLockConfigured(id(), lockConfiguration.mode(),
-                lockConfiguration.retention().duration(), Instant.now()));
-        return new LockedS3Object(id(), bucketId(), key(), storageClass(), userMetadata(),
-            contentDescriptor(), encryption(), etag(), versionId(),
+            new ObjectStoreEvent.ObjectLockConfigured(key(), lockConfiguration.mode(),
+                lockConfiguration.retention().duration(), ZonedDateTime.now()));
+        return new LockedS3Object(key(), storageClass(), userMetadata(),
+            encryption(), checksum(), size(), createdAt(),
             lockConfiguration, newEvents);
     }
 
@@ -53,10 +57,10 @@ public final class ActiveS3Object extends S3Object {
      */
     public ArchivedS3Object archive() {
         var newEvents = appendEvent(domainEvents(),
-            new ObjectStoreEvent.ObjectArchived(id(), bucketId(), storageClass(), Instant.now()));
-        return new ArchivedS3Object(id(), bucketId(), key(), storageClass(), userMetadata(),
-            contentDescriptor(), encryption(), etag(), versionId(),
-            null, newEvents);
+            new ObjectStoreEvent.ObjectArchived(key(), ZonedDateTime.now()));
+        return new ArchivedS3Object(key(), storageClass(), userMetadata(),
+            encryption(), checksum(), size(), createdAt(),
+            false, null, newEvents);
     }
 
     /**
@@ -66,18 +70,19 @@ public final class ActiveS3Object extends S3Object {
      */
     public DeletedS3Object delete() {
         var newEvents = appendEvent(domainEvents(),
-            new ObjectStoreEvent.ObjectDeleted(id(), bucketId(), Instant.now()));
-        return new DeletedS3Object(id(), bucketId(), key(), storageClass(), userMetadata(), newEvents);
+            new ObjectStoreEvent.ObjectDeleted(key(), ZonedDateTime.now()));
+        return new DeletedS3Object(key(), storageClass(), userMetadata(),
+            createdAt(), newEvents);
     }
 
     @Override
     public S3Object clearEvents() {
-        return new ActiveS3Object(id(), bucketId(), key(), storageClass(), userMetadata(),
-            contentDescriptor(), encryption(), etag(), versionId(), List.of());
+        return new ActiveS3Object(key(), storageClass(), userMetadata(),
+            encryption(), checksum(), size(), createdAt(), List.of());
     }
 
     @Override
     public String toString() {
-        return "ActiveS3Object[id=" + id() + ", key=" + key() + "]";
+        return "ActiveS3Object[key=" + key() + "]";
     }
 }

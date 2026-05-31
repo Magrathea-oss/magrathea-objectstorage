@@ -2,10 +2,9 @@ package com.example.magrathea.reactive.application.service;
 
 import com.example.magrathea.objectstore.domain.aggregate.ActiveS3Object;
 import com.example.magrathea.objectstore.domain.aggregate.Bucket;
-import com.example.magrathea.objectstore.domain.aggregate.CreatingS3Object;
 import com.example.magrathea.objectstore.domain.aggregate.S3Object;
 import com.example.magrathea.objectstore.domain.event.ObjectStoreEvent;
-import com.example.magrathea.objectstore.domain.valueobject.ContentDescriptor;
+import com.example.magrathea.objectstore.domain.valueobject.ObjectChecksum;
 import com.example.magrathea.objectstore.domain.valueobject.ObjectKey;
 import com.example.magrathea.objectstore.reactive.repository.application.CommandResult;
 import com.example.magrathea.reactive.infrastructure.adapter.persistence.InMemoryReactiveBucketRepository;
@@ -20,6 +19,7 @@ import reactor.test.StepVerifier;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -30,6 +30,7 @@ public class ObjectStepDefinitions {
     private ReactiveObjectService service;
     private Mono<?> result;
     private Bucket.Id testBucketId;
+    private String testBucketName;
 
     @Before
     public void reset() {
@@ -38,6 +39,7 @@ public class ObjectStepDefinitions {
         service = new ReactiveObjectService(objectRepository, objectRepository, bucketRepository);
         result = null;
         testBucketId = null;
+        testBucketName = null;
     }
 
     @Given("object store bucket {string} exists")
@@ -48,31 +50,38 @@ public class ObjectStepDefinitions {
             com.example.magrathea.objectstore.domain.valueobject.StorageClass.STANDARD);
         bucketRepository.save(bucket).block();
         testBucketId = id;
+        testBucketName = bucketName;
     }
 
     @Given("object {string} does not exist")
     public void objectDoesNotExist(String objectKey) {
         assertNotNull(testBucketId);
-        var existing = objectRepository.findByBucketAndKey(testBucketId, ObjectKey.of(objectKey)).block();
+        var existing = objectRepository.findByBucketAndKey(testBucketId, ObjectKey.of(testBucketName, objectKey)).block();
         assertNull(existing, "Object should not exist: " + objectKey);
     }
 
     @Given("object {string} exists")
     public void objectExists(String objectKey) {
         assertNotNull(testBucketId);
-        S3Object.Id id = S3Object.Id.generate();
-        S3Object object = S3Object.create(id, testBucketId, ObjectKey.of(objectKey), "text/plain", null, null, 1024, Map.of(), null);
+        var checksum = ObjectChecksum.of(Set.of(
+            new com.example.magrathea.objectstore.domain.valueobject.ChecksumValue(
+                com.example.magrathea.objectstore.domain.valueobject.ChecksumAlgorithm.MD5, "abc123")), null);
+        ActiveS3Object object = ActiveS3Object.create(
+            ObjectKey.of(testBucketName, objectKey), null,
+            Map.of(), null, checksum, 1024);
         objectRepository.save(object).block();
     }
 
     @When("I create object {string} with content descriptor of size {long}")
     public void createObjectWithContentDescriptor(String objectKey, long size) {
         assertNotNull(testBucketId);
-        S3Object.Id id = S3Object.Id.generate();
-        CreatingS3Object creating = S3Object.create(id, testBucketId, ObjectKey.of(objectKey), "text/plain", null, null, size, Map.of(), null);
-        ContentDescriptor descriptor = ContentDescriptor.of(size, "abc123", "content-" + id.value());
-        ActiveS3Object withContent = creating.attachContent(descriptor);
-        result = service.saveObject(withContent).cache();
+        var checksum = ObjectChecksum.of(Set.of(
+            new com.example.magrathea.objectstore.domain.valueobject.ChecksumValue(
+                com.example.magrathea.objectstore.domain.valueobject.ChecksumAlgorithm.MD5, "abc123")), null);
+        ActiveS3Object active = ActiveS3Object.create(
+            ObjectKey.of(testBucketName, objectKey), null,
+            Map.of(), null, checksum, size);
+        result = service.saveObject(active).cache();
     }
 
     @Then("the result is a Created<S3Object> with version {long}")
@@ -99,7 +108,22 @@ public class ObjectStepDefinitions {
             .expectNextMatches(cr -> {
                 if (cr instanceof CommandResult cmdResult) {
                     List<ObjectStoreEvent> events = cmdResult.events();
-                    return events.stream().anyMatch(e -> e instanceof ObjectStoreEvent.ContentDescriptorCreated);
+                    return events.stream().anyMatch(e -> e instanceof ObjectStoreEvent.ObjectCreated);
+                }
+                return false;
+            })
+            .verifyComplete();
+    }
+
+
+    @Then("the event ObjectCreated is recorded")
+    public void eventObjectCreatedRecorded() {
+        assertNotNull(result);
+        StepVerifier.create(result)
+            .expectNextMatches(cr -> {
+                if (cr instanceof CommandResult cmdResult) {
+                    List<ObjectStoreEvent> events = cmdResult.events();
+                    return events.stream().anyMatch(e -> e instanceof ObjectStoreEvent.ObjectCreated);
                 }
                 return false;
             })
@@ -113,7 +137,7 @@ public class ObjectStepDefinitions {
             .expectNextMatches(cr -> {
                 if (cr instanceof CommandResult cmdResult) {
                     S3Object obj = (S3Object) cmdResult.aggregate();
-                    return obj.contentDescriptor() != null && obj.contentDescriptor().size() == size;
+                    return obj.size() == size;
                 }
                 return false;
             })
@@ -123,7 +147,7 @@ public class ObjectStepDefinitions {
     @When("I find object {string} in bucket {string}")
     public void findObjectInBucket(String objectKey, String bucketName) {
         assertNotNull(testBucketId);
-        result = service.findByBucketAndKey(testBucketId, ObjectKey.of(objectKey));
+        result = service.findByBucketAndKey(testBucketId, ObjectKey.of(bucketName, objectKey));
     }
 
     @Then("the result is an S3Object with key {string}")
@@ -132,7 +156,7 @@ public class ObjectStepDefinitions {
         StepVerifier.create(result)
             .expectNextMatches(obj -> {
                 if (obj instanceof S3Object s3) {
-                    return s3.key().equals(ObjectKey.of(objectKey));
+                    return s3.key().equals(ObjectKey.of(testBucketName, objectKey));
                 }
                 return false;
             })
@@ -142,11 +166,16 @@ public class ObjectStepDefinitions {
     @When("I delete object {string}")
     public void deleteObject(String objectKey) {
         assertNotNull(testBucketId);
-        S3Object found = objectRepository.findByBucketAndKey(testBucketId, ObjectKey.of(objectKey)).block();
+        S3Object found = objectRepository.findByBucketAndKey(testBucketId, ObjectKey.of(testBucketName, objectKey)).block();
         if (found != null) {
             result = service.deleteObject(found).cache();
         } else {
-            S3Object dummy = S3Object.create(S3Object.Id.generate(), testBucketId, ObjectKey.of(objectKey), null, null, null, 0, Map.of(), null);
+            var checksum = ObjectChecksum.of(Set.of(
+                new com.example.magrathea.objectstore.domain.valueobject.ChecksumValue(
+                    com.example.magrathea.objectstore.domain.valueobject.ChecksumAlgorithm.MD5, "abc123")), null);
+            ActiveS3Object dummy = ActiveS3Object.create(
+                ObjectKey.of(testBucketName, objectKey), null,
+                Map.of(), null, checksum, 0);
             result = service.deleteObject(dummy).cache();
         }
     }

@@ -1,28 +1,27 @@
 package com.example.magrathea.objectstore.domain;
 
-import com.example.magrathea.objectstore.domain.aggregate.Bucket;
-import com.example.magrathea.objectstore.domain.aggregate.S3Object;
 import com.example.magrathea.objectstore.domain.aggregate.ActiveS3Object;
 import com.example.magrathea.objectstore.domain.aggregate.ArchivedS3Object;
-import com.example.magrathea.objectstore.domain.aggregate.CreatingS3Object;
 import com.example.magrathea.objectstore.domain.aggregate.DeletedS3Object;
 import com.example.magrathea.objectstore.domain.aggregate.LockedS3Object;
-import com.example.magrathea.objectstore.domain.aggregate.RestoredS3Object;
-import com.example.magrathea.objectstore.domain.valueobject.ContentDescriptor;
-import com.example.magrathea.objectstore.domain.valueobject.EncryptionConfiguration;
+import com.example.magrathea.objectstore.domain.aggregate.S3Object;
+import com.example.magrathea.objectstore.domain.event.ObjectStoreEvent;
 import com.example.magrathea.objectstore.domain.valueobject.EncryptionAlgorithm;
+import com.example.magrathea.objectstore.domain.valueobject.EncryptionConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.EncryptionKeyReference;
-import com.example.magrathea.objectstore.domain.valueobject.EncryptionContext;
+import com.example.magrathea.objectstore.domain.valueobject.ObjectChecksum;
 import com.example.magrathea.objectstore.domain.valueobject.ObjectKey;
 import com.example.magrathea.objectstore.domain.valueobject.ObjectLockConfiguration;
-import com.example.magrathea.objectstore.domain.valueobject.RestoreConfiguration;
-import com.example.magrathea.objectstore.domain.event.ObjectStoreEvent;
-
-import org.junit.jupiter.api.Test;
+import com.example.magrathea.objectstore.domain.valueobject.ChecksumAlgorithm;
+import com.example.magrathea.objectstore.domain.valueobject.ChecksumValue;
 
 import java.time.Duration;
-import java.time.Instant;
+import java.time.ZonedDateTime;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+
+import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -32,558 +31,408 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class S3ObjectTest {
 
-    // ── CreatingS3Object tests ──
+    // ── Helper: a minimal checksum ──
+    private static ObjectChecksum someChecksum() {
+        return ObjectChecksum.of(Set.of(
+            new ChecksumValue(ChecksumAlgorithm.SHA256, "abc123def456")));
+    }
+
+    private static ObjectKey someKey() {
+        return ObjectKey.of("test-bucket", "test-key");
+    }
+
+    // ── S3Object.create() tests ──
 
     @Test
-    void create_returnsCreatingS3Object() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test-key");
-        var object = S3Object.create(id, bucketId, key,
-            "text/plain", null, null, 100, Map.of("description", "test"), null);
-        assertInstanceOf(CreatingS3Object.class, object);
+    void create_returnsActiveS3Object() {
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD",
+            Map.of("description", "test"),
+            null, someChecksum(), 100);
+        assertInstanceOf(ActiveS3Object.class, object);
         assertEquals("test-bucket", object.key().bucket());
         assertEquals("test-key", object.key().key());
-        assertFalse(object.hasEtag());
+        assertEquals("STANDARD", object.storageClass());
+        assertEquals(100, object.size());
         assertFalse(object.hasEncryption());
+        assertTrue(object.hasChecksum());
     }
 
     @Test
     void create_sizeNegative_throws() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
+        var key = someKey();
         assertThrows(IllegalArgumentException.class,
-            () -> S3Object.create(id, bucketId, key, "text/plain", null, null, -1, Map.of(), null));
+            () -> S3Object.create(key, "STANDARD", Map.of(), null, someChecksum(), -1));
     }
 
     @Test
     void create_nullKey_throws() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
         assertThrows(NullPointerException.class,
-            () -> S3Object.create(id, bucketId, null, "text/plain", null, null, 100, Map.of(), null));
-    }
-
-    // ── State machine: Creating → Active ──
-
-    @Test
-    void creating_attachContent_transitionsToActive() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
-        var object = S3Object.create(id, bucketId, key, "text/plain", null, null, 100, Map.of(), null);
-        assertInstanceOf(CreatingS3Object.class, object);
-
-        var descriptor = ContentDescriptor.of(100, "d41d8cd98f00b204e9800998ecf8427e", "content-ref-1");
-        var active = ((CreatingS3Object) object).attachContent(descriptor);
-        assertInstanceOf(ActiveS3Object.class, active);
-        assertTrue(active.hasContentDescriptor());
-        assertEquals("d41d8cd98f00b204e9800998ecf8427e", active.contentDescriptor().md5Hash());
-        assertEquals("content-ref-1", active.contentDescriptor().contentId());
-        assertEquals(100, active.contentDescriptor().size());
+            () -> S3Object.create(null, "STANDARD", Map.of(), null, someChecksum(), 100));
     }
 
     @Test
-    void creating_attachContent_null_throws() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
-        var object = S3Object.create(id, bucketId, key, "text/plain", null, null, 100, Map.of(), null);
+    void create_nullChecksum_throws() {
+        var key = someKey();
         assertThrows(NullPointerException.class,
-            () -> ((CreatingS3Object) object).attachContent(null));
-    }
-
-    // ── State machine: Active → Locked ──
-
-    @Test
-    void active_applyLock_transitionsToLocked() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
-        var creating = S3Object.create(id, bucketId, key, "text/plain", null, null, 100, Map.of(), null);
-        var descriptor = ContentDescriptor.of(100, "abc123", "content-id-1");
-        var active = ((CreatingS3Object) creating).attachContent(descriptor);
-
-        var lockConfig = ObjectLockConfiguration.of(
-            ObjectLockConfiguration.ObjectLockMode.COMPLIANCE,
-            ObjectLockConfiguration.RetentionPeriod.startingNow(Duration.ofDays(30)));
-        var locked = active.applyLock(lockConfig);
-        assertInstanceOf(LockedS3Object.class, locked);
-        assertEquals(ObjectLockConfiguration.ObjectLockMode.COMPLIANCE,
-            ((LockedS3Object) locked).lockConfiguration().mode());
+            () -> S3Object.create(key, "STANDARD", Map.of(), null, null, 100));
     }
 
     @Test
-    void active_applyLock_null_throws() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
-        var creating = S3Object.create(id, bucketId, key, "text/plain", null, null, 100, Map.of(), null);
-        var descriptor = ContentDescriptor.of(100, "abc123", "content-id-1");
-        var active = ((CreatingS3Object) creating).attachContent(descriptor);
-        assertThrows(NullPointerException.class,
-            () -> active.applyLock(null));
+    void create_producesObjectCreatedEvent() {
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD", Map.of(), null, someChecksum(), 100);
+        var events = object.domainEvents();
+        assertEquals(1, events.size());
+        assertInstanceOf(ObjectStoreEvent.ObjectCreated.class, events.get(0));
+        var created = (ObjectStoreEvent.ObjectCreated) events.get(0);
+        assertEquals(key, created.key());
+        assertNotNull(created.occurredOn());
     }
 
     // ── State machine: Active → Archived ──
 
     @Test
     void active_archive_transitionsToArchived() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
-        var creating = S3Object.create(id, bucketId, key, "text/plain", null, null, 100, Map.of(), null);
-        var descriptor = ContentDescriptor.of(100, "abc123", "content-id-1");
-        var active = ((CreatingS3Object) creating).attachContent(descriptor);
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD", Map.of(), null, someChecksum(), 100);
 
-        var archived = active.archive();
+        var archived = object.archive();
         assertInstanceOf(ArchivedS3Object.class, archived);
+        assertFalse(archived.restored());
+        assertNull(archived.restoreExpiry());
+    }
+
+    @Test
+    void active_archive_producesObjectArchivedEvent() {
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD", Map.of(), null, someChecksum(), 100);
+        var archived = object.archive();
+        var events = archived.domainEvents();
+        assertEquals(2, events.size());
+        assertInstanceOf(ObjectStoreEvent.ObjectArchived.class, events.get(1));
+    }
+
+    // ── State machine: Active → Locked ──
+
+    @Test
+    void active_applyLock_transitionsToLocked() {
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD", Map.of(), null, someChecksum(), 100);
+
+        var lockConfig = ObjectLockConfiguration.of(
+            ObjectLockConfiguration.ObjectLockMode.COMPLIANCE,
+            ObjectLockConfiguration.RetentionPeriod.startingNow(Duration.ofDays(30)));
+        var locked = object.applyLock(lockConfig);
+        assertInstanceOf(LockedS3Object.class, locked);
+        assertEquals(ObjectLockConfiguration.ObjectLockMode.COMPLIANCE,
+            locked.lockConfiguration().mode());
+        assertFalse(locked.lockConfiguration().legalHold());
+    }
+
+    @Test
+    void active_applyLock_null_throws() {
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD", Map.of(), null, someChecksum(), 100);
+        assertThrows(IllegalStateTransitionException.class,
+            () -> object.applyLock(null));
+    }
+
+    @Test
+    void active_applyLock_producesObjectLockConfiguredEvent() {
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD", Map.of(), null, someChecksum(), 100);
+        var lockConfig = ObjectLockConfiguration.of(
+            ObjectLockConfiguration.ObjectLockMode.GOVERNANCE,
+            ObjectLockConfiguration.RetentionPeriod.startingNow(Duration.ofDays(30)));
+        var locked = object.applyLock(lockConfig);
+        var events = locked.domainEvents();
+        assertEquals(2, events.size());
+        assertInstanceOf(ObjectStoreEvent.ObjectLockConfigured.class, events.get(1));
     }
 
     // ── State machine: Active → Deleted ──
 
     @Test
     void active_delete_transitionsToDeleted() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
-        var creating = S3Object.create(id, bucketId, key, "text/plain", null, null, 100, Map.of(), null);
-        var descriptor = ContentDescriptor.of(100, "abc123", "content-id-1");
-        var active = ((CreatingS3Object) creating).attachContent(descriptor);
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD", Map.of(), null, someChecksum(), 100);
 
-        var deleted = active.delete();
+        var deleted = object.delete();
         assertInstanceOf(DeletedS3Object.class, deleted);
+    }
+
+    @Test
+    void active_delete_producesObjectDeletedEvent() {
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD", Map.of(), null, someChecksum(), 100);
+        var deleted = object.delete();
+        var events = deleted.domainEvents();
+        assertEquals(2, events.size());
+        assertInstanceOf(ObjectStoreEvent.ObjectDeleted.class, events.get(1));
+    }
+
+    // ── State machine: Locked → Active (removeLegalHold) ──
+
+    @Test
+    void locked_removeLegalHold_transitionsToActive() {
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD", Map.of(), null, someChecksum(), 100);
+
+        // Apply lock with legal hold enabled
+        var lockConfig = ObjectLockConfiguration.of(
+            ObjectLockConfiguration.ObjectLockMode.GOVERNANCE,
+            ObjectLockConfiguration.RetentionPeriod.startingNow(Duration.ofDays(30)),
+            true);
+        var locked = object.applyLock(lockConfig);
+
+        var active = locked.removeLegalHold();
+        assertInstanceOf(ActiveS3Object.class, active);
+    }
+
+    @Test
+    void locked_removeLegalHold_withoutLegalHold_throws() {
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD", Map.of(), null, someChecksum(), 100);
+
+        // Apply lock WITHOUT legal hold
+        var lockConfig = ObjectLockConfiguration.of(
+            ObjectLockConfiguration.ObjectLockMode.COMPLIANCE,
+            ObjectLockConfiguration.RetentionPeriod.startingNow(Duration.ofDays(30)));
+        var locked = object.applyLock(lockConfig);
+
+        assertThrows(IllegalStateTransitionException.class,
+            () -> locked.removeLegalHold());
+    }
+
+    @Test
+    void locked_removeLegalHold_producesLegalHoldRemovedEvent() {
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD", Map.of(), null, someChecksum(), 100);
+        var lockConfig = ObjectLockConfiguration.of(
+            ObjectLockConfiguration.ObjectLockMode.GOVERNANCE,
+            ObjectLockConfiguration.RetentionPeriod.startingNow(Duration.ofDays(30)),
+            true);
+        var locked = object.applyLock(lockConfig);
+        var active = locked.removeLegalHold();
+        var events = active.domainEvents();
+        assertEquals(3, events.size());
+        assertInstanceOf(ObjectStoreEvent.LegalHoldRemoved.class, events.get(2));
     }
 
     // ── State machine: Locked → Archived ──
 
     @Test
     void locked_archive_transitionsToArchived() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
-        var creating = S3Object.create(id, bucketId, key, "text/plain", null, null, 100, Map.of(), null);
-        var descriptor = ContentDescriptor.of(100, "abc123", "content-id-1");
-        var active = ((CreatingS3Object) creating).attachContent(descriptor);
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD", Map.of(), null, someChecksum(), 100);
         var lockConfig = ObjectLockConfiguration.of(
             ObjectLockConfiguration.ObjectLockMode.COMPLIANCE,
             ObjectLockConfiguration.RetentionPeriod.startingNow(Duration.ofDays(30)));
-        var locked = active.applyLock(lockConfig);
+        var locked = object.applyLock(lockConfig);
 
         var archived = locked.archive();
         assertInstanceOf(ArchivedS3Object.class, archived);
+        assertFalse(archived.restored());
     }
 
-    // ── State machine: Locked → Deleted ──
+    // ── State machine: Archived → Deleted ──
 
     @Test
-    void locked_delete_transitionsToDeleted() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
-        var creating = S3Object.create(id, bucketId, key, "text/plain", null, null, 100, Map.of(), null);
-        var descriptor = ContentDescriptor.of(100, "abc123", "content-id-1");
-        var active = ((CreatingS3Object) creating).attachContent(descriptor);
-        var lockConfig = ObjectLockConfiguration.of(
-            ObjectLockConfiguration.ObjectLockMode.COMPLIANCE,
-            ObjectLockConfiguration.RetentionPeriod.startingNow(Duration.ofDays(30)));
-        var locked = active.applyLock(lockConfig);
+    void archived_delete_transitionsToDeleted() {
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD", Map.of(), null, someChecksum(), 100);
+        var archived = object.archive();
 
-        var deleted = locked.delete();
+        var deleted = archived.delete();
         assertInstanceOf(DeletedS3Object.class, deleted);
     }
 
-    // ── State machine: Archived → Restored ──
-
     @Test
-    void archived_restore_transitionsToRestored() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
-        var creating = S3Object.create(id, bucketId, key, "text/plain", null, null, 100, Map.of(), null);
-        var descriptor = ContentDescriptor.of(100, "abc123", "content-id-1");
-        var active = ((CreatingS3Object) creating).attachContent(descriptor);
-        var archived = active.archive();
-
-        var restoreConfig = RestoreConfiguration.of(
-            Instant.now(), Instant.now().plus(Duration.ofDays(3)),
-            RestoreConfiguration.RestoreTier.STANDARD);
-        var restored = archived.restore(restoreConfig);
-        assertInstanceOf(RestoredS3Object.class, restored);
-    }
-
-    @Test
-    void archived_restore_null_throws() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
-        var creating = S3Object.create(id, bucketId, key, "text/plain", null, null, 100, Map.of(), null);
-        var descriptor = ContentDescriptor.of(100, "abc123", "content-id-1");
-        var active = ((CreatingS3Object) creating).attachContent(descriptor);
-        var archived = active.archive();
-        assertThrows(NullPointerException.class,
-            () -> archived.restore(null));
-    }
-
-    // ── State machine: Restored → Locked ──
-
-    @Test
-    void restored_applyLock_transitionsToLocked() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
-        var creating = S3Object.create(id, bucketId, key, "text/plain", null, null, 100, Map.of(), null);
-        var descriptor = ContentDescriptor.of(100, "abc123", "content-id-1");
-        var active = ((CreatingS3Object) creating).attachContent(descriptor);
-        var archived = active.archive();
-        var restoreConfig = RestoreConfiguration.of(
-            Instant.now(), Instant.now().plus(Duration.ofDays(3)),
-            RestoreConfiguration.RestoreTier.STANDARD);
-        var restored = archived.restore(restoreConfig);
-
-        var lockConfig = ObjectLockConfiguration.of(
-            ObjectLockConfiguration.ObjectLockMode.GOVERNANCE,
-            ObjectLockConfiguration.RetentionPeriod.startingNow(Duration.ofDays(7)));
-        var locked = restored.applyLock(lockConfig);
-        assertInstanceOf(LockedS3Object.class, locked);
-        assertEquals(ObjectLockConfiguration.ObjectLockMode.GOVERNANCE,
-            ((LockedS3Object) locked).lockConfiguration().mode());
-    }
-
-    // ── State machine: Restored → Deleted ──
-
-    @Test
-    void restored_delete_transitionsToDeleted() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
-        var creating = S3Object.create(id, bucketId, key, "text/plain", null, null, 100, Map.of(), null);
-        var descriptor = ContentDescriptor.of(100, "abc123", "content-id-1");
-        var active = ((CreatingS3Object) creating).attachContent(descriptor);
-        var archived = active.archive();
-        var restoreConfig = RestoreConfiguration.of(
-            Instant.now(), Instant.now().plus(Duration.ofDays(3)),
-            RestoreConfiguration.RestoreTier.STANDARD);
-        var restored = archived.restore(restoreConfig);
-
-        var deleted = restored.delete();
-        assertInstanceOf(DeletedS3Object.class, deleted);
-    }
-
-    // ── Id tests ──
-
-    @Test
-    void id_generatesUniqueValues() {
-        var id1 = S3Object.Id.generate();
-        var id2 = S3Object.Id.generate();
-        assertNotNull(id1.value());
-        assertNotNull(id2.value());
-        assertNotEquals(id1.value(), id2.value());
-    }
-
-    @Test
-    void id_null_throws() {
-        assertThrows(NullPointerException.class, () -> new S3Object.Id(null));
-    }
-
-    // ── Restore tests ──
-
-    @Test
-    void restoreActive_returnsActiveS3Object() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
-        var now = Instant.now();
-        var contentDescriptor = ContentDescriptor.of(100, "abc123", "content-id-1");
-        var object = S3Object.restoreActive(id, bucketId, key,
-            "\"etag\"", "STANDARD", now,
-            "text/plain", null, null, Map.of(), contentDescriptor, null);
-        assertInstanceOf(ActiveS3Object.class, object);
-        assertEquals("\"etag\"", object.etag());
-        assertEquals("STANDARD", object.storageClass());
-        assertTrue(object.hasContentDescriptor());
-        assertEquals("abc123", object.contentDescriptor().md5Hash());
-        assertEquals("content-id-1", object.contentDescriptor().contentId());
-        assertFalse(object.hasEncryption());
-    }
-
-    @Test
-    void restore_withEncryption() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
-        var now = Instant.now();
-        var contentDescriptor = ContentDescriptor.of(100, "abc123", "content-id-1");
-        var encryption = EncryptionConfiguration.of(EncryptionAlgorithm.AES256);
-        var object = S3Object.restoreActive(id, bucketId, key,
-            "\"etag\"", "STANDARD", now,
-            "text/plain", null, null, Map.of(), contentDescriptor, encryption);
-        assertTrue(object.hasEncryption());
-        assertEquals(EncryptionAlgorithm.AES256, object.encryption().algorithm());
-    }
-
-    @Test
-    void restoreLegacy_returnsActiveS3Object() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
-        var now = Instant.now();
-        var contentDescriptor = ContentDescriptor.of(100, "abc123", "content-id-1");
-        var object = S3Object.restore(id, bucketId, key,
-            "\"etag\"", 100, "STANDARD", now,
-            "text/plain", null, null, Map.of(), contentDescriptor);
-        assertInstanceOf(ActiveS3Object.class, object);
-        assertEquals("\"etag\"", object.etag());
-        assertEquals("STANDARD", object.storageClass());
-        assertTrue(object.hasContentDescriptor());
-        assertEquals("abc123", object.contentDescriptor().md5Hash());
-        assertEquals("content-id-1", object.contentDescriptor().contentId());
-    }
-
-    @Test
-    void restore_withLockConfiguration() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
-        var now = Instant.now();
-        var contentDescriptor = ContentDescriptor.of(100, "abc123", "content-id-1");
-        var lockConfig = ObjectLockConfiguration.of(
-            ObjectLockConfiguration.ObjectLockMode.COMPLIANCE,
-            ObjectLockConfiguration.RetentionPeriod.startingNow(Duration.ofDays(30)));
-        var object = S3Object.restore(id, bucketId, key,
-            "\"etag\"", 100, "STANDARD", now,
-            "text/plain", null, null, Map.of(), contentDescriptor,
-            lockConfig, null, null);
-        assertInstanceOf(LockedS3Object.class, object);
-        assertEquals(ObjectLockConfiguration.ObjectLockMode.COMPLIANCE,
-            ((LockedS3Object) object).lockConfiguration().mode());
-    }
-
-    @Test
-    void restore_withRestoreConfiguration() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
-        var now = Instant.now();
-        var contentDescriptor = ContentDescriptor.of(100, "abc123", "content-id-1");
-        var restoreConfig = RestoreConfiguration.of(
-            now, now.plus(Duration.ofDays(3)),
-            RestoreConfiguration.RestoreTier.STANDARD);
-        var object = S3Object.restore(id, bucketId, key,
-            "\"etag\"", 100, "STANDARD", now,
-            "text/plain", null, null, Map.of(), contentDescriptor,
-            null, restoreConfig, null);
-        assertInstanceOf(RestoredS3Object.class, object);
-        assertEquals(RestoreConfiguration.RestoreTier.STANDARD,
-            ((RestoredS3Object) object).restoreConfiguration().tier());
-    }
-
-    @Test
-    void restoreDeleted_returnsDeletedS3Object() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
-        var object = S3Object.restoreDeleted(id, bucketId, key, null, Map.of());
-        assertInstanceOf(DeletedS3Object.class, object);
-    }
-
-    @Test
-    void restoreArchived_returnsArchivedS3Object() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
-        var now = Instant.now();
-        var contentDescriptor = ContentDescriptor.of(100, "abc123", "content-id-1");
-        var object = S3Object.restoreArchived(id, bucketId, key,
-            "\"etag\"", "GLACIER", now,
-            "text/plain", null, null, Map.of(), contentDescriptor, null, null);
-        assertInstanceOf(ArchivedS3Object.class, object);
-    }
-
-    // ── Domain events tests ──
-
-    @Test
-    void create_producesObjectCreatedEvent() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
-        var object = S3Object.create(id, bucketId, key, "text/plain", null, null, 100, Map.of(), null);
-        var events = object.domainEvents();
-        assertEquals(1, events.size());
-        assertInstanceOf(ObjectStoreEvent.ObjectCreated.class, events.get(0));
-    }
-
-    @Test
-    void attachContent_producesContentDescriptorCreatedEvent() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
-        var object = S3Object.create(id, bucketId, key, "text/plain", null, null, 100, Map.of(), null);
-        var descriptor = ContentDescriptor.of(100, "abc123", "content-id-1");
-        var active = ((CreatingS3Object) object).attachContent(descriptor);
-        var events = active.domainEvents();
-        assertEquals(2, events.size());
-        assertInstanceOf(ObjectStoreEvent.ObjectCreated.class, events.get(0));
-        assertInstanceOf(ObjectStoreEvent.ContentDescriptorCreated.class, events.get(1));
-    }
-
-    @Test
-    void active_delete_producesObjectDeletedEvent() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
-        var creating = S3Object.create(id, bucketId, key, "text/plain", null, null, 100, Map.of(), null);
-        var descriptor = ContentDescriptor.of(100, "abc123", "content-id-1");
-        var active = ((CreatingS3Object) creating).attachContent(descriptor);
-        var deleted = active.delete();
+    void archived_delete_producesObjectDeletedEvent() {
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD", Map.of(), null, someChecksum(), 100);
+        var archived = object.archive();
+        var deleted = archived.delete();
         var events = deleted.domainEvents();
         assertEquals(3, events.size());
         assertInstanceOf(ObjectStoreEvent.ObjectDeleted.class, events.get(2));
     }
 
-    @Test
-    void active_archive_producesObjectArchivedEvent() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
-        var creating = S3Object.create(id, bucketId, key, "text/plain", null, null, 100, Map.of(), null);
-        var descriptor = ContentDescriptor.of(100, "abc123", "content-id-1");
-        var active = ((CreatingS3Object) creating).attachContent(descriptor);
-        var archived = active.archive();
-        var events = archived.domainEvents();
-        assertEquals(3, events.size());
-        assertInstanceOf(ObjectStoreEvent.ObjectArchived.class, events.get(2));
-    }
-
-    @Test
-    void archived_restore_producesObjectRestoredEvent() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
-        var creating = S3Object.create(id, bucketId, key, "text/plain", null, null, 100, Map.of(), null);
-        var descriptor = ContentDescriptor.of(100, "abc123", "content-id-1");
-        var active = ((CreatingS3Object) creating).attachContent(descriptor);
-        var archived = active.archive();
-        var restoreConfig = RestoreConfiguration.of(
-            Instant.now(), Instant.now().plus(Duration.ofDays(3)),
-            RestoreConfiguration.RestoreTier.STANDARD);
-        var restored = archived.restore(restoreConfig);
-        var events = restored.domainEvents();
-        assertEquals(4, events.size());
-        assertInstanceOf(ObjectStoreEvent.ObjectRestored.class, events.get(3));
-    }
-
     // ── clearEvents tests ──
 
     @Test
-    void clearEvents_removesEventsFromCreatingS3Object() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
-        var object = S3Object.create(id, bucketId, key, "text/plain", null, null, 100, Map.of(), null);
+    void clearEvents_removesEventsFromActiveS3Object() {
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD", Map.of(), null, someChecksum(), 100);
         assertEquals(1, object.domainEvents().size());
         var cleared = object.clearEvents();
-        assertInstanceOf(CreatingS3Object.class, cleared);
+        assertInstanceOf(ActiveS3Object.class, cleared);
         assertEquals(0, cleared.domainEvents().size());
     }
 
     @Test
-    void clearEvents_removesEventsFromActiveS3Object() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
-        var creating = S3Object.create(id, bucketId, key, "text/plain", null, null, 100, Map.of(), null);
-        var descriptor = ContentDescriptor.of(100, "abc123", "content-id-1");
-        var active = ((CreatingS3Object) creating).attachContent(descriptor);
-        assertEquals(2, active.domainEvents().size());
-        var cleared = active.clearEvents();
-        assertInstanceOf(ActiveS3Object.class, cleared);
+    void clearEvents_removesEventsFromArchivedS3Object() {
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD", Map.of(), null, someChecksum(), 100);
+        var archived = object.archive();
+        assertEquals(2, archived.domainEvents().size());
+        var cleared = archived.clearEvents();
+        assertInstanceOf(ArchivedS3Object.class, cleared);
         assertEquals(0, cleared.domainEvents().size());
-        assertTrue(cleared.hasContentDescriptor());
+        assertFalse(((ArchivedS3Object) cleared).restored());
+    }
+
+    @Test
+    void clearEvents_removesEventsFromLockedS3Object() {
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD", Map.of(), null, someChecksum(), 100);
+        var lockConfig = ObjectLockConfiguration.of(
+            ObjectLockConfiguration.ObjectLockMode.COMPLIANCE,
+            ObjectLockConfiguration.RetentionPeriod.startingNow(Duration.ofDays(30)));
+        var locked = object.applyLock(lockConfig);
+        assertEquals(2, locked.domainEvents().size());
+        var cleared = locked.clearEvents();
+        assertInstanceOf(LockedS3Object.class, cleared);
+        assertEquals(0, cleared.domainEvents().size());
     }
 
     @Test
     void clearEvents_removesEventsFromDeletedS3Object() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
-        var creating = S3Object.create(id, bucketId, key, "text/plain", null, null, 100, Map.of(), null);
-        var descriptor = ContentDescriptor.of(100, "abc123", "content-id-1");
-        var active = ((CreatingS3Object) creating).attachContent(descriptor);
-        var deleted = active.delete();
-        assertEquals(3, deleted.domainEvents().size());
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD", Map.of(), null, someChecksum(), 100);
+        var deleted = object.delete();
+        assertEquals(2, deleted.domainEvents().size());
         var cleared = deleted.clearEvents();
         assertInstanceOf(DeletedS3Object.class, cleared);
         assertEquals(0, cleared.domainEvents().size());
     }
 
-    // ── EncryptionConfiguration tests ──
+    // ── Encryption preservation ──
 
     @Test
-    void create_withEncryption() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test-key");
+    void encryption_preservedThroughTransition() {
+        var key = someKey();
+        var encryption = EncryptionConfiguration.of(EncryptionAlgorithm.AWS_KMS,
+            EncryptionKeyReference.of("kms-key-1"));
+        var object = S3Object.create(key, "STANDARD", Map.of(), encryption, someChecksum(), 100);
+        assertTrue(object.hasEncryption());
+        assertEquals(EncryptionAlgorithm.AWS_KMS, object.encryption().algorithm());
+        assertEquals("kms-key-1", object.encryption().keyReference().keyId());
+
+        // Transition to Archived should preserve encryption
+        var archived = object.archive();
+        assertTrue(archived.hasEncryption());
+        assertEquals(EncryptionAlgorithm.AWS_KMS, archived.encryption().algorithm());
+        assertEquals("kms-key-1", archived.encryption().keyReference().keyId());
+    }
+
+    // ── Restore (event sourcing) tests ──
+
+    @Test
+    void restoreActive_returnsActiveS3Object() {
+        var key = someKey();
+        var now = ZonedDateTime.now();
+        var object = S3Object.restoreActive(key, "STANDARD",
+            Map.of("description", "test"),
+            null, someChecksum(), 100, now, List.of());
+        assertInstanceOf(ActiveS3Object.class, object);
+        assertEquals("STANDARD", object.storageClass());
+        assertEquals(100, object.size());
+        assertTrue(object.hasChecksum());
+    }
+
+    @Test
+    void restoreActive_withEncryption() {
+        var key = someKey();
+        var now = ZonedDateTime.now();
         var encryption = EncryptionConfiguration.of(EncryptionAlgorithm.AES256);
-        var object = S3Object.create(id, bucketId, key,
-            "text/plain", null, null, 100, Map.of("description", "test"), encryption);
-        assertInstanceOf(CreatingS3Object.class, object);
+        var object = S3Object.restoreActive(key, "STANDARD",
+            Map.of(), encryption, someChecksum(), 100, now, List.of());
         assertTrue(object.hasEncryption());
         assertEquals(EncryptionAlgorithm.AES256, object.encryption().algorithm());
     }
 
     @Test
-    void encryption_preservedThroughTransition() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test-key");
-        var encryption = EncryptionConfiguration.of(EncryptionAlgorithm.AWS_KMS,
-            EncryptionKeyReference.of("kms-key-1"));
-        var object = S3Object.create(id, bucketId, key,
-            "text/plain", null, null, 100, Map.of(), encryption);
-        assertTrue(object.hasEncryption());
-        assertEquals(EncryptionAlgorithm.AWS_KMS, object.encryption().algorithm());
-        assertEquals("kms-key-1", object.encryption().keyReference().keyId());
-
-        // Transition to Active should preserve encryption
-        var descriptor = ContentDescriptor.of(100, "abc123", "content-id-1");
-        var active = ((CreatingS3Object) object).attachContent(descriptor);
-        assertTrue(active.hasEncryption());
-        assertEquals(EncryptionAlgorithm.AWS_KMS, active.encryption().algorithm());
-        assertEquals("kms-key-1", active.encryption().keyReference().keyId());
-    }
-
-    // ── EncryptionConfiguration value object tests ──
-
-    @Test
-    void encryptionConfiguration_nullAlgorithm_throws() {
-        assertThrows(NullPointerException.class,
-            () -> new EncryptionConfiguration(null, null, null));
+    void restoreLocked_returnsLockedS3Object() {
+        var key = someKey();
+        var now = ZonedDateTime.now();
+        var lockConfig = ObjectLockConfiguration.of(
+            ObjectLockConfiguration.ObjectLockMode.COMPLIANCE,
+            ObjectLockConfiguration.RetentionPeriod.startingNow(Duration.ofDays(30)));
+        var object = S3Object.restoreLocked(key, "STANDARD",
+            Map.of(), null, someChecksum(), 100, now,
+            lockConfig, List.of());
+        assertInstanceOf(LockedS3Object.class, object);
+        assertEquals(ObjectLockConfiguration.ObjectLockMode.COMPLIANCE,
+            object.lockConfiguration().mode());
     }
 
     @Test
-    void encryptionKeyReference_nullKeyId_throws() {
-        assertThrows(NullPointerException.class,
-            () -> EncryptionKeyReference.of(null));
+    void restoreArchived_returnsArchivedS3Object() {
+        var key = someKey();
+        var now = ZonedDateTime.now();
+        var object = S3Object.restoreArchived(key, "GLACIER",
+            Map.of(), null, someChecksum(), 100, now,
+            true, now.plusDays(3), List.of());
+        assertInstanceOf(ArchivedS3Object.class, object);
+        assertTrue(object.restored());
+        assertNotNull(object.restoreExpiry());
     }
 
     @Test
-    void encryptionContext_nullContext_throws() {
-        assertThrows(NullPointerException.class,
-            () -> EncryptionContext.of(null));
+    void restoreArchived_notRestored() {
+        var key = someKey();
+        var now = ZonedDateTime.now();
+        var object = S3Object.restoreArchived(key, "GLACIER",
+            Map.of(), null, someChecksum(), 100, now,
+            false, null, List.of());
+        assertInstanceOf(ArchivedS3Object.class, object);
+        assertFalse(object.restored());
+        assertNull(object.restoreExpiry());
     }
 
-    // ── size accessor ──
+    @Test
+    void restoreDeleted_returnsDeletedS3Object() {
+        var key = someKey();
+        var now = ZonedDateTime.now();
+        var object = S3Object.restoreDeleted(key, null,
+            Map.of(), now, List.of());
+        assertInstanceOf(DeletedS3Object.class, object);
+        assertNull(object.storageClass());
+    }
+
+    // ── DeletedS3Object — terminal, no transitions ──
 
     @Test
-    void size_reflectsContentDescriptorSize() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var key = ObjectKey.of("test-bucket", "test");
-        var creating = S3Object.create(id, bucketId, key, "text/plain", null, null, 100, Map.of(), null);
-        var descriptor = ContentDescriptor.of(200, "abc123", "content-id-1");
-        var active = ((CreatingS3Object) creating).attachContent(descriptor);
-        assertEquals(200, active.contentDescriptor().size());
+    void deletedS3Object_isTerminal() {
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD", Map.of(), null, someChecksum(), 100);
+        var deleted = object.delete();
+        // No transition methods — just verify it's a DeletedS3Object
+        assertInstanceOf(DeletedS3Object.class, deleted);
+        assertEquals(0L, deleted.size());
+        assertNull(deleted.encryption());
+        assertNull(deleted.checksum());
+    }
+
+    // ── User metadata ──
+
+    @Test
+    void userMetadata_null_becomesEmpty() {
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD", null, null, someChecksum(), 100);
+        assertTrue(object.userMetadata().isEmpty());
+    }
+
+    @Test
+    void userMetadata_preserved() {
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD",
+            Map.of("description", "test", "project", "magrathea"),
+            null, someChecksum(), 100);
+        assertEquals(2, object.userMetadata().size());
+        assertEquals("test", object.userMetadata().get("description"));
+        assertEquals("magrathea", object.userMetadata().get("project"));
     }
 }

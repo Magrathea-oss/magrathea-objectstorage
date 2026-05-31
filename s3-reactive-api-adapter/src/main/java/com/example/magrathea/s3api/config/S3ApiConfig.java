@@ -44,14 +44,16 @@ public class S3ApiConfig {
     }
 
     @Bean
-    public S3ObjectOperationsHandler s3ObjectOperationsHandler(ReactiveObjectService objectService) {
-        return new S3ObjectOperationsHandler(objectService);
+    public S3ObjectOperationsHandler s3ObjectOperationsHandler(ReactiveBucketService bucketService,
+                                                               ReactiveObjectService objectService) {
+        return new S3ObjectOperationsHandler(bucketService, objectService);
     }
 
     @Bean
     public S3ObjectMetadataHandler s3ObjectMetadataHandler(ReactiveBucketService bucketService,
-                                                           ReactiveObjectService objectService) {
-        return new S3ObjectMetadataHandler(bucketService, objectService);
+                                                           ReactiveObjectService objectService,
+                                                           S3ObjectOperationsHandler objectOperationsHandler) {
+        return new S3ObjectMetadataHandler(bucketService, objectService, objectOperationsHandler);
     }
 
     @Bean

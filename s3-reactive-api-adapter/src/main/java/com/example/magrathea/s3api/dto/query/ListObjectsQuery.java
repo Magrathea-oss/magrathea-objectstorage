@@ -38,15 +38,12 @@ public record ListObjectsQuery(
      */
     public static Mono<ListObjectsQuery> from(String bucket, Flux<S3Object> objects) {
         return objects
-            .map(o -> {
-                var descriptor = o.contentDescriptor();
-                return new ContentEntry(
-                    o.key().key(),
-                    null, // contentType not stored on sealed hierarchy
-                    descriptor != null ? descriptor.size() : 0L,
-                    o.hasEtag() ? o.etag() : "\"\""
-                );
-            })
+            .map(o -> new ContentEntry(
+                o.key().key(),
+                null, // contentType not stored on sealed hierarchy
+                o.size(),
+                "\"\""
+            ))
             .collectList()
             .map(list -> new ListObjectsQuery(bucket, list));
     }
@@ -57,15 +54,12 @@ public record ListObjectsQuery(
      */
     public static ListObjectsQuery from(String bucket, List<S3Object> objects) {
         List<ContentEntry> entries = objects.stream()
-            .map(o -> {
-                var descriptor = o.contentDescriptor();
-                return new ContentEntry(
-                    o.key().key(),
-                    null, // contentType not stored on sealed hierarchy
-                    descriptor != null ? descriptor.size() : 0L,
-                    o.hasEtag() ? o.etag() : "\"\""
-                );
-            })
+            .map(o -> new ContentEntry(
+                o.key().key(),
+                null, // contentType not stored on sealed hierarchy
+                o.size(),
+                "\"\""
+            ))
             .toList();
         return new ListObjectsQuery(bucket, entries);
     }

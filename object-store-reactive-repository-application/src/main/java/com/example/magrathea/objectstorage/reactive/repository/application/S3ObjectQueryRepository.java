@@ -10,11 +10,10 @@ import reactor.core.publisher.Mono;
 import reactor.core.publisher.Flux;
 
 public interface S3ObjectQueryRepository {
-    Mono<S3Object> findById(S3Object.Id objectId);
     Mono<S3Object> findByBucketAndKey(Bucket.Id bucketId, ObjectKey key);
     Mono<S3Object> findByBucketAndKey(ObjectKey key);
-    Flux<S3Object> findByBucket(Bucket.Id bucketId);
-    Flux<DataBuffer> getContent(S3Object.Id objectId);
+    Flux<S3Object> findByBucket(String bucketName);
+    Flux<DataBuffer> getContent(ObjectKey key);
 
     // ── Phase F object config queries ──
 

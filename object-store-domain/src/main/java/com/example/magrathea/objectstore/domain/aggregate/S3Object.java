@@ -1,30 +1,26 @@
 package com.example.magrathea.objectstore.domain.aggregate;
 
 import com.example.magrathea.objectstore.domain.event.ObjectStoreEvent;
-import com.example.magrathea.objectstore.domain.valueobject.ContentDescriptor;
 import com.example.magrathea.objectstore.domain.valueobject.EncryptionConfiguration;
+import com.example.magrathea.objectstore.domain.valueobject.ObjectChecksum;
 import com.example.magrathea.objectstore.domain.valueobject.ObjectKey;
 import com.example.magrathea.objectstore.domain.valueobject.ObjectLockConfiguration;
-import com.example.magrathea.objectstore.domain.valueobject.RestoreConfiguration;
 
-import java.time.Instant;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 
 /**
  * AWS S3 Object — aggregate root as a sealed state machine hierarchy.
  * <p>
  * States:
  * <ul>
- *   <li>{@code CreatingS3Object} — initial state, no content yet</li>
  *   <li>{@code ActiveS3Object} — has content, normal operations</li>
- *   <li>{@code LockedS3Object} — object lock applied</li>
  *   <li>{@code ArchivedS3Object} — archived to Glacier/Deep Archive</li>
- *   <li>{@code RestoredS3Object} — restored from archive</li>
+ *   <li>{@code LockedS3Object} — object lock applied</li>
  *   <li>{@code DeletedS3Object} — terminal state</li>
  * </ul>
  * </p>
@@ -36,49 +32,38 @@ import java.util.UUID;
  * Pure domain — NO framework dependencies.
  */
 public sealed abstract class S3Object
-    permits CreatingS3Object, ActiveS3Object, LockedS3Object,
-            ArchivedS3Object, RestoredS3Object, DeletedS3Object {
+    permits ActiveS3Object, ArchivedS3Object, LockedS3Object, DeletedS3Object {
 
     // ── Common fields ──
-    private final Id id;
-    private final Bucket.Id bucketId;
     private final ObjectKey key;
     private final String storageClass;
     private final Map<String, String> userMetadata;
-    private final ContentDescriptor contentDescriptor;
     private final EncryptionConfiguration encryption;
-    private final String etag;
-    private final String versionId;
+    private final ObjectChecksum checksum;
+    private final long size;
+    private final ZonedDateTime createdAt;
     private final List<ObjectStoreEvent> events;
 
     /**
      * Package-private constructor for subclasses.
      */
-    S3Object(Id id, Bucket.Id bucketId, ObjectKey key, String storageClass,
-             Map<String, String> userMetadata, ContentDescriptor contentDescriptor,
-             EncryptionConfiguration encryption, String etag, String versionId,
+    S3Object(ObjectKey key, String storageClass,
+             Map<String, String> userMetadata, EncryptionConfiguration encryption,
+             ObjectChecksum checksum, long size, ZonedDateTime createdAt,
              List<ObjectStoreEvent> events) {
-        this.id = Objects.requireNonNull(id, "id must not be null");
-        this.bucketId = Objects.requireNonNull(bucketId, "bucketId must not be null");
         this.key = Objects.requireNonNull(key, "key must not be null");
         this.storageClass = storageClass;
         this.userMetadata = Map.copyOf(Objects.requireNonNull(userMetadata, "userMetadata must not be null"));
-        this.contentDescriptor = contentDescriptor;
         this.encryption = encryption;
-        this.etag = etag;
-        this.versionId = versionId;
+        this.checksum = checksum;
+        this.size = size;
+        this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
         this.events = Objects.requireNonNull(events, "events must not be null");
     }
 
     // ── Getters ──
 
-    /** Returns the object identifier. */
-    public Id id() { return id; }
-
-    /** Returns the bucket identifier. */
-    public Bucket.Id bucketId() { return bucketId; }
-
-    /** Returns the object key. */
+    /** Returns the object key (bucket/key composite). */
     public ObjectKey key() { return key; }
 
     /** Returns the storage class, or {@code null} if not set. */
@@ -87,32 +72,29 @@ public sealed abstract class S3Object
     /** Returns the user metadata (x-amz-meta-* headers). */
     public Map<String, String> userMetadata() { return userMetadata; }
 
-    /** Returns the content descriptor, or {@code null} if not yet attached. */
-    public ContentDescriptor contentDescriptor() { return contentDescriptor; }
-
     /** Returns the encryption configuration, or {@code null} if not encrypted. */
     public EncryptionConfiguration encryption() { return encryption; }
 
-    /** Returns the ETag, or {@code null} if not set. */
-    public String etag() { return etag; }
+    /** Returns the checksum, or {@code null} if not yet attached. */
+    public ObjectChecksum checksum() { return checksum; }
 
-    /** Returns the version ID, or {@code null} if versioning is not enabled. */
-    public String versionId() { return versionId; }
+    /** Returns the content size in bytes. */
+    public long size() { return size; }
 
-    /** Returns {@code true} if a content descriptor is attached. */
-    public boolean hasContentDescriptor() { return contentDescriptor != null; }
+    /** Returns the creation timestamp. */
+    public ZonedDateTime createdAt() { return createdAt; }
 
-    /** Returns {@code true} if an ETag is set. */
-    public boolean hasEtag() { return etag != null; }
-
-    /** Returns {@code true} if a storage class is set. */
-    public boolean hasStorageClass() { return storageClass != null; }
+    /** Returns the accumulated domain events since the last {@link #clearEvents()}. */
+    public List<ObjectStoreEvent> domainEvents() { return events; }
 
     /** Returns {@code true} if encryption is configured. */
     public boolean hasEncryption() { return encryption != null; }
 
-    /** Returns the accumulated domain events since the last {@link #clearEvents()}. */
-    public List<ObjectStoreEvent> domainEvents() { return events; }
+    /** Returns {@code true} if a checksum is attached. */
+    public boolean hasChecksum() { return checksum != null; }
+
+    /** Returns {@code true} if a storage class is set. */
+    public boolean hasStorageClass() { return storageClass != null; }
 
     /**
      * Returns a new instance of the same state with all events cleared — suitable for persistence.
@@ -129,222 +111,105 @@ public sealed abstract class S3Object
         return Collections.unmodifiableList(newEvents);
     }
 
-    // ── Nested Id record ──
-
-    /**
-     * Value object for the S3Object identifier.
-     */
-    public static final class Id {
-        private final String value;
-
-        public Id(String value) {
-            this.value = Objects.requireNonNull(value, "value must not be null");
-        }
-
-        public String value() { return value; }
-
-        public static Id generate() { return new Id(UUID.randomUUID().toString()); }
-
-        public static Id of(String value) { return new Id(value); }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (!(o instanceof Id other)) return false;
-            return value.equals(other.value);
-        }
-
-        @Override
-        public int hashCode() { return value.hashCode(); }
-
-        @Override
-        public String toString() { return "Id[" + value + "]"; }
-    }
-
     // ── Factory methods ──
 
     /**
-     * Factory method — create a new S3Object in {@code CreatingS3Object} state.
+     * Factory method — create a new S3Object in {@code ActiveS3Object} state.
+     * The {@code createdAt} is set internally to the current time.
      * Records an {@link ObjectStoreEvent.ObjectCreated} event.
      */
-    public static CreatingS3Object create(Id id, Bucket.Id bucketId, ObjectKey key,
-                                          String contentType, String contentDisposition,
-                                          String contentEncoding, long size,
-                                          Map<String, String> userMetadata,
-                                          EncryptionConfiguration encryption) {
-        Objects.requireNonNull(id, "id must not be null");
-        Objects.requireNonNull(bucketId, "bucketId must not be null");
+    public static ActiveS3Object create(
+            ObjectKey key,
+            String storageClass,
+            Map<String, String> userMetadata,
+            EncryptionConfiguration encryption,
+            ObjectChecksum checksum,
+            long size) {
         Objects.requireNonNull(key, "key must not be null");
+        Objects.requireNonNull(checksum, "checksum must not be null");
         if (size < 0) throw new IllegalArgumentException("size must be non-negative");
         var meta = userMetadata != null
             ? Map.<String, String>copyOf(userMetadata)
             : Map.<String, String>of();
-        var now = Instant.now();
+        var now = ZonedDateTime.now();
         var events = List.<ObjectStoreEvent>of(
-            new ObjectStoreEvent.ObjectCreated(id, bucketId, key, now)
+            new ObjectStoreEvent.ObjectCreated(key, now)
         );
-        return new CreatingS3Object(id, bucketId, key, null, meta, null,
-            encryption, null, null, events);
+        return new ActiveS3Object(key, storageClass, meta, encryption,
+            checksum, size, now, events);
     }
 
     /**
-     * Factory method — restore an {@code ActiveS3Object} from persistence.
+     * Factory method — restore an {@code ActiveS3Object} from persistence (event sourcing).
      */
-    public static ActiveS3Object restoreActive(Id id, Bucket.Id bucketId, ObjectKey key,
-                                                String etag, String storageClass,
-                                                Instant lastModified, String contentType,
-                                                String contentDisposition, String contentEncoding,
-                                                Map<String, String> userMetadata,
-                                                ContentDescriptor contentDescriptor,
-                                                EncryptionConfiguration encryption) {
-        Objects.requireNonNull(id, "id must not be null");
-        Objects.requireNonNull(bucketId, "bucketId must not be null");
+    public static ActiveS3Object restoreActive(
+            ObjectKey key, String storageClass,
+            Map<String, String> userMetadata, EncryptionConfiguration encryption,
+            ObjectChecksum checksum, long size, ZonedDateTime createdAt,
+            List<ObjectStoreEvent> events) {
         Objects.requireNonNull(key, "key must not be null");
-        Objects.requireNonNull(lastModified, "lastModified must not be null");
+        Objects.requireNonNull(createdAt, "createdAt must not be null");
         var meta = userMetadata != null
             ? Map.<String, String>copyOf(userMetadata)
             : Map.<String, String>of();
-        return new ActiveS3Object(id, bucketId, key, storageClass, meta,
-            contentDescriptor, encryption, etag, null, List.of());
+        var evts = events != null ? List.<ObjectStoreEvent>copyOf(events) : List.<ObjectStoreEvent>of();
+        return new ActiveS3Object(key, storageClass, meta, encryption,
+            checksum, size, createdAt, evts);
     }
 
     /**
-     * Factory method — restore a {@code LockedS3Object} from persistence.
+     * Factory method — restore a {@code LockedS3Object} from persistence (event sourcing).
      */
-    public static LockedS3Object restoreLocked(Id id, Bucket.Id bucketId, ObjectKey key,
-                                                String etag, String storageClass,
-                                                Instant lastModified, String contentType,
-                                                String contentDisposition, String contentEncoding,
-                                                Map<String, String> userMetadata,
-                                                ContentDescriptor contentDescriptor,
-                                                EncryptionConfiguration encryption,
-                                                ObjectLockConfiguration lockConfiguration) {
-        Objects.requireNonNull(id, "id must not be null");
-        Objects.requireNonNull(bucketId, "bucketId must not be null");
+    public static LockedS3Object restoreLocked(
+            ObjectKey key, String storageClass,
+            Map<String, String> userMetadata, EncryptionConfiguration encryption,
+            ObjectChecksum checksum, long size, ZonedDateTime createdAt,
+            ObjectLockConfiguration lockConfiguration,
+            List<ObjectStoreEvent> events) {
         Objects.requireNonNull(key, "key must not be null");
-        Objects.requireNonNull(lastModified, "lastModified must not be null");
+        Objects.requireNonNull(createdAt, "createdAt must not be null");
+        Objects.requireNonNull(lockConfiguration, "lockConfiguration must not be null");
         var meta = userMetadata != null
             ? Map.<String, String>copyOf(userMetadata)
             : Map.<String, String>of();
-        return new LockedS3Object(id, bucketId, key, storageClass, meta,
-            contentDescriptor, encryption, etag, null, lockConfiguration, List.of());
+        var evts = events != null ? List.<ObjectStoreEvent>copyOf(events) : List.<ObjectStoreEvent>of();
+        return new LockedS3Object(key, storageClass, meta, encryption,
+            checksum, size, createdAt, lockConfiguration, evts);
     }
 
     /**
-     * Factory method — restore an {@code ArchivedS3Object} from persistence.
+     * Factory method — restore an {@code ArchivedS3Object} from persistence (event sourcing).
      */
-    public static ArchivedS3Object restoreArchived(Id id, Bucket.Id bucketId, ObjectKey key,
-                                                    String etag, String storageClass,
-                                                    Instant lastModified, String contentType,
-                                                    String contentDisposition, String contentEncoding,
-                                                    Map<String, String> userMetadata,
-                                                    ContentDescriptor contentDescriptor,
-                                                    EncryptionConfiguration encryption,
-                                                    RestoreConfiguration restoreConfiguration) {
-        Objects.requireNonNull(id, "id must not be null");
-        Objects.requireNonNull(bucketId, "bucketId must not be null");
+    public static ArchivedS3Object restoreArchived(
+            ObjectKey key, String storageClass,
+            Map<String, String> userMetadata, EncryptionConfiguration encryption,
+            ObjectChecksum checksum, long size, ZonedDateTime createdAt,
+            boolean restored, ZonedDateTime restoreExpiry,
+            List<ObjectStoreEvent> events) {
         Objects.requireNonNull(key, "key must not be null");
-        Objects.requireNonNull(lastModified, "lastModified must not be null");
+        Objects.requireNonNull(createdAt, "createdAt must not be null");
         var meta = userMetadata != null
             ? Map.<String, String>copyOf(userMetadata)
             : Map.<String, String>of();
-        return new ArchivedS3Object(id, bucketId, key, storageClass, meta,
-            contentDescriptor, encryption, etag, null, restoreConfiguration, List.of());
+        var evts = events != null ? List.<ObjectStoreEvent>copyOf(events) : List.<ObjectStoreEvent>of();
+        return new ArchivedS3Object(key, storageClass, meta, encryption,
+            checksum, size, createdAt, restored, restoreExpiry, evts);
     }
 
     /**
-     * Factory method — restore a {@code RestoredS3Object} from persistence.
+     * Factory method — restore a {@code DeletedS3Object} from persistence (event sourcing).
      */
-    public static RestoredS3Object restoreRestored(Id id, Bucket.Id bucketId, ObjectKey key,
-                                                    String etag, String storageClass,
-                                                    Instant lastModified, String contentType,
-                                                    String contentDisposition, String contentEncoding,
-                                                    Map<String, String> userMetadata,
-                                                    ContentDescriptor contentDescriptor,
-                                                    EncryptionConfiguration encryption,
-                                                    RestoreConfiguration restoreConfiguration) {
-        Objects.requireNonNull(id, "id must not be null");
-        Objects.requireNonNull(bucketId, "bucketId must not be null");
+    public static DeletedS3Object restoreDeleted(
+            ObjectKey key, String storageClass,
+            Map<String, String> userMetadata,
+            ZonedDateTime createdAt,
+            List<ObjectStoreEvent> events) {
         Objects.requireNonNull(key, "key must not be null");
-        Objects.requireNonNull(lastModified, "lastModified must not be null");
+        Objects.requireNonNull(createdAt, "createdAt must not be null");
         var meta = userMetadata != null
             ? Map.<String, String>copyOf(userMetadata)
             : Map.<String, String>of();
-        return new RestoredS3Object(id, bucketId, key, storageClass, meta,
-            contentDescriptor, encryption, etag, null, restoreConfiguration, List.of());
-    }
-
-    /**
-     * Factory method — restore a {@code DeletedS3Object} from persistence.
-     */
-    public static DeletedS3Object restoreDeleted(Id id, Bucket.Id bucketId, ObjectKey key,
-                                                  String storageClass,
-                                                  Map<String, String> userMetadata) {
-        Objects.requireNonNull(id, "id must not be null");
-        Objects.requireNonNull(bucketId, "bucketId must not be null");
-        Objects.requireNonNull(key, "key must not be null");
-        var meta = userMetadata != null
-            ? Map.<String, String>copyOf(userMetadata)
-            : Map.<String, String>of();
-        return new DeletedS3Object(id, bucketId, key, storageClass, meta, List.of());
-    }
-
-    // ── Convenience restore (detects state from data) ──
-
-    /**
-     * Convenience factory — detect state from provided fields and restore the appropriate subclass.
-     * Used by legacy callers that do not know the exact state.
-     */
-    public static S3Object restore(Id id, Bucket.Id bucketId, ObjectKey key,
-                                    String etag, long size, String storageClass,
-                                    Instant lastModified, String contentType,
-                                    String contentDisposition, String contentEncoding,
-                                    Map<String, String> userMetadata,
-                                    ContentDescriptor contentDescriptor) {
-        // When contentDescriptor is present, return ActiveS3Object
-        if (contentDescriptor != null) {
-            return restoreActive(id, bucketId, key, etag, storageClass, lastModified,
-                contentType, contentDisposition, contentEncoding, userMetadata,
-                contentDescriptor, null);
-        }
-        // No content — return CreatingS3Object
-        var meta = userMetadata != null
-            ? Map.<String, String>copyOf(userMetadata)
-            : Map.<String, String>of();
-        return new CreatingS3Object(id, bucketId, key, storageClass, meta,
-            null, null, etag, null, List.of());
-    }
-
-    /**
-     * Convenience factory — restore with optional lock, restore, encryption.
-     * Dispatches to the appropriate subclass based on provided fields.
-     */
-    public static S3Object restore(Id id, Bucket.Id bucketId, ObjectKey key,
-                                    String etag, long size, String storageClass,
-                                    Instant lastModified, String contentType,
-                                    String contentDisposition, String contentEncoding,
-                                    Map<String, String> userMetadata,
-                                    ContentDescriptor contentDescriptor,
-                                    ObjectLockConfiguration objectLockConfiguration,
-                                    RestoreConfiguration restoreConfiguration,
-                                    EncryptionConfiguration encryption) {
-        Objects.requireNonNull(contentDescriptor, "contentDescriptor must not be null");
-        var meta = userMetadata != null
-            ? Map.<String, String>copyOf(userMetadata)
-            : Map.<String, String>of();
-
-        if (objectLockConfiguration != null) {
-            return new LockedS3Object(id, bucketId, key, storageClass, meta,
-                contentDescriptor, encryption, etag, null,
-                objectLockConfiguration, List.of());
-        }
-        if (restoreConfiguration != null) {
-            // If already restored, return RestoredS3Object
-            return new RestoredS3Object(id, bucketId, key, storageClass, meta,
-                contentDescriptor, encryption, etag, null,
-                restoreConfiguration, List.of());
-        }
-        return new ActiveS3Object(id, bucketId, key, storageClass, meta,
-            contentDescriptor, encryption, etag, null, List.of());
+        var evts = events != null ? List.<ObjectStoreEvent>copyOf(events) : List.<ObjectStoreEvent>of();
+        return new DeletedS3Object(key, storageClass, meta, createdAt, evts);
     }
 }

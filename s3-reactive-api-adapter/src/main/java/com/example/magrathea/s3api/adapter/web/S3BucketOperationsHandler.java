@@ -127,7 +127,7 @@ public class S3BucketOperationsHandler {
         var bucket = request.pathVariable("bucket");
         return bucketService.findByName(bucket)
             .flatMap(b -> S3WebSupport.validateRuntimeRequest(request, b)
-                .switchIfEmpty(Mono.defer(() -> ListObjectsQuery.from(bucket, objectService.findByBucket(b.id()))
+                .switchIfEmpty(Mono.defer(() -> ListObjectsQuery.from(bucket, objectService.findByBucket(bucket))
                     .flatMap(result -> {
                         var builder = ServerResponse.ok().contentType(MediaType.APPLICATION_XML);
                         S3WebSupport.applyRuntimeHeaders(builder, request, b);
@@ -141,7 +141,7 @@ public class S3BucketOperationsHandler {
         var bucket = request.pathVariable("bucket");
         return bucketService.findByName(bucket)
             .flatMap(b -> S3WebSupport.validateRuntimeRequest(request, b)
-                .switchIfEmpty(Mono.defer(() -> ListObjectsV2Query.from(bucket, objectService.findByBucket(b.id()))
+                .switchIfEmpty(Mono.defer(() -> ListObjectsV2Query.from(bucket, objectService.findByBucket(bucket))
                     .flatMap(result -> {
                         var builder = ServerResponse.ok().contentType(MediaType.APPLICATION_XML);
                         S3WebSupport.applyRuntimeHeaders(builder, request, b);
@@ -155,7 +155,7 @@ public class S3BucketOperationsHandler {
         var bucket = request.pathVariable("bucket");
         return bucketService.findByName(bucket)
             .flatMap(b -> S3WebSupport.validateRuntimeRequest(request, b)
-                .switchIfEmpty(Mono.defer(() -> ListVersionsQuery.from(bucket, objectService.findByBucket(b.id()))
+                .switchIfEmpty(Mono.defer(() -> ListVersionsQuery.from(bucket, objectService.findByBucket(bucket))
                     .flatMap(result -> {
                         var builder = ServerResponse.ok().contentType(MediaType.APPLICATION_XML);
                         S3WebSupport.applyRuntimeHeaders(builder, request, b);

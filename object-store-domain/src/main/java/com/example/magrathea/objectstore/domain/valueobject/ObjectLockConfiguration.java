@@ -13,12 +13,14 @@ import java.util.Objects;
  *       can override the retention period</li>
  *   <li>{@code COMPLIANCE} — no one can override the retention period</li>
  * </ul>
+ * When {@code legalHold} is true, the object is under a legal hold regardless of retention mode.
  * </p>
  * Pure domain — NO framework dependencies.
  */
 public record ObjectLockConfiguration(
     ObjectLockMode mode,
-    RetentionPeriod retention
+    RetentionPeriod retention,
+    boolean legalHold
 ) {
 
     public ObjectLockConfiguration {
@@ -27,14 +29,26 @@ public record ObjectLockConfiguration(
     }
 
     /**
-     * Factory method — create a new lock configuration.
+     * Factory method — create a new lock configuration with retention (no legal hold).
      *
      * @param mode      the lock mode (GOVERNANCE or COMPLIANCE)
      * @param retention the retention period
      * @return a new {@code ObjectLockConfiguration}
      */
     public static ObjectLockConfiguration of(ObjectLockMode mode, RetentionPeriod retention) {
-        return new ObjectLockConfiguration(mode, retention);
+        return new ObjectLockConfiguration(mode, retention, false);
+    }
+
+    /**
+     * Factory method — create a new lock configuration with retention and optional legal hold.
+     *
+     * @param mode      the lock mode (GOVERNANCE or COMPLIANCE)
+     * @param retention the retention period
+     * @param legalHold true to apply a legal hold
+     * @return a new {@code ObjectLockConfiguration}
+     */
+    public static ObjectLockConfiguration of(ObjectLockMode mode, RetentionPeriod retention, boolean legalHold) {
+        return new ObjectLockConfiguration(mode, retention, legalHold);
     }
 
     /**

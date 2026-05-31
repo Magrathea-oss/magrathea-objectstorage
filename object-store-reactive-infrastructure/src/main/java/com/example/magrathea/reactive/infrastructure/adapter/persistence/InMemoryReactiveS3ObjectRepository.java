@@ -2,12 +2,11 @@ package com.example.magrathea.reactive.infrastructure.adapter.persistence;
 
 import com.example.magrathea.objectstore.domain.aggregate.ActiveS3Object;
 import com.example.magrathea.objectstore.domain.aggregate.Bucket;
-import com.example.magrathea.objectstore.domain.aggregate.CreatingS3Object;
 import com.example.magrathea.objectstore.domain.aggregate.S3Object;
 import com.example.magrathea.objectstore.domain.valueobject.ChecksumValue;
-import com.example.magrathea.objectstore.domain.valueobject.ContentDescriptor;
 import com.example.magrathea.objectstore.domain.valueobject.EncryptionConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.LegalHold;
+import com.example.magrathea.objectstore.domain.valueobject.ObjectChecksum;
 import com.example.magrathea.objectstore.domain.valueobject.ObjectKey;
 import com.example.magrathea.objectstore.domain.valueobject.ObjectLockConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.RestoreConfiguration;
@@ -23,19 +22,16 @@ import org.springframework.stereotype.Repository;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Repository
 public class InMemoryReactiveS3ObjectRepository implements S3ObjectCommandRepository, S3ObjectQueryRepository {
 
-    private final Map<S3Object.Id, S3Object> store = new ConcurrentHashMap<>();
     private final Map<String, S3Object> storeByObjectKey = new ConcurrentHashMap<>();
-    private final Map<String, byte[]> contentById = new ConcurrentHashMap<>();
+    private final Map<String, byte[]> contentByKey = new ConcurrentHashMap<>();
     private final AtomicLong versionCounter = new AtomicLong(1);
     private static final DefaultDataBufferFactory DATA_BUFFER_FACTORY = new DefaultDataBufferFactory();
 
@@ -51,10 +47,10 @@ public class InMemoryReactiveS3ObjectRepository implements S3ObjectCommandReposi
     @Override
     public Mono<CommandResult<S3Object>> save(S3Object object) {
         return Mono.defer(() -> {
-            boolean exists = store.containsKey(object.id());
+            var storeKey = objectKeyStoreKey(object);
+            boolean exists = storeByObjectKey.containsKey(storeKey);
             S3Object clean = object.clearEvents();
-            store.put(object.id(), clean);
-            storeByObjectKey.put(objectKeyStoreKey(object), clean);
+            storeByObjectKey.put(storeKey, clean);
             long version = versionCounter.getAndIncrement();
             CommandResult<S3Object> result = exists
                 ? new CommandResult.Updated<>(clean, object.domainEvents(), version)
@@ -66,28 +62,21 @@ public class InMemoryReactiveS3ObjectRepository implements S3ObjectCommandReposi
     @Override
     public Mono<CommandResult<S3Object>> delete(S3Object object) {
         return Mono.defer(() -> {
-            S3Object removed = store.remove(object.id());
+            var storeKey = objectKeyStoreKey(object);
+            S3Object removed = storeByObjectKey.remove(storeKey);
             if (removed == null) {
                 return Mono.error(new S3ObjectNotFoundException(
                     ObjectKey.of("unknown", object.key().key())));
             }
-            storeByObjectKey.remove(objectKeyStoreKey(object));
             long version = versionCounter.getAndIncrement();
             return Mono.just(new CommandResult.Deleted<>(removed, object.domainEvents(), version));
         });
     }
 
     @Override
-    public Mono<S3Object> findById(S3Object.Id objectId) {
-        return Mono.defer(() -> Mono.justOrEmpty(store.get(objectId)));
-    }
-
-    @Override
     public Mono<S3Object> findByBucketAndKey(Bucket.Id bucketId, ObjectKey key) {
         return Mono.defer(() -> Mono.justOrEmpty(
-            store.values().stream()
-                .filter(obj -> obj.bucketId().equals(bucketId) && obj.key().equals(key))
-                .findFirst()
+            storeByObjectKey.get(objectKeyStoreKey(key))
         ));
     }
 
@@ -99,9 +88,9 @@ public class InMemoryReactiveS3ObjectRepository implements S3ObjectCommandReposi
     }
 
     @Override
-    public Flux<S3Object> findByBucket(Bucket.Id bucketId) {
-        return Flux.defer(() -> Flux.fromIterable(store.values())
-            .filter(obj -> obj.bucketId().equals(bucketId)));
+    public Flux<S3Object> findByBucket(String bucketName) {
+        return Flux.defer(() -> Flux.fromIterable(storeByObjectKey.values())
+            .filter(obj -> obj.key().bucket().equals(bucketName)));
     }
 
     @Override
@@ -117,27 +106,47 @@ public class InMemoryReactiveS3ObjectRepository implements S3ObjectCommandReposi
                 }
             )
             .flatMap(bytes -> {
-                var md5Hash = md5Hex(bytes);
-                var etag = "\"" + md5Hash + "\"";
-                var versionId = UUID.randomUUID().toString();
-                var contentId = object.id().value();
+                var md5Hash = md5Base64(bytes);
 
-                // Build ContentDescriptor with size, md5Hash, contentId, and checksums
-                var existingDescriptor = object.contentDescriptor();
-                var checksums = existingDescriptor != null ? existingDescriptor.checksums() : Set.<ChecksumValue>of();
-                var descriptor = ContentDescriptor.of(bytes.length, md5Hash, contentId, checksums, null);
+                // Build ObjectChecksum with MD5 checksum
+                var existingChecksum = object.checksum();
+                Set<ChecksumValue> allChecksums = new java.util.HashSet<>();
+                if (existingChecksum != null) {
+                    allChecksums.addAll(existingChecksum.checksums());
+                }
+                // Use existing MD5 checksum if present (from Content-MD5 header), otherwise compute
+                boolean hasExistingMd5 = existingChecksum != null && existingChecksum.checksums().stream()
+                    .anyMatch(cv -> cv.algorithm() == com.example.magrathea.objectstore.domain.valueobject.ChecksumAlgorithm.MD5);
+                if (!hasExistingMd5) {
+                    var md5Checksum = new ChecksumValue(
+                        com.example.magrathea.objectstore.domain.valueobject.ChecksumAlgorithm.MD5, md5Hash);
+                    allChecksums.add(md5Checksum);
+                }
+                var sdkAlgorithm = existingChecksum != null ? existingChecksum.sdkAlgorithm() : null;
+                var combinedChecksum = ObjectChecksum.of(allChecksums, sdkAlgorithm);
 
-                // Transition CreatingS3Object → ActiveS3Object via attachContent
+                // Store the content keyed by ObjectKey string
+                var storeKey = objectKeyStoreKey(object);
+                contentByKey.put(storeKey, bytes);
+
+                // Create a clean ActiveS3Object with the computed checksum
+                // If the object is already an ActiveS3Object, use its properties
+                // Otherwise, create a fresh ActiveS3Object from the object's data
                 S3Object storedObject;
-                if (object instanceof CreatingS3Object creating) {
-                    storedObject = creating.attachContent(descriptor).clearEvents();
+                if (object instanceof ActiveS3Object active) {
+                    // Re-create with updated checksum
+                    storedObject = ActiveS3Object.restoreActive(
+                        active.key(), active.storageClass(), active.userMetadata(),
+                        active.encryption(), combinedChecksum, bytes.length,
+                        active.createdAt(), active.domainEvents()).clearEvents();
                 } else {
-                    storedObject = object.clearEvents();
+                    storedObject = ActiveS3Object.restoreActive(
+                        object.key(), object.storageClass(), object.userMetadata(),
+                        object.encryption(), combinedChecksum, bytes.length,
+                        object.createdAt(), object.domainEvents()).clearEvents();
                 }
 
-                store.put(object.id(), storedObject);
-                storeByObjectKey.put(objectKeyStoreKey(storedObject), storedObject);
-                contentById.put(contentId, bytes);
+                storeByObjectKey.put(storeKey, storedObject);
                 long version = versionCounter.getAndIncrement();
                 boolean exists = version > 1;
                 CommandResult<S3Object> result = exists
@@ -160,24 +169,20 @@ public class InMemoryReactiveS3ObjectRepository implements S3ObjectCommandReposi
                 }
             )
             .flatMap(bytes -> {
-                var id = S3Object.Id.generate();
-                var md5Hash = md5Hex(bytes);
-                var etag = "\"" + md5Hash + "\"";
-                var versionId = UUID.randomUUID().toString();
-                var contentId = id.value();
-
-                // Build ContentDescriptor with size, md5Hash, contentId, and checksums
-                var descriptor = ContentDescriptor.of(bytes.length, md5Hash, contentId, Set.<ChecksumValue>of(), null);
+                var md5Hash = md5Base64(bytes);
+                var md5Checksum = new ChecksumValue(
+                    com.example.magrathea.objectstore.domain.valueobject.ChecksumAlgorithm.MD5, md5Hash);
+                var combinedChecksum = ObjectChecksum.of(Set.of(md5Checksum), null);
+                // Note: for the ObjectKey-based saveWithContent, there's no pre-existing checksum,
+                // so always compute from content.
 
                 // Create the S3Object domain aggregate directly as ActiveS3Object
-                // We use restoreActive since we have all the content information
-                var storedObject = S3Object.restoreActive(id, Bucket.Id.of(objectKey.bucket()), objectKey,
-                    etag, storageClass, java.time.Instant.now(), null, null, null,
-                    Map.<String, String>of(), descriptor, null).clearEvents();
+                var storedObject = ActiveS3Object.create(objectKey, storageClass,
+                    Map.<String, String>of(), null, combinedChecksum, bytes.length);
 
-                store.put(storedObject.id(), storedObject);
-                storeByObjectKey.put(objectKeyStoreKey(storedObject), storedObject);
-                contentById.put(contentId, bytes);
+                var storeKey = objectKeyStoreKey(storedObject);
+                storeByObjectKey.put(storeKey, storedObject);
+                contentByKey.put(storeKey, bytes);
                 long version = versionCounter.getAndIncrement();
                 CommandResult<S3Object> result = new CommandResult.Created<>(storedObject, storedObject.domainEvents(), version);
                 return Mono.just(result);
@@ -185,14 +190,9 @@ public class InMemoryReactiveS3ObjectRepository implements S3ObjectCommandReposi
     }
 
     @Override
-    public Flux<DataBuffer> getContent(S3Object.Id objectId) {
+    public Flux<DataBuffer> getContent(ObjectKey key) {
         return Flux.defer(() -> {
-            var stored = store.get(objectId);
-            if (stored == null || stored.contentDescriptor() == null) {
-                return Flux.empty();
-            }
-            var contentId = stored.contentDescriptor().contentId();
-            var bytes = contentById.get(contentId);
+            var bytes = contentByKey.get(objectKeyStoreKey(key));
             if (bytes == null) {
                 return Flux.empty();
             }
@@ -270,23 +270,21 @@ public class InMemoryReactiveS3ObjectRepository implements S3ObjectCommandReposi
     public Mono<Void> renameObject(String bucketName, ObjectKey oldKey, ObjectKey newKey) {
         return findObjectByBucketNameAndKey(bucketName, oldKey)
             .flatMap(obj -> {
-                // Update the stored object's key by creating a new S3Object with updated key
-                // Use the sealed hierarchy's restoreActive with the new key
-                var newId = S3Object.Id.generate();
-                var descriptor = obj.contentDescriptor();
-                var encryption = obj.encryption();
-                var meta = obj.userMetadata();
-                var storageClass = obj.storageClass();
-                var etag = obj.etag();
-                // Create a new ActiveS3Object with the new key via restoreActive
-                var renamed = S3Object.restoreActive(newId, obj.bucketId(), newKey,
-                    etag, storageClass, java.time.Instant.now(), null, null, null,
-                    meta, descriptor, encryption);
-                var clean = renamed.clearEvents();
-                store.remove(obj.id());
-                store.put(clean.id(), clean);
-                storeByObjectKey.remove(objectKeyStoreKey(obj));
-                storeByObjectKey.put(objectKeyStoreKey(clean), clean);
+                // Update the stored object's key by creating a new ActiveS3Object with the new key
+                var storedObject = ActiveS3Object.restoreActive(
+                    newKey, obj.storageClass(), obj.userMetadata(),
+                    obj.encryption(), obj.checksum(), obj.size(),
+                    obj.createdAt(), obj.domainEvents());
+                var clean = storedObject.clearEvents();
+                var oldStoreKey = objectKeyStoreKey(oldKey);
+                var newStoreKey = objectKeyStoreKey(newKey);
+                storeByObjectKey.remove(oldStoreKey);
+                storeByObjectKey.put(newStoreKey, clean);
+                // Move content if present
+                var content = contentByKey.remove(oldStoreKey);
+                if (content != null) {
+                    contentByKey.put(newStoreKey, content);
+                }
                 return Mono.<Void>empty();
             })
             .switchIfEmpty(Mono.<Void>error(
@@ -317,9 +315,8 @@ public class InMemoryReactiveS3ObjectRepository implements S3ObjectCommandReposi
     }
 
     public void reset() {
-        store.clear();
         storeByObjectKey.clear();
-        contentById.clear();
+        contentByKey.clear();
         versionCounter.set(1);
         legalHoldByKey.clear();
         encryptionByKey.clear();
@@ -328,11 +325,12 @@ public class InMemoryReactiveS3ObjectRepository implements S3ObjectCommandReposi
         restoreByKey.clear();
     }
 
-    private static String md5Hex(byte[] bytes) {
+    private static String md5Base64(byte[] bytes) {
         try {
             var md = MessageDigest.getInstance("MD5");
             md.update(bytes);
-            return HexFormat.of().formatHex(md.digest());
+            var digest = md.digest();
+            return java.util.Base64.getEncoder().encodeToString(digest);
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException("MD5 not available", e);
         }

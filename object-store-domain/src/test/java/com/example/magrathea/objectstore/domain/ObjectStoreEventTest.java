@@ -1,7 +1,6 @@
 package com.example.magrathea.objectstore.domain;
 
 import com.example.magrathea.objectstore.domain.aggregate.Bucket;
-import com.example.magrathea.objectstore.domain.aggregate.S3Object;
 import com.example.magrathea.objectstore.domain.event.ObjectStoreEvent;
 import com.example.magrathea.objectstore.domain.valueobject.BucketAccelerateConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.BucketAnalyticsConfiguration;
@@ -16,15 +15,18 @@ import com.example.magrathea.objectstore.domain.valueobject.BucketOwnershipContr
 import com.example.magrathea.objectstore.domain.valueobject.BucketReplicationConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.BucketRequestPaymentConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.BucketWebsiteConfiguration;
-import com.example.magrathea.objectstore.domain.valueobject.ContentDescriptor;
 import com.example.magrathea.objectstore.domain.valueobject.CorsConfiguration;
+import com.example.magrathea.objectstore.domain.valueobject.EncryptionAlgorithm;
+import com.example.magrathea.objectstore.domain.valueobject.EncryptionConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.ObjectKey;
+import com.example.magrathea.objectstore.domain.valueobject.ObjectLockConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.PublicAccessBlockConfiguration;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZonedDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-
-import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -52,41 +54,25 @@ class ObjectStoreEventTest {
 
     @Test
     void objectCreated() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
         var key = ObjectKey.of("bucket", "test.txt");
-        var event = new ObjectStoreEvent.ObjectCreated(id, bucketId, key, Instant.now());
-        assertEquals(id, event.id());
-        assertEquals(bucketId, event.bucketId());
+        var event = new ObjectStoreEvent.ObjectCreated(key, ZonedDateTime.now());
         assertEquals("bucket", event.key().bucket());
         assertEquals("test.txt", event.key().key());
+        assertNotNull(event.occurredOn());
     }
 
     @Test
     void objectDeleted() {
-        var bucketId = Bucket.Id.generate();
-        var id = S3Object.Id.generate();
-        var event = new ObjectStoreEvent.ObjectDeleted(id, bucketId, Instant.now());
-        assertEquals(id, event.id());
-        assertEquals(bucketId, event.bucketId());
+        var key = ObjectKey.of("bucket", "test.txt");
+        var event = new ObjectStoreEvent.ObjectDeleted(key, ZonedDateTime.now());
+        assertEquals("bucket", event.key().bucket());
+        assertEquals("test.txt", event.key().key());
+        assertNotNull(event.occurredOn());
     }
 
     @Test
     void sealedInterface_permitsOnlyKnownTypes() {
-        // ObjectStoreEvent permits only BucketCreated, BucketDeleted, ObjectCreated, ObjectDeleted
         assertTrue(ObjectStoreEvent.class.isSealed());
-    }
-
-    @Test
-    void contentDescriptorCreated() {
-        var id = S3Object.Id.generate();
-        var descriptor = ContentDescriptor.of(100, "abc123", "content-id-1");
-        var event = new ObjectStoreEvent.ContentDescriptorCreated(id, descriptor, Instant.now());
-        assertEquals(id, event.id());
-        assertEquals(100, event.descriptor().size());
-        assertEquals("abc123", event.descriptor().md5Hash());
-        assertEquals("content-id-1", event.descriptor().contentId());
-        assertNotNull(event.occurredOn());
     }
 
     @Test
@@ -97,6 +83,73 @@ class ObjectStoreEventTest {
             case ObjectStoreEvent.BucketCreated c -> assertEquals("test", c.name());
             default -> fail("unexpected event type");
         }
+    }
+
+    @Test
+    void objectArchived() {
+        var key = ObjectKey.of("bucket", "archived.txt");
+        var event = new ObjectStoreEvent.ObjectArchived(key, ZonedDateTime.now());
+        assertEquals("bucket", event.key().bucket());
+        assertEquals("archived.txt", event.key().key());
+        assertNotNull(event.occurredOn());
+    }
+
+    @Test
+    void legalHoldApplied() {
+        var key = ObjectKey.of("bucket", "hold.txt");
+        var event = new ObjectStoreEvent.LegalHoldApplied(key, ZonedDateTime.now());
+        assertEquals("bucket", event.key().bucket());
+        assertNotNull(event.occurredOn());
+    }
+
+    @Test
+    void legalHoldRemoved() {
+        var key = ObjectKey.of("bucket", "hold.txt");
+        var event = new ObjectStoreEvent.LegalHoldRemoved(key, ZonedDateTime.now());
+        assertEquals("bucket", event.key().bucket());
+        assertNotNull(event.occurredOn());
+    }
+
+    @Test
+    void objectLockConfigured() {
+        var key = ObjectKey.of("bucket", "locked.txt");
+        var event = new ObjectStoreEvent.ObjectLockConfigured(
+            key, ObjectLockConfiguration.ObjectLockMode.COMPLIANCE,
+            Duration.ofDays(30), ZonedDateTime.now());
+        assertEquals("bucket", event.key().bucket());
+        assertEquals(ObjectLockConfiguration.ObjectLockMode.COMPLIANCE, event.mode());
+        assertEquals(Duration.ofDays(30), event.retentionDuration());
+        assertNotNull(event.occurredOn());
+    }
+
+    @Test
+    void objectRetentionSet() {
+        var key = ObjectKey.of("bucket", "retention.txt");
+        var event = new ObjectStoreEvent.ObjectRetentionSet(
+            key, ZonedDateTime.now().plusDays(30), ZonedDateTime.now());
+        assertEquals("bucket", event.key().bucket());
+        assertNotNull(event.expirationAt());
+        assertNotNull(event.occurredOn());
+    }
+
+    @Test
+    void objectEncryptionUpdated() {
+        var key = ObjectKey.of("bucket", "encrypted.txt");
+        var encryption = EncryptionConfiguration.of(EncryptionAlgorithm.AES256);
+        var event = new ObjectStoreEvent.ObjectEncryptionUpdated(key, encryption, ZonedDateTime.now());
+        assertEquals("bucket", event.key().bucket());
+        assertEquals(EncryptionAlgorithm.AES256, event.encryption().algorithm());
+        assertNotNull(event.occurredOn());
+    }
+
+    @Test
+    void objectRenamed() {
+        var oldKey = ObjectKey.of("bucket", "old.txt");
+        var newKey = ObjectKey.of("bucket", "new.txt");
+        var event = new ObjectStoreEvent.ObjectRenamed(oldKey, newKey, ZonedDateTime.now());
+        assertEquals("bucket/old.txt", event.oldKey().toString());
+        assertEquals("bucket/new.txt", event.newKey().toString());
+        assertNotNull(event.occurredOn());
     }
 
     // ── Bucket configuration events ──

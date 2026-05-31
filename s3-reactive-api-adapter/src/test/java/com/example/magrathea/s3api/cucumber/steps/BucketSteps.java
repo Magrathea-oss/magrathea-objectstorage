@@ -34,10 +34,14 @@ public class BucketSteps {
     @Given("bucket {string} exists")
     public void bucketExists(String name) {
         bucketName = name;
-        webTestClient.put()
+        var status = webTestClient.put()
             .uri("/{bucket}", name)
             .exchange()
-            .expectStatus().isOk();
+            .returnResult()
+            .getStatus();
+        // Accept 200 OK (bucket created) or 409 CONFLICT (bucket already exists)
+        assertTrue(status.value() == 200 || status.value() == 409,
+            "Expected bucket creation to succeed (200) or already exist (409), but got: " + status.value());
     }
 
     @Given("bucket {string} does not exist")

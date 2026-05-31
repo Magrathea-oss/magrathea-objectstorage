@@ -30,6 +30,7 @@ public class MultipartUploadStepDefinitions {
     private Mono<?> result;
     private Bucket.Id testBucketId;
     private MultipartUpload activeUpload;
+    private String testBucketName;
 
     @Before
     public void reset() {
@@ -39,6 +40,7 @@ public class MultipartUploadStepDefinitions {
         result = null;
         testBucketId = null;
         activeUpload = null;
+        testBucketName = null;
     }
 
     @Given("multipart bucket {string} exists")
@@ -49,6 +51,7 @@ public class MultipartUploadStepDefinitions {
             com.example.magrathea.objectstore.domain.valueobject.StorageClass.STANDARD);
         bucketRepository.save(bucket).block();
         testBucketId = id;
+        testBucketName = bucketName;
     }
 
     @Given("multipart upload {string} exists with {int} part(s)")
@@ -56,7 +59,7 @@ public class MultipartUploadStepDefinitions {
         assertNotNull(testBucketId);
         UploadId uploadId = UploadId.of(uploadName);
         MultipartUpload.Id id = MultipartUpload.Id.generate();
-        MultipartUpload upload = MultipartUpload.create(id, testBucketId, ObjectKey.of("large-file.zip"), uploadId);
+        MultipartUpload upload = MultipartUpload.create(id, testBucketId, ObjectKey.of(testBucketName, "large-file.zip"), uploadId);
         for (int i = 1; i <= partCount; i++) {
             UploadPart part = UploadPart.create(PartNumber.of(i), "etag-" + i, 1024);
             upload = upload.withPart(part);
@@ -78,7 +81,7 @@ public class MultipartUploadStepDefinitions {
         assertNotNull(testBucketId);
         MultipartUpload.Id id = MultipartUpload.Id.generate();
         UploadId uploadId = UploadId.generate();
-        MultipartUpload upload = MultipartUpload.create(id, testBucketId, ObjectKey.of(objectKey), uploadId);
+        MultipartUpload upload = MultipartUpload.create(id, testBucketId, ObjectKey.of(testBucketName, objectKey), uploadId);
         result = service.saveUpload(upload).cache();
     }
 

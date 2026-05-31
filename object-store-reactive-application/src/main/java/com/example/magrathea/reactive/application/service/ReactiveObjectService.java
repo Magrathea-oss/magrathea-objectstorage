@@ -2,9 +2,7 @@ package com.example.magrathea.reactive.application.service;
 
 import com.example.magrathea.objectstore.domain.aggregate.ActiveS3Object;
 import com.example.magrathea.objectstore.domain.aggregate.Bucket;
-import com.example.magrathea.objectstore.domain.aggregate.CreatingS3Object;
 import com.example.magrathea.objectstore.domain.aggregate.LockedS3Object;
-import com.example.magrathea.objectstore.domain.aggregate.RestoredS3Object;
 import com.example.magrathea.objectstore.domain.aggregate.S3Object;
 import com.example.magrathea.objectstore.domain.valueobject.EncryptionConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.LegalHold;
@@ -54,19 +52,21 @@ public class ReactiveObjectService {
 
     /**
      * Save an S3Object with streaming content.
-     * Creates a CreatingS3Object via the domain factory, then delegates to the repository
-     * which computes ETag, versionId, and transitions to ActiveS3Object.
+     * Creates an ActiveS3Object via the domain factory, then delegates to the repository
+     * which computes checksums and stores content.
      */
     public Mono<CommandResult<S3Object>> saveObjectWithContent(
-            S3Object.Id id, Bucket.Id bucketId, ObjectKey key,
-            String contentType, String contentDisposition, String contentEncoding,
-            long contentLength, Map<String, String> userMetadata,
-            EncryptionConfiguration encryption,
+            ObjectKey key,
             String storageClass,
+            ObjectChecksum checksum,
+            EncryptionConfiguration encryption,
+            String contentType,
+            long contentLength,
+            Map<String, String> userMetadata,
             Flux<DataBuffer> content) {
-        var creating = S3Object.create(id, bucketId, key, contentType,
-            contentDisposition, contentEncoding, contentLength, userMetadata, encryption);
-        return commandRepository.saveWithContent(creating, content, storageClass);
+        var active = ActiveS3Object.create(key, storageClass,
+            userMetadata, encryption, checksum, contentLength);
+        return commandRepository.saveWithContent(active, content, storageClass);
     }
 
     /**
@@ -75,30 +75,6 @@ public class ReactiveObjectService {
     public Mono<CommandResult<S3Object>> saveObjectWithContent(S3Object object, Flux<DataBuffer> content,
                                                                  String storageClass) {
         return commandRepository.saveWithContent(object, content, storageClass);
-    }
-
-    /**
-     * Save an S3Object with streaming content, identified by its natural key.
-     * The ObjectKey carries both bucket name and object key, which is the
-     * true identity of an S3 object. The service looks up the bucket and creates
-     * the domain aggregate internally.
-     */
-    public Mono<CommandResult<S3Object>> saveObjectWithContent(
-            ObjectKey objectKey,
-            String contentType, String contentDisposition, String contentEncoding,
-            long contentLength, Map<String, String> userMetadata,
-            EncryptionConfiguration encryption,
-            String storageClass,
-            Flux<DataBuffer> content) {
-        var id = S3Object.Id.generate();
-        return bucketQueryRepository.findByName(objectKey.bucket())
-            .flatMap(bucket -> {
-                var creating = S3Object.create(id, bucket.id(), objectKey, contentType,
-                    contentDisposition, contentEncoding, contentLength, userMetadata, encryption);
-                return commandRepository.saveWithContent(creating, content, storageClass);
-            })
-            .switchIfEmpty(Mono.error(
-                new BucketNotFoundException(objectKey.bucket())));
     }
 
     /**
@@ -124,18 +100,10 @@ public class ReactiveObjectService {
             long contentLength,
             UserMetadata userMetadata,
             Flux<DataBuffer> content) {
-        var id = S3Object.Id.generate();
-        return bucketQueryRepository.findByName(objectKey.bucket())
-            .flatMap(bucket -> {
-                var userMetadataMap = userMetadata.entries();
-                var creating = S3Object.create(id, bucket.id(), objectKey, contentType,
-                    null, null, contentLength, userMetadataMap, encryption);
-                return commandRepository.saveWithContent(creating, content, storageClass);
-            })
-            .switchIfEmpty(Mono.error(
-                new BucketNotFoundException(objectKey.bucket())));
-        // TODO: Use ObjectChecksum for future validation/verification against
-        //       the internally-computed checksum.
+        var userMetadataMap = userMetadata != null ? userMetadata.entries() : Map.<String, String>of();
+        var active = ActiveS3Object.create(objectKey, storageClass,
+            userMetadataMap, encryption, checksum, contentLength);
+        return commandRepository.saveWithContent(active, content, storageClass);
     }
 
     /**
@@ -151,20 +119,10 @@ public class ReactiveObjectService {
     public Mono<CommandResult<S3Object>> deleteObject(S3Object object) {
         var deleted = switch (object) {
             case ActiveS3Object a -> a.delete();
-            case CreatingS3Object c -> c.delete();
-            case LockedS3Object l -> l.delete();
-            case RestoredS3Object r -> r.delete();
+            case LockedS3Object l -> l.removeLegalHold().delete();
             default -> object; // Archived or Deleted
         };
         return commandRepository.delete(deleted);
-    }
-
-    public Mono<S3Object> findById(S3Object.Id objectId) {
-        return queryRepository.findById(objectId);
-    }
-
-    public Mono<S3Object> findByBucketAndKey(Bucket.Id bucketId, ObjectKey key) {
-        return queryRepository.findByBucketAndKey(bucketId, key);
     }
 
     /**
@@ -174,12 +132,22 @@ public class ReactiveObjectService {
         return queryRepository.findByBucketAndKey(key);
     }
 
-    public Flux<S3Object> findByBucket(Bucket.Id bucketId) {
-        return queryRepository.findByBucket(bucketId);
+    /**
+     * Find an S3Object by bucket ID and ObjectKey.
+     */
+    public Mono<S3Object> findByBucketAndKey(Bucket.Id bucketId, ObjectKey key) {
+        return queryRepository.findByBucketAndKey(bucketId, key);
     }
 
-    public Flux<DataBuffer> getContent(S3Object.Id objectId) {
-        return queryRepository.getContent(objectId);
+    public Flux<S3Object> findByBucket(String bucketName) {
+        return queryRepository.findByBucket(bucketName);
+    }
+
+    /**
+     * Get content for an object by its ObjectKey.
+     */
+    public Flux<DataBuffer> getContent(ObjectKey key) {
+        return queryRepository.getContent(key);
     }
 
     /**
@@ -249,7 +217,7 @@ public class ReactiveObjectService {
     public Mono<SelectResponse> selectObjectContent(String bucketName, ObjectKey key, SelectRequest request) {
         return bucketQueryRepository.findByName(bucketName)
             .flatMap(bucket -> queryRepository.findByBucketAndKey(key))
-            .map(obj -> SelectResponse.of(obj.contentDescriptor() != null ? obj.contentDescriptor().size() : 0L, "OK", "placeholder-request-id"))
+            .map(obj -> SelectResponse.of(obj.size(), "OK", "placeholder-request-id"))
             .switchIfEmpty(Mono.just(SelectResponse.of(0L, "NoSuchKey", "placeholder-request-id")));
     }
 
@@ -301,7 +269,7 @@ public class ReactiveObjectService {
         return bucketQueryRepository.findByName(objectKey.bucket())
             .switchIfEmpty(Mono.error(new BucketNotFoundException(objectKey.bucket())))
             .flatMap(bucket -> queryRepository.findByBucketAndKey(bucket.id(), objectKey))
-            .flatMap(obj -> Mono.just(new ObjectWithContent(obj, queryRepository.getContent(obj.id()))));
+            .flatMap(obj -> Mono.just(new ObjectWithContent(obj, queryRepository.getContent(obj.key()))));
     }
 
     /**

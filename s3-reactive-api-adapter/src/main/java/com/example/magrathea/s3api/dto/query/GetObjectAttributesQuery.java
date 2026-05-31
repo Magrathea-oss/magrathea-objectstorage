@@ -21,13 +21,12 @@ public record GetObjectAttributesQuery(
     String etag
 ) {
     public static GetObjectAttributesQuery from(S3Object obj) {
-        var descriptor = obj.contentDescriptor();
         return new GetObjectAttributesQuery(
             obj.key().key(),
             null, // contentType not stored on sealed hierarchy
-            descriptor != null ? descriptor.size() : 0L,
+            obj.size(),
             obj.storageClass() != null ? obj.storageClass() : "STANDARD",
-            obj.hasEtag() ? obj.etag() : "\"\""
+            "\"\""
         );
     }
 }

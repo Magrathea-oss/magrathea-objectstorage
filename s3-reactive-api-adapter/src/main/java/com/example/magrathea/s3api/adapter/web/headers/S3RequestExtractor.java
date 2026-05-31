@@ -181,12 +181,21 @@ public final class S3RequestExtractor {
 
     /**
      * Extracts the Content-Length header as a long.
+     * Reads the header directly to preserve negative values (e.g., for validation).
      *
      * @param request the HTTP request
-     * @return the content length, or {@code 0} if not present
+     * @return the content length header value, or {@code 0} if not present
      */
     public static long extractContentLength(ServerRequest request) {
-        return request.headers().contentLength().orElse(0L);
+        var headerValue = request.headers().firstHeader(S3Header.CONTENT_LENGTH.headerName());
+        if (headerValue == null || headerValue.isBlank()) {
+            return 0L;
+        }
+        try {
+            return Long.parseLong(headerValue);
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
     }
 
     // ─────────────────────────────────────────────────────
