@@ -5,34 +5,6 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
   model {
     user = person "User" "End user or automated client using AWS CLI, SDK, curl, or another S3-compatible HTTP client."
 
-    kafka = softwareSystem "Kafka" "Event broker for notification events and access log streaming." {
-      tags "external-system"
-    }
-    awsSns = softwareSystem "AWS SNS" "AWS Simple Notification Service for event notification delivery." {
-      tags "external-system"
-    }
-    awsSqs = softwareSystem "AWS SQS" "AWS Simple Queue Service for event notification delivery." {
-      tags "external-system"
-    }
-    elasticSearch = softwareSystem "ElasticSearch" "Search and analytics engine for access log indexing." {
-      tags "external-system"
-    }
-    fileSystem = softwareSystem "File System" "Local file system or CSV/ORC format output for analytics data export destination." {
-      tags "external-system"
-    }
-    awsS3TargetBucket = softwareSystem "AWS S3 Target Bucket" "AWS S3 bucket for log output and analytics data export destination." {
-      tags "external-system"
-    }
-    prometheus = softwareSystem "Prometheus" "Monitoring and alerting system for metrics collection." {
-      tags "external-system"
-    }
-    awsCloudWatch = softwareSystem "AWS CloudWatch" "AWS monitoring and observability service for metrics and logs." {
-      tags "external-system"
-    }
-    micrometer = softwareSystem "Micrometer" "Metrics instrumentation library facade for collecting measurements." {
-      tags "external-system"
-    }
-
     magrathea = softwareSystem "Magrathea ObjectStore" "AWS S3-compatible object storage built with Spring Boot 4 WebFlux and Java 21." {
       s3ReactiveApiAdapter = container "s3-reactive-api-adapter" "HTTP adapter that exposes the S3-compatible REST API and translates HTTP/XML/binary requests into reactive application use cases." "Spring Boot 4 WebFlux, RouterFunction, Java 21, Jackson XML" {
         bucketOperationsHandler = component "S3BucketOperationsHandler" "Handles bucket lifecycle endpoints: create, delete, head, list, location, versioning and directory-bucket listing." "Java WebFlux handler"
@@ -77,12 +49,11 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
         inMemoryReactiveMultipartUploadRepository = component "InMemoryReactiveMultipartUploadRepository" "In-memory reactive implementation of MultipartUploadCommandRepository and MultipartUploadQueryRepository. Internally stores multipart upload sessions in a ConcurrentHashMap structure." "Spring @Repository"
       }
 
-      storageEngine = container "storage-engine" "Future implementation module for extensible interfaces: event notification publishing, access log writing, metrics collection, and analytics data export. These interfaces are defined in object-store-domain and will be implemented here." "Java 21, domain interfaces" {
-      tags "planned"
-        notificationEventPublisher = component "NotificationEventPublisher" "Extensible event publishing interface for S3 event notifications (s3:ObjectCreated, s3:ObjectRemoved). Publishes to TopicConfiguration, QueueConfiguration, CloudFunctionConfiguration destinations." "Domain interface"
-        accessLogWriter = component "AccessLogWriter" "Extensible interface for writing S3 access logs to external destinations (Kafka, ElasticSearch, file system, S3 target bucket)." "Domain interface"
-        metricsCollector = component "MetricsCollector" "Extensible interface for recording metrics to CloudWatch, Prometheus, or Micrometer backends." "Domain interface"
-        analyticsDataExporter = component "AnalyticsDataExporter" "Extensible interface for exporting analytics data snapshots to destination buckets (S3 target, CSV/ORC output)." "Domain interface"
+      storageEngine = container "storage-engine" "Storage Engine bounded context: persistence pipeline, virtual devices, deduplication, erasure coding, content-addressed storage, manifest management." "Java 21, domain-driven" {
+        storageEngineDomain = component "storage-engine-domain" "Pure domain model: StoragePolicy, EffectiveStoragePolicy, VirtualDevice (BucketDevice, DedupDevice), DedupNamespace, WorkflowCompatibilityKey, DeviceConfigurationHash, StepPlan, StepExecutionTrace, ChunkPersistenceTrace, ObjectManifest, StoredObject aggregate. Zero framework dependencies." "Java 21 domain"
+        storageEngineApplication = component "storage-engine-application" "Reactive orchestration layer: ReactiveStorageOrchestrator, Chunker, ApplicationChunkPayload, ports (StoragePolicyCatalog, StoredObjectRepository, ObjectManifestRepository, ContentAddressIndex, ChecksumPort, DataTransformPort, AlterationPort, ChunkStorePort)." "Spring @Service, Reactor"
+        storageEngineInfrastructure = component "storage-engine-infrastructure" "Filesystem cluster backend: FileSystemStorageCluster, FileSystemStorageNode, FileSystemVirtualDeviceMapper, FileSystemContentAddressIndex, FileSystemManifestRepository, FileSystemStoredObjectRepository, checksum/compression/encryption/EC/replication adapters, FaultInjectingStorageCluster chaos decorator." "Java 21, Reactor"
+        storageEngineRepositoryAdapter = component "object-store-reactive-repository-storage-engine-infrastructure" "Anti-Corruption Layer + adapter: implements Object Store repository interfaces using Storage Engine backend. Contains ObjectStoreToStorageEngineTranslator, StorageEngineReactiveS3ObjectRepository, StorageEngineReactiveBucketRepository, StorageEngineReactiveMultipartUploadRepository." "Spring @Repository, Reactor"
       }
     }
 
@@ -136,25 +107,16 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
     magrathea.reactiveRepositoryApplication.multipartUploadCommandRepository -> magrathea.reactiveInfrastructure.inMemoryReactiveMultipartUploadRepository "Implemented by" "Implements"
     magrathea.reactiveRepositoryApplication.multipartUploadQueryRepository -> magrathea.reactiveInfrastructure.inMemoryReactiveMultipartUploadRepository "Implemented by" "Implements"
 
-    magrathea.storageEngine.notificationEventPublisher -> kafka "Publishes S3 events (s3:ObjectCreated, s3:ObjectRemoved)" "Event topic"
-    magrathea.storageEngine.notificationEventPublisher -> awsSns "Publishes S3 events to SNS topics" "TopicConfiguration"
-    magrathea.storageEngine.notificationEventPublisher -> awsSqs "Publishes S3 events to SQS queues" "QueueConfiguration"
+    magrathea.reactiveRepositoryApplication.bucketCommandRepository -> magrathea.storageEngine.storageEngineRepositoryAdapter "Implemented by (storage-engine profile)" "Implements"
+    magrathea.reactiveRepositoryApplication.bucketQueryRepository -> magrathea.storageEngine.storageEngineRepositoryAdapter "Implemented by (storage-engine profile)" "Implements"
+    magrathea.reactiveRepositoryApplication.s3ObjectCommandRepository -> magrathea.storageEngine.storageEngineRepositoryAdapter "Implemented by (storage-engine profile)" "Implements"
+    magrathea.reactiveRepositoryApplication.s3ObjectQueryRepository -> magrathea.storageEngine.storageEngineRepositoryAdapter "Implemented by (storage-engine profile)" "Implements"
+    magrathea.reactiveRepositoryApplication.multipartUploadCommandRepository -> magrathea.storageEngine.storageEngineRepositoryAdapter "Implemented by (storage-engine profile)" "Implements"
+    magrathea.reactiveRepositoryApplication.multipartUploadQueryRepository -> magrathea.storageEngine.storageEngineRepositoryAdapter "Implemented by (storage-engine profile)" "Implements"
 
-    magrathea.storageEngine.accessLogWriter -> kafka "Writes access logs" "Log topic"
-    magrathea.storageEngine.accessLogWriter -> elasticSearch "Writes access logs" "Index"
-    magrathea.storageEngine.accessLogWriter -> fileSystem "Writes access logs" "File output"
-    magrathea.storageEngine.accessLogWriter -> awsS3TargetBucket "Writes access logs" "Target bucket"
-
-    magrathea.storageEngine.metricsCollector -> prometheus "Records metrics" "Prometheus format"
-    magrathea.storageEngine.metricsCollector -> awsCloudWatch "Records metrics" "CloudWatch API"
-    magrathea.storageEngine.metricsCollector -> micrometer "Records metrics" "Micrometer facade"
-
-    magrathea.storageEngine.analyticsDataExporter -> awsS3TargetBucket "Exports analytics data" "Target bucket"
-    magrathea.storageEngine.analyticsDataExporter -> fileSystem "Exports analytics data" "CSV/ORC format output"
-    magrathea.reactiveObjectStore -> magrathea.storageEngine.notificationEventPublisher "Emits domain events (s3:ObjectCreated, s3:ObjectRemoved)" "Domain events"
-    magrathea.s3ReactiveApiAdapter -> magrathea.storageEngine.accessLogWriter "Sends HTTP request/response log entries" "Access log"
-    magrathea.reactiveObjectStore -> magrathea.storageEngine.metricsCollector "Records operation metrics (count, size, latency)" "Metrics"
-    magrathea.reactiveBucketManagement -> magrathea.storageEngine.analyticsDataExporter "Triggers analytics data export snapshots" "Export trigger"
+    magrathea.storageEngine.storageEngineRepositoryAdapter -> magrathea.storageEngine.storageEngineApplication "Delegates persistence to Storage Engine orchestrator" "Java calls"
+    magrathea.storageEngine.storageEngineApplication -> magrathea.storageEngine.storageEngineDomain "Uses domain services (PersistencePlanner, EffectivePolicyResolver, VirtualDeviceResolver, CompleteUploadService)" "Java calls"
+    magrathea.storageEngine.storageEngineApplication -> magrathea.storageEngine.storageEngineInfrastructure "Persists via ports (ChunkStorePort, ContentAddressIndex, ManifestRepository, StoredObjectRepository)" "Repository interfaces"
   }
 
   views {
@@ -168,7 +130,7 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
 
     container magrathea "Container" {
       title "C2 Container: Magrathea ObjectStore"
-      description "s3-reactive-api-adapter exposes the S3 API with RouterFunction dispatch; reactive-object-store and reactive-bucket-management implement core reactive capabilities with Phase F advanced operations; reactive-repository-application provides CQS interfaces; reactive-infrastructure persists state reactively in-process; and storage-engine provides extensible interfaces for notification, logging, metrics, and analytics."
+      description "s3-reactive-api-adapter exposes the S3 API with RouterFunction dispatch; reactive-object-store and reactive-bucket-management implement core reactive capabilities with Phase F advanced operations; reactive-repository-application provides CQS interfaces; reactive-infrastructure persists state reactively in-process; and storage-engine provides the Storage Engine bounded context for persistence pipeline, virtual devices, deduplication, erasure coding, content-addressed storage, and manifest management."
       include user
       include magrathea.s3ReactiveApiAdapter
       include magrathea.reactiveObjectStore
@@ -176,15 +138,6 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
       include magrathea.reactiveRepositoryApplication
       include magrathea.reactiveInfrastructure
       include magrathea.storageEngine
-      include kafka
-      include awsSns
-      include awsSqs
-      include elasticSearch
-      include fileSystem
-      include awsS3TargetBucket
-      include prometheus
-      include awsCloudWatch
-      include micrometer
       autolayout lr
     }
 
@@ -227,6 +180,7 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
       include magrathea.reactiveBucketManagement
       include *
       include magrathea.reactiveInfrastructure
+      include magrathea.storageEngine
       autolayout lr
     }
 
@@ -242,17 +196,8 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
 
     component magrathea.storageEngine "StorageEngineComponents" {
       title "C3 Component: storage-engine"
-      description "Extensible domain interfaces for event notification publishing, access log writing, metrics collection, and analytics data export. Implementation is POSTPONED — only interfaces are defined now in object-store-domain."
+      description "Storage Engine bounded context: domain model, reactive orchestration layer, filesystem cluster backend, and Anti-Corruption Layer adapter that implements Object Store repository interfaces using the Storage Engine backend."
       include *
-      include kafka
-      include awsSns
-      include awsSqs
-      include elasticSearch
-      include fileSystem
-      include awsS3TargetBucket
-      include prometheus
-      include awsCloudWatch
-      include micrometer
       autolayout lr
     }
 
@@ -269,7 +214,7 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
 
     dynamic magrathea.s3ReactiveApiAdapter "PutObjectRuntime" {
       title "Runtime: PutObject"
-      description "PutObject verifies the bucket, then persists object metadata and content."
+      description "PutObject verifies the bucket, then persists object metadata and content. Two persistence implementations exist: in-memory (reactive-infrastructure) and storage-engine profile (storage-engine)."
       user -> magrathea.s3ReactiveApiAdapter.objectOperationsHandler "1. PUT /{bucket}/{key}" "HTTP"
       magrathea.s3ReactiveApiAdapter.objectOperationsHandler -> magrathea.reactiveBucketManagement.reactiveBucketService "2. Verify bucket exists" "Java service calls"
       magrathea.reactiveBucketManagement.reactiveBucketService -> magrathea.reactiveBucketManagement.bucketRepositoryPort "3. Read bucket aggregate via domain repository port" "Repository interfaces"
@@ -278,13 +223,14 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
       magrathea.s3ReactiveApiAdapter.objectOperationsHandler -> magrathea.reactiveObjectStore.reactiveObjectService "6. PutObject use case" "Java service calls"
       magrathea.reactiveObjectStore.reactiveObjectService -> magrathea.reactiveObjectStore.s3ObjectRepositoryPort "7. Persist object metadata and content via domain repository port" "Repository interfaces"
       magrathea.reactiveObjectStore.s3ObjectRepositoryPort -> magrathea.reactiveRepositoryApplication.s3ObjectCommandRepository "8. CQS command interface" "Implemented by"
-      magrathea.reactiveRepositoryApplication.s3ObjectCommandRepository -> magrathea.reactiveInfrastructure.inMemoryReactiveS3ObjectRepository "9. Persist object metadata and bytes" "Implements"
+      magrathea.reactiveRepositoryApplication.s3ObjectCommandRepository -> magrathea.reactiveInfrastructure.inMemoryReactiveS3ObjectRepository "9. Persist object metadata and bytes (in-memory profile)" "Implements"
+      magrathea.reactiveRepositoryApplication.s3ObjectCommandRepository -> magrathea.storageEngine.storageEngineRepositoryAdapter "9b. Persist object metadata and bytes (storage-engine profile)" "Implements"
       autolayout lr
     }
 
     dynamic magrathea.s3ReactiveApiAdapter "GetObjectRuntime" {
       title "Runtime: GetObject"
-      description "GetObject verifies the bucket, then loads object metadata and binary content."
+      description "GetObject verifies the bucket, then loads object metadata and binary content. Two persistence implementations exist: in-memory (reactive-infrastructure) and storage-engine profile (storage-engine)."
       user -> magrathea.s3ReactiveApiAdapter.objectOperationsHandler "1. GET /{bucket}/{key}" "HTTP"
       magrathea.s3ReactiveApiAdapter.objectOperationsHandler -> magrathea.reactiveBucketManagement.reactiveBucketService "2. Verify bucket exists" "Java service calls"
       magrathea.reactiveBucketManagement.reactiveBucketService -> magrathea.reactiveBucketManagement.bucketRepositoryPort "3. Read bucket aggregate via domain repository port" "Repository interfaces"
@@ -293,20 +239,23 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
       magrathea.s3ReactiveApiAdapter.objectOperationsHandler -> magrathea.reactiveObjectStore.reactiveObjectService "6. GetObject use case" "Java service calls"
       magrathea.reactiveObjectStore.reactiveObjectService -> magrathea.reactiveObjectStore.s3ObjectRepositoryPort "7. Read object metadata and content via domain repository port" "Repository interfaces"
       magrathea.reactiveObjectStore.s3ObjectRepositoryPort -> magrathea.reactiveRepositoryApplication.s3ObjectQueryRepository "8. CQS query interface" "Implemented by"
-      magrathea.reactiveRepositoryApplication.s3ObjectQueryRepository -> magrathea.reactiveInfrastructure.inMemoryReactiveS3ObjectRepository "9. Read object metadata and bytes" "Implements"
+      magrathea.reactiveRepositoryApplication.s3ObjectQueryRepository -> magrathea.reactiveInfrastructure.inMemoryReactiveS3ObjectRepository "9. Read object metadata and bytes (in-memory profile)" "Implements"
+      magrathea.reactiveRepositoryApplication.s3ObjectQueryRepository -> magrathea.storageEngine.storageEngineRepositoryAdapter "9b. Read object metadata and bytes (storage-engine profile)" "Implements"
       autolayout lr
     }
 
     dynamic magrathea.s3ReactiveApiAdapter "MultipartUploadRuntime" {
       title "Runtime: Multipart upload lifecycle"
-      description "Multipart endpoints manage upload sessions and uploaded part state."
+      description "Multipart endpoints manage upload sessions and uploaded part state. Two persistence implementations exist: in-memory (reactive-infrastructure) and storage-engine profile (storage-engine)."
       user -> magrathea.s3ReactiveApiAdapter.multipartHandler "1. POST/PUT/GET/DELETE multipart endpoints" "HTTP"
       magrathea.s3ReactiveApiAdapter.multipartHandler -> magrathea.reactiveObjectStore.reactiveMultipartUploadService "2. Multipart upload lifecycle use cases" "Java service calls"
       magrathea.reactiveObjectStore.reactiveMultipartUploadService -> magrathea.reactiveObjectStore.multipartUploadRepositoryPort "3. Persist/load multipart upload state via domain repository port" "Repository interfaces"
       magrathea.reactiveObjectStore.multipartUploadRepositoryPort -> magrathea.reactiveRepositoryApplication.multipartUploadCommandRepository "4. CQS command interface" "Implemented by"
       magrathea.reactiveObjectStore.multipartUploadRepositoryPort -> magrathea.reactiveRepositoryApplication.multipartUploadQueryRepository "5. CQS query interface" "Implemented by"
-      magrathea.reactiveRepositoryApplication.multipartUploadCommandRepository -> magrathea.reactiveInfrastructure.inMemoryReactiveMultipartUploadRepository "6. Persist multipart upload state" "Implements"
-      magrathea.reactiveRepositoryApplication.multipartUploadQueryRepository -> magrathea.reactiveInfrastructure.inMemoryReactiveMultipartUploadRepository "7. Read multipart upload state" "Implements"
+      magrathea.reactiveRepositoryApplication.multipartUploadCommandRepository -> magrathea.reactiveInfrastructure.inMemoryReactiveMultipartUploadRepository "6. Persist multipart upload state (in-memory profile)" "Implements"
+      magrathea.reactiveRepositoryApplication.multipartUploadQueryRepository -> magrathea.reactiveInfrastructure.inMemoryReactiveMultipartUploadRepository "7. Read multipart upload state (in-memory profile)" "Implements"
+      magrathea.reactiveRepositoryApplication.multipartUploadCommandRepository -> magrathea.storageEngine.storageEngineRepositoryAdapter "6b. Persist multipart upload state (storage-engine profile)" "Implements"
+      magrathea.reactiveRepositoryApplication.multipartUploadQueryRepository -> magrathea.storageEngine.storageEngineRepositoryAdapter "7b. Read multipart upload state (storage-engine profile)" "Implements"
       autolayout lr
     }
 
@@ -324,7 +273,7 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
 
     dynamic magrathea.s3ReactiveApiAdapter "PhaseFAdvancedOperationsRuntime" {
       title "Runtime: Phase F Advanced Operations"
-      description "Phase F advanced operations (legal hold, retention, torrent, restore, select, Object Lambda, rename, encryption update, ABAC, object lock, session, metadata/table config) follow the established RouterFunction dispatch and service delegation pattern."
+      description "Phase F advanced operations (legal hold, retention, torrent, restore, select, Object Lambda, rename, encryption update, ABAC, object lock, session, metadata/table config) follow the established RouterFunction dispatch and service delegation pattern. Two persistence implementations exist: in-memory (reactive-infrastructure) and storage-engine profile (storage-engine)."
       user -> magrathea.s3ReactiveApiAdapter.objectOperationsHandler "1. Advanced object request (rename, torrent, restore, select, Object Lambda)" "HTTP"
       user -> magrathea.s3ReactiveApiAdapter.objectMetadataHandler "2. Advanced metadata request (legal hold, retention, encryption update)" "HTTP"
       user -> magrathea.s3ReactiveApiAdapter.sessionHandler "3. CreateSession request" "HTTP"
@@ -339,8 +288,12 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
       magrathea.reactiveObjectStore.s3ObjectRepositoryPort -> magrathea.reactiveRepositoryApplication.s3ObjectQueryRepository "12. CQS query interface" "Implemented by"
       magrathea.reactiveBucketManagement.bucketRepositoryPort -> magrathea.reactiveRepositoryApplication.bucketCommandRepository "13. CQS command interface" "Implemented by"
       magrathea.reactiveBucketManagement.bucketRepositoryPort -> magrathea.reactiveRepositoryApplication.bucketQueryRepository "14. CQS query interface" "Implemented by"
-      magrathea.reactiveRepositoryApplication.s3ObjectCommandRepository -> magrathea.reactiveInfrastructure.inMemoryReactiveS3ObjectRepository "15. Persist/load S3Object data" "Implements"
-      magrathea.reactiveRepositoryApplication.bucketCommandRepository -> magrathea.reactiveInfrastructure.inMemoryReactiveBucketRepository "16. Persist/load bucket data" "Implements"
+      magrathea.reactiveRepositoryApplication.s3ObjectCommandRepository -> magrathea.reactiveInfrastructure.inMemoryReactiveS3ObjectRepository "15. Persist/load S3Object data (in-memory profile)" "Implements"
+      magrathea.reactiveRepositoryApplication.bucketCommandRepository -> magrathea.reactiveInfrastructure.inMemoryReactiveBucketRepository "16. Persist/load bucket data (in-memory profile)" "Implements"
+      magrathea.reactiveRepositoryApplication.s3ObjectCommandRepository -> magrathea.storageEngine.storageEngineRepositoryAdapter "15b. Persist/load S3Object data (storage-engine profile)" "Implements"
+      magrathea.reactiveRepositoryApplication.s3ObjectQueryRepository -> magrathea.storageEngine.storageEngineRepositoryAdapter "16b. Load S3Object data (storage-engine profile)" "Implements"
+      magrathea.reactiveRepositoryApplication.bucketCommandRepository -> magrathea.storageEngine.storageEngineRepositoryAdapter "17b. Persist/load bucket data (storage-engine profile)" "Implements"
+      magrathea.reactiveRepositoryApplication.bucketQueryRepository -> magrathea.storageEngine.storageEngineRepositoryAdapter "18b. Load bucket data (storage-engine profile)" "Implements"
       autolayout lr
     }
 
@@ -354,11 +307,6 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
         background #1168bd
         color #ffffff
       }
-      element "external-system" {
-        background #6b7b8f
-        color #ffffff
-        shape roundedBox
-      }
       element "Container" {
         background #438dd5
         color #ffffff
@@ -371,11 +319,6 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
       element "Component" {
         background #85bbf0
         color #000000
-      }
-      element "planned" {
-        background #b8cce4
-        color #000000
-        border dashed
       }
     }
 

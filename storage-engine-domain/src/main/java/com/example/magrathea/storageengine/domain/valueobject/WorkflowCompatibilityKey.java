@@ -23,9 +23,10 @@ public record WorkflowCompatibilityKey(
         DedupNamespace namespace;
         if (effectivePolicy.dedup().isPresent()) {
             DedupConfig dedupConfig = effectivePolicy.dedup().get();
-            switch (dedupConfig.scope()) {
-                case GLOBAL_LEVEL -> namespace = DedupNamespace.GlobalDedupNamespace.INSTANCE;
-                case BUCKET_LEVEL -> namespace = new DedupNamespace.BucketDedupNamespace(effectivePolicy.bucketRef());
+            if (dedupConfig.scope() == DedupScope.GLOBAL_LEVEL) {
+                namespace = DedupNamespace.GlobalDedupNamespace.INSTANCE;
+            } else {
+                namespace = new DedupNamespace.BucketDedupNamespace(effectivePolicy.bucketRef());
             }
         } else {
             namespace = DedupNamespace.GlobalDedupNamespace.INSTANCE;

@@ -40,8 +40,42 @@
 | `object-store-reactive-repository-application` | Reactive CQS repository interfaces | Bucket, object, and multipart command/query ports |
 | `object-store-reactive-application` | Reactive application services and DTOs | Native Mono/Flux service APIs |
 | `object-store-reactive-infrastructure` | Reactive in-memory repository implementations | No HTTP API, no S3 router |
-| `storage-engine-domain` / `storage-engine-application` / `storage-engine-infrastructure` | Reserved storage-engine modules | Empty by design for future persistence/storage-engine work |
+| `object-store-reactive-repository-storage-engine-infrastructure` | Anti-Corruption Layer + adapter: Object Store → Storage Engine | Implements repository interfaces using Storage Engine backend |
+| `storage-engine-domain` | Storage Engine domain model (puro) | Policy, workflow, device, trace, manifest — zero framework dependencies |
+| `storage-engine-application` | Storage Engine reactive orchestration | Ports, Chunker, ReactiveStorageOrchestrator |
+| `storage-engine-infrastructure` | Storage Engine filesystem cluster backend | FileSystemStorageCluster, content address index, manifest repository, chaos decorator |
 | `bootstrap-application` | Spring Boot entry point | Includes `s3-reactive-api-adapter` to activate S3 endpoints |
+
+### Backend selection
+
+Two implementations of the Object Store repository interfaces coexist:
+
+| Profile | Backend | Module |
+|---|---|---|
+| `single-node` (default) | In-memory repositories | `object-store-reactive-infrastructure` |
+| `storage-engine` | Storage Engine filesystem cluster | `object-store-reactive-repository-storage-engine-infrastructure` |
+
+The Storage Engine backend is selectable via Spring profile or Maven profile at deployment time.
+The ACL translation layer lives in `object-store-reactive-repository-storage-engine-infrastructure`,
+which translates Object Store concepts into Storage Engine commands and delegates persistence
+to the Storage Engine bounded context.
+
+### Storage Engine Architecture
+
+The Storage Engine bounded context is a separate domain model for object persistence,
+independent of the S3 API domain. It defines:
+
+- **StoragePolicy / EffectiveStoragePolicy** — base policy vs request-resolved policy
+- **VirtualDevice** — BucketDevice (non-dedup) and DedupDevice (content-addressed)
+- **DedupNamespace** — GlobalDedupNamespace and BucketDedupNamespace
+- **WorkflowCompatibilityKey / DeviceConfigurationHash** — deterministic device identity
+- **StepPlan / StepExecutionTrace** — fixed 6-step pipeline with EXECUTED/SKIPPED/BYPASSED
+- **ObjectManifest** — persisted chunk layout, separate from StoredObject aggregate
+- **CompleteUpload** — common phase for PutObject and MultipartUpload
+- **Chaos engineering** — alter step after checksum, before verify, with FaultInjectingStorageCluster
+
+The pipeline order is fixed: DEDUP → COMPRESS → CRYPT → ERASURE_CODING → REPLICATION → STORE.
+EC differentiates DedupDevice; replication does not.
 
 ### S3 API activation
 

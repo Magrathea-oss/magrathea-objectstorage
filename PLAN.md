@@ -14,13 +14,28 @@ magrathea-objectstorage/
 ├── object-store-reactive-repository-application/ # Reactive CQS repository interfaces
 ├── object-store-reactive-application/          # Reactive application services and DTOs
 ├── object-store-reactive-infrastructure/       # Reactive in-memory repository implementations
-├── storage-engine-domain/                      # Reserved for future storage-engine domain design
-├── storage-engine-application/                 # Reserved for future storage-engine application design
-├── storage-engine-infrastructure/              # Reserved for future storage-engine infrastructure design
+├── storage-engine-domain/                      # Storage Engine domain: policy, workflow, device, trace, manifest
+├── storage-engine-application/                 # Storage Engine reactive orchestration and ports
+├── storage-engine-infrastructure/              # Storage Engine filesystem cluster backend (FS nodes, content-address index, chaos)
+├── object-store-reactive-repository-storage-engine-infrastructure/ # ACL + adapter: Object Store → Storage Engine
 ├── bootstrap-application/                      # Spring Boot entry point
 ├── docs/                                       # ARC42, ADR, C4
 └── test-aws-cli.sh                             # AWS CLI compatibility tests for implemented S3 operations
 ```
+
+### Two-backend Repository Strategy
+
+The Object Store repository interfaces (`object-store-reactive-repository-application`) have two
+concrete implementations:
+
+| Backend | Module | Profile | Description |
+|---|---|---|---|
+| InMemory | `object-store-reactive-infrastructure` | `single-node` (default) | Reactive in-memory repositories for development and single-node deployments |
+| Storage Engine | `object-store-reactive-repository-storage-engine-infrastructure` | `storage-engine` | Filesystem cluster backend using the Storage Engine bounded context |
+
+The ACL/adapter module (`object-store-reactive-repository-storage-engine-infrastructure`) translates
+Object Store repository commands into Storage Engine domain commands. It is the Anti-Corruption
+Layer between the two bounded contexts.
 
 Removed modules/components:
 - `shared-domain` removed.

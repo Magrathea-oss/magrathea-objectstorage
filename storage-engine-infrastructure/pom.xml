@@ -11,7 +11,15 @@
     </parent>
     <artifactId>storage-engine-infrastructure</artifactId>
 
-    <!-- EMPTY — reserved for future use -->
     <dependencies>
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>storage-engine-application</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-core</artifactId>
+        </dependency>
     </dependencies>
 </project>
