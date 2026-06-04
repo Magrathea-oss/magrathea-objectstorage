@@ -107,7 +107,6 @@ public class S3ProxyRouter {
             .PUT("/{bucket}", queryParam("metrics", v -> true), bucketConfig::putBucketMetrics)
             .PUT("/{bucket}", queryParam("intelligent-tiering", v -> true), bucketConfig::putBucketIntelligentTiering)
             .PUT("/{bucket}", bucketOperations::createBucket)
-            .PUT("/{bucket}/", S3WebSupport::xmlErrorEmptyKey)
             .HEAD("/{bucket}", bucketOperations::headBucket)
             .DELETE("/{bucket}", queryParam("tagging", v -> true), bucketMetadata::deleteBucketTagging)
             .DELETE("/{bucket}", queryParam("cors", v -> true), bucketConfig::deleteBucketCors)

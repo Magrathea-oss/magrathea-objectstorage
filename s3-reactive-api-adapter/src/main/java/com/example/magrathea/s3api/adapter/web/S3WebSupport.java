@@ -58,11 +58,6 @@ final class S3WebSupport {
             .bodyValue(ErrorQuery.from(code, message));
     }
 
-    /** Handles PUT /{bucket}/ (empty key) — returns 400 InvalidArgument. */
-    static Mono<ServerResponse> xmlErrorEmptyKey(ServerRequest request) {
-        return xmlError(HttpStatus.BAD_REQUEST, "InvalidArgument", "Key is empty");
-    }
-
     // ─────────────────────────────────────────────────────
     //  Runtime bucket configuration effects
     // ─────────────────────────────────────────────────────
@@ -311,53 +306,6 @@ final class S3WebSupport {
             }
         }
         return response;
-    }
-
-    /**
-     * Validates CORS origin for a request and applies CORS headers to the response.
-     * Returns a Mono that resolves to:
-     * - An error ServerResponse (403) if CORS validation fails
-     * - The original response with CORS headers added if valid
-     * - The original response unchanged if no Origin header is present
-     */
-    static Mono<ServerResponse> withCorsValidation(ServerRequest request, Bucket bucket, Mono<ServerResponse> response) {
-        var origin = request.headers().firstHeader("Origin");
-        if (origin == null || origin.isBlank()) {
-            return response;
-        }
-        var corsConfig = bucket.bucketConfig() != null
-            ? bucket.bucketConfig().getCorsConfiguration().orElse(null) : null;
-        if (corsConfig == null || corsConfig.corsRules() == null || corsConfig.corsRules().isEmpty()) {
-            return S3WebSupport.xmlError(HttpStatus.FORBIDDEN, "AccessForbidden", "CORS not configured");
-        }
-        for (var rule : corsConfig.corsRules()) {
-            for (var allowedOrigin : rule.allowedOrigins()) {
-                if (originMatches(origin, allowedOrigin)) {
-                    // Apply CORS headers to the response
-                    return response.flatMap(r -> {
-                        var builder = ServerResponse.from(r);
-                        builder.header("Access-Control-Allow-Origin", origin);
-                        if (!rule.allowedMethods().isEmpty()) {
-                            builder.header("Access-Control-Allow-Methods",
-                                commaSeparated(rule.allowedMethods()));
-                        }
-                        if (rule.allowedHeaders() != null && !rule.allowedHeaders().isEmpty()) {
-                            builder.header("Access-Control-Allow-Headers",
-                                commaSeparated(rule.allowedHeaders()));
-                        }
-                        if (rule.exposeHeaders() != null && !rule.exposeHeaders().isEmpty()) {
-                            builder.header("Access-Control-Expose-Headers",
-                                commaSeparated(rule.exposeHeaders()));
-                        }
-                        if (rule.maxAgeSeconds() > 0) {
-                            builder.header("Access-Control-Max-Age", String.valueOf(rule.maxAgeSeconds()));
-                        }
-                        return builder.build();
-                    });
-                }
-            }
-        }
-        return S3WebSupport.xmlError(HttpStatus.FORBIDDEN, "AccessForbidden", "Origin not allowed");
     }
 
     // ─────────────────────────────────────────────────────

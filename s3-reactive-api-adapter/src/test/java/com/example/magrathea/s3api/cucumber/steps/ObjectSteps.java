@@ -66,12 +66,8 @@ public class ObjectSteps {
 
     @When("the object is stored via S3 API")
     public void objectStored() {
-        // Use direct URI string to handle empty keys that fail with URI template
-        var uriPath = (objectKey == null || objectKey.isBlank())
-            ? "/test-bucket/"
-            : "/test-bucket/" + objectKey;
         var result = webTestClient.put()
-            .uri(uriPath)
+            .uri("/test-bucket/{key}", objectKey)
             .header("x-amz-sdk-checksum-algorithm", "crc64nvme")
             .header("x-amz-checksum-crc64nvme", "AAAAAAAAAAAAAA==")
             .bodyValue(objectContent)
@@ -433,12 +429,8 @@ public class ObjectSteps {
 
     @When("the object is stored via S3 API with invalid bucket name {string}")
     public void objectStoredWithInvalidBucketName(String bucketName) {
-        // Use direct URI to handle empty bucket names that fail with URI template
-        var uriPath = bucketName == null || bucketName.isBlank()
-            ? "/" + objectKey
-            : "/" + bucketName + "/" + objectKey;
         var result = webTestClient.put()
-            .uri(uriPath)
+            .uri("/{bucket}/{key}", bucketName, objectKey)
             .bodyValue(objectContent)
             .exchange()
             .returnResult();
@@ -466,26 +458,14 @@ public class ObjectSteps {
 
     @When("the object is stored via S3 API with content-length header {long}")
     public void objectStoredWithContentLengthHeader(long contentLength) {
-        // For negative content length, omit bodyValue to prevent Spring WebFlux
-        // from overriding the Content-Length header with actual body size.
-        if (contentLength >= 0) {
-            var result = webTestClient.put()
-                .uri("/test-bucket/{key}", objectKey)
-                .bodyValue(objectContent)
-                .header("Content-Length", String.valueOf(contentLength))
-                .exchange()
-                .returnResult();
-            commonSteps.setResponseStatus(result.getStatus());
-            commonSteps.setResponseHeaders(result.getResponseHeaders());
-        } else {
-            var result = webTestClient.put()
-                .uri("/test-bucket/{key}", objectKey)
-                .header("Content-Length", String.valueOf(contentLength))
-                .exchange()
-                .returnResult();
-            commonSteps.setResponseStatus(result.getStatus());
-            commonSteps.setResponseHeaders(result.getResponseHeaders());
-        }
+        var result = webTestClient.put()
+            .uri("/test-bucket/{key}", objectKey)
+            .header("Content-Length", String.valueOf(contentLength))
+            .bodyValue(objectContent)
+            .exchange()
+            .returnResult();
+        commonSteps.setResponseStatus(result.getStatus());
+        commonSteps.setResponseHeaders(result.getResponseHeaders());
     }
 
     @When("object {string} is locked via S3 API with mode {string} and duration {int} days")

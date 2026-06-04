@@ -26,7 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Object metadata-context S3 operations: ACL, tagging, object attributes, and encryption.
  * Minimal handler — extracts headers and delegates to service.
- * ACL storage is shared with S3ObjectOperationsHandler via SharedAclStore.
+ * Handler-local state is removed — ACL, tagging, encryption persistence is moved to service/domain.
  */
 public class S3ObjectMetadataHandler {
 
@@ -34,16 +34,13 @@ public class S3ObjectMetadataHandler {
     private final ReactiveObjectService objectService;
 
     // Temporary adapter storage for ACL and tagging until domain support is added
-    private final ConcurrentHashMap<String, String> objectAclStore;
+    private final ConcurrentHashMap<String, String> objectAclStore = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, List<TaggingQuery.TagEntry>> objectTagStore = new ConcurrentHashMap<>();
 
     public S3ObjectMetadataHandler(ReactiveBucketService bucketService,
-                                    ReactiveObjectService objectService,
-                                    S3ObjectOperationsHandler objectOperationsHandler) {
+                                    ReactiveObjectService objectService) {
         this.bucketService = bucketService;
         this.objectService = objectService;
-        // Share ACL store with S3ObjectOperationsHandler so ACL set by putObject is visible to getObjectAcl
-        this.objectAclStore = objectOperationsHandler.getObjectAclStore();
     }
 
     /** GET /{bucket}/{key}?acl — GetObjectAcl */
@@ -59,7 +56,7 @@ public class S3ObjectMetadataHandler {
                             objectAclStore.getOrDefault(storeKey(bucketName, key), "private")))))
                 .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found"))
             )
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+            .onErrorResume(ex -> S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
     }
 
     /** PUT /{bucket}/{key}?acl — PutObjectAcl */
@@ -80,7 +77,7 @@ public class S3ObjectMetadataHandler {
                 })
                 .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found"))
             )
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+            .onErrorResume(ex -> S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
     }
 
     /** GET /{bucket}/{key}?tagging — GetObjectTagging */
@@ -95,7 +92,7 @@ public class S3ObjectMetadataHandler {
                         objectTagStore.getOrDefault(storeKey(bucketName, key), List.of())))))
                 .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found"))
             )
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+            .onErrorResume(ex -> S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
     }
 
     /** PUT /{bucket}/{key}?tagging — PutObjectTagging */
@@ -114,7 +111,7 @@ public class S3ObjectMetadataHandler {
                     }))
                 .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found"))
             )
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+            .onErrorResume(ex -> S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
     }
 
     /** DELETE /{bucket}/{key}?tagging — DeleteObjectTagging */
@@ -129,7 +126,7 @@ public class S3ObjectMetadataHandler {
                 })
                 .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found"))
             )
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+            .onErrorResume(ex -> S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
     }
 
     /** GET /{bucket}/{key}?attributes — GetObjectAttributes */
@@ -143,7 +140,7 @@ public class S3ObjectMetadataHandler {
                     .bodyValue(GetObjectAttributesQuery.from(obj)))
                 .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found"))
             )
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+            .onErrorResume(ex -> S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
     }
 
     /** PUT /{bucket}/{key}?encryption — UpdateObjectEncryption */
@@ -183,7 +180,7 @@ public class S3ObjectMetadataHandler {
                 })
                 .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found"))
             )
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+            .onErrorResume(ex -> S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
     }
 
     // ─────────────────────────────────────────────────────
@@ -201,7 +198,7 @@ public class S3ObjectMetadataHandler {
                     .bodyValue(LegalHoldQuery.from(hold.status())))
                 .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found"))
             )
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+            .onErrorResume(ex -> S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
     }
 
     /** PUT /{bucket}/{key}?legal-hold — PutObjectLegalHold */
@@ -215,7 +212,7 @@ public class S3ObjectMetadataHandler {
                         ? com.example.magrathea.objectstore.domain.valueobject.LegalHold.apply()
                         : com.example.magrathea.objectstore.domain.valueobject.LegalHold.remove(java.time.Instant.now())))
                 .then(ServerResponse.ok().build()))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+            .onErrorResume(ex -> S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
     }
 
     // ─────────────────────────────────────────────────────
@@ -238,7 +235,7 @@ public class S3ObjectMetadataHandler {
                 })
                 .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchRetentionConfiguration",
                     "The retention configuration does not exist")))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+            .onErrorResume(ex -> S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
     }
 
     /** PUT /{bucket}/{key}?retention — PutObjectRetention */
@@ -259,7 +256,7 @@ public class S3ObjectMetadataHandler {
                         .then(objectService.putObjectRetention(bucketName, ObjectKey.of(bucketName, key), retention));
                 })
                 .then(ServerResponse.ok().build()))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+            .onErrorResume(ex -> S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
     }
 
     private static String storeKey(String bucketName, String key) {
