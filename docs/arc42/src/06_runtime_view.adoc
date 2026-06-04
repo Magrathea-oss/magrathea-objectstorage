@@ -57,7 +57,7 @@ image::../../c4/images/MultipartUploadRuntime.png[MultipartUpload Runtime, width
 5. reactive-repository-application → reactive-infrastructure: Persist multipart upload state
 6. reactive-repository-application → reactive-infrastructure: Read multipart upload state from persistence
 
-=== Scenario 6 — Bucket Configuration (CORS, Lifecycle, Policy, Encryption, Logging, Website, Notification, Replication, Request Payment, Ownership Controls, Public Access Block, Accelerate, Analytics, Inventory, Metrics, Intelligent-Tiering, ABAC, Object Lock, Metadata Configuration)
+=== Scenario 5 — Bucket Configuration (CORS, Lifecycle, Policy, Encryption, Logging, Website, Notification, Replication, Request Payment, Ownership Controls, Public Access Block, Accelerate, Analytics, Inventory, Metrics, Intelligent-Tiering, ABAC, Object Lock, Metadata Configuration)
 
 .Runtime Diagram — Bucket Configuration
 image::../../c4/images/BucketConfigurationRuntime.png[Bucket Configuration Runtime, width=600]
@@ -95,7 +95,7 @@ image::../../c4/images/BucketConfigurationRuntime.png[Bucket Configuration Runti
 | Inventory Table Configuration | `?inventory-table-config` | No | metadata table command/query DTOs |
 | Journal Table Configuration | `?journal-table-config` | No | metadata table command/query DTOs |
 
-=== Scenario 7 — Phase F Advanced Object Operations
+=== Scenario 6 — Phase F Advanced Object Operations
 
 **Description:** Phase F adds advanced/specialized operations from ADR 0012 while reusing existing RouterFunction and handler patterns.
 
@@ -108,7 +108,7 @@ image::../../c4/images/BucketConfigurationRuntime.png[Bucket Configuration Runti
 
 **Verification:** Phase F is Cucumber-tested; `mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false` completed with 216 tests, 0 failures, and 0 errors.
 
-=== Scenario 5 — Reactive Chain Pattern
+=== Scenario 7 — Reactive Chain Pattern
 
 **Description:** The reactive chain pattern used throughout the application layer. No blocking `.join()`, no `Mono.fromCallable`, no `.subscribeOn(Schedulers.boundedElastic())`.
 
@@ -135,7 +135,7 @@ public Mono<ServerResponse> handleGet(ServerRequest request) {
 }
 ```
 
-=== Scenario 6 — Runtime Effects
+=== Scenario 8 — Runtime Effects
 
 **Description:** Runtime effects that execute during request processing to enforce S3 semantics.
 
@@ -169,7 +169,7 @@ public Mono<ServerResponse> handleGet(ServerRequest request) {
 **Trigger:** Requests to buckets with `RequestPayment` configured.
 **Behavior:** If bucket has `RequesterPays` enabled, requests must include `x-amz-request-payer` header or return `403 AccessDenied`.
 
-=== Scenario 7 — Error Handling
+=== Scenario 9 — Error Handling
 
 **Description:** System behavior for error conditions.
 

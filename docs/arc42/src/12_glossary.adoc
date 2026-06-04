@@ -5,23 +5,23 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 | Term | Definition |
 |---|---|
-| Bucket | Contenitore di oggetti S3. Identificato da nome unico (DNS-compliant, 3-63 caratteri, lowercase) |
-| S3Object | Oggetto S3: key, metadata, versione, ACL, tagging, attributi, contenuto binario |
-| ObjectKey | Chiave univoca di un oggetto all'interno di un bucket |
-| Region | Regione AWS S3 (es. `us-east-1`, `eu-west-1`) |
-| StorageClass | Classe di storage S3: `STANDARD`, `INTELLIGENT_TIERING`, `PARANOIC_MODE` |
-| ETag | Entity tag per optimistic concurrency e content verification |
-| VersionId | Identificatore di versione per oggetti versionati |
+| Bucket | S3 object container. Identified by a unique DNS-compliant name (3-63 characters, lowercase) |
+| S3Object | S3 object: key, metadata, version, ACL, tagging, attributes, binary content |
+| ObjectKey | Unique key of an object within a bucket |
+| Region | AWS S3 region (e.g., `us-east-1`, `eu-west-1`) |
+| StorageClass | S3 storage class: `STANDARD`, `INTELLIGENT_TIERING`, `PARANOIC_MODE` |
+| ETag | Entity tag for optimistic concurrency and content verification |
+| VersionId | Version identifier for versioned objects |
 | ACL | Access Control List: `private`, `public-read`, `public-read-write`, `authenticated-read` |
-| Tagging | Coppie key-value per categorizzazione oggetti/bucket |
+| Tagging | Key-value pairs for object/bucket categorization |
 | CORS | Cross-Origin Resource Sharing: allowed origins, methods, headers |
-| Multipart Upload | Upload di oggetti grandi in parti (fase C) |
-| RouterFunction | Functional WebFlux pattern per definire route HTTP programmaticamente |
-| CompletableFuture | Standard Java async — bridge tra dominio puro e infrastruttura reattiva |
-| Flux<DataBuffer> | Reactive type per streaming binario in WebFlux |
-| S3ObjectWrite | Interfaccia dominio: contratto di salvataggio oggetto senza tipi reattivi |
-| S3ObjectContent | Interfaccia dominio: contratto di lettura oggetto senza tipi reattivi |
-| ARC42 | Template di documentazione architetturale in 12 sezioni |
-| ADR | Architecture Decision Record (formato Michael Nygard) |
-| C4 Model | Metodo di descrizione architetturale con 4 livelli (Context, Container, Component, Code) |
-| Structurizr DSL | Domain-specific language per modellare C4 diagrams |
+| Multipart Upload | Upload of large objects in parts (Phase C) |
+| RouterFunction | Functional WebFlux pattern for defining HTTP routes programmatically |
+| CompletableFuture | Standard Java async — bridge between pure domain and reactive infrastructure |
+| Flux<DataBuffer> | Reactive type for binary streaming in WebFlux |
+| S3ObjectWrite | Domain interface: object save contract without reactive types |
+| S3ObjectContent | Domain interface: object read contract without reactive types |
+| ARC42 | Architecture documentation template in 12 sections |
+| ADR | Architecture Decision Record (Michael Nygard format) |
+| C4 Model | Architecture description method with 4 levels (Context, Container, Component, Code) |
+| Structurizr DSL | Domain-specific language for modeling C4 diagrams |

@@ -6,33 +6,16 @@
 // configure EN settings for asciidoc
 include::src/config.adoc[]
 
-= image:arc42-logo.png[arc42] Template
+= image:arc42-logo.png[arc42] Magrathea ObjectStore — Architecture Documentation
 :revnumber: {revnumber}
 :revdate: {revdate}
 :revremark: {revremark}
 :toc-title: Table of Contents
 
-//additional style for arc42 help callouts
-include::src/../../../common/styles/arc42-help-style.adoc[]
-
-
-
 include::src/about-arc42.adoc[]
 
 // horizontal line
 ***
-
-ifdef::arc42help[]
-[role="arc42help"]
-****
-[NOTE]
-====
-This version of the template contains some help and explanations.
-It is used for familiarization with arc42 and the understanding of the concepts.
-For documentation of your own system you use better the _plain_ version.
-====
-****
-endif::arc42help[]
 
 // numbering from here on
 :numbered:

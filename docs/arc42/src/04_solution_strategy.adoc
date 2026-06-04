@@ -23,79 +23,15 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 === Bucket Configuration Redesign (ADR 0011)
 
-ADR 0011 records a course correction for the Bucket aggregate's configuration design.
-
-==== Problem
-
-The Bucket aggregate originally stored all configuration types (CORS, Lifecycle, Encryption, Logging, Website, Notification, Replication, Policy, PublicAccessBlock, OwnershipControls, RequestPayment, Accelerate, Analytics, Inventory, Metrics, Intelligent-Tiering) as nullable fields in a single flat `Bucket.Configuration` record. This approach:
-
-- Lost domain semantics — no invariants, no relationships between config types
-- Used a single generic `BucketConfigurationChanged` event for ALL changes
-- Left value objects floating as disconnected concepts, never properly integrated with the aggregate root
-- Created copypasta handler code (925 lines of identical pattern)
-
-==== Decision
-
-Revert `Bucket.Configuration` to CORS-only (its original scope). Model each remaining configuration feature as a dedicated value object attached to Bucket via specific `with*()` / `without*()` methods. Emit a specific domain event per config type. Study the official AWS S3 API documentation first to understand constraints, state transitions, and proper event semantics.
-
-==== Implementation Plan
-
-| Phase | Config Types | Complexity | Notes |
-|-------|-------------|-----------|-------|
-| 1 | CORS, Accelerate, RequestPayment, OwnershipControls | Simple | Already have value objects; simple XML |
-| 2 | Encryption, Logging, Website, PublicAccessBlock | Medium | Richer XML structures |
-| 3 | Lifecycle, Notification | Medium-High | Complex nested XML with filters |
-| 4 | Replication, Policy | High | Cross-bucket dependencies, JSON policy |
-| 5 | Analytics, Inventory, Metrics, Intelligent-Tiering | Medium | Multi-instance pattern with pagination |
-
-==== Open Design Issues
-
-See `docs/s3-bucket-configuration-design.md#open-design-issues` for a complete list of unresolved action-after-configuration behaviors per feature. These must be resolved before each feature is marked complete.
+ADR 0011 records a course correction: each configuration feature (CORS, Lifecycle, Encryption, etc.) is modeled as a dedicated value object on the Bucket aggregate with specific `with*()` / `without*()` methods and a specific domain event type per config change, replacing the earlier flat `Bucket.Configuration` record.
 
 === Reactive Migration (ADR 0010)
 
-ADR 0010 records a course correction that completed the reactive migration from ADR 0009.
+ADR 0010 records a course correction that completed the reactive migration from ADR 0009. All application services now return `Mono<T>` or `Flux<T>` natively (no `.join()`), handlers chain reactive operators directly (no `.subscribeOn()`), and repository implementations are fully reactive (no `Mono.fromCallable` stubs). Runtime effects (CORS validation, Website routing, OwnershipControls enforcement, PublicAccessBlock evaluation, Accelerate headers, RequestPayment enforcement) were added.
 
-==== Problem
+=== Registry-Based Handler Dispatch
 
-The initial ADR 0009 implementation produced incomplete code with stub repository methods, missing aggregate root state transitions, simplistic reactive patterns (`Mono.fromCallable` wrappers), and blocking `.join()` calls in application services.
-
-==== Corrective Actions
-
-| # | Action | Resolution |
-|---|---|---|
-| 1 | Repository implementations must have real (non-stub) method bodies with proper in-memory storage and reactive patterns | Implemented: `InMemoryReactiveBucketRepository`, `InMemoryReactiveS3ObjectRepository`, `InMemoryReactiveMultipartUploadRepository` use `Mono.defer`, `Mono.just`, `Mono.justOrEmpty`, `Flux.defer`, `Flux.fromIterable` natively |
-| 2 | Aggregate roots must enforce state transitions through the main aggregate object with domain event notification | Implemented: Bucket, S3Object, MultipartUpload aggregates enforce transitions via `with*` methods that return new instances with accumulated sealed `ObjectStoreEvent` records |
-| 3 | Reactive repository interfaces must leverage full reactive capabilities (backpressure, error handling, operator fusion) | Implemented: CQS split (Command + Query per aggregate) with native `Mono<T>`/`Flux<T>` interfaces |
-| 4 | C4 diagrams must be updated | Completed: diagrams aligned with current architecture |
-| 5 | ARC42 must be updated | Completed: this document reflects current state |
-| 6 | Tests must be more sophisticated | Completed: domain tests increased from 149 to 213; total test suite at 458 |
-
-==== Resulting Architecture
-
-- All application services return `Mono<T>` or `Flux<T>` natively — no `.join()` calls
-- Handlers chain reactive operators directly — no `.subscribeOn(Schedulers.boundedElastic())`
-- Repository implementations are fully reactive — no `Mono.fromCallable` stubs
-- Runtime effects added: CORS validation, Website routing, OwnershipControls enforcement, PublicAccessBlock evaluation, Accelerate headers, RequestPayment enforcement
-
-=== Registry-Based Handler Dispatch (ADR 0011)
-
-ADR 0011 records a course correction for the Bucket aggregate's configuration design and the `S3BucketConfigHandler` refactoring into a registry/strategy pattern.
-
-==== Components
-
-| Component | Responsibility |
-|-----------|---------------|
-| `ConfigType` | Enum or sealed interface identifying the configuration type |
-| `ConfigHandlerStrategy` | Interface with methods for extracting config from Bucket aggregate, applying config change, serializing to Query DTO, deserializing from Command DTO |
-| `ConfigHandlerRegistry` | A `Map<ConfigType, ConfigHandlerStrategy>` populated at startup |
-
-==== Benefits
-
-- Adding a new config type = write one strategy class + register it
-- No copypasta — every config type uses the same delegation pattern
-- Each strategy is independently testable
-- The Bucket aggregate stays decoupled from handler concerns
+The `S3BucketConfigHandler` uses a registry/strategy pattern to dispatch configuration operations without copypasta. Each config type has a `ConfigHandlerStrategy` implementation registered in `ConfigHandlerRegistry`; adding a new config type requires only one strategy class and its registration.
 
 === Quality Strategy
 

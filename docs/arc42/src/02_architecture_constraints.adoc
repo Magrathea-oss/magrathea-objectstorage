@@ -21,7 +21,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 - `object-store-domain`: uses ONLY AWS S3 native terminology — no custom abstractions like BinaryContent
 - `object-store-domain`: zero dependencies except test dependencies
 - No `shared-domain` module exists
-- `storage-engine-*` modules are intentionally empty placeholders reserved for future storage-engine design and are not referenced by the current S3 implementation
+- `storage-engine-domain`, `storage-engine-application`, `storage-engine-infrastructure`, and `object-store-reactive-repository-storage-engine-infrastructure` are fully implemented. They form the Storage Engine bounded context for persistent, scalable object storage, selectable via Spring profile (`storage-engine`) as an alternative to the in-memory backend
 
 === Infrastructure Constraints
 

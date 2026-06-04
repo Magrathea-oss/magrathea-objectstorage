@@ -34,87 +34,9 @@ The `object-store-domain` module is strictly pure:
 
 Advanced configuration value objects (BucketAnalyticsConfiguration, BucketInventoryConfiguration, BucketMetricsConfiguration, BucketIntelligentTieringConfiguration) follow the same pattern: immutable records, zero framework dependencies, validation with Objects.requireNonNull.
 
-=== Domain Events and State Transitions
 
-The Bucket aggregate root emits sealed `ObjectStoreEvent` records on every state transition:
 
-- `BucketCreated`, `BucketDeleted`, `BucketVersioningEnabled`, `BucketVersioningSuspended`
-- `BucketEncryptionEnabled` (separate from encryption configuration!)
 
-==== Bucket Configuration Events
-
-Instead of a single generic `BucketConfigurationChanged`, each configuration feature emits a specific event subtype:
-
-```
-ObjectStoreEvent
-├── BucketCreated
-├── BucketDeleted
-├── BucketVersioningEnabled
-├── BucketVersioningSuspended
-├── BucketEncryptionEnabled
-├── BucketCorsConfigurationChanged
-├── BucketLifecycleConfigurationChanged
-├── BucketEncryptionConfigurationChanged
-├── BucketLoggingConfigurationChanged
-├── BucketWebsiteConfigurationChanged
-├── BucketNotificationConfigurationChanged
-├── BucketReplicationConfigurationChanged
-├── BucketPolicyChanged
-├── BucketPublicAccessBlockChanged
-├── BucketOwnershipControlsChanged
-├── BucketRequestPaymentChanged
-├── BucketAccelerateConfigurationChanged
-├── BucketAnalyticsConfigurationAdded
-├── BucketAnalyticsConfigurationRemoved
-├── BucketInventoryConfigurationAdded
-├── BucketInventoryConfigurationRemoved
-├── BucketMetricsConfigurationAdded
-├── BucketMetricsConfigurationRemoved
-├── BucketIntelligentTieringConfigurationAdded
-├── BucketIntelligentTieringConfigurationRemoved
-```
-
-Each event carries the specific value object type (e.g., `BucketLifecycleConfiguration`, `BucketNotificationConfiguration`) so consumers can react to precise changes.
-
-==== State Transition Rules
-
-- State transitions return NEW immutable instances with accumulated events
-- `domainEvents()` retrieves pending events; `clearEvents()` returns a clean instance for persistence
-
-S3Object and MultipartUpload aggregates follow the same pattern with `ObjectCreated`, `ObjectDeleted`, `ObjectEtagUpdated`, `ObjectStoreStorageClassChanged`, `ContentDescriptorCreated`, `PartUploaded`, `MultipartUploadCreated`, `MultipartUploadCompleted`, `MultipartUploadAborted`.
-
-=== Registry-based Handler Integration
-
-The `S3BucketConfigHandler` is refactored into a registry-based design to eliminate copypasta (previously 925 lines of identical pattern).
-
-==== Components
-
-| Component | Responsibility |
-|-----------|---------------|
-| `ConfigType` | Enum or sealed interface identifying the configuration type (e.g., CORS, Lifecycle, Encryption) |
-| `ConfigHandlerStrategy` | Interface with methods for: extracting config from Bucket aggregate, applying config change (creating proper event), serializing to Query DTO, deserializing from Command DTO |
-| `ConfigHandlerRegistry` | A `Map<ConfigType, ConfigHandlerStrategy>` populated at startup |
-
-==== How it works
-
-1. `S3ProxyRouter` dispatches a config request to `S3BucketConfigHandler` with a `ConfigType`
-2. The handler looks up the matching `ConfigHandlerStrategy` from the registry
-3. The strategy performs the GET/PUT/DELETE operation using its typed methods
-4. No switch/if-else chains — each config type is a few lines of strategy registration
-
-==== Benefits
-
-- Adding a new config type = write one strategy class + register it
-- No copypasta — every config type uses the same delegation pattern
-- Each strategy is independently testable
-- The Bucket aggregate stays decoupled from handler concerns
-
-==== Config Type Categorization
-
-| Category | Types | Pattern |
-|----------|-------|---------|
-| **Singleton** | CORS, Lifecycle, Encryption, Logging, Website, Notification, Replication, Policy, PublicAccessBlock, OwnershipControls, RequestPayment, Accelerate | Single value object, `with*()` / `without*()` methods |
-| **Multi-instance** | Analytics, Inventory, Metrics, Intelligent-Tiering | Map<String, ValueObject>, `add*()` / `remove*()` / `list*()` methods |
 
 === S3 API Compatibility
 
@@ -201,7 +123,7 @@ public Mono<ServerResponse> handleGet(ServerRequest request) {
 
 All error responses use `S3WebSupport.errorResponse()` which creates a Jackson 3 XML annotated `S3Error` record.
 
-=== Domain Events and State Transitions (Detailed)
+=== Domain Events and State Transitions
 
 ==== Aggregate Root Pattern
 
@@ -211,6 +133,13 @@ All three aggregates (Bucket, S3Object, MultipartUpload) follow the same pattern
 2. Each transition records a domain event in an accumulated list
 3. `domainEvents()` retrieves pending events
 4. `clearEvents()` returns a clean instance ready for persistence
+
+==== State Transition Rules
+
+- State transitions return NEW immutable instances with accumulated events
+- `domainEvents()` retrieves pending events; `clearEvents()` returns a clean instance for persistence
+
+Each event carries the specific value object type (e.g., `BucketLifecycleConfiguration`, `BucketNotificationConfiguration`) so consumers can react to precise changes.
 
 ==== Bucket Events
 
@@ -280,13 +209,13 @@ The system must handle headers that the AWS CLI v2 sends by default on every `aw
 
 | Header | Value | Purpose | Handler Status |
 |--------|-------|---------|----------------|
-| `x-amz-sdk-checksum-algorithm` | `crc64nvme` (default) | Identifies the checksum algorithm used | ❌ Not read |
-| `x-amz-checksum-crc64nvme` | BASE64 CRC64-NVME hash | Payload integrity hash computed automatically by AWS CLI | ❌ Not validated |
-| `X-Amz-Date` | ISO 8601 timestamp | SigV4 signing timestamp | ❌ Not validated |
-| `X-Amz-Content-SHA256` | SHA256 hex string | SigV4 payload hash | ❌ Not validated |
-| `Authorization` | SigV4 signature string | SigV4 signature | ❌ Not validated |
-| `User-Agent` | SDK identifier string | Client identification | ❌ Not read |
-| `Expect` | `100-continue` | Hop-by-hop header for large payloads | ❌ Not read |
+| `x-amz-sdk-checksum-algorithm` | `crc64nvme` (default) | Identifies the checksum algorithm used | [red]#Not read# |
+| `x-amz-checksum-crc64nvme` | BASE64 CRC64-NVME hash | Payload integrity hash computed automatically by AWS CLI | [red]#Not validated# |
+| `X-Amz-Date` | ISO 8601 timestamp | SigV4 signing timestamp | [red]#Not validated# |
+| `X-Amz-Content-SHA256` | SHA256 hex string | SigV4 payload hash | [red]#Not validated# |
+| `Authorization` | SigV4 signature string | SigV4 signature | [red]#Not validated# |
+| `User-Agent` | SDK identifier string | Client identification | [red]#Not read# |
+| `Expect` | `100-continue` | Hop-by-hop header for large payloads | [red]#Not read# |
 
 ==== Checksum Algorithm Mapping
 
@@ -294,15 +223,15 @@ When `--checksum-algorithm <alg>` is specified, AWS CLI v2 **automatically compu
 
 | CLI `--checksum-algorithm` | Header Sent | Automatic Computation |
 |---------------------------|-------------|---------------------|
-| `crc64nvme` (default) | `x-amz-checksum-crc64nvme` | ✅ Yes — AWS CLI computes CRC64-NVME |
-| `crc32` | `x-amz-checksum-crc32` | ✅ Yes |
-| `crc32c` | `x-amz-checksum-crc32c` | ✅ Yes |
-| `sha1` | `x-amz-checksum-sha1` | ✅ Yes |
-| `sha256` | `x-amz-checksum-sha256` | ✅ Yes |
-| `sha512` | `x-amz-checksum-sha512` | ✅ Yes |
-| `xxhash64` | `x-amz-checksum-xxhash64` | ✅ Yes |
-| `xxhash3` | `x-amz-checksum-xxhash3` | ✅ Yes |
-| `xxhash128` | `x-amz-checksum-xxhash128` | ✅ Yes |
+| `crc64nvme` (default) | `x-amz-checksum-crc64nvme` | [green]#Yes# — AWS CLI computes CRC64-NVME |
+| `crc32` | `x-amz-checksum-crc32` | [green]#Yes# |
+| `crc32c` | `x-amz-checksum-crc32c` | [green]#Yes# |
+| `sha1` | `x-amz-checksum-sha1` | [green]#Yes# |
+| `sha256` | `x-amz-checksum-sha256` | [green]#Yes# |
+| `sha512` | `x-amz-checksum-sha512` | [green]#Yes# |
+| `xxhash64` | `x-amz-checksum-xxhash64` | [green]#Yes# |
+| `xxhash3` | `x-amz-checksum-xxhash3` | [green]#Yes# |
+| `xxhash128` | `x-amz-checksum-xxhash128` | [green]#Yes# |
 
 The server must read `x-amz-sdk-checksum-algorithm`, re-compute the hash of the received body with that algorithm, and compare against the corresponding `x-amz-checksum-<alg>` header. A mismatch must return `400 InvalidArgument (ChecksumMismatch)`.
 
@@ -314,11 +243,11 @@ AWS CLI v2 does NOT send `Content-Type` by default unless `--content-type` is ex
 
 | Gap | Impact | Severity |
 |-----|--------|---------|
-| Checksum headers ignored | No data integrity validation — corrupted payloads accepted silently | 🔴 High |
-| SigV4 headers ignored | No authentication — anyone can write/read objects | 🔴 High |
-| Content-Type not sent by AWS CLI | Wrong content-type stored when using AWS CLI | 🟡 Medium |
-| User-Agent ignored | No client identification for analytics | 🟢 Low |
-| Expect ignored | No 100-continue optimization | 🟢 Low |
+| Checksum headers ignored | No data integrity validation — corrupted payloads accepted silently | [red]#High# |
+| SigV4 headers ignored | No authentication — anyone can write/read objects | [red]#High# |
+| Content-Type not sent by AWS CLI | Wrong content-type stored when using AWS CLI | [yellow]#Medium# |
+| User-Agent ignored | No client identification for analytics | [green]#Low# |
+| Expect ignored | No 100-continue optimization | [green]#Low# |
 
 === Testing Strategy
 
@@ -329,4 +258,4 @@ Three levels of testing:
 3. **S3 Integration:** Cucumber BDD with WebTestClient — verify HTTP endpoints (227 tests)
 4. **AWS CLI Compatibility:** `test-aws-cli.sh` bash script + `mvn verify -Paws-cli-tests`
 
-Total: **479 tests**, 12 failures (12 anomaly tests documenting known bugs in put_object handler — see PLAN.md Phase 0 for details).
+Total: **479 tests** (213 domain + 18 application + 227 S3 integration + 21 AWS CLI), 12 failures (12 anomaly tests documenting known bugs in put_object handler — see PLAN.md Phase 0 for details).

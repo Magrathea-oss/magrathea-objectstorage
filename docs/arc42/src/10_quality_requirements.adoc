@@ -9,7 +9,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 |---|---|---|---|
 | Functional | S3 API Compatibility | Implement the in-scope AWS S3 REST API operation set | 111/111 operations implemented |
 | Performance | Reactive non-blocking I/O | Upload/download without thread blocking | DataBuffer streaming, no byte[] in handlers |
-| Testability | 3-layer testing | Domain JUnit + Cucumber BDD + AWS CLI | Phase F Cucumber verification: 216 tests, 0 failures, 0 errors |
+| Testability | 3-layer testing | Domain JUnit + Cucumber BDD + AWS CLI | Total: 479 tests (213 domain + 18 application + 227 S3 integration + 21 AWS CLI), 12 failures (12 anomaly tests) |
 | Maintainability | Domain-Driven Design | Pure domain, zero framework dependencies | 12 ADRs document decisions |
 
 === Quality Scenarios
