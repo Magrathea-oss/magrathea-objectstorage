@@ -108,22 +108,10 @@
                 <artifactId>object-store-reactive-repository-storage-engine-infrastructure</artifactId>
                 <version>${project.version}</version>
             </dependency>
-            <dependency>
-                <groupId>io.projectreactor</groupId>
-                <artifactId>reactor-core</artifactId>
-                <version>3.6.0</version>
-            </dependency>
-            <dependency>
-                <groupId>io.projectreactor</groupId>
-                <artifactId>reactor-test</artifactId>
-                <version>3.6.0</version>
-                <scope>test</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.springframework</groupId>
-                <artifactId>spring-context</artifactId>
-                <version>6.0.0</version>
-            </dependency>
+            <!-- Reactor versions are managed by spring-boot-dependencies BOM -->
+            <!-- Explicit override removed to avoid version mismatch with Spring Boot 4.0.0 -->
+            <!-- Spring Context version is managed by spring-boot-dependencies BOM -->
+            <!-- Explicit override removed to avoid version mismatch with Spring Boot 4.0.0 -->
             <dependency>
                 <groupId>org.junit.platform</groupId>
                 <artifactId>junit-platform-suite</artifactId>

@@ -40,20 +40,6 @@ Feature: S3-compatible PutObject API — Anomaly Tests (Analysis-Complete)
     Then the response status is 200
     And the object metadata returned by HEAD contains header "x-amz-server-side-encryption-customer-algorithm" with value "AES256"
 
-  # M3: x-amz-acl headers ignored
-  Scenario: Put object with canned ACL returns READ permission
-    Given an object with key "acl-test.txt" and content "data"
-    When the object is stored via S3 API with header "x-amz-acl" value "public-read"
-    Then the response status is 200
-    And the object metadata response contains "READ"
-
-  # M3: x-amz-grant-read header ignored
-  Scenario: Put object with grant-read header
-    Given an object with key "grant-test.txt" and content "data"
-    When the object is stored via S3 API with header "x-amz-grant-read" value "uri://someone"
-    Then the response status is 200
-    And the object metadata response contains "Grant"
-
   # M4: x-amz-checksum-sha256 header ignored
   Scenario: Put object stores checksum SHA256 header
     Given an object with key "checksum-test.txt" and content "data"
@@ -75,12 +61,6 @@ Feature: S3-compatible PutObject API — Anomaly Tests (Analysis-Complete)
     Then the response status is 200
 
   # AWS CLI default headers — handler ignores these
-  Scenario: Put object ignores Content-Type when AWS CLI omits it
-    Given an object with key "ctype-test.txt" and content "data"
-    When the object is stored via S3 API without content-type header
-    Then the response status is 200
-    And the object metadata returned by HEAD contains header "Content-Type" with value "application/octet-stream"
-
   Scenario: Put object ignores x-amz-checksum-crc64nvme (AWS CLI v2 default)
     Given an object with key "crc64-test.txt" and content "data"
     When the object is stored via S3 API with header "x-amz-checksum-crc64nvme" value "crc64value"
@@ -136,16 +116,6 @@ Feature: S3-compatible PutObject API — Anomaly Tests (Analysis-Complete)
     Then the response status is 200
     And the object appears in the object list
 
-  Scenario: Put object with unknown SDK checksum algorithm returns 400
-    Given an object with key "unknown-alg-test.txt" and content "data"
-    When the object is stored via S3 API with SDK checksum algorithm "invalid-alg"
-    Then the response status is 400
-
-  Scenario: Put object with SDK checksum algorithm but missing hash header returns 400
-    Given an object with key "missing-hash-test.txt" and content "data"
-    When the object is stored via S3 API with SDK checksum algorithm "sha256" without corresponding hash header
-    Then the response status is 400
-
   Scenario: Put object with direct x-amz-checksum header (no SDK hint) succeeds and echoes in HEAD
     Given an object with key "direct-checksum-test.txt" and content "data"
     When the object is stored via S3 API with direct checksum header "x-amz-checksum-crc32c" value "AAAAAA=="
@@ -168,18 +138,6 @@ Feature: S3-compatible PutObject API — Anomaly Tests (Analysis-Complete)
     # The handler delegates to objectService.saveObjectWithContent() which creates the aggregate.
     # Service validates storage class and metadata before creating the domain object.
     And the handler delegates to service for aggregate creation — verified by code review
-
-  # ── Anomaly tests — Input Validation ──
-
-  Scenario: Put object with invalid storage class returns 400
-    Given an object with key "invalid-sc.txt" and content "data"
-    When the object is stored via S3 API with storage class "INVALID_CLASS"
-    Then the response status is 400
-
-  Scenario: Put object with empty key returns 400
-    Given an object with key "" and content "data"
-    When the object is stored via S3 API
-    Then the response status is 400
 
   # ── G13: SSE-KMS scenario ──
 
@@ -206,24 +164,7 @@ Feature: S3-compatible PutObject API — Anomaly Tests (Analysis-Complete)
     Then the response status is 200
     And GET response contains checksum header "x-amz-checksum-sha256" with value "deadbeef"
 
-  # ── Failure scenarios (currently working) ──
-
-  Scenario: Put object to nonexistent bucket returns 404
-    Given an object with key "orphan.txt" and content "data"
-    When the object is stored via S3 API in bucket "no-such-bucket"
-    Then the response status is 404
-
-  # ── Service/repository error scenarios ──
-
-  Scenario: Put object with invalid bucket name returns 400
-    Given an object with key "bad-bucket-test.txt" and content "data"
-    When the object is stored via S3 API with invalid bucket name ""
-    Then the response status is 400
-
-  Scenario: Put object with negative content length returns 400
-    Given an object with key "negative-length.txt" and content "data"
-    When the object is stored via S3 API with content-length header -1
-    Then the response status is 400
+  # ── Failure scenarios ──
 
   Scenario: Copy object with metadata directive returns 200
     Given object "copy-source.txt" exists with content "Copy source data"

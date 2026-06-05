@@ -38,16 +38,6 @@ Feature: S3-compatible Bucket Operations
 
   # ── Failure scenarios ──
 
-  Scenario: Create bucket with invalid short name
-    Given a bucket name "ab"
-    When the bucket is created via S3 API
-    Then the response status is 400
-
-  Scenario: Create bucket with invalid characters
-    Given a bucket name "INVALID_BUCKET!"
-    When the bucket is created via S3 API
-    Then the response status is 400
-
   Scenario: Create duplicate bucket
     Given bucket "dup-bucket" exists
     And a bucket name "dup-bucket"

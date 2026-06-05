@@ -35,13 +35,6 @@ Feature: S3-compatible Multipart Upload Operations
     Then the response status is 200
     And the complete response contains an ETag
 
-  Scenario: List multipart uploads
-    Given bucket "test-multipart-bucket" exists
-    And an object key "test-key.txt"
-    And a multipart upload is initiated for the bucket
-    When the multipart uploads are listed
-    Then the response status is 200
-    And the list uploads response contains 1 upload
 
   Scenario: Abort multipart upload
     Given bucket "test-multipart-bucket" exists

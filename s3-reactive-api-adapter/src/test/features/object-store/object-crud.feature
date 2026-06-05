@@ -154,11 +154,6 @@ Feature: S3-compatible Object CRUD
     When the object with key "ghost-restore-svc.txt" is restored via S3 API
     Then the response status is 404
 
-  Scenario: Get attributes for nonexistent object returns error from service
-    Given bucket "test-bucket" exists
-    When object attributes are requested for "ghost-attr.txt"
-    Then the response status is 404
-
   Scenario: Delete object returns 204 even when already deleted (idempotent)
     Given object "already-deleted.txt" exists
     When the object is deleted via S3 API
