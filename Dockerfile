@@ -30,6 +30,9 @@ COPY bootstrap-application/pom.xml ./bootstrap-application/
 # Download dependencies
 RUN mvn dependency:go-offline -DskipTests
 
+# Copy docs
+COPY docs ./docs/
+
 # Copy source for all modules
 COPY object-store-domain/src ./object-store-domain/src/
 COPY storage-engine-domain/src ./storage-engine-domain/src/
@@ -47,7 +50,7 @@ RUN mvn clean package -DskipTests && \
     cp bootstrap-application/target/*.jar /app.jar
 
 # Stage 2: Runtime
-FROM eclipse-temurin:21-jre
+FROM docker.io/eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=builder /app.jar /app.jar
 COPY --from=builder /build/docs /app/docs
