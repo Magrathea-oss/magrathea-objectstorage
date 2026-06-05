@@ -6,3 +6,4 @@ target
 # Local tool builds/downloads
 /.cache/
 /.pi
+bootstrap-application/node/
