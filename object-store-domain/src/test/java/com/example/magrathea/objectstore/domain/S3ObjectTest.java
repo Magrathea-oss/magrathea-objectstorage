@@ -5,6 +5,7 @@ import com.example.magrathea.objectstore.domain.aggregate.ArchivedS3Object;
 import com.example.magrathea.objectstore.domain.aggregate.DeletedS3Object;
 import com.example.magrathea.objectstore.domain.aggregate.LockedS3Object;
 import com.example.magrathea.objectstore.domain.aggregate.S3Object;
+import com.example.magrathea.objectstore.domain.aggregate.WriteState;
 import com.example.magrathea.objectstore.domain.event.ObjectStoreEvent;
 import com.example.magrathea.objectstore.domain.valueobject.EncryptionAlgorithm;
 import com.example.magrathea.objectstore.domain.valueobject.EncryptionConfiguration;
@@ -434,5 +435,169 @@ class S3ObjectTest {
         assertEquals(2, object.userMetadata().size());
         assertEquals("test", object.userMetadata().get("description"));
         assertEquals("magrathea", object.userMetadata().get("project"));
+    }
+
+    // ── Write state machine: CREATED → WRITING → WRITTEN → DELETED ──
+
+    @Test
+    void create_setsWriteStateToWritten() {
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD", Map.of(), null, someChecksum(), 100);
+        assertEquals(WriteState.WRITTEN, object.writeState());
+    }
+
+    @Test
+    void createPending_setsWriteStateToCreated() {
+        var key = someKey();
+        var object = S3Object.createPending(key, "STANDARD", Map.of(), null);
+        assertInstanceOf(ActiveS3Object.class, object);
+        assertEquals(WriteState.CREATED, object.writeState());
+        assertFalse(object.hasChecksum());
+        assertEquals(0L, object.size());
+        assertTrue(object.domainEvents().isEmpty());
+    }
+
+    @Test
+    void createPending_nullKey_throws() {
+        assertThrows(NullPointerException.class,
+            () -> S3Object.createPending(null, "STANDARD", Map.of(), null));
+    }
+
+    @Test
+    void initiateUpload_fromCreated_transitionsToWriting() {
+        var key = someKey();
+        var object = S3Object.createPending(key, "STANDARD", Map.of(), null);
+        var writing = object.initiateUpload();
+        assertInstanceOf(ActiveS3Object.class, writing);
+        assertEquals(WriteState.WRITING, writing.writeState());
+        // Events should be unchanged (no new event emitted)
+        assertTrue(writing.domainEvents().isEmpty());
+    }
+
+    @Test
+    void initiateUpload_fromWritten_throws() {
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD", Map.of(), null, someChecksum(), 100);
+        assertThrows(IllegalStateTransitionException.class, object::initiateUpload);
+    }
+
+    @Test
+    void completeUpload_fromWriting_transitionsToWritten() {
+        var key = someKey();
+        var object = S3Object.createPending(key, "STANDARD", Map.of(), null);
+        var writing = object.initiateUpload();
+        var written = writing.completeUpload(someChecksum(), 100);
+        assertInstanceOf(ActiveS3Object.class, written);
+        assertEquals(WriteState.WRITTEN, written.writeState());
+        assertTrue(written.hasChecksum());
+        assertEquals(100, written.size());
+        // Should emit ObjectCreated event
+        assertEquals(1, written.domainEvents().size());
+        assertInstanceOf(ObjectStoreEvent.ObjectCreated.class, written.domainEvents().get(0));
+    }
+
+    @Test
+    void completeUpload_fromCreated_throws() {
+        var key = someKey();
+        var object = S3Object.createPending(key, "STANDARD", Map.of(), null);
+        assertThrows(IllegalStateTransitionException.class,
+            () -> object.completeUpload(someChecksum(), 100));
+    }
+
+    @Test
+    void completeUpload_fromWritten_throws() {
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD", Map.of(), null, someChecksum(), 100);
+        assertThrows(IllegalStateTransitionException.class,
+            () -> object.completeUpload(someChecksum(), 100));
+    }
+
+    @Test
+    void completeUpload_nullChecksum_throws() {
+        var key = someKey();
+        var object = S3Object.createPending(key, "STANDARD", Map.of(), null);
+        var writing = object.initiateUpload();
+        assertThrows(NullPointerException.class,
+            () -> writing.completeUpload(null, 100));
+    }
+
+    @Test
+    void completeUpload_negativeSize_throws() {
+        var key = someKey();
+        var object = S3Object.createPending(key, "STANDARD", Map.of(), null);
+        var writing = object.initiateUpload();
+        assertThrows(IllegalArgumentException.class,
+            () -> writing.completeUpload(someChecksum(), -1));
+    }
+
+    @Test
+    void delete_fromWritten_allowed() {
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD", Map.of(), null, someChecksum(), 100);
+        var deleted = object.delete();
+        assertInstanceOf(DeletedS3Object.class, deleted);
+        assertEquals(WriteState.DELETED, deleted.writeState());
+    }
+
+    @Test
+    void delete_fromCreated_allowed() {
+        var key = someKey();
+        var object = S3Object.createPending(key, "STANDARD", Map.of(), null);
+        var deleted = ((ActiveS3Object) object).delete();
+        assertInstanceOf(DeletedS3Object.class, deleted);
+        assertEquals(WriteState.DELETED, deleted.writeState());
+    }
+
+    @Test
+    void delete_fromWriting_throws() {
+        var key = someKey();
+        var object = S3Object.createPending(key, "STANDARD", Map.of(), null);
+        var writing = object.initiateUpload();
+        assertThrows(IllegalStateTransitionException.class,
+            () -> ((ActiveS3Object) writing).delete());
+    }
+
+    // ── Write state preservation across state transitions ──
+
+    @Test
+    void writeState_preservedThroughArchive() {
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD", Map.of(), null, someChecksum(), 100);
+        assertEquals(WriteState.WRITTEN, object.writeState());
+        var archived = object.archive();
+        assertEquals(WriteState.WRITTEN, archived.writeState());
+    }
+
+    @Test
+    void writeState_preservedThroughApplyLock() {
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD", Map.of(), null, someChecksum(), 100);
+        var lockConfig = ObjectLockConfiguration.of(
+            ObjectLockConfiguration.ObjectLockMode.COMPLIANCE,
+            ObjectLockConfiguration.RetentionPeriod.startingNow(Duration.ofDays(30)));
+        var locked = object.applyLock(lockConfig);
+        assertEquals(WriteState.WRITTEN, locked.writeState());
+    }
+
+    @Test
+    void writeState_preservedThroughRemoveLegalHold() {
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD", Map.of(), null, someChecksum(), 100);
+        var lockConfig = ObjectLockConfiguration.of(
+            ObjectLockConfiguration.ObjectLockMode.GOVERNANCE,
+            ObjectLockConfiguration.RetentionPeriod.startingNow(Duration.ofDays(30)),
+            true);
+        var locked = object.applyLock(lockConfig);
+        var active = locked.removeLegalHold();
+        assertEquals(WriteState.WRITTEN, active.writeState());
+    }
+
+    @Test
+    void writeState_preservedThroughClearEvents() {
+        var key = someKey();
+        var object = S3Object.create(key, "STANDARD", Map.of(), null, someChecksum(), 100);
+        assertEquals(WriteState.WRITTEN, object.writeState());
+        var cleared = object.clearEvents();
+        assertEquals(WriteState.WRITTEN, cleared.writeState());
     }
 }

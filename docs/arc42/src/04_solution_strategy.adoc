@@ -29,6 +29,16 @@ ADR 0011 records a course correction: each configuration feature (CORS, Lifecycl
 
 ADR 0010 records a course correction that completed the reactive migration from ADR 0009. All application services now return `Mono<T>` or `Flux<T>` natively (no `.join()`), handlers chain reactive operators directly (no `.subscribeOn()`), and repository implementations are fully reactive (no `Mono.fromCallable` stubs). Runtime effects (CORS validation, Website routing, OwnershipControls enforcement, PublicAccessBlock evaluation, Accelerate headers, RequestPayment enforcement) were added.
 
+=== Handler Minimal Pattern
+
+All handlers (except `S3BucketConfigHandler`) follow the **extract → delegate → response** pattern:
+
+1. **Extract**: `S3RequestExtractor` parses HTTP headers, path variables, and query parameters into typed primitives and DTOs
+2. **Delegate**: The handler calls a single reactive service method — no validation, no bucket checks, no ETag computation
+3. **Response**: `S3ResponseBuilder` or direct XML serialization converts the service result into an HTTP response
+
+All cross-cutting concerns (validation, bucket existence checks, CORS, website routing, ETag) are **postponed to the repository layer**.
+
 === Registry-Based Handler Dispatch
 
 The `S3BucketConfigHandler` uses a registry/strategy pattern to dispatch configuration operations without copypasta. Each config type has a `ConfigHandlerStrategy` implementation registered in `ConfigHandlerRegistry`; adding a new config type requires only one strategy class and its registration.

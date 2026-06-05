@@ -46,7 +46,7 @@ public class S3MultipartHandler {
         var uploadId = UploadId.generate();
         // TODO: bucket check postponed — service/repository handles bucket resolution
         var upload = MultipartUpload.create(
-            MultipartUpload.Id.generate(), Bucket.Id.generate(), ObjectKey.of(bucket, key), uploadId
+            MultipartUpload.Id.generate(), Bucket.Id.of(bucket), ObjectKey.of(bucket, key), uploadId
         );
         return multipartUploadService.saveUpload(upload)
             .then(ServerResponse.ok()
@@ -156,7 +156,7 @@ public class S3MultipartHandler {
     public Mono<ServerResponse> listMultipartUploads(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
         // TODO: bucket check postponed — service/repository handles bucket resolution
-        Flux<ListMultipartUploadsQuery.UploadEntry> entries = multipartUploadService.findByBucket(Bucket.Id.generate())
+        Flux<ListMultipartUploadsQuery.UploadEntry> entries = multipartUploadService.findByBucket(Bucket.Id.of(bucket))
             .map(u -> ListMultipartUploadsQuery.UploadEntry.from(
                 u.key().key(), u.uploadId().value(), u.initiated()
             ));

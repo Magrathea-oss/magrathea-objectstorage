@@ -36,6 +36,12 @@ Feature: S3-compatible Bucket Operations
     When the bucket is deleted via S3 API
     Then the bucket no longer appears in the bucket list
 
+  Scenario: List buckets
+    Given bucket "list-bucket-test" exists
+    When the buckets are listed
+    Then the response status is 200
+    And the bucket appears in the bucket list
+
   # ── Failure scenarios ──
 
   Scenario: Create duplicate bucket

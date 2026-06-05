@@ -15,6 +15,13 @@ image::../../c4/images/Container.png[Container Diagram, width=600]
 **Blackbox Description:**
 Exposes the S3-compatible REST API via RouterFunction WebFlux. Translates HTTP/XML/binary requests into calls to reactive application services. Serializes XML responses with Jackson 3.
 
+Handlers follow a strict **minimal pattern**:
+- **Extract** HTTP headers, path variables, and query parameters into primitives/DTOs via `S3RequestExtractor`
+- **Delegate** to reactive application services (no validation, no bucket checks, no ETag computation)
+- **Response** via `S3ResponseBuilder` or direct XML serialization
+
+All validation, bucket existence checks, ETag computation, CORS validation, and website routing are **postponed to the repository layer**.
+
 - **Provided Interface:** S3 REST API (111/111 in-scope operations)
 - **Required Interface:** ReactiveBucketService, ReactiveObjectService, ReactiveMultipartUploadService
 - **Technology:** Spring Boot 4 WebFlux, Java 21, RouterFunction, Jackson 3 XML
@@ -61,17 +68,17 @@ Implements reactive in-memory repositories with ConcurrentHashMap using Mono/Flu
 .C3 Component — s3-reactive-api-adapter
 image::../../c4/images/S3ReactiveApiAdapterComponents.png[S3 Reactive API Adapter Components, width=600]
 
-| Component | Responsibility |
-|---|---|
-| `S3ProxyRouter` | Entry point RouterFunction: defines S3 routes and dispatches requests to handlers |
-| `S3BucketOperationsHandler` | Bucket lifecycle: create, delete, head, list, location, versioning, directory-bucket listing |
-| `S3BucketMetadataHandler` | Bucket metadata: ACL, tagging |
-| `S3BucketConfigHandler` | Bucket configuration: CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate, analytics, inventory, metrics, intelligent-tiering, ABAC, object lock, bucket metadata/table configuration |
-| `S3ObjectOperationsHandler` | Object CRUD, copy, multi-delete, rename, torrent, restore, select, Object Lambda response |
-| `S3ObjectMetadataHandler` | Object metadata: ACL, tagging, attributes, legal hold, retention, encryption metadata |
-| `S3MultipartHandler` | Multipart upload lifecycle: initiate, upload, complete, abort, list |
-| `S3SessionHandler` | CreateSession support for Phase F session management |
-| `S3WebSupport` | Shared request predicates, parsing, lookup, error helpers |
+| Component | Responsibility | Handler Pattern |
+|---|---|---|
+| `S3ProxyRouter` | Entry point RouterFunction: defines S3 routes and dispatches requests to handlers | — |
+| `S3BucketOperationsHandler` | Bucket lifecycle: create, delete, head, list, location, versioning, directory-bucket listing | ✅ Minimal (extract → delegate → response) |
+| `S3BucketMetadataHandler` | Bucket metadata: ACL, tagging | ✅ Minimal (extract → delegate → response) |
+| `S3BucketConfigHandler` | Bucket configuration: CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate, analytics, inventory, metrics, intelligent-tiering, ABAC, object lock, bucket metadata/table configuration | ⏳ Excluded (complex registry + ConcurrentHashMap — postponed) |
+| `S3ObjectOperationsHandler` | Object CRUD, copy, multi-delete, rename, torrent, restore, select, Object Lambda response | ✅ Minimal (extract → delegate → response) |
+| `S3ObjectMetadataHandler` | Object metadata: ACL, tagging, attributes, legal hold, retention, encryption metadata | ✅ Minimal (extract → delegate → response) |
+| `S3MultipartHandler` | Multipart upload lifecycle: initiate, upload, complete, abort, list | ✅ Minimal (extract → delegate → response) |
+| `S3SessionHandler` | CreateSession support for Phase F session management | ✅ Minimal (extract → delegate → response) |
+| `S3WebSupport` | Shared request predicates, parsing, lookup, error helpers | — |
 
 === Level 2 — Component Diagram (reactive-object-store)
 

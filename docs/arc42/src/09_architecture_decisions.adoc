@@ -21,3 +21,4 @@ All architectural decisions are documented as Architecture Decision Records (ADR
 | [0012](adr/0012-phase-f-advanced-s3-operations.md) | Phase F: Advanced and Specialized S3 Operations | ✅ Accepted |
 | [0013](adr/0013-course-correction-phase-f-domain-application-ownership-and-aws-cli-verification-gate.md) | Course correction: Phase F domain/application ownership and AWS CLI verification gate | ✅ Accepted |
 | [0014](adr/0014-storage-engine-bounded-context.md) | Storage Engine bounded context | ✅ Accepted |
+| [0015](adr/0015-handler-minimal-pattern-and-postponed-repository-responsibilities.md) | Handler minimal pattern and postponed repository responsibilities | ✅ Accepted |

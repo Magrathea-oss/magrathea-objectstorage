@@ -43,6 +43,14 @@ Feature: S3-compatible Multipart Upload Operations
     When the multipart upload is aborted
     Then the response status is 204
 
+  Scenario: List multipart uploads
+    Given bucket "test-multipart-bucket" exists
+    And an object key "list-uploads-key.txt"
+    And a multipart upload is initiated for the bucket
+    When the multipart uploads are listed
+    Then the response status is 200
+    And the list uploads response contains 1 upload
+
   # ── Failure scenarios ──
 
   Scenario: Initiate multipart upload to nonexistent bucket

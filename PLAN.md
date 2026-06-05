@@ -126,40 +126,47 @@ public Mono<ServerResponse> putObject(ServerRequest request) {
 }
 ```
 
-### Already Done (Reverted to Minimal Pattern)
+### Already Cleaned Up (Minimal Pattern Applied)
 
-- `S3ObjectOperationsHandler.java` — reverted to minimal pattern
-- `S3ObjectMetadataHandler.java` — reverted (no ACL store sharing via constructor)
-- `S3ResponseBuilder.java` — reverted (no computeEtagFromChecksum, no applyHeaders)
-- `S3ApiConfig.java` — reverted (no BucketService in S3ObjectOperationsHandler)
-- `S3ProxyRouter.java` — reverted (no xmlErrorEmptyKey route)
-- `S3WebSupport.java` — reverted (no withCorsValidation, no xmlErrorEmptyKey)
-- `pom.xml` — reverted (awscli-cucumber-tests profile restored)
+All handlers except `S3BucketConfigHandler` have been cleaned up to follow the minimal handler pattern: **extract → delegate → response**.
 
-### Handlers Still Needing Cleanup
-
-Each handler needs: remove bucket checks, remove handler-local state, remove validation, remove CORS/website logic. Delegate to service.
-
-| Handler | Current Violations | Cleanup Actions | Agent |
-|---|---|---|---|
-| **S3MultipartHandler** | `bucketService.findByName()` in initiateMultipartUpload/listMultipartUploads; `DigestUtils.md5DigestAsHex()` for ETag | Remove bucket checks; ETag → repository (postponed). | java-infra-coder |
-| **S3BucketOperationsHandler** | Bucket name validation in createBucket; `validateRuntimeRequest`/`applyRuntimeHeaders` in listObjects; `websiteRouting` | Remove bucket name validation (postponed); remove CORS/website (postponed). | java-infra-coder |
-| **S3BucketMetadataHandler** | `ConcurrentHashMap` for ACL/tag; `visibleAcl`/`validatePublicAclMutation` | Remove handler-local state (postponed → repository); remove CORS (postponed). | java-infra-coder |
-| **S3ObjectMetadataHandler** | `bucketService.findByName()` in every method; `ConcurrentHashMap` for ACL/tag | Remove bucket checks (postponed); remove handler-local state (postponed); remove CORS (postponed). | java-infra-coder |
-| **S3BucketConfigHandler** | Complex registry pattern; `ConcurrentHashMap` for ABAC, ObjectLock, Metadata, InventoryTable, JournalTable | **Separate phase** — too complex. Needs thorough analysis later. | java-infra-coder (later) |
-
-### Postponed Items (DA FARE — nei repository)
-
-| Item | Target | Notes |
+| Handler | Status | Notes |
 |---|---|---|
-| Validation (Spring Reactive Validator) | Repository preconditions | A data da destinarsi |
-| Bucket existence checks | Repository preconditions | A data da destinarsi |
-| Bucket name validation | Repository preconditions | A data da destinarsi |
-| ETag computation | Repository | Generato dal repository su store |
-| Handler-local ACL/grants/tagging | Repository | ConcurrentHashMap → repository |
-| CORS validation | Repository/Service | A data da destinarsi |
-| Website routing | Repository/Service | A data da destinarsi |
-| S3Object state machine | Domain | Phase 1o-1q |
+| `S3ObjectOperationsHandler` | ✅ Minimal pattern | Delegates to `ReactiveObjectService`; no bucket checks, no validation, no ETag |
+| `S3ObjectMetadataHandler` | ✅ Minimal pattern | Delegates to `ReactiveObjectService`; no bucket checks, no handler-local state |
+| `S3MultipartHandler` | ✅ Minimal pattern | Delegates to `ReactiveMultipartUploadService`; no bucket checks, no ETag |
+| `S3BucketOperationsHandler` | ✅ Minimal pattern | Delegates to `ReactiveBucketService`; no CORS/website, no validation |
+| `S3BucketMetadataHandler` | ✅ Minimal pattern | Delegates to `ReactiveBucketService`; no handler-local state, no CORS |
+| `S3SessionHandler` | ✅ Minimal pattern | Delegates to `ReactiveBucketService.createSession()` |
+| `S3BucketConfigHandler` | ⏳ Excluded | Complex registry pattern + `ConcurrentHashMap` for ABAC/ObjectLock/Metadata — postponed to separate phase |
+
+All bucket existence checks, validation, ETag computation, CORS, website routing, and handler-local state (ACL/tag maps) have been removed from handlers and **postponed to the repository layer**.
+
+### Postponed Items (Postponed to Repository Layer)
+
+| Item | Target | Status |
+|---|---|---|
+| Validation (Spring Reactive Validator) | Repository preconditions | ⏳ Postponed |
+| Bucket existence checks | Repository preconditions | ⏳ Postponed |
+| Bucket name validation | Repository preconditions | ⏳ Postponed |
+| ETag computation | Repository | ⏳ Postponed |
+| Handler-local ACL/grants/tagging | Repository | ⏳ Postponed |
+| CORS validation | Repository/Service | ⏳ Postponed |
+| Website routing | Repository/Service | ⏳ Postponed |
+| S3BucketConfigHandler cleanup | Separate phase | ⏳ Postponed |
+
+**Note:** Postponed tests have been removed. Tests for postponed features will be added when those features are implemented in the repository layer.
+
+### New Domain Files (Phase 1o–1q)
+
+| File | Module | Description |
+|---|---|---|
+| `WriteState.java` | `object-store-domain` | Enum: `CREATED` → `WRITING` → `WRITTEN` → `DELETED` — write lifecycle state machine |
+| `ContentDescriptor.java` | `object-store-domain` | Record: size, checksum, content type, disposition, encoding, language |
+| `EncryptionConfiguration.java` (aggregate) | `object-store-domain` | Record: encryption type, KMS key ID, KMS context, algorithm — aggregate-level |
+| `EncryptionType.java` | `object-store-domain` | Enum: `NONE`, `SSE_S3`, `SSE_KMS`, `SSE_C` |
+
+These files implement the S3Object state machine with sealed hierarchy (`ActiveS3Object`, `ArchivedS3Object`, `LockedS3Object`, `DeletedS3Object`) and carry `WriteState` for write lifecycle tracking.
 
 ### Completed Sub-phases
 
@@ -167,18 +174,18 @@ Each handler needs: remove bucket checks, remove handler-local state, remove val
 |---|---|---|
 | 1a | S3Header enum + S3RequestExtractor foundation | ✅ DONE |
 | 1b | ObjectKey as natural identifier | ✅ DONE |
-| 1c–1n | Handler cleanup (reverted to minimal pattern) | ✅ DONE (via revert) |
+| 1c–1n | Handler cleanup (reverted to minimal pattern) | ✅ DONE |
+| 1o–1q | S3Object state machine, ContentDescriptor, EncryptionConfiguration, EncryptionType | ✅ DONE |
+| 1r | Domain tests | ✅ DONE |
+| 1s | Cucumber tests for updated handlers | ✅ DONE |
+| 1t | Verify: `mvn test` → 0 failures | ✅ DONE |
 
 ### Remaining Sub-phases
 
 | Sub-phase | Description | Agent | Priority |
 |---|---|---|---|
-| 1o–1q | S3Object state machine, ContentDescriptor, EncryptionConfiguration | java-domain-coder | Next |
-| 1r | Domain tests | java-tester | After domain |
-| 1s | Cucumber tests for updated handlers | java-tester | After handlers |
-| 1t | Verify: `mvn test` → 0 failures | java-planner | After all code |
-| 1u | Update docs (PLAN.md, ARC42, ADRs) | documenter | After verify |
-| 1v | Create docs/user-manual.md | documenter | After verify |
+| 1u | Update docs (PLAN.md, ARC42, ADRs) | documenter | ✅ NOW |
+| 1v | Create docs/user-manual.md | documenter | ✅ NOW |
 
 ### Verification
 

@@ -164,6 +164,18 @@ public class BucketSteps {
         commonSteps.setResponseStatus(status);
     }
 
+    @When("the buckets are listed")
+    public void bucketsListed() {
+        var result = webTestClient.get()
+            .uri("/")
+            .accept(MediaType.APPLICATION_XML)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        commonSteps.setResponseBody(result.getResponseBody());
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
     @When("the bucket is deleted via S3 API")
     public void bucketDeleted() {
         var status = webTestClient.delete()
@@ -191,7 +203,6 @@ public class BucketSteps {
         assertNotNull(body);
         assertTrue(body.contains(bucketName));
     }
-
     @Then("the metadata response contains {string}")
     public void metadataResponseContains(String expected) {
         var body = commonSteps.getResponseBody();

@@ -182,3 +182,23 @@ Feature: S3-compatible PutObject API — Anomaly Tests (Analysis-Complete)
     Given object "archive-me.txt" exists with content "Archivable data"
     When object "archive-me.txt" is archived via S3 API
     Then the response status is 200
+
+  # ── S3Object write state machine integration ──
+
+  Scenario: S3Object lifecycle — create, read, overwrite, delete
+    Given an object with key "sm-lifecycle.txt" and content "First version"
+    When the object is stored via S3 API
+    Then the response status is 200
+    When HEAD request is sent for object "sm-lifecycle.txt"
+    Then the response status is 200
+    When the object with key "sm-lifecycle.txt" is retrieved via S3 API
+    Then the response status is 200
+    And the content is "First version"
+    When the object is stored via S3 API with header "x-amz-checksum-sha256" value "overwrite-hash"
+    Then the response status is 200
+    When HEAD request is sent for object "sm-lifecycle.txt"
+    Then the response status is 200
+    When the object is deleted via S3 API
+    Then the response status is 204
+    When HEAD request is sent for object "sm-lifecycle.txt"
+    Then the response status is 404

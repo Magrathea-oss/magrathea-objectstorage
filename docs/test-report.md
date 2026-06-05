@@ -1,21 +1,149 @@
 # Magrathea ObjectStorage Test Report
 
-Generated: 2026-05-27T15:07:01+02:00
+Generated: 2026-06-05T08:40:11+02:00
 
 ## Summary
 
 | Suite | Passed | Failed | Total | Notes |
 |---|---:|---:|---:|---|
-| AWS CLI S3 compatibility | 0 | 0 | 0 | Endpoint: `http://localhost:8080` |
+| AWS CLI S3 compatibility | 46 | 82 | 128 | Endpoint: `http://localhost:8080` |
 | Maven Surefire | See section | See section | See section | Latest reports under `*/target/surefire-reports` |
 | Clover coverage | See section | - | - | Latest report under `target/site/clover` |
 
 ## AWS CLI S3 Compatibility
 
-Bucket: `magrathea-cli-test-1779835534-245973`
+Bucket: `magrathea-cli-test-1780641560-106784`
 
 | Check | Status | Notes |
 |---|---|---|
+| ListBuckets | ❌ Failed | Expected success, exit code 254 |
+| CreateBucket | ❌ Failed | Expected success, exit code 254 |
+| HeadBucket existing | ❌ Failed | Expected success, exit code 254 |
+| PutObject | ❌ Failed | Expected success, exit code 254 |
+| PutObject header capture | ✅ Passed | Headers documented |
+| HeadObject existing | ❌ Failed | Expected success, exit code 254 |
+| PutObjectAcl | ❌ Failed | Expected success, exit code 254 |
+| GetObjectAcl | ❌ Failed | Expected success, exit code 254 |
+| PutObjectTagging | ❌ Failed | Expected success, exit code 254 |
+| GetObjectTagging | ❌ Failed | Expected success, exit code 254 |
+| DeleteObjectTagging | ❌ Failed | Expected success, exit code 254 |
+| GetObjectAttributes | ❌ Failed | Expected success, exit code 254 |
+| GetObject | ❌ Failed | Expected success, exit code 254 |
+| GetObject content matches | ❌ Failed | Expected success, exit code 2 |
+| ListObjects | ❌ Failed | Expected success, exit code 254 |
+| ListObjectsV2 | ❌ Failed | Expected success, exit code 254 |
+| GetBucketLocation | ❌ Failed | Expected success, exit code 255 |
+| PutBucketAcl | ❌ Failed | Expected success, exit code 254 |
+| GetBucketAcl | ❌ Failed | Expected success, exit code 254 |
+| PutBucketTagging | ❌ Failed | Expected success, exit code 254 |
+| GetBucketTagging | ❌ Failed | Expected success, exit code 254 |
+| DeleteBucketTagging | ❌ Failed | Expected success, exit code 254 |
+| GetBucketVersioning initial | ❌ Failed | Expected success, exit code 254 |
+| PutBucketVersioning Enabled | ❌ Failed | Expected success, exit code 254 |
+| GetBucketVersioning enabled | ❌ Failed | Expected success, exit code 254 |
+| ListObjectVersions | ❌ Failed | Expected success, exit code 254 |
+| CopyObject | ❌ Failed | Expected success, exit code 254 |
+| HeadObject copy existing | ❌ Failed | Expected success, exit code 254 |
+| DeleteObjects | ❌ Failed | Expected success, exit code 254 |
+| HeadObject copy after DeleteObjects | ✅ Passed | Expected failure |
+| PutObject PARANOIC_MODE | ❌ Failed | Expected success, exit code 254 |
+| HeadObject PARANOIC_MODE | ❌ Failed | Expected success, exit code 254 |
+| GetObjectAttributes PARANOIC_MODE | ❌ Failed | Expected success, exit code 254 |
+| DeleteObject PARANOIC_MODE | ❌ Failed | Expected success, exit code 254 |
+| DeleteObject | ❌ Failed | Expected success, exit code 254 |
+| PutObject SSE-S3 AES256 | ❌ Failed | Expected success, exit code 254 |
+| HeadObject SSE-S3 AES256 | ❌ Failed | Expected success, exit code 254 |
+| DeleteObject SSE-S3 | ❌ Failed | Expected success, exit code 254 |
+| PutObject STANDARD storage class | ❌ Failed | Expected success, exit code 254 |
+| HeadObject STANDARD | ❌ Failed | Expected success, exit code 254 |
+| GetObjectAttributes STANDARD | ❌ Failed | Expected success, exit code 254 |
+| DeleteObject STANDARD | ❌ Failed | Expected success, exit code 254 |
+| HeadObject after DeleteObject | ✅ Passed | Expected failure |
+| PutBucketCors | ❌ Failed | Expected success, exit code 254 |
+| GetBucketCors | ❌ Failed | Expected success, exit code 254 |
+| DeleteBucketCors | ❌ Failed | Expected success, exit code 254 |
+| GetBucketCors nonexistent | ✅ Passed | Expected failure |
+| GetBucketCors after delete | ✅ Passed | Expected failure |
+| PutBucketLifecycleConfiguration | ❌ Failed | Expected success, exit code 254 |
+| GetBucketLifecycleConfiguration | ❌ Failed | Expected success, exit code 254 |
+| DeleteBucketLifecycleConfiguration | ❌ Failed | Expected success, exit code 252 |
+| GetBucketLifecycleConfiguration nonexistent | ✅ Passed | Expected failure |
+| GetBucketLifecycleConfiguration after delete | ✅ Passed | Expected failure |
+| PutBucketPolicy | ❌ Failed | Expected success, exit code 254 |
+| GetBucketPolicy | ❌ Failed | Expected success, exit code 254 |
+| DeleteBucketPolicy | ❌ Failed | Expected success, exit code 254 |
+| GetBucketPolicy nonexistent | ✅ Passed | Expected failure |
+| GetBucketPolicy after delete | ✅ Passed | Expected failure |
+| PutBucketEncryption | ❌ Failed | Expected success, exit code 252 |
+| GetBucketEncryption | ❌ Failed | Expected success, exit code 254 |
+| DeleteBucketEncryption | ❌ Failed | Expected success, exit code 254 |
+| GetBucketEncryption nonexistent | ✅ Passed | Expected failure |
+| GetBucketEncryption after delete | ✅ Passed | Expected failure |
+| PutBucketLogging | ❌ Failed | Expected success, exit code 252 |
+| GetBucketLogging | ❌ Failed | Expected success, exit code 254 |
+| DeleteBucketLogging | ❌ Failed | Expected success, exit code 252 |
+| GetBucketLogging nonexistent | ✅ Passed | Expected failure |
+| GetBucketLogging after delete | ✅ Passed | Expected failure |
+| PutBucketWebsite | ❌ Failed | Expected success, exit code 254 |
+| GetBucketWebsite | ❌ Failed | Expected success, exit code 254 |
+| DeleteBucketWebsite | ❌ Failed | Expected success, exit code 254 |
+| GetBucketWebsite nonexistent | ✅ Passed | Expected failure |
+| GetBucketWebsite after delete | ✅ Passed | Expected failure |
+| PutBucketNotification | ❌ Failed | Expected success, exit code 254 |
+| GetBucketNotification | ❌ Failed | Expected success, exit code 254 |
+| GetBucketNotification nonexistent | ✅ Passed | Expected failure |
+| PutBucketReplication | ❌ Failed | Expected success, exit code 254 |
+| GetBucketReplication | ❌ Failed | Expected success, exit code 254 |
+| DeleteBucketReplication | ❌ Failed | Expected success, exit code 254 |
+| GetBucketReplication nonexistent | ✅ Passed | Expected failure |
+| GetBucketReplication after delete | ✅ Passed | Expected failure |
+| PutBucketRequestPayment | ❌ Failed | Expected success, exit code 254 |
+| GetBucketRequestPayment | ❌ Failed | Expected success, exit code 254 |
+| GetBucketRequestPayment nonexistent | ✅ Passed | Expected failure |
+| PutBucketOwnershipControls | ❌ Failed | Expected success, exit code 254 |
+| GetBucketOwnershipControls | ❌ Failed | Expected success, exit code 254 |
+| DeleteBucketOwnershipControls | ❌ Failed | Expected success, exit code 254 |
+| GetBucketOwnershipControls nonexistent | ✅ Passed | Expected failure |
+| GetBucketOwnershipControls after delete | ✅ Passed | Expected failure |
+| PutPublicAccessBlock | ❌ Failed | Expected success, exit code 254 |
+| GetPublicAccessBlock | ❌ Failed | Expected success, exit code 254 |
+| DeletePublicAccessBlock | ❌ Failed | Expected success, exit code 254 |
+| GetPublicAccessBlock nonexistent | ✅ Passed | Expected failure |
+| GetPublicAccessBlock after delete | ✅ Passed | Expected failure |
+| PutBucketAccelerateConfiguration | ❌ Failed | Expected success, exit code 254 |
+| GetBucketAccelerateConfiguration | ❌ Failed | Expected success, exit code 254 |
+| GetBucketAccelerateConfiguration nonexistent | ✅ Passed | Expected failure |
+| PutBucketAnalyticsConfiguration | ❌ Failed | Expected success, exit code 254 |
+| GetBucketAnalyticsConfiguration | ❌ Failed | Expected success, exit code 254 |
+| ListBucketAnalyticsConfigurations | ❌ Failed | Expected success, exit code 254 |
+| DeleteBucketAnalyticsConfiguration | ❌ Failed | Expected success, exit code 254 |
+| GetBucketAnalyticsConfiguration nonexistent bucket | ✅ Passed | Expected failure |
+| GetBucketAnalyticsConfiguration missing id | ✅ Passed | Expected failure |
+| DeleteBucketAnalyticsConfiguration nonexistent bucket | ✅ Passed | Expected failure |
+| DeleteBucketAnalyticsConfiguration missing id | ✅ Passed | Expected failure |
+| PutBucketAnalyticsConfiguration nonexistent bucket | ✅ Passed | Expected failure |
+| ListBucketAnalyticsConfigurations nonexistent bucket | ✅ Passed | Expected failure |
+| PutBucketInventoryConfiguration | ❌ Failed | Expected success, exit code 252 |
+| GetBucketInventoryConfiguration | ❌ Failed | Expected success, exit code 254 |
+| ListBucketInventoryConfigurations | ❌ Failed | Expected success, exit code 254 |
+| DeleteBucketInventoryConfiguration | ❌ Failed | Expected success, exit code 254 |
+| GetBucketInventoryConfiguration nonexistent bucket | ✅ Passed | Expected failure |
+| GetBucketInventoryConfiguration missing id | ✅ Passed | Expected failure |
+| DeleteBucketInventoryConfiguration nonexistent bucket | ✅ Passed | Expected failure |
+| DeleteBucketInventoryConfiguration missing id | ✅ Passed | Expected failure |
+| PutBucketInventoryConfiguration nonexistent bucket | ✅ Passed | Expected failure |
+| ListBucketInventoryConfigurations nonexistent bucket | ✅ Passed | Expected failure |
+| DeleteBucket | ❌ Failed | Expected success, exit code 254 |
+| HeadBucket after DeleteBucket | ✅ Passed | Expected failure |
+| GetObject nonexistent | ✅ Passed | Expected failure |
+| HeadObject nonexistent | ✅ Passed | Expected failure |
+| GetBucketLocation nonexistent | ✅ Passed | Expected failure |
+| GetBucketVersioning nonexistent | ✅ Passed | Expected failure |
+| GetBucketAcl nonexistent | ✅ Passed | Expected failure |
+| GetBucketTagging nonexistent | ✅ Passed | Expected failure |
+| CopyObject nonexistent source | ✅ Passed | Expected failure |
+| PutObject nonexistent bucket | ✅ Passed | Expected failure |
+| GetObjectAcl nonexistent | ✅ Passed | Expected failure |
 
 ## Maven Surefire Results
 
@@ -35,35 +163,33 @@ Bucket: `magrathea-cli-test-1779835534-245973`
 | object-store-domain | com.example.magrathea.objectstore.domain.BucketPolicyTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
 | object-store-domain | com.example.magrathea.objectstore.domain.BucketReplicationConfigurationTest.txt | 3 | 0 | 0 | 0 | ✅ Passed |
 | object-store-domain | com.example.magrathea.objectstore.domain.BucketRequestPaymentConfigurationTest.txt | 3 | 0 | 0 | 0 | ✅ Passed |
-| object-store-domain | com.example.magrathea.objectstore.domain.BucketTest.txt | 22 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.BucketTest.txt | 54 | 0 | 0 | 0 | ✅ Passed |
 | object-store-domain | com.example.magrathea.objectstore.domain.BucketWebsiteConfigurationTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.ChecksumAlgorithmTest.txt | 5 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.ContentDescriptorTest.txt | 8 | 0 | 0 | 0 | ✅ Passed |
 | object-store-domain | com.example.magrathea.objectstore.domain.CorsConfigurationTest.txt | 7 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.EncryptionConfigurationTest.txt | 10 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.EncryptionTypeTest.txt | 2 | 0 | 0 | 0 | ✅ Passed |
 | object-store-domain | com.example.magrathea.objectstore.domain.MultipartUploadTest.txt | 9 | 0 | 0 | 0 | ✅ Passed |
-| object-store-domain | com.example.magrathea.objectstore.domain.ObjectKeyTest.txt | 6 | 0 | 0 | 0 | ✅ Passed |
-| object-store-domain | com.example.magrathea.objectstore.domain.ObjectStoreEventTest.txt | 7 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.ObjectKeyTest.txt | 11 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.ObjectStoreEventTest.txt | 45 | 0 | 0 | 0 | ✅ Passed |
 | object-store-domain | com.example.magrathea.objectstore.domain.PartNumberTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
 | object-store-domain | com.example.magrathea.objectstore.domain.PublicAccessBlockConfigurationTest.txt | 3 | 0 | 0 | 0 | ✅ Passed |
 | object-store-domain | com.example.magrathea.objectstore.domain.RegionTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
-| object-store-domain | com.example.magrathea.objectstore.domain.S3ObjectTest.txt | 11 | 0 | 0 | 0 | ✅ Passed |
+| object-store-domain | com.example.magrathea.objectstore.domain.S3ObjectTest.txt | 49 | 0 | 0 | 0 | ✅ Passed |
 | object-store-domain | com.example.magrathea.objectstore.domain.StorageClassTest.txt | 7 | 0 | 0 | 0 | ✅ Passed |
 | object-store-domain | com.example.magrathea.objectstore.domain.UploadIdTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
 | object-store-domain | com.example.magrathea.objectstore.domain.UploadPartTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
-| **Total domain** |  | **213** | **0** | **0** | **0** | **✅ Passed** |
 | object-store-reactive-application | com.example.magrathea.reactive.application.service.CucumberTest.txt | 18 | 0 | 0 | 0 | ✅ Passed |
-| **Total application** |  | **18** | **0** | **0** | **0** | **✅ Passed** |
-| s3-reactive-api-adapter | com.example.magrathea.s3api.cucumber.ObjectStoreCucumberTest.txt | 227 | 0 | 0 | 0 | ✅ Passed |
-| **Total Cucumber** |  | **227** | **0** | **0** | **0** | **✅ Passed** |
-| **Total** |  | **458** | **0** | **0** | **0** | **✅ Passed** |
+| s3-reactive-api-adapter | com.example.magrathea.s3api.awscli.AwsCliCucumberTest.txt | 1 | 0 | 0 | 0 | ✅ Passed |
+| s3-reactive-api-adapter | com.example.magrathea.s3api.cucumber.ObjectStoreCucumberTest.txt | 238 | 0 | 0 | 0 | ✅ Passed |
+| **Total** |  | **544** | **0** | **0** | **0** | **✅ Passed** |
 
 ## Clover Coverage
 
 | Metric | Covered | Total | Coverage |
 |---|---:|---:|---:|
-| Elements | 1823 | 2168 | 84.09% |
-| Statements | 1157 | 1348 | 85.83% |
-| Methods | 357 | 392 | 91.07% |
-| Conditionals | 309 | 428 | 72.20% |
-| NCLOC | - | 4919 | - |
+| Clover | - | - | ⚠️ Not generated |
 
 Report HTML: `target/site/clover/index.html`
 
@@ -99,6 +225,13 @@ Report HTML: `target/site/clover/index.html`
 | HeadObject PARANOIC_MODE | `aws s3api head-object` | ✅ |
 | GetObjectAttributes PARANOIC_MODE | `aws s3api get-object-attributes` | ✅ |
 | DeleteObject PARANOIC_MODE | `aws s3api delete-object` | ✅ |
+| PutObject SSE-S3 AES256 |  | ✅ |
+| HeadObject SSE-S3 AES256 |  | ✅ |
+| DeleteObject SSE-S3 |  | ✅ |
+| PutObject STANDARD storage class |  | ✅ |
+| HeadObject STANDARD |  | ✅ |
+| GetObjectAttributes STANDARD |  | ✅ |
+| DeleteObject STANDARD |  | ✅ |
 | DeleteObject | `aws s3api delete-object` | ✅ |
 | DeleteObjects | `aws s3api delete-objects` | ✅ |
 | PutBucketCors | `aws s3api put-bucket-cors` | ✅ |

@@ -26,8 +26,8 @@ public final class ActiveS3Object extends S3Object {
     ActiveS3Object(ObjectKey key, String storageClass,
                    Map<String, String> userMetadata, EncryptionConfiguration encryption,
                    ObjectChecksum checksum, long size, ZonedDateTime createdAt,
-                   List<ObjectStoreEvent> events) {
-        super(key, storageClass, userMetadata, encryption, checksum, size, createdAt, events);
+                   WriteState writeState, List<ObjectStoreEvent> events) {
+        super(key, storageClass, userMetadata, encryption, checksum, size, createdAt, writeState, events);
     }
 
     /**
@@ -47,7 +47,7 @@ public final class ActiveS3Object extends S3Object {
                 lockConfiguration.retention().duration(), ZonedDateTime.now()));
         return new LockedS3Object(key(), storageClass(), userMetadata(),
             encryption(), checksum(), size(), createdAt(),
-            lockConfiguration, newEvents);
+            lockConfiguration, writeState(), newEvents);
     }
 
     /**
@@ -60,7 +60,7 @@ public final class ActiveS3Object extends S3Object {
             new ObjectStoreEvent.ObjectArchived(key(), ZonedDateTime.now()));
         return new ArchivedS3Object(key(), storageClass(), userMetadata(),
             encryption(), checksum(), size(), createdAt(),
-            false, null, newEvents);
+            false, null, writeState(), newEvents);
     }
 
     /**
@@ -69,20 +69,36 @@ public final class ActiveS3Object extends S3Object {
      * @return a new {@code DeletedS3Object} with an {@code ObjectDeleted} event
      */
     public DeletedS3Object delete() {
+        validateWriteStateForDelete();
         var newEvents = appendEvent(domainEvents(),
             new ObjectStoreEvent.ObjectDeleted(key(), ZonedDateTime.now()));
         return new DeletedS3Object(key(), storageClass(), userMetadata(),
-            createdAt(), newEvents);
+            createdAt(), WriteState.DELETED, newEvents);
     }
 
     @Override
     public S3Object clearEvents() {
         return new ActiveS3Object(key(), storageClass(), userMetadata(),
-            encryption(), checksum(), size(), createdAt(), List.of());
+            encryption(), checksum(), size(), createdAt(),
+            writeState(), List.of());
+    }
+
+    @Override
+    protected S3Object withWriteState(WriteState newState) {
+        return new ActiveS3Object(key(), storageClass(), userMetadata(),
+            encryption(), checksum(), size(), createdAt(),
+            newState, domainEvents());
+    }
+
+    @Override
+    protected S3Object withWriteStateAndContent(ObjectChecksum checksum, long size, List<ObjectStoreEvent> events) {
+        return new ActiveS3Object(key(), storageClass(), userMetadata(),
+            encryption(), checksum, size, createdAt(),
+            WriteState.WRITTEN, events);
     }
 
     @Override
     public String toString() {
-        return "ActiveS3Object[key=" + key() + "]";
+        return "ActiveS3Object[key=" + key() + ",writeState=" + writeState() + "]";
     }
 }

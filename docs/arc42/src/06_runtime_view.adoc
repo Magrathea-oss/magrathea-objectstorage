@@ -23,12 +23,11 @@ image::../../c4/images/PutObjectRuntime.png[PutObject Runtime, width=600]
 
 **Flow:**
 1. User → s3-reactive-api-adapter: `PUT /{bucket}/{key}`
-2. s3-reactive-api-adapter → reactive-bucket-management: Verify bucket exists
-3. reactive-bucket-management → reactive-repository-application: Read bucket metadata via query repository
-4. reactive-repository-application → reactive-infrastructure: Read bucket from persistence
-5. s3-reactive-api-adapter → reactive-object-store: PutObject use case
-6. reactive-object-store → reactive-repository-application: Save object metadata and bytes via command repository
-7. reactive-repository-application → reactive-infrastructure: Persist object metadata and bytes
+2. s3-reactive-api-adapter → reactive-object-store: PutObject use case (handler delegates directly — no bucket check in handler)
+3. reactive-object-store → reactive-repository-application: Save object metadata and bytes via command repository
+4. reactive-repository-application → reactive-infrastructure: Persist object metadata and bytes
+
+**Note:** Bucket existence validation is postponed to the repository layer. The handler does not verify bucket existence before delegating.
 
 === Scenario 3 — GetObject
 
@@ -37,12 +36,11 @@ image::../../c4/images/GetObjectRuntime.png[GetObject Runtime, width=600]
 
 **Flow:**
 1. User → s3-reactive-api-adapter: `GET /{bucket}/{key}`
-2. s3-reactive-api-adapter → reactive-bucket-management: Verify bucket exists
-3. reactive-bucket-management → reactive-repository-application: Read bucket metadata via query repository
-4. reactive-repository-application → reactive-infrastructure: Read bucket from persistence
-5. s3-reactive-api-adapter → reactive-object-store: GetObject use case
-6. reactive-object-store → reactive-repository-application: Read object metadata and bytes via query repository
-7. reactive-repository-application → reactive-infrastructure: Read object metadata and bytes from persistence
+2. s3-reactive-api-adapter → reactive-object-store: GetObject use case (handler delegates directly — no bucket check in handler)
+3. reactive-object-store → reactive-repository-application: Read object metadata and bytes via query repository
+4. reactive-repository-application → reactive-infrastructure: Read object metadata and bytes from persistence
+
+**Note:** Bucket existence validation is postponed to the repository layer. The handler does not verify bucket existence before delegating.
 
 === Scenario 4 — Multipart Upload Lifecycle
 

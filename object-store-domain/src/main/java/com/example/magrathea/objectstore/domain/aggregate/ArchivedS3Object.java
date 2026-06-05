@@ -27,8 +27,8 @@ public final class ArchivedS3Object extends S3Object {
                      Map<String, String> userMetadata, EncryptionConfiguration encryption,
                      ObjectChecksum checksum, long size, ZonedDateTime createdAt,
                      boolean restored, ZonedDateTime restoreExpiry,
-                     List<ObjectStoreEvent> events) {
-        super(key, storageClass, userMetadata, encryption, checksum, size, createdAt, events);
+                     WriteState writeState, List<ObjectStoreEvent> events) {
+        super(key, storageClass, userMetadata, encryption, checksum, size, createdAt, writeState, events);
         this.restored = restored;
         this.restoreExpiry = restoreExpiry;
     }
@@ -45,21 +45,29 @@ public final class ArchivedS3Object extends S3Object {
      * @return a new {@code DeletedS3Object} with an {@code ObjectDeleted} event
      */
     public DeletedS3Object delete() {
+        validateWriteStateForDelete();
         var newEvents = appendEvent(domainEvents(),
             new ObjectStoreEvent.ObjectDeleted(key(), ZonedDateTime.now()));
         return new DeletedS3Object(key(), storageClass(), userMetadata(),
-            createdAt(), newEvents);
+            createdAt(), WriteState.DELETED, newEvents);
     }
 
     @Override
     public S3Object clearEvents() {
         return new ArchivedS3Object(key(), storageClass(), userMetadata(),
             encryption(), checksum(), size(), createdAt(),
-            restored, restoreExpiry, List.of());
+            restored, restoreExpiry, writeState(), List.of());
+    }
+
+    @Override
+    protected S3Object withWriteState(WriteState newState) {
+        return new ArchivedS3Object(key(), storageClass(), userMetadata(),
+            encryption(), checksum(), size(), createdAt(),
+            restored, restoreExpiry, newState, domainEvents());
     }
 
     @Override
     public String toString() {
-        return "ArchivedS3Object[key=" + key() + "]";
+        return "ArchivedS3Object[key=" + key() + ",writeState=" + writeState() + "]";
     }
 }
