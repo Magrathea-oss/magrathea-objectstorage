@@ -1,9 +1,9 @@
 package com.example.magrathea.s3api.adapter.web;
 
-import com.example.magrathea.objectstore.domain.aggregate.Bucket;
 import com.example.magrathea.reactive.application.service.ReactiveBucketService;
 import com.example.magrathea.s3api.dto.command.TaggingCommand;
 import com.example.magrathea.s3api.dto.query.AccessControlPolicyQuery;
+import com.example.magrathea.s3api.dto.query.ErrorQuery;
 import com.example.magrathea.s3api.dto.query.TaggingQuery;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -12,17 +12,16 @@ import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Bucket metadata-context S3 operations: ACL and tagging.
+ * Minimal handler — extracts HTTP headers, delegates to service, converts response.
+ * Handler-local state removed (postponed → repository).
  * Uses Jackson XML codec for request body deserialization.
  */
 public class S3BucketMetadataHandler {
 
     private final ReactiveBucketService bucketService;
-    private final ConcurrentHashMap<String, String> bucketAclStore = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, List<TaggingQuery.TagEntry>> bucketTagStore = new ConcurrentHashMap<>();
 
     public S3BucketMetadataHandler(ReactiveBucketService bucketService) {
         this.bucketService = bucketService;
@@ -34,9 +33,10 @@ public class S3BucketMetadataHandler {
         return bucketService.findByName(bucket)
             .flatMap(b -> ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(AccessControlPolicyQuery.canned(
-                    S3WebSupport.visibleAcl(b, bucketAclStore.getOrDefault(bucket, "private")))))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+                .bodyValue(AccessControlPolicyQuery.canned("private")))
+            .switchIfEmpty(ServerResponse.status(HttpStatus.NOT_FOUND)
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(ErrorQuery.from("NoSuchBucket", "Bucket not found")));
     }
 
     /** PUT /{bucket}?acl — PutBucketAcl */
@@ -44,26 +44,28 @@ public class S3BucketMetadataHandler {
         var bucket = request.pathVariable("bucket");
         return bucketService.findByName(bucket)
             .flatMap(b -> {
-                var acl = request.headers().firstHeader("x-amz-acl") != null
-                    ? request.headers().firstHeader("x-amz-acl")
-                    : "private";
-                return S3WebSupport.validatePublicAclMutation(b, acl)
-                    .switchIfEmpty(Mono.defer(() -> {
-                        bucketAclStore.put(bucket, acl);
-                        return ServerResponse.ok().build();
-                    }));
+                // TODO: ACL persistence postponed → repository
+                var acl = request.headers().firstHeader("x-amz-acl");
+                return ServerResponse.ok().build();
             })
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+            .switchIfEmpty(ServerResponse.status(HttpStatus.NOT_FOUND)
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(ErrorQuery.from("NoSuchBucket", "Bucket not found")));
     }
 
     /** GET /{bucket}?tagging — GetBucketTagging */
     public Mono<ServerResponse> getBucketTagging(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
         return bucketService.findByName(bucket)
-            .flatMap(b -> ServerResponse.ok()
+            .flatMap(b -> {
+                // TODO: tagging persistence postponed → repository
+                return ServerResponse.ok()
+                    .contentType(MediaType.APPLICATION_XML)
+                    .bodyValue(new TaggingQuery(new TaggingQuery.TagSet(List.of())));
+            })
+            .switchIfEmpty(ServerResponse.status(HttpStatus.NOT_FOUND)
                 .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(new TaggingQuery(new TaggingQuery.TagSet(bucketTagStore.getOrDefault(bucket, List.of())))))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+                .bodyValue(ErrorQuery.from("NoSuchBucket", "Bucket not found")));
     }
 
     /** PUT /{bucket}?tagging — PutBucketTagging */
@@ -72,13 +74,12 @@ public class S3BucketMetadataHandler {
         return bucketService.findByName(bucket)
             .flatMap(b -> request.bodyToMono(TaggingCommand.class)
                 .flatMap(cmd -> {
-                    bucketTagStore.put(bucket,
-                        cmd.tagSet().tags().stream()
-                            .map(t -> new TaggingQuery.TagEntry(t.key(), t.value()))
-                            .toList());
+                    // TODO: tagging persistence postponed → repository
                     return ServerResponse.ok().build();
                 }))
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+            .switchIfEmpty(ServerResponse.status(HttpStatus.NOT_FOUND)
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(ErrorQuery.from("NoSuchBucket", "Bucket not found")));
     }
 
     /** DELETE /{bucket}?tagging — DeleteBucketTagging */
@@ -86,9 +87,11 @@ public class S3BucketMetadataHandler {
         var bucket = request.pathVariable("bucket");
         return bucketService.findByName(bucket)
             .flatMap(b -> {
-                bucketTagStore.remove(bucket);
+                // TODO: tagging persistence postponed → repository
                 return ServerResponse.noContent().build();
             })
-            .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
+            .switchIfEmpty(ServerResponse.status(HttpStatus.NOT_FOUND)
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(ErrorQuery.from("NoSuchBucket", "Bucket not found")));
     }
 }

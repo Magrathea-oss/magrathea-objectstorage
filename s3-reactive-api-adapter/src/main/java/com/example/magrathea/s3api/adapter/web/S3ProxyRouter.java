@@ -85,7 +85,6 @@ public class S3ProxyRouter {
             .PUT("/{bucket}", queryParam("inventory-table-config", v -> true), bucketConfig::putBucketInventoryTableConfiguration)
             .GET("/{bucket}", queryParam("journal-table-config", v -> true), bucketConfig::getBucketJournalTableConfiguration)
             .PUT("/{bucket}", queryParam("journal-table-config", v -> true), bucketConfig::putBucketJournalTableConfiguration)
-            .GET("/{bucket}", request -> request.queryParams().isEmpty(), bucketOperations::websiteRouting)
             .GET("/{bucket}", accept(APPLICATION_XML), bucketOperations::listObjectsXml)
             .PUT("/{bucket}", queryParam("acl", v -> true), bucketMetadata::putBucketAcl)
             .PUT("/{bucket}", queryParam("tagging", v -> true), bucketMetadata::putBucketTagging)

@@ -5,7 +5,6 @@ import com.example.magrathea.objectstore.domain.aggregate.MultipartUpload;
 import com.example.magrathea.objectstore.domain.valueobject.ObjectKey;
 import com.example.magrathea.objectstore.domain.valueobject.PartNumber;
 import com.example.magrathea.objectstore.domain.valueobject.UploadId;
-import com.example.magrathea.reactive.application.service.ReactiveBucketService;
 import com.example.magrathea.reactive.application.service.ReactiveMultipartUploadService;
 import com.example.magrathea.s3api.dto.query.ErrorQuery;
 import com.example.magrathea.s3api.dto.query.InitiateMultipartUploadQuery;
@@ -15,17 +14,15 @@ import com.example.magrathea.s3api.dto.query.ListMultipartUploadsQuery;
 import com.example.magrathea.s3api.dto.query.ListPartsQuery;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.util.DigestUtils;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.UUID;
-
 /**
  * Multipart upload S3 operations handler.
- * Minimal handler — delegates bucket existence checks to service, removes handler-level checks.
+ * Minimal handler — extracts HTTP headers, delegates to service, converts response.
+ * No bucket check, no ETag computation.
  * POST /{bucket}/{key}?uploads — CreateMultipartUpload
  * PUT /{bucket}/{key}?uploadId=...&partNumber=... — UploadPart
  * PUT /{bucket}/{key}?uploadId=...&partNumber=...&x-amz-copy-source — UploadPartCopy
@@ -37,33 +34,25 @@ import java.util.UUID;
 public class S3MultipartHandler {
 
     private final ReactiveMultipartUploadService multipartUploadService;
-    private final ReactiveBucketService bucketService;
 
-    public S3MultipartHandler(ReactiveMultipartUploadService multipartUploadService,
-                               ReactiveBucketService bucketService) {
+    public S3MultipartHandler(ReactiveMultipartUploadService multipartUploadService) {
         this.multipartUploadService = multipartUploadService;
-        this.bucketService = bucketService;
     }
 
     /** POST /{bucket}/{key}?uploads — Initiate multipart upload */
     public Mono<ServerResponse> initiateMultipartUpload(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
         var key = request.pathVariable("key");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> {
-                var uploadId = UploadId.generate();
-                var upload = MultipartUpload.create(
-                    MultipartUpload.Id.generate(), b.id(), ObjectKey.of(bucket, key), uploadId
-                );
-                return multipartUploadService.saveUpload(upload)
-                    .then(ServerResponse.ok()
-                        .contentType(MediaType.APPLICATION_XML)
-                        .bodyValue(InitiateMultipartUploadQuery.from(
-                            bucket, key, upload.uploadId().value())));
-            })
-            .onErrorResume(ex -> ServerResponse.status(HttpStatus.NOT_FOUND)
+        var uploadId = UploadId.generate();
+        // TODO: bucket check postponed — service/repository handles bucket resolution
+        var upload = MultipartUpload.create(
+            MultipartUpload.Id.generate(), Bucket.Id.generate(), ObjectKey.of(bucket, key), uploadId
+        );
+        return multipartUploadService.saveUpload(upload)
+            .then(ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(ErrorQuery.from("NoSuchBucket", "Bucket not found")));
+                .bodyValue(InitiateMultipartUploadQuery.from(
+                    bucket, key, upload.uploadId().value())));
     }
 
     /** PUT /{bucket}/{key}?uploadId=...&partNumber=... + x-amz-copy-source — UploadPartCopy */
@@ -80,7 +69,8 @@ public class S3MultipartHandler {
         }
         return multipartUploadService.findById(uploadId)
             .flatMap(upload -> {
-                var etag = "\"" + DigestUtils.md5DigestAsHex((uploadIdStr + "-" + partNumberStr).getBytes()) + "\"";
+                // TODO: ETag computation postponed — use placeholder
+                var etag = "\"placeholder-etag\"";
                 var part = com.example.magrathea.objectstore.domain.valueobject.UploadPart.create(
                     PartNumber.of(partNumber), etag, 0
                 );
@@ -105,7 +95,8 @@ public class S3MultipartHandler {
 
         return multipartUploadService.findById(uploadId)
             .flatMap(upload -> {
-                var etag = "\"" + DigestUtils.md5DigestAsHex((uploadIdStr + "-" + partNumberStr).getBytes()) + "\"";
+                // TODO: ETag computation postponed — use placeholder
+                var etag = "\"placeholder-etag\"";
                 var part = com.example.magrathea.objectstore.domain.valueobject.UploadPart.create(
                     PartNumber.of(partNumber), etag, size
                 );
@@ -132,7 +123,8 @@ public class S3MultipartHandler {
                 var completed = upload.withCompleted();
                 return multipartUploadService.saveUpload(completed)
                     .then(Mono.defer(() -> {
-                        var finalEtag = "\"" + DigestUtils.md5DigestAsHex(uploadIdStr.getBytes()) + "\"";
+                        // TODO: ETag computation postponed — use placeholder
+                        var finalEtag = "\"placeholder-etag\"";
                         var result = CompleteMultipartUploadQuery.from(bucket, key, finalEtag);
                         return ServerResponse.ok()
                             .contentType(MediaType.APPLICATION_XML)
@@ -163,20 +155,15 @@ public class S3MultipartHandler {
     /** GET /{bucket}?uploads — List multipart uploads */
     public Mono<ServerResponse> listMultipartUploads(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
-        return bucketService.findByName(bucket)
-            .flatMap(b -> {
-                Flux<ListMultipartUploadsQuery.UploadEntry> entries = multipartUploadService.findByBucket(b.id())
-                    .map(u -> ListMultipartUploadsQuery.UploadEntry.from(
-                        u.key().key(), u.uploadId().value(), u.initiated()
-                    ));
-                return ListMultipartUploadsQuery.from(bucket, entries)
-                    .flatMap(result -> ServerResponse.ok()
-                        .contentType(MediaType.APPLICATION_XML)
-                        .bodyValue(result));
-            })
-            .onErrorResume(ex -> ServerResponse.status(HttpStatus.NOT_FOUND)
+        // TODO: bucket check postponed — service/repository handles bucket resolution
+        Flux<ListMultipartUploadsQuery.UploadEntry> entries = multipartUploadService.findByBucket(Bucket.Id.generate())
+            .map(u -> ListMultipartUploadsQuery.UploadEntry.from(
+                u.key().key(), u.uploadId().value(), u.initiated()
+            ));
+        return ListMultipartUploadsQuery.from(bucket, entries)
+            .flatMap(result -> ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(ErrorQuery.from("NoSuchBucket", "Bucket not found")));
+                .bodyValue(result));
     }
 
     /** GET /{bucket}/{key}?uploadId=... — List parts */

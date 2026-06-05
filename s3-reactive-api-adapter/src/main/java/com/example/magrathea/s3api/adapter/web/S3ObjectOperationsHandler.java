@@ -1,6 +1,8 @@
 package com.example.magrathea.s3api.adapter.web;
 
+import com.example.magrathea.objectstore.domain.aggregate.ActiveS3Object;
 import com.example.magrathea.objectstore.domain.aggregate.S3Object;
+import com.example.magrathea.objectstore.domain.valueobject.ObjectChecksum;
 import com.example.magrathea.objectstore.domain.valueobject.ObjectKey;
 import com.example.magrathea.reactive.application.service.ReactiveObjectService;
 import com.example.magrathea.s3api.adapter.web.headers.S3Header;
@@ -27,9 +29,9 @@ import java.util.Map;
 
 /**
  * Object-context S3 operations.
- * Minimal handler — all extraction via {@link S3RequestExtractor},
+ * Minimal handler -- all extraction via {@link S3RequestExtractor},
  * all response building via {@link S3ResponseBuilder}.
- * No queries before commands — bucket validation is handled by the repository layer.
+ * No queries before commands -- bucket validation is handled by the repository layer.
  */
 public class S3ObjectOperationsHandler {
 
@@ -43,7 +45,7 @@ public class S3ObjectOperationsHandler {
     //  PutObject
     // ─────────────────────────────────────────────────────
 
-    /** PUT /{bucket}/{key} — PutObject */
+    /** PUT /{bucket}/{key} -- PutObject */
     public Mono<ServerResponse> putObject(ServerRequest request) {
         return objectService.saveObjectWithContent(
                 S3RequestExtractor.extractObjectKey(request),
@@ -65,7 +67,7 @@ public class S3ObjectOperationsHandler {
     //  CopyObject
     // ─────────────────────────────────────────────────────
 
-    /** PUT /{bucket}/{key} with x-amz-copy-source — CopyObject */
+    /** PUT /{bucket}/{key} with x-amz-copy-source -- CopyObject */
     public Mono<ServerResponse> copyObject(ServerRequest request) {
         var sourceHeader = request.headers().firstHeader(
             S3Header.X_AMZ_COPY_SOURCE.headerName());
@@ -88,17 +90,24 @@ public class S3ObjectOperationsHandler {
 
     private Mono<ServerResponse> copyObjectWithContent(
             S3Object sourceObject, ObjectKey targetKey, ServerRequest request) {
-        var targetObjectId = S3Object.Id.generate();
-        var descriptor = sourceObject.contentDescriptor();
-        var size = descriptor != null ? descriptor.size() : 0L;
-        var s3Object = S3Object.create(targetObjectId, null, targetKey,
-            null, null, null, size, Map.of(), null);
+        var size = sourceObject.size();
+        var checksum = sourceObject.checksum();
+        var encryption = sourceObject.encryption();
+        var metadata = sourceObject.userMetadata();
+        var storageClass = sourceObject.storageClass();
 
-        return objectService.saveObjectWithContent(s3Object,
-                objectService.getContent(sourceObject.id()), null)
+        return objectService.saveObjectWithContent(
+                targetKey,
+                storageClass,
+                checksum != null ? checksum : ObjectChecksum.of(java.util.Set.of()),
+                encryption,
+                null,
+                size,
+                metadata != null ? metadata : Map.of(),
+                objectService.getContent(sourceObject.key()))
             .flatMap(result -> {
-                var etag = result.aggregate().hasEtag()
-                    ? result.aggregate().etag() : "\"\"";
+                // TODO: ETag computed by repository (postponed)
+                var etag = "\"\"";
                 return S3ResponseBuilder.okXml(etag,
                     CopyObjectResultQuery.from(Instant.now().toString(), etag));
             });
@@ -108,7 +117,7 @@ public class S3ObjectOperationsHandler {
     //  DeleteObjects
     // ─────────────────────────────────────────────────────
 
-    /** POST /{bucket}?delete — DeleteObjects */
+    /** POST /{bucket}?delete -- DeleteObjects */
     public Mono<ServerResponse> deleteObjects(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
         return request.bodyToMono(DeleteObjectsCommand.class)
@@ -132,7 +141,7 @@ public class S3ObjectOperationsHandler {
     //  GetObject
     // ─────────────────────────────────────────────────────
 
-    /** GET /{bucket}/{key} — GetObject */
+    /** GET /{bucket}/{key} -- GetObject */
     public Mono<ServerResponse> getObject(ServerRequest request) {
         var objectKey = S3RequestExtractor.extractObjectKey(request);
         return objectService.getObjectWithContent(objectKey)
@@ -147,7 +156,7 @@ public class S3ObjectOperationsHandler {
     //  HeadObject
     // ─────────────────────────────────────────────────────
 
-    /** HEAD /{bucket}/{key} — HeadObject */
+    /** HEAD /{bucket}/{key} -- HeadObject */
     public Mono<ServerResponse> headObject(ServerRequest request) {
         var objectKey = S3RequestExtractor.extractObjectKey(request);
         return objectService.getObject(objectKey)
@@ -160,7 +169,7 @@ public class S3ObjectOperationsHandler {
     //  RenameObject
     // ─────────────────────────────────────────────────────
 
-    /** PUT /{bucket}/{key}?rename — RenameObject */
+    /** PUT /{bucket}/{key}?rename -- RenameObject */
     public Mono<ServerResponse> renameObject(ServerRequest request) {
         var sourceKey = S3RequestExtractor.extractObjectKey(request);
         var destinationKey = request.headers().firstHeader(
@@ -173,15 +182,21 @@ public class S3ObjectOperationsHandler {
         return objectService.getObject(sourceKey)
             .flatMap(sourceObject -> {
                 var targetObjectKey = ObjectKey.of(sourceKey.bucket(), destinationKey);
-                var descriptor = sourceObject.contentDescriptor();
-                var size = descriptor != null ? descriptor.size() : 0L;
+                var size = sourceObject.size();
                 var metadata = sourceObject.userMetadata();
-                var targetObject = S3Object.create(
-                    S3Object.Id.generate(), null, targetObjectKey,
-                    null, null, null, size, metadata, null);
+                var checksum = sourceObject.checksum();
+                var encryption = sourceObject.encryption();
+                var storageClass = sourceObject.storageClass();
 
-                return objectService.saveObjectWithContent(targetObject,
-                        objectService.getContent(sourceObject.id()), null)
+                return objectService.saveObjectWithContent(
+                        targetObjectKey,
+                        storageClass,
+                        checksum != null ? checksum : ObjectChecksum.of(java.util.Set.of()),
+                        encryption,
+                        null,
+                        size,
+                        metadata != null ? metadata : Map.of(),
+                        objectService.getContent(sourceObject.key()))
                     .then(objectService.deleteObject(sourceKey))
                     .then(S3ResponseBuilder.okWithEtag("\"\""));
             })
@@ -195,7 +210,7 @@ public class S3ObjectOperationsHandler {
     //  GetObjectTorrent
     // ─────────────────────────────────────────────────────
 
-    /** GET /{bucket}/{key}?torrent — GetObjectTorrent */
+    /** GET /{bucket}/{key}?torrent -- GetObjectTorrent */
     public Mono<ServerResponse> getObjectTorrent(ServerRequest request) {
         var objectKey = S3RequestExtractor.extractObjectKey(request);
         return objectService.getObjectTorrent(objectKey)
@@ -212,7 +227,7 @@ public class S3ObjectOperationsHandler {
     //  RestoreObject
     // ─────────────────────────────────────────────────────
 
-    /** POST /{bucket}/{key}?restore — RestoreObject */
+    /** POST /{bucket}/{key}?restore -- RestoreObject */
     public Mono<ServerResponse> restoreObject(ServerRequest request) {
         var objectKey = S3RequestExtractor.extractObjectKey(request);
         return objectService.getObject(objectKey)
@@ -230,7 +245,7 @@ public class S3ObjectOperationsHandler {
     //  DeleteObject
     // ─────────────────────────────────────────────────────
 
-    /** DELETE /{bucket}/{key} — DeleteObject */
+    /** DELETE /{bucket}/{key} -- DeleteObject */
     public Mono<ServerResponse> deleteObject(ServerRequest request) {
         var objectKey = S3RequestExtractor.extractObjectKey(request);
         return objectService.deleteObject(objectKey)
@@ -242,7 +257,7 @@ public class S3ObjectOperationsHandler {
     //  SelectObjectContent
     // ─────────────────────────────────────────────────────
 
-    /** POST /{bucket}/{key}?select — SelectObjectContent */
+    /** POST /{bucket}/{key}?select -- SelectObjectContent */
     public Mono<ServerResponse> selectObjectContent(ServerRequest request) {
         var objectKey = S3RequestExtractor.extractObjectKey(request);
         return objectService.getObject(objectKey)
@@ -266,7 +281,7 @@ public class S3ObjectOperationsHandler {
     //  WriteGetObjectResponse
     // ─────────────────────────────────────────────────────
 
-    /** PUT /{bucket}/{key}?x-id=WriteGetObjectResponse — WriteGetObjectResponse */
+    /** PUT /{bucket}/{key}?x-id=WriteGetObjectResponse -- WriteGetObjectResponse */
     public Mono<ServerResponse> writeGetObjectResponse(ServerRequest request) {
         var requestId = request.headers().firstHeader(
             S3Header.X_AMZ_REQUEST_ID.headerName());

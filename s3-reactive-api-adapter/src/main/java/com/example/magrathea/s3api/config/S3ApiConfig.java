@@ -49,9 +49,8 @@ public class S3ApiConfig {
     }
 
     @Bean
-    public S3ObjectMetadataHandler s3ObjectMetadataHandler(ReactiveBucketService bucketService,
-                                                           ReactiveObjectService objectService) {
-        return new S3ObjectMetadataHandler(bucketService, objectService);
+    public S3ObjectMetadataHandler s3ObjectMetadataHandler(ReactiveObjectService objectService) {
+        return new S3ObjectMetadataHandler(objectService);
     }
 
     @Bean
@@ -60,9 +59,8 @@ public class S3ApiConfig {
     }
 
     @Bean
-    public S3MultipartHandler s3MultipartHandler(ReactiveMultipartUploadService multipartUploadService,
-                                                  ReactiveBucketService bucketService) {
-        return new S3MultipartHandler(multipartUploadService, bucketService);
+    public S3MultipartHandler s3MultipartHandler(ReactiveMultipartUploadService multipartUploadService) {
+        return new S3MultipartHandler(multipartUploadService);
     }
 
     @Bean
