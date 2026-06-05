@@ -1,0 +1,50 @@
+{
+  "app": {
+    "title": "Magrathea ObjectStore",
+    "subtitle": "Gestione Storage Cloud Compatibile S3",
+    "footer": "Magrathea ObjectStore — Storage Compatibile S3"
+  },
+  "nav": {
+    "buckets": "Bucket",
+    "objects": "Oggetti",
+    "health": "Salute",
+    "settings": "Impostazioni"
+  },
+  "buckets": {
+    "title": "Bucket",
+    "create": "Crea Bucket",
+    "delete": "Elimina",
+    "name": "Nome Bucket",
+    "region": "Regione",
+    "created": "Creato",
+    "empty": "Nessun bucket presente. Creane uno per iniziare."
+  },
+  "objects": {
+    "title": "Oggetti",
+    "upload": "Carica",
+    "delete": "Elimina",
+    "download": "Scarica",
+    "name": "Chiave Oggetto",
+    "size": "Dimensione",
+    "etag": "ETag",
+    "storageClass": "Classe di Storage",
+    "empty": "Questo bucket è vuoto."
+  },
+  "health": {
+    "title": "Salute del Sistema",
+    "status": "Stato",
+    "uptime": "Uptime",
+    "version": "Versione"
+  },
+  "actions": {
+    "refresh": "Aggiorna",
+    "cancel": "Annulla",
+    "confirm": "Conferma",
+    "close": "Chiudi"
+  },
+  "errors": {
+    "general": "Errore generico",
+    "notFound": "Risorsa non trovata",
+    "serverError": "Errore del server"
+  }
+}

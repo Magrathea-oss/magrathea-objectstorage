@@ -1,0 +1,50 @@
+{
+  "app": {
+    "title": "Magrathea 对象存储",
+    "subtitle": "兼容 S3 的云存储管理",
+    "footer": "Magrathea 对象存储 — 兼容 S3 的存储"
+  },
+  "nav": {
+    "buckets": "存储桶",
+    "objects": "对象",
+    "health": "系统健康",
+    "settings": "设置"
+  },
+  "buckets": {
+    "title": "存储桶",
+    "create": "创建存储桶",
+    "delete": "删除",
+    "name": "存储桶名称",
+    "region": "区域",
+    "created": "创建时间",
+    "empty": "暂无存储桶。创建一个以开始使用。"
+  },
+  "objects": {
+    "title": "对象",
+    "upload": "上传",
+    "delete": "删除",
+    "download": "下载",
+    "name": "对象键",
+    "size": "大小",
+    "etag": "ETag",
+    "storageClass": "存储类别",
+    "empty": "此存储桶为空。"
+  },
+  "health": {
+    "title": "系统健康状态",
+    "status": "状态",
+    "uptime": "运行时间",
+    "version": "版本"
+  },
+  "actions": {
+    "refresh": "刷新",
+    "cancel": "取消",
+    "confirm": "确认",
+    "close": "关闭"
+  },
+  "errors": {
+    "general": "发生错误",
+    "notFound": "资源未找到",
+    "serverError": "服务器错误"
+  }
+}
