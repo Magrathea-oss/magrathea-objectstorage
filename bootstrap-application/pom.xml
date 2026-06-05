@@ -93,9 +93,12 @@
                             <goal>run</goal>
                         </goals>
                         <configuration>
-                            <target>
-                                <copy todir="${project.basedir}/src/main/resources/static" overwrite="true">
-                                    <fileset dir="${project.basedir}/../magrathea-ui/dist"/>
+                            <target name="copy frontend dist">
+                                <mkdir dir="${project.basedir}/src/main/resources/static"/>
+                                <copy todir="${project.basedir}/src/main/resources/static" overwrite="true" preservelastmodified="true">
+                                    <fileset dir="${project.basedir}/../magrathea-ui/dist">
+                                        <include name="**/*"/>
+                                    </fileset>
                                 </copy>
                             </target>
                         </configuration>

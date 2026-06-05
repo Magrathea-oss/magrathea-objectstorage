@@ -72,5 +72,6 @@ COPY --from=builder /app.jar /app.jar
 COPY --from=builder /build/docs /app/docs
 
 EXPOSE 8080
+EXPOSE 8081
 
 ENTRYPOINT ["java", "-jar", "/app.jar"]
