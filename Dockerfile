@@ -4,28 +4,42 @@ WORKDIR /build
 
 # Copy POMs first for dependency caching
 COPY pom.xml .
-COPY shared-domain/pom.xml ./shared-domain/
-COPY shared-kernel/pom.xml ./shared-kernel/
-COPY object-storage-domain/pom.xml ./object-storage-domain/
-COPY object-storage-application/pom.xml ./object-storage-application/
-COPY object-storage-infrastructure/pom.xml ./object-storage-infrastructure/
-COPY persistence-context-domain/pom.xml ./persistence-context-domain/
-COPY persistence-context-application/pom.xml ./persistence-context-application/
-COPY persistence-context-infrastructure/pom.xml ./persistence-context-infrastructure/
+
+# Domain modules
+COPY object-store-domain/pom.xml ./object-store-domain/
+COPY storage-engine-domain/pom.xml ./storage-engine-domain/
+
+# Application modules
+COPY storage-engine-application/pom.xml ./storage-engine-application/
+
+# Infrastructure modules
+COPY storage-engine-infrastructure/pom.xml ./storage-engine-infrastructure/
+
+# Reactive modules
+COPY object-store-reactive-repository-application/pom.xml ./object-store-reactive-repository-application/
+COPY object-store-reactive-application/pom.xml ./object-store-reactive-application/
+COPY object-store-reactive-infrastructure/pom.xml ./object-store-reactive-infrastructure/
+COPY object-store-reactive-repository-storage-engine-infrastructure/pom.xml ./object-store-reactive-repository-storage-engine-infrastructure/
+
+# API adapter
+COPY s3-reactive-api-adapter/pom.xml ./s3-reactive-api-adapter/
+
+# Bootstrap
 COPY bootstrap-application/pom.xml ./bootstrap-application/
 
 # Download dependencies
 RUN mvn dependency:go-offline -DskipTests
 
-# Copy source
-COPY shared-domain/src ./shared-domain/src/
-COPY shared-kernel/src ./shared-kernel/src/
-COPY object-storage-domain/src ./object-storage-domain/src/
-COPY object-storage-application/src ./object-storage-application/src/
-COPY object-storage-infrastructure/src ./object-storage-infrastructure/src/
-COPY persistence-context-domain/src ./persistence-context-domain/src/
-COPY persistence-context-application/src ./persistence-context-application/src/
-COPY persistence-context-infrastructure/src ./persistence-context-infrastructure/src/
+# Copy source for all modules
+COPY object-store-domain/src ./object-store-domain/src/
+COPY storage-engine-domain/src ./storage-engine-domain/src/
+COPY storage-engine-application/src ./storage-engine-application/src/
+COPY storage-engine-infrastructure/src ./storage-engine-infrastructure/src/
+COPY object-store-reactive-repository-application/src ./object-store-reactive-repository-application/src/
+COPY object-store-reactive-application/src ./object-store-reactive-application/src/
+COPY object-store-reactive-infrastructure/src ./object-store-reactive-infrastructure/src/
+COPY object-store-reactive-repository-storage-engine-infrastructure/src ./object-store-reactive-repository-storage-engine-infrastructure/src/
+COPY s3-reactive-api-adapter/src ./s3-reactive-api-adapter/src/
 COPY bootstrap-application/src ./bootstrap-application/src/
 
 # Build (skip tests for faster build in Docker)
