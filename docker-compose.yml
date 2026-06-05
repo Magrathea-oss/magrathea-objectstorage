@@ -4,9 +4,11 @@ services:
   magrathea:
     build: .
     ports:
-      - "8080:8080"
+      - "9000:8080"
+      - "8081:8081"
     environment:
       - SPRING_PROFILES_ACTIVE=dev
+      - admin.server.port=8081
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/"]
       interval: 5s

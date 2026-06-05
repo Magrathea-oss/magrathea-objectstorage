@@ -1,0 +1,26 @@
+# Node.js artifacts
+magrathea-ui/node_modules/
+magrathea-ui/node/
+magrathea-ui/dist/
+
+# Maven build artifacts
+**/target/
+
+# Git metadata
+.git/
+.gitignore
+.gitattributes
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
