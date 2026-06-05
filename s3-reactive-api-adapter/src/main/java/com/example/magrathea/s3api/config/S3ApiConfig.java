@@ -9,7 +9,7 @@ import com.example.magrathea.s3api.adapter.web.S3BucketOperationsHandler;
 import com.example.magrathea.s3api.adapter.web.S3MultipartHandler;
 import com.example.magrathea.s3api.adapter.web.S3ObjectMetadataHandler;
 import com.example.magrathea.s3api.adapter.web.S3ObjectOperationsHandler;
-import com.example.magrathea.s3api.adapter.web.S3ProxyRouter;
+import com.example.magrathea.s3api.adapter.web.S3PathRouter;
 import com.example.magrathea.s3api.adapter.web.S3SessionHandler;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -69,18 +69,18 @@ public class S3ApiConfig {
     }
 
     @Bean
-    public S3ProxyRouter s3ProxyRouter(S3BucketOperationsHandler bucketOperations,
+    public S3PathRouter s3PathRouter(S3BucketOperationsHandler bucketOperations,
                                         S3BucketMetadataHandler bucketMetadata,
                                         S3ObjectOperationsHandler objectOperations,
                                         S3ObjectMetadataHandler objectMetadata,
                                         S3BucketConfigHandler bucketConfig,
                                         S3MultipartHandler multipartHandler,
                                         S3SessionHandler sessionHandler) {
-        return new S3ProxyRouter(bucketOperations, bucketMetadata, objectOperations, objectMetadata, bucketConfig, multipartHandler, sessionHandler);
+        return new S3PathRouter(bucketOperations, bucketMetadata, objectOperations, objectMetadata, bucketConfig, multipartHandler, sessionHandler);
     }
 
     @Bean
-    public RouterFunction<ServerResponse> s3Routes(S3ProxyRouter router) {
+    public RouterFunction<ServerResponse> s3Routes(S3PathRouter router) {
         return router.s3Routes();
     }
 }

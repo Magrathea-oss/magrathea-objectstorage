@@ -45,7 +45,7 @@ Removed modules/components:
 
 | Class | Responsibility |
 |---|---|
-| `S3ProxyRouter` | Route composition only |
+| `S3PathRouter` | Route composition only |
 | `S3BucketOperationsHandler` | Bucket lifecycle, bucket-level listings, location/versioning, directory-bucket listing |
 | `S3BucketMetadataHandler` | Bucket ACL and tagging metadata |
 | `S3BucketConfigHandler` | Bucket configuration, object-lock configuration, ABAC, and Phase F bucket metadata/table configurations |

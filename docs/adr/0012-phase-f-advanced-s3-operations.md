@@ -63,7 +63,7 @@ Operations were implemented in five batches, ordered from simplest (reusing exis
 
 All operations follow the established pattern from ADR 0005 (RouterFunction functional WebFlux pattern) and ADR 0006 (S3 API protocol endpoint mapping):
 
-- **RouterFunction route** — registered in `S3ProxyRouter` with appropriate HTTP method, path, and query parameters
+- **RouterFunction route** — registered in `S3PathRouter` with appropriate HTTP method, path, and query parameters
 - **Handler method** — implemented in the appropriate handler class (`S3SessionHandler`, `S3BucketOperationsHandler`, `S3ObjectOperationsHandler`, `S3ObjectMetadataHandler`, or `S3BucketConfigHandler`)
 - **DTOs** — command DTOs in `dto/command/` for request bodies, query DTOs in `dto/query/` for response bodies
 - **Cucumber feature scenarios** — at least one success scenario and one failure scenario per operation, covering all error cases documented in the AWS S3 API spec

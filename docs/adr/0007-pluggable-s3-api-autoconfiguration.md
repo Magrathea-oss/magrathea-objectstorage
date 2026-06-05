@@ -11,7 +11,7 @@ The project must expose only AWS S3-compatible HTTP APIs. A previous internal JS
 
 Create a dedicated `s3-api` module containing:
 
-- `S3ProxyRouter`
+- `S3PathRouter`
 - `S3XmlResponses`
 - `JacksonXmlCodecConfig`
 - `S3ApiConfig`

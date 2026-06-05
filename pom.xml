@@ -9,6 +9,7 @@
     <packaging>pom</packaging>
 
     <modules>
+        <module>admin-api-adapter</module>
         <module>s3-reactive-api-adapter</module>
 
         <module>object-store-domain</module>
@@ -57,6 +58,11 @@
                 <scope>import</scope>
             </dependency>
             <!-- Internal module dependencies -->
+            <dependency>
+                <groupId>com.example</groupId>
+                <artifactId>admin-api-adapter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
             <dependency>
                 <groupId>com.example</groupId>
                 <artifactId>s3-reactive-api-adapter</artifactId>

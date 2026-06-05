@@ -70,7 +70,7 @@ image::../../c4/images/S3ReactiveApiAdapterComponents.png[S3 Reactive API Adapte
 
 | Component | Responsibility | Handler Pattern |
 |---|---|---|
-| `S3ProxyRouter` | Entry point RouterFunction: defines S3 routes and dispatches requests to handlers | — |
+| `S3PathRouter` | Entry point RouterFunction: defines S3 routes and dispatches requests to handlers | — |
 | `S3BucketOperationsHandler` | Bucket lifecycle: create, delete, head, list, location, versioning, directory-bucket listing | ✅ Minimal (extract → delegate → response) |
 | `S3BucketMetadataHandler` | Bucket metadata: ACL, tagging | ✅ Minimal (extract → delegate → response) |
 | `S3BucketConfigHandler` | Bucket configuration: CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate, analytics, inventory, metrics, intelligent-tiering, ABAC, object lock, bucket metadata/table configuration | ⏳ Excluded (complex registry + ConcurrentHashMap — postponed) |

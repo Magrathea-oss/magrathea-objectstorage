@@ -99,7 +99,7 @@ image::../../c4/images/BucketConfigurationRuntime.png[Bucket Configuration Runti
 
 **Flow:**
 1. User → s3-reactive-api-adapter: sends an advanced S3 request such as RenameObject, RestoreObject, SelectObjectContent, WriteGetObjectResponse, legal hold, retention, torrent, or encryption update.
-2. `S3ProxyRouter` dispatches by HTTP method, path, query parameter, and headers.
+2. `S3PathRouter` dispatches by HTTP method, path, query parameter, and headers.
 3. `S3ObjectOperationsHandler` handles advanced object behavior such as rename, torrent, restore, select, and Object Lambda response.
 4. `S3ObjectMetadataHandler` handles metadata-oriented Phase F operations such as legal hold, retention, and encryption update.
 5. Reactive services/repositories are used where object or bucket state must be read or updated.

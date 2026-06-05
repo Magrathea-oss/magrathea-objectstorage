@@ -13,7 +13,7 @@ import static org.springframework.web.reactive.function.server.RequestPredicates
  * This class only declares HTTP route mappings. Endpoint behavior is delegated
  * to context-specific handlers so bucket and object concerns stay readable.
  */
-public class S3ProxyRouter {
+public class S3PathRouter {
 
     private final S3BucketOperationsHandler bucketOperations;
     private final S3BucketMetadataHandler bucketMetadata;
@@ -23,7 +23,7 @@ public class S3ProxyRouter {
     private final S3MultipartHandler multipartHandler;
     private final S3SessionHandler sessionHandler;
 
-    public S3ProxyRouter(S3BucketOperationsHandler bucketOperations,
+    public S3PathRouter(S3BucketOperationsHandler bucketOperations,
                          S3BucketMetadataHandler bucketMetadata,
                          S3ObjectOperationsHandler objectOperations,
                          S3ObjectMetadataHandler objectMetadata,
