@@ -29,55 +29,9 @@
     <!-- JSON-rendered content -->
     <div v-else class="docs-content">
       <div class="docs-json" v-if="docData">
-        <template v-for="section in docData.sections" :key="section.id">
+        <template v-for="section in (docData?.document?.sections || [])" :key="section.id">
           <h2 :id="section.id" class="docs-section-title">{{ section.title }}</h2>
-
-          <!-- Paragraphs -->
-          <p v-for="(para, pi) in section.paragraphs" :key="pi" class="docs-paragraph">{{ para }}</p>
-
-          <!-- Tables -->
-          <div v-for="(table, ti) in section.tables" :key="'t'+ti" class="docs-table-wrapper">
-            <table class="docs-table">
-              <thead v-if="table.headers">
-                <tr>
-                  <th v-for="(h, hi) in table.headers" :key="'h'+hi">{{ h }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(row, ri) in table.rows" :key="'r'+ri">
-                  <td v-for="(cell, ci) in row" :key="'c'+ci">{{ cell }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Subsections -->
-          <div v-for="sub in section.subsections" :key="sub.id" class="docs-subsection">
-            <h3 :id="sub.id" class="docs-subsection-title">{{ sub.title }}</h3>
-            <p v-for="(para, pi) in sub.paragraphs" :key="'p'+pi" class="docs-paragraph">{{ para }}</p>
-            <div v-for="(table, ti) in sub.tables" :key="'t'+ti" class="docs-table-wrapper">
-              <table class="docs-table">
-                <thead v-if="table.headers">
-                  <tr>
-                    <th v-for="(h, hi) in table.headers" :key="'h'+hi">{{ h }}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(row, ri) in table.rows" :key="'r'+ri">
-                    <td v-for="(cell, ci) in row" :key="'c'+ci">{{ cell }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <ul v-if="sub.list" class="docs-list">
-              <li v-for="(item, li) in sub.list" :key="'l'+li">{{ item }}</li>
-            </ul>
-          </div>
-
-          <!-- Inline list at section level -->
-          <ul v-if="section.list" class="docs-list">
-            <li v-for="(item, li) in section.list" :key="'l'+li">{{ item }}</li>
-          </ul>
+          <DocBlockRenderer :blocks="section.blocks || []" />
         </template>
       </div>
     </div>
@@ -93,6 +47,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import DocBlockRenderer from './DocBlockRenderer.vue'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -152,15 +107,28 @@ function refreshDocs() {
  * @returns {object|null} The section object or null
  */
 function getDocSection(sectionId) {
-  if (!docData.value?.sections) return null
+  if (!docData.value?.document?.sections) return null
   // Search top-level sections
-  const found = docData.value.sections.find(s => s.id === sectionId)
+  const found = docData.value.document.sections.find(s => s.id === sectionId)
   if (found) return found
-  // Search subsections
-  for (const section of docData.value.sections) {
-    if (section.subsections) {
-      const sub = section.subsections.find(s => s.id === sectionId)
-      if (sub) return sub
+  // Search nested sections inside blocks
+  for (const section of docData.value.document.sections) {
+    const sub = findSectionInBlocks(section.blocks, sectionId)
+    if (sub) return sub
+  }
+  return null
+}
+
+/**
+ * Recursively search for a section with given id inside blocks array.
+ */
+function findSectionInBlocks(blocks, sectionId) {
+  if (!blocks) return null
+  for (const block of blocks) {
+    if (block.type === 'section') {
+      if (block.id === sectionId) return block
+      const found = findSectionInBlocks(block.blocks, sectionId)
+      if (found) return found
     }
   }
   return null
