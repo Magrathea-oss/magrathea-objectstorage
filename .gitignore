@@ -9,3 +9,4 @@ target
 bootstrap-application/node/
 magrathea-ui/node/
 node_modules/
+bootstrap-application/src/main/scripts/test-*.mjs
