@@ -2,11 +2,8 @@
   <div class="docs-viewer">
     <!-- Header -->
     <div class="docs-header">
-      <h2 class="docs-title">{{ $t('docs.title') }}</h2>
+      <h2 class="docs-title">{{ docData?.title || $t('docs.title') }}</h2>
       <div class="docs-controls">
-        <button class="docs-nav-btn" @click="navigateBack" :disabled="!canGoBack">
-          ← {{ $t('docs.back') }}
-        </button>
         <button class="docs-dashboard-btn" @click="router.push('/')">
           ← {{ $t('nav.dashboard') }}
         </button>
@@ -29,24 +26,60 @@
       <button class="docs-retry-btn" @click="fetchDocs">{{ $t('actions.retry') }}</button>
     </div>
 
-    <!-- Content -->
+    <!-- JSON-rendered content -->
     <div v-else class="docs-content">
-      <!-- Iframe for full HTML docs -->
-      <iframe
-        v-if="useIframe"
-        ref="docIframe"
-        :src="docUrl"
-        class="docs-iframe"
-        title="Documentation"
-        @load="onIframeLoad"
-      />
+      <div class="docs-json" v-if="docData">
+        <template v-for="section in docData.sections" :key="section.id">
+          <h2 :id="section.id" class="docs-section-title">{{ section.title }}</h2>
 
-      <!-- Sanitized HTML view -->
-      <div
-        v-else
-        class="docs-html"
-        v-html="sanitizedHtml"
-      />
+          <!-- Paragraphs -->
+          <p v-for="(para, pi) in section.paragraphs" :key="pi" class="docs-paragraph">{{ para }}</p>
+
+          <!-- Tables -->
+          <div v-for="(table, ti) in section.tables" :key="'t'+ti" class="docs-table-wrapper">
+            <table class="docs-table">
+              <thead v-if="table.headers">
+                <tr>
+                  <th v-for="(h, hi) in table.headers" :key="'h'+hi">{{ h }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, ri) in table.rows" :key="'r'+ri">
+                  <td v-for="(cell, ci) in row" :key="'c'+ci">{{ cell }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Subsections -->
+          <div v-for="sub in section.subsections" :key="sub.id" class="docs-subsection">
+            <h3 :id="sub.id" class="docs-subsection-title">{{ sub.title }}</h3>
+            <p v-for="(para, pi) in sub.paragraphs" :key="'p'+pi" class="docs-paragraph">{{ para }}</p>
+            <div v-for="(table, ti) in sub.tables" :key="'t'+ti" class="docs-table-wrapper">
+              <table class="docs-table">
+                <thead v-if="table.headers">
+                  <tr>
+                    <th v-for="(h, hi) in table.headers" :key="'h'+hi">{{ h }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(row, ri) in table.rows" :key="'r'+ri">
+                    <td v-for="(cell, ci) in row" :key="'c'+ci">{{ cell }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <ul v-if="sub.list" class="docs-list">
+              <li v-for="(item, li) in sub.list" :key="'l'+li">{{ item }}</li>
+            </ul>
+          </div>
+
+          <!-- Inline list at section level -->
+          <ul v-if="section.list" class="docs-list">
+            <li v-for="(item, li) in section.list" :key="'l'+li">{{ item }}</li>
+          </ul>
+        </template>
+      </div>
     </div>
 
     <!-- Navigation info -->
@@ -57,7 +90,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
@@ -68,23 +101,35 @@ const { locale } = useI18n()
 
 const loading = ref(true)
 const error = ref(null)
-const htmlContent = ref('')
-const docUrl = ref('/docs/index.html')
-const useIframe = ref(true)
-const canGoBack = ref(false)
+const docData = ref(null)
 const lastUpdated = ref('')
+const docCache = ref({})
+
+// Watch locale changes → reload docs
+watch(locale, () => {
+  fetchDocs()
+})
 
 async function fetchDocs() {
   loading.value = true
   error.value = null
+  const lang = locale.value || 'en'
+
+  // Return cached if available
+  if (docCache.value[lang]) {
+    docData.value = docCache.value[lang]
+    loading.value = false
+    lastUpdated.value = new Date().toLocaleString()
+    return
+  }
+
   try {
-    const lang = locale.value || 'en'
-    const url = `/docs/index.${lang}.html`
+    const url = `/docs/index.${lang}.json`
     const res = await fetch(url)
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
-    const html = await res.text()
-    htmlContent.value = html
-    docUrl.value = url
+    const json = await res.json()
+    docData.value = json
+    docCache.value[lang] = json
     lastUpdated.value = new Date().toLocaleString()
   } catch (e) {
     error.value = e.message || t('errors.general')
@@ -94,43 +139,37 @@ async function fetchDocs() {
 }
 
 function refreshDocs() {
-  // Force re-fetch by clearing cache via a timestamp parameter
+  // Clear cache and re-fetch
   const lang = locale.value || 'en'
-  docUrl.value = `/docs/index.${lang}.html?t=${Date.now()}`
+  delete docCache.value[lang]
   fetchDocs()
 }
 
-function navigateBack() {
-  // For iframe mode, we can't easily navigate back inside the iframe
-  // This would be handled differently in production
-  if (useIframe.value && canGoBack.value) {
-    // Try to go back in iframe history
-    try {
-      const iframe = docIframe.value
-      if (iframe?.contentWindow?.history?.back) {
-        iframe.contentWindow.history.back()
-      }
-    } catch (e) {
-      // Cross-origin restrictions may prevent this
+/**
+ * Retrieve a specific section by its id from the loaded doc data.
+ * Useful for tooltip content in forms.
+ * @param {string} sectionId - The section id (e.g. '_frontend_overview')
+ * @returns {object|null} The section object or null
+ */
+function getDocSection(sectionId) {
+  if (!docData.value?.sections) return null
+  // Search top-level sections
+  const found = docData.value.sections.find(s => s.id === sectionId)
+  if (found) return found
+  // Search subsections
+  for (const section of docData.value.sections) {
+    if (section.subsections) {
+      const sub = section.subsections.find(s => s.id === sectionId)
+      if (sub) return sub
     }
   }
+  return null
 }
 
-function onIframeLoad() {
-  canGoBack.value = true
+// Expose getDocSection globally for use by form components
+if (typeof window !== 'undefined') {
+  window.__getDocSection = getDocSection
 }
-
-// Basic HTML sanitization for v-html mode
-const sanitizedHtml = computed(() => {
-  if (!htmlContent.value) return ''
-  // Remove script tags and event handlers for security
-  let cleaned = htmlContent.value.replace(/<script[^>]*>.*?<\/script>/gi, '')
-  cleaned = cleaned.replace(/on\w+="[^"]*"/gi, '')
-  cleaned = cleaned.replace(/on\w+='[^']*'/gi, '')
-  return cleaned
-})
-
-let docIframe = ref(null)
 
 onMounted(fetchDocs)
 </script>
@@ -166,7 +205,6 @@ onMounted(fetchDocs)
   gap: 0.5rem;
 }
 
-.docs-nav-btn,
 .docs-dashboard-btn,
 .docs-refresh-btn {
   padding: 0.4rem 1rem;
@@ -174,22 +212,6 @@ onMounted(fetchDocs)
   font-size: 0.8rem;
   font-weight: 500;
   transition: all 0.2s;
-}
-
-.docs-nav-btn {
-  background: var(--bg-card);
-  color: var(--text-secondary);
-  border: 1px solid var(--border-glass);
-}
-
-.docs-nav-btn:hover:not(:disabled) {
-  background: var(--bg-card-hover);
-  color: var(--text-primary);
-}
-
-.docs-nav-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
 }
 
 .docs-dashboard-btn {
@@ -268,20 +290,77 @@ onMounted(fetchDocs)
   border: 1px solid var(--border-glass);
   border-radius: 12px;
   overflow: hidden;
-}
-
-.docs-iframe {
-  width: 100%;
-  height: 100%;
-  border: none;
-  min-height: 500px;
-}
-
-.docs-html {
   padding: 2rem;
   overflow-y: auto;
   max-height: calc(100vh - 10rem);
+}
+
+.docs-json {
   line-height: 1.6;
+}
+
+.docs-section-title {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding-bottom: 0.5rem;
+}
+
+.docs-subsection {
+  margin-left: 1rem;
+}
+
+.docs-subsection-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+}
+
+.docs-paragraph {
+  margin: 0.6em 0;
+  color: var(--text-secondary);
+}
+
+.docs-table-wrapper {
+  margin: 1em 0;
+  overflow-x: auto;
+}
+
+.docs-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.docs-table th,
+.docs-table td {
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 0.6rem 1rem;
+  text-align: left;
+}
+
+.docs-table th {
+  background: rgba(255,255,255,0.06);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.docs-table td {
+  color: var(--text-secondary);
+}
+
+.docs-list {
+  padding-left: 1.5em;
+  margin: 0.6em 0;
+}
+
+.docs-list li {
+  margin: 0.3em 0;
+  color: var(--text-secondary);
 }
 
 /* Footer */

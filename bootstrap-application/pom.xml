@@ -69,12 +69,12 @@
                         </configuration>
                     </execution>
                     <execution>
-                        <id>asciidoc-to-html</id>
+                        <id>asciidoc-to-json</id>
                         <phase>generate-resources</phase>
                         <configuration>
                             <executable>node</executable>
                             <arguments>
-                                <argument>${project.basedir}/src/main/scripts/asciidoc-to-html.mjs</argument>
+                                <argument>${project.basedir}/src/main/scripts/asciidoc-to-json.mjs</argument>
                             </arguments>
                         </configuration>
                         <goals><goal>exec</goal></goals>
