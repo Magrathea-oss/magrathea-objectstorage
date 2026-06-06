@@ -59,7 +59,7 @@ public class AdminServerConfig {
                     .contentType(MediaType.valueOf("image/svg+xml"))
                     .body(BodyInserters.fromResource(new ClassPathResource("static/icons.svg")))))
             .and(RouterFunctions.resources("/docs/**", new ClassPathResource("static/docs/")))
-            .and(route(GET("/{path:^(?!admin|assets|docs|favicon|icons).*$}"), req ->
+            .and(route(GET("/{path:^(?!admin|assets).*$}"), req ->
                 ServerResponse.ok()
                     .contentType(MediaType.TEXT_HTML)
                     .body(BodyInserters.fromResource(new ClassPathResource("static/index.html")))));
