@@ -75,8 +75,6 @@
                             <executable>node</executable>
                             <arguments>
                                 <argument>${project.basedir}/src/main/scripts/asciidoc-to-html.mjs</argument>
-                                <argument>${project.basedir}/../docs/usermanual/index.adoc</argument>
-                                <argument>${project.basedir}/src/main/resources/static/docs</argument>
                             </arguments>
                         </configuration>
                         <goals><goal>exec</goal></goals>

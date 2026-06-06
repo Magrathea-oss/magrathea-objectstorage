@@ -1,0 +1,61 @@
+= Magrathea ObjectStore — Manual de Usuario
+:doctype: article
+:icons: font
+:sectlinks:
+:source-highlighter: highlight.js
+
+== Visión General del Frontend
+
+Magrathea ObjectStore incluye un frontend de administración basado en Vue.js, servido en el puerto 8081.
+
+=== Acceso al Frontend
+
+Abre tu navegador en:
+
+* `http://localhost:8081/` — por defecto
+* `http://<host>:8081/` — desde otra máquina en la LAN
+
+El frontend es servido por el servidor de administración (Netty embebido independiente en el puerto 8081), independiente de la API S3 en el puerto 8080.
+
+=== Páginas
+
+| Página | URL | Descripción |
+|--------|-----|-------------|
+| Dashboard | `/` | Vista general con diseño glassmorphism |
+| Buckets | `/buckets` | Gestión de buckets S3 |
+| Storage Policies | `/storage-policies` | Configuración de políticas de almacenamiento (API Admin) |
+| Documentación | `/docs` | Este manual de usuario |
+
+=== Idiomas Soportados
+
+El frontend soporta 5 idiomas mediante vue-i18n:
+
+* English (en)
+* Italiano (it)
+* Español (es)
+* Deutsch (de)
+* 中文 (cn)
+
+El idioma se puede cambiar mediante el selector de idioma en la esquina superior derecha.
+
+=== Tema
+
+La interfaz utiliza un diseño glassmorphism con:
+
+* Fondos de vidrio esmerilado (`backdrop-filter: blur`)
+* Superposiciones de gradientes
+* Transiciones suaves
+* Tema oscuro con colores de acento
+
+=== API de Administración
+
+La API de administración es REST con HATEOAS, disponible en el puerto 8081:
+
+* `GET /admin/health` — verificación de salud
+* `GET /admin/storage-policies` — listar todas las políticas de almacenamiento
+* `GET /admin/storage-policies/{id}` — obtener una política
+* `POST /admin/storage-policies` — crear una política
+* `PUT /admin/storage-policies/{id}` — actualizar una política
+* `DELETE /admin/storage-policies/{id}` — eliminar una política
+
+Todas las respuestas incluyen `_links` para navegación HATEOAS.

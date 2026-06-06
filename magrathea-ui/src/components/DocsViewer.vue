@@ -64,6 +64,8 @@ import { useRouter } from 'vue-router'
 const { t } = useI18n()
 const router = useRouter()
 
+const { locale } = useI18n()
+
 const loading = ref(true)
 const error = ref(null)
 const htmlContent = ref('')
@@ -76,10 +78,13 @@ async function fetchDocs() {
   loading.value = true
   error.value = null
   try {
-    const res = await fetch('/docs/index.html')
+    const lang = locale.value || 'en'
+    const url = `/docs/index.${lang}.html`
+    const res = await fetch(url)
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
     const html = await res.text()
     htmlContent.value = html
+    docUrl.value = url
     lastUpdated.value = new Date().toLocaleString()
   } catch (e) {
     error.value = e.message || t('errors.general')
@@ -90,7 +95,8 @@ async function fetchDocs() {
 
 function refreshDocs() {
   // Force re-fetch by clearing cache via a timestamp parameter
-  docUrl.value = `/docs/index.html?t=${Date.now()}`
+  const lang = locale.value || 'en'
+  docUrl.value = `/docs/index.${lang}.html?t=${Date.now()}`
   fetchDocs()
 }
 
