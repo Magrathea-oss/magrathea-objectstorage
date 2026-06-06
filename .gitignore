@@ -8,3 +8,4 @@ target
 /.pi
 bootstrap-application/node/
 magrathea-ui/node/
+node_modules/
