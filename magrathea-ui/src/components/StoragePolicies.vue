@@ -32,7 +32,6 @@
         <thead>
           <tr>
             <th>{{ $t('storagePolicies.storageClassId') }}</th>
-            <th>{{ $t('storagePolicies.chunking') }}</th>
             <th>{{ $t('storagePolicies.dedup') }}</th>
             <th>{{ $t('storagePolicies.compression') }}</th>
             <th>{{ $t('storagePolicies.encryption') }}</th>
@@ -45,16 +44,11 @@
           <tr v-for="policy in policies" :key="policy.storageClassId">
             <td class="cell-id">{{ policy.storageClassId }}</td>
             <td class="cell-nested">
-              <span v-if="policy.chunking">
-                {{ $t('storagePolicies.chunkSize') }}: {{ policy.chunking.chunkSize }}<br>
-                {{ $t('storagePolicies.alignment') }}: {{ policy.chunking.alignment }}
-              </span>
-              <span v-else class="cell-na">—</span>
-            </td>
-            <td class="cell-nested">
               <span v-if="policy.dedup">
                 {{ $t('storagePolicies.dedupAlgorithm') }}: {{ policy.dedup.algorithm }}<br>
-                {{ $t('storagePolicies.dedupScope') }}: {{ policy.dedup.scope }}
+                {{ $t('storagePolicies.dedupScope') }}: {{ policy.dedup.scope }}<br>
+                {{ $t('storagePolicies.dedupChunkSize') }}: {{ policy.dedup.chunkSize }}<br>
+                {{ $t('storagePolicies.dedupAlignment') }}: {{ policy.dedup.alignment }}
               </span>
               <span v-else class="cell-na">—</span>
             </td>
@@ -116,24 +110,6 @@
           </div>
 
           <fieldset>
-            <legend>{{ $t('storagePolicies.chunking') }}</legend>
-            <div class="form-row">
-              <div class="form-group">
-                <label>{{ $t('storagePolicies.chunkSize') }}</label>
-                <input v-model="form.chunking.chunkSize" class="form-input" type="number" min="1" />
-              </div>
-              <div class="form-group">
-                <label>{{ $t('storagePolicies.alignment') }}</label>
-                <select v-model="form.chunking.alignment" class="form-input">
-                  <option value="BYTE">Byte</option>
-                  <option value="BLOCK">Block</option>
-                  <option value="STRIPE">Stripe</option>
-                </select>
-              </div>
-            </div>
-          </fieldset>
-
-          <fieldset>
             <legend>{{ $t('storagePolicies.dedup') }}</legend>
             <div class="form-row">
               <div class="form-group">
@@ -150,6 +126,21 @@
                   <option value="OBJECT">Object</option>
                   <option value="BUCKET">Bucket</option>
                   <option value="GLOBAL">Global</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>{{ $t('storagePolicies.dedupChunkSize') }}</label>
+                <input v-model="form.dedup.chunkSize" class="form-input" type="number" min="1" />
+              </div>
+              <div class="form-group">
+                <label>{{ $t('storagePolicies.dedupAlignment') }}</label>
+                <select v-model="form.dedup.alignment" class="form-input">
+                  <option value="NONE">None</option>
+                  <option value="BYTE">Byte</option>
+                  <option value="BLOCK">Block</option>
+                  <option value="STRIPE">Stripe</option>
                 </select>
               </div>
             </div>
@@ -254,8 +245,7 @@ const policyToDelete = ref(null)
 
 const emptyForm = () => ({
   storageClassId: '',
-  chunking: { chunkSize: '', alignment: 'BYTE' },
-  dedup: { algorithm: 'SHA256', scope: 'OBJECT' },
+  dedup: { algorithm: 'SHA256', scope: 'OBJECT', chunkSize: 1048576, alignment: 'NONE' },
   compression: { algorithm: 'GZIP', level: '' },
   encryption: { algorithm: '' },
   erasureCoding: { dataBlocks: '', parityBlocks: '' },
@@ -290,12 +280,9 @@ function openEditForm(policy) {
   isEditing.value = true
   form.value = {
     storageClassId: policy.storageClassId || '',
-    chunking: policy.chunking
-      ? { chunkSize: policy.chunking.chunkSize ?? '', alignment: policy.chunking.alignment || 'BYTE' }
-      : { chunkSize: '', alignment: 'BYTE' },
     dedup: policy.dedup
-      ? { algorithm: policy.dedup.algorithm || 'SHA256', scope: policy.dedup.scope || 'OBJECT' }
-      : { algorithm: 'SHA256', scope: 'OBJECT' },
+      ? { algorithm: policy.dedup.algorithm || 'SHA256', scope: policy.dedup.scope || 'OBJECT', chunkSize: policy.dedup.chunkSize ?? 1048576, alignment: policy.dedup.alignment || 'NONE' }
+      : { algorithm: 'SHA256', scope: 'OBJECT', chunkSize: 1048576, alignment: 'NONE' },
     compression: policy.compression
       ? { algorithm: policy.compression.algorithm || 'GZIP', level: policy.compression.level ?? '' }
       : { algorithm: 'GZIP', level: '' },
@@ -319,11 +306,13 @@ function closeModal() {
 function buildPayload() {
   const payload = {
     storageClassId: form.value.storageClassId,
-    chunking: form.value.chunking.chunkSize !== ''
-      ? { chunkSize: Number(form.value.chunking.chunkSize), alignment: form.value.chunking.alignment }
-      : null,
     dedup: form.value.dedup.algorithm
-      ? { algorithm: form.value.dedup.algorithm, scope: form.value.dedup.scope }
+      ? {
+          algorithm: form.value.dedup.algorithm,
+          scope: form.value.dedup.scope,
+          chunkSize: Number(form.value.dedup.chunkSize),
+          alignment: form.value.dedup.alignment
+        }
       : null,
     compression: form.value.compression.algorithm
       ? { algorithm: form.value.compression.algorithm, level: form.value.compression.level !== '' ? Number(form.value.compression.level) : null }

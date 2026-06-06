@@ -1,6 +1,5 @@
 package com.example.magrathea.storageengine.domain.service;
 
-import com.example.magrathea.storageengine.domain.valueobject.ChunkingConfig;
 import com.example.magrathea.storageengine.domain.valueobject.CompressionConfig;
 import com.example.magrathea.storageengine.domain.valueobject.DedupConfig;
 import com.example.magrathea.storageengine.domain.valueobject.EffectiveStoragePolicy;
@@ -115,7 +114,6 @@ public class EffectivePolicyResolver {
         return EffectiveStoragePolicy.of(
                 policy.id(),
                 context.bucket(),
-                policy.chunking(),
                 dedup,
                 compression,
                 encryption,

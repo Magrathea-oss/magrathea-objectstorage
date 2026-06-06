@@ -9,7 +9,6 @@ import java.util.Optional;
 public record EffectiveStoragePolicy(
         StorageClassId storageClassId,
         BucketRef bucketRef,
-        ChunkingConfig chunking,
         Optional<DedupConfig> dedup,
         Optional<CompressionConfig> compression,
         Optional<EncryptionPolicy> encryption,
@@ -19,7 +18,6 @@ public record EffectiveStoragePolicy(
     public EffectiveStoragePolicy {
         java.util.Objects.requireNonNull(storageClassId, "storageClassId must not be null");
         java.util.Objects.requireNonNull(bucketRef, "bucketRef must not be null");
-        java.util.Objects.requireNonNull(chunking, "chunking must not be null");
         java.util.Objects.requireNonNull(dedup, "dedup must not be null");
         java.util.Objects.requireNonNull(compression, "compression must not be null");
         java.util.Objects.requireNonNull(encryption, "encryption must not be null");
@@ -30,13 +28,12 @@ public record EffectiveStoragePolicy(
     public static EffectiveStoragePolicy of(
             StorageClassId storageClassId,
             BucketRef bucketRef,
-            ChunkingConfig chunking,
             Optional<DedupConfig> dedup,
             Optional<CompressionConfig> compression,
             Optional<EncryptionPolicy> encryption,
             Optional<ErasureCodingConfig> erasureCoding,
             ReplicationConfig replication) {
         return new EffectiveStoragePolicy(
-                storageClassId, bucketRef, chunking, dedup, compression, encryption, erasureCoding, replication);
+                storageClassId, bucketRef, dedup, compression, encryption, erasureCoding, replication);
     }
 }

@@ -4,7 +4,8 @@ import java.util.Optional;
 
 public record WorkflowCompatibilityKey(
         DedupNamespace namespace,
-        ChunkingConfig chunking,
+        long chunkSize,
+        ChunkAlignment alignment,
         FingerprintAlgorithm fingerprintAlgorithm,
         Optional<CompressionConfig> compression,
         Optional<EncryptionConfig> encryption,
@@ -12,15 +13,18 @@ public record WorkflowCompatibilityKey(
 
     public WorkflowCompatibilityKey {
         java.util.Objects.requireNonNull(namespace, "namespace must not be null");
-        java.util.Objects.requireNonNull(chunking, "chunking must not be null");
+        java.util.Objects.requireNonNull(alignment, "alignment must not be null");
         java.util.Objects.requireNonNull(fingerprintAlgorithm, "fingerprintAlgorithm must not be null");
         java.util.Objects.requireNonNull(compression, "compression must not be null");
         java.util.Objects.requireNonNull(encryption, "encryption must not be null");
         java.util.Objects.requireNonNull(erasureCoding, "erasureCoding must not be null");
+        if (chunkSize <= 0) throw new IllegalArgumentException("chunkSize must be positive: " + chunkSize);
     }
 
     public static WorkflowCompatibilityKey from(EffectiveStoragePolicy effectivePolicy) {
         DedupNamespace namespace;
+        long chunkSize;
+        ChunkAlignment alignment;
         if (effectivePolicy.dedup().isPresent()) {
             DedupConfig dedupConfig = effectivePolicy.dedup().get();
             if (dedupConfig.scope() == DedupScope.GLOBAL_LEVEL) {
@@ -28,8 +32,12 @@ public record WorkflowCompatibilityKey(
             } else {
                 namespace = new DedupNamespace.BucketDedupNamespace(effectivePolicy.bucketRef());
             }
+            chunkSize = dedupConfig.chunkSize();
+            alignment = dedupConfig.alignment();
         } else {
             namespace = DedupNamespace.GlobalDedupNamespace.INSTANCE;
+            chunkSize = 1048576L;
+            alignment = ChunkAlignment.NONE;
         }
 
         FingerprintAlgorithm fingerprintAlgorithm = effectivePolicy.dedup()
@@ -43,7 +51,8 @@ public record WorkflowCompatibilityKey(
 
         return new WorkflowCompatibilityKey(
                 namespace,
-                effectivePolicy.chunking(),
+                chunkSize,
+                alignment,
                 fingerprintAlgorithm,
                 compression,
                 encryption,
@@ -52,7 +61,7 @@ public record WorkflowCompatibilityKey(
 
     public DeviceConfigurationHash deriveDeviceHash() {
         String canonical = namespace.canonicalRepresentation()
-                + ":" + chunking.chunkSize() + ":" + chunking.alignment().name()
+                + ":" + chunkSize + ":" + alignment.name()
                 + ":" + fingerprintAlgorithm.name()
                 + ":" + compression.map(c -> c.algorithm().name() + ":" + c.level()).orElse("none")
                 + ":" + encryption.map(e -> e.algorithm().name()).orElse("none")

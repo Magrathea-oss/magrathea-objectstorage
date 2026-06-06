@@ -24,24 +24,19 @@ public class AdminRouter {
         // Default policies seeded from StorageClass definitions (anti-corruption layer)
         policies.put("STANDARD", StoragePolicy.of(
             StorageClassId.of("STANDARD"),
-            ChunkingConfig.of((int) (8L * 1024 * 1024), ChunkAlignment.NONE),
-            Optional.empty(),
-            Optional.empty(),
-            Optional.empty(),
-            Optional.empty(),
+            Optional.empty(),                           // no dedup
+            Optional.empty(),                           // no compression
+            Optional.empty(),                           // no encryption
+            Optional.empty(),                           // no erasure coding
             ReplicationConfig.of(1)));
-        policies.put("STANDARD_IA", StoragePolicy.of(
-            StorageClassId.of("STANDARD_IA"),
-            ChunkingConfig.of((int) (8L * 1024 * 1024), ChunkAlignment.NONE),
-            Optional.empty(),
-            Optional.of(CompressionConfig.of(CompressionAlgorithm.GZIP, 6)),
-            Optional.empty(),
-            Optional.empty(),
-            ReplicationConfig.of(1)));
+
         policies.put("GLACIER", StoragePolicy.of(
             StorageClassId.of("GLACIER"),
-            ChunkingConfig.of((int) (64L * 1024 * 1024), ChunkAlignment.NONE),
-            Optional.of(DedupConfig.of(DedupScope.BUCKET_LEVEL, FingerprintAlgorithm.SHA256)),
+            Optional.of(DedupConfig.of(
+                DedupScope.BUCKET_LEVEL,
+                FingerprintAlgorithm.SHA256,
+                64L * 1024 * 1024,                     // 64MB chunk size
+                ChunkAlignment.NONE)),
             Optional.of(CompressionConfig.of(CompressionAlgorithm.GZIP, 6)),
             Optional.of(EncryptionPolicy.of(EncryptionAlgorithm.SSE_S3)),
             Optional.empty(),
@@ -111,8 +106,14 @@ public class AdminRouter {
     private Map<String, Object> toItemMap(StoragePolicy p) {
         Map<String, Object> map = new HashMap<>();
         map.put("storageClassId", p.id().value());
-        map.put("chunking", Map.of("chunkSize", p.chunking().chunkSize(), "alignment", p.chunking().alignment().name()));
-        p.dedup().ifPresent(d -> map.put("dedup", Map.of("algorithm", d.algorithm().name(), "scope", d.scope().name())));
+        p.dedup().ifPresent(d -> {
+            Map<String, Object> dedupMap = new HashMap<>();
+            dedupMap.put("algorithm", d.algorithm().name());
+            dedupMap.put("scope", d.scope().name());
+            dedupMap.put("chunkSize", d.chunkSize());
+            dedupMap.put("alignment", d.alignment().name());
+            map.put("dedup", dedupMap);
+        });
         p.compression().ifPresent(c -> map.put("compression", Map.of("algorithm", c.algorithm().name(), "level", c.level())));
         p.encryption().ifPresent(e -> map.put("encryption", Map.of("algorithm", e.algorithm().name())));
         p.erasureCoding().ifPresent(e -> map.put("erasureCoding", Map.of("dataBlocks", e.dataBlocks(), "parityBlocks", e.parityBlocks())));
@@ -128,23 +129,19 @@ public class AdminRouter {
     record HealthResponse(String status, String message, List<Map<String, Object>> _links) {}
     record StoragePolicyRequest(
             String storageClassId,
-            int chunkSize,
-            String chunkAlignment,
             Map<String, Object> dedup,
             Map<String, Object> compression,
             Map<String, Object> encryption,
             Map<String, Object> erasureCoding,
             int replicationFactor) {
         StoragePolicy toDomain() {
-            ChunkAlignment alignment = chunkAlignment == null
-                ? ChunkAlignment.NONE
-                : ChunkAlignment.valueOf(chunkAlignment);
             return StoragePolicy.of(
                 StorageClassId.of(storageClassId),
-                ChunkingConfig.of(chunkSize, alignment),
                 dedup == null ? Optional.empty() : Optional.of(DedupConfig.of(
                     DedupScope.valueOf((String) dedup.get("scope")),
-                    FingerprintAlgorithm.valueOf((String) dedup.get("algorithm")))),
+                    FingerprintAlgorithm.valueOf((String) dedup.get("algorithm")),
+                    dedup.containsKey("chunkSize") ? (long) dedup.get("chunkSize") : 1048576L,
+                    dedup.containsKey("alignment") ? ChunkAlignment.valueOf((String) dedup.get("alignment")) : ChunkAlignment.NONE)),
                 compression == null ? Optional.empty() : Optional.of(CompressionConfig.of(
                     CompressionAlgorithm.valueOf((String) compression.get("algorithm")),
                     compression.containsKey("level") ? (int) compression.get("level") : 6)),
