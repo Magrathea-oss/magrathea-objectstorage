@@ -101,6 +101,16 @@ function blockToJson(node) {
       return { type: 'codeblock', content, style };
     }
 
+    case 'image': {
+      const target = node.getAttribute('target') || '';
+      const alt = node.getAttribute('alt') || '';
+      const width = node.getAttribute('width') || '';
+      const height = node.getAttribute('height') || '';
+      const attrs = width ? (height ? ` width="${width}" height="${height}"` : ` width="${width}"`) : '';
+      const html = `<img src="${target}" alt="${alt}"${attrs}>`;
+      return { type: 'image', html };
+    }
+
     case 'admonition': {
       const admonitionType = node.getType() || 'note';
       const html = node.getContent() || '';
@@ -122,6 +132,79 @@ function blockToJson(node) {
 function blocksToJson(blocks) {
   if (!blocks || !blocks.length) return [];
   return blocks.map(b => blockToJson(b)).filter(Boolean);
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Image path fixers
+// ──────────────────────────────────────────────────────────────────
+
+function fixImagePaths(html) {
+  if (!html || typeof html !== 'string') return html;
+  html = html.replace(
+    /<img\s+src="arc42-logo\.png"/g,
+    '<img src="/docs/arc42/images/arc42-logo.png"'
+  );
+  html = html.replace(
+    /<img\s+src="\.\.\/\.\.\/c4\/images\/([^"]+)"/g,
+    (match, filename) => `<img src="/docs/c4/images/${filename}"`
+  );
+  return html;
+}
+
+function fixImagesInTree(obj) {
+  if (!obj || typeof obj !== 'object') return;
+  if (Array.isArray(obj)) {
+    for (const item of obj) fixImagesInTree(item);
+    return;
+  }
+  if (obj.html && typeof obj.html === 'string') obj.html = fixImagePaths(obj.html);
+  if (obj.title && typeof obj.title === 'string') obj.title = fixImagePaths(obj.title);
+  for (const val of Object.values(obj)) {
+    if (typeof val === 'object' && val !== null) fixImagesInTree(val);
+  }
+}
+
+function parsePipeTable(text) {
+  if (!text || typeof text !== 'string') return null;
+  const lines = text.split('\n').filter(l => l.trim() !== '');
+  if (lines.length < 2) return null;
+  const firstLine = lines[0].trim();
+  if (!firstLine.startsWith('|') || (firstLine.match(/\|/g) || []).length < 2) return null;
+  const secondLine = lines[1].trim();
+  if (!secondLine.startsWith('|') || !secondLine.includes('-')) return null;
+  function parseRow(line) { return line.split('|').map(cell => cell.trim()); }
+  const headerCells = parseRow(firstLine);
+  const headers = headerCells[0] === '' ? headerCells.slice(1) : headerCells;
+  if (headers[headers.length - 1] === '') headers.pop();
+  const dataLines = lines.slice(2);
+  const rows = dataLines.map(line => {
+    const cells = parseRow(line);
+    const row = cells[0] === '' ? cells.slice(1) : cells;
+    if (row[row.length - 1] === '') row.pop();
+    return row;
+  }).filter(r => r.length > 0);
+  return { headers, rows };
+}
+
+function convertPipeTables(obj) {
+  if (!obj || typeof obj !== 'object') return;
+  if (Array.isArray(obj)) {
+    for (let i = 0; i < obj.length; i++) {
+      const item = obj[i];
+      if (item && item.type === 'paragraph' && item.html) {
+        const table = parsePipeTable(item.html);
+        if (table) {
+          obj[i] = { type: 'table', headers: table.headers, rows: table.rows };
+        }
+      } else if (typeof item === 'object') {
+        convertPipeTables(item);
+      }
+    }
+    return;
+  }
+  for (const val of Object.values(obj)) {
+    if (typeof val === 'object' && val !== null) convertPipeTables(val);
+  }
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -153,6 +236,9 @@ const doc = instance.loadFile(ARC42_TEMPLATE_PATH, {
 
 // Build JSON tree
 const jsonTree = blockToJson(doc);
+
+fixImagesInTree(jsonTree);
+convertPipeTables(jsonTree);
 
 // Wrap with metadata
 const output = {
