@@ -18,6 +18,18 @@ const routes = [
     name: 'docs',
     component: DocsViewer,
   },
+  {
+    path: '/docs/arc42',
+    name: 'docs-arc42',
+    component: DocsViewer,
+    props: { initialDocType: 'arc42' },
+  },
+  {
+    path: '/docs/test-report',
+    name: 'docs-test-report',
+    component: DocsViewer,
+    props: { initialDocType: 'testreport' },
+  },
 ]
 
 export default createRouter({

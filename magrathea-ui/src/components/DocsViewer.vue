@@ -13,6 +13,19 @@
       </div>
     </div>
 
+    <!-- Tabs -->
+    <div class="docs-tabs">
+      <button
+        v-for="tab in tabs"
+        :key="tab.id"
+        class="docs-tab"
+        :class="{ 'docs-tab--active': activeTab === tab.id }"
+        @click="switchTab(tab.id)"
+      >
+        {{ tab.label }}
+      </button>
+    </div>
+
     <!-- Loading -->
     <div v-if="loading" class="docs-loading">
       <span class="loading-spinner"></span>
@@ -54,43 +67,74 @@ const router = useRouter()
 
 const { locale } = useI18n()
 
+const props = defineProps({
+  initialDocType: {
+    type: String,
+    default: 'usermanual'
+  }
+})
+
 const loading = ref(true)
 const error = ref(null)
 const docData = ref(null)
 const lastUpdated = ref('')
 const docCache = ref({})
+const activeTab = ref(props.initialDocType)
+
+const tabs = [
+  { id: 'usermanual', label: 'User Manual', url: lang => `/docs/index.${lang}.json` },
+  { id: 'arc42', label: 'ARC42', url: () => '/docs/arc42.json' },
+  { id: 'testreport', label: 'Test Report', url: () => '/docs/test-report.json' },
+]
+
+function getDocUrl(tabId) {
+  if (tabId === 'usermanual') {
+    const lang = locale.value || 'en'
+    return `/docs/index.${lang}.json`
+  }
+  return tabId === 'arc42' ? '/docs/arc42.json' : '/docs/test-report.json'
+}
 
 // Watch locale changes → reload docs
 watch(locale, () => {
-  fetchDocs()
+  if (activeTab.value === 'usermanual') {
+    fetchDocs()
+  }
 })
 
 async function fetchDocs() {
   loading.value = true
   error.value = null
-  const lang = locale.value || 'en'
+  const tab = activeTab.value
+
+  const cacheKey = tab === 'usermanual' ? (locale.value || 'en') : tab
 
   // Return cached if available
-  if (docCache.value[lang]) {
-    docData.value = docCache.value[lang]
+  if (docCache.value[cacheKey]) {
+    docData.value = docCache.value[cacheKey]
     loading.value = false
     lastUpdated.value = new Date().toLocaleString()
     return
   }
 
   try {
-    const url = `/docs/index.${lang}.json`
+    const url = getDocUrl(tab)
     const res = await fetch(url)
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
     const json = await res.json()
     docData.value = json
-    docCache.value[lang] = json
+    docCache.value[cacheKey] = json
     lastUpdated.value = new Date().toLocaleString()
   } catch (e) {
     error.value = e.message || t('errors.general')
   } finally {
     loading.value = false
   }
+}
+
+function switchTab(tabId) {
+  activeTab.value = tabId
+  fetchDocs()
 }
 
 function refreshDocs() {
@@ -191,6 +235,40 @@ onMounted(fetchDocs)
 .docs-dashboard-btn:hover {
   background: var(--accent);
   box-shadow: 0 0 16px var(--accent-glow);
+}
+
+/* Tabs */
+.docs-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-glass);
+  padding-bottom: 0;
+}
+
+.docs-tab {
+  padding: 0.5rem 1.25rem;
+  border: 1px solid var(--border-glass);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.docs-tab:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.docs-tab--active {
+  background: var(--bg-card);
+  color: var(--accent);
+  border-color: var(--accent);
+  border-bottom-color: var(--bg-card);
 }
 
 .docs-refresh-btn {
