@@ -44,6 +44,10 @@ COPY magrathea-ui/index.html ./magrathea-ui/
 COPY magrathea-ui/public ./magrathea-ui/public/
 COPY magrathea-ui/src ./magrathea-ui/src/
 
+# Install npm dependencies (required for asciidoc-to-html and vite build)
+RUN npm install --prefix magrathea-ui && \
+    npm install -g @asciidoctor/core
+
 # Download Maven dependencies
 RUN mvn -B dependency:go-offline -DskipTests
 
@@ -62,6 +66,7 @@ COPY s3-reactive-api-adapter/src ./s3-reactive-api-adapter/src/
 COPY bootstrap-application/src ./bootstrap-application/src/
 
 # Build (Maven will call npm via exec-maven-plugin during generate-resources)
+ENV NODE_PATH=/build/magrathea-ui/node_modules
 RUN mvn -B clean package -DskipTests && \
     cp bootstrap-application/target/*.jar /app.jar
 

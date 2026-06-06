@@ -14,7 +14,8 @@ import org.springframework.context.annotation.ComponentScan;
 @ComponentScan(basePackages = {
     "com.example.magrathea.bootstrap",
     "com.example.magrathea.objectstore",
-    "com.example.magrathea.reactive"
+    "com.example.magrathea.reactive",
+    "com.example.magrathea.admin"
 })
 public class MagratheaApplication {
 

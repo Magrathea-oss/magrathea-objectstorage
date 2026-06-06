@@ -26,7 +26,7 @@
         </dependency>
         <dependency>
             <groupId>com.example</groupId>
-            <artifactId>bootstrap-application</artifactId>
+            <artifactId>storage-engine-domain</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

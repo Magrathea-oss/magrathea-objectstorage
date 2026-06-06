@@ -13,6 +13,7 @@
     "vue-i18n": "^10.0.8"
   },
   "devDependencies": {
+    "@asciidoctor/core": "^3.0.0",
     "@vitejs/plugin-vue": "^6.0.6",
     "vite": "^8.0.12"
   }
