@@ -19,12 +19,14 @@ Das Frontend wird vom Admin-Server (separater eingebetteter Netty auf Port 8081)
 
 === Seiten
 
-| Seite | URL | Beschreibung |
-|-------|-----|-------------|
-| Dashboard | `/` | Übersicht mit Glassmorphism-Design |
-| Buckets | `/buckets` | S3-Bucket-Verwaltung |
-| Storage Policies | `/storage-policies` | Speicherrichtlinien-Konfiguration (Admin-API) |
-| Dokumentation | `/docs` | Dieses Benutzerhandbuch |
+[%header]
+|===
+| Seite | URL | Beschreibung
+| Dashboard | `/` | Übersicht mit Glassmorphism-Design
+| Buckets | `/buckets` | S3-Bucket-Verwaltung
+| Storage Policies | `/storage-policies` | Speicherrichtlinien-Konfiguration (Admin-API)
+| Dokumentation | `/docs` | Dieses Benutzerhandbuch
+|===
 
 === Sprachunterstützung
 

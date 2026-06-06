@@ -93,7 +93,8 @@ function blockToJson(node) {
         type: 'list',
         style,
         items: items.map(item => {
-          const text = item.text || '';
+          // Use getText() for rendered HTML, fall back to text property
+          const text = typeof item.getText === 'function' ? item.getText() : (item.text || '');
           return {
             text,
             blocks: blocksToJson(item.getBlocks()),
@@ -106,10 +107,10 @@ function blockToJson(node) {
       const headRows = node.getHeadRows() || [];
       const bodyRows = node.getBodyRows() || [];
       const headers = headRows.length
-        ? headRows[0].map(cell => (typeof cell === 'string' ? cell : (cell.text || '')))
+        ? headRows[0].map(cell => (typeof cell === 'string' ? cell : cell.getText()))
         : [];
       const rows = bodyRows.map(row =>
-        row.map(cell => (typeof cell === 'string' ? cell : (cell.text || '')))
+        row.map(cell => (typeof cell === 'string' ? cell : cell.getText()))
       );
       return { type: 'table', headers, rows };
     }

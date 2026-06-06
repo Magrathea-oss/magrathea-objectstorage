@@ -9,7 +9,7 @@
 
     <div v-else-if="block.type === 'list'" class="docs-list-wrapper">
       <ul class="docs-list">
-        <li v-for="(item, li) in (block.items || [])" :key="'l'+li" v-html="item"></li>
+        <li v-for="(item, li) in (block.items || [])" :key="'l'+li" v-html="item.text || item"></li>
       </ul>
     </div>
 

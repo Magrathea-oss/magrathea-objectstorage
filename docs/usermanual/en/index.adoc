@@ -19,12 +19,14 @@ The frontend is served by the admin server (separate embedded Netty on port 8081
 
 === Pages
 
-| Page | URL | Description |
-|------|-----|-------------|
-| Dashboard | `/` | Overview with glassmorphism design |
-| Buckets | `/buckets` | S3 bucket management |
-| Storage Policies | `/storage-policies` | Storage policy configuration (Admin API) |
-| Documentation | `/docs` | This user manual |
+[%header]
+|===
+| Page | URL | Description
+| Dashboard | `/` | Overview with glassmorphism design
+| Buckets | `/buckets` | S3 bucket management
+| Storage Policies | `/storage-policies` | Storage policy configuration (Admin API)
+| Documentation | `/docs` | This user manual
+|===
 
 === Language Support
 

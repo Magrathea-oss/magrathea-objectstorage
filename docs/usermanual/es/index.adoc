@@ -19,12 +19,14 @@ El frontend es servido por el servidor de administración (Netty embebido indepe
 
 === Páginas
 
-| Página | URL | Descripción |
-|--------|-----|-------------|
-| Dashboard | `/` | Vista general con diseño glassmorphism |
-| Buckets | `/buckets` | Gestión de buckets S3 |
-| Storage Policies | `/storage-policies` | Configuración de políticas de almacenamiento (API Admin) |
-| Documentación | `/docs` | Este manual de usuario |
+[%header]
+|===
+| Página | URL | Descripción
+| Dashboard | `/` | Vista general con diseño glassmorphism
+| Buckets | `/buckets` | Gestión de buckets S3
+| Storage Policies | `/storage-policies` | Configuración de políticas de almacenamiento (API Admin)
+| Documentación | `/docs` | Este manual de usuario
+|===
 
 === Idiomas Soportados
 

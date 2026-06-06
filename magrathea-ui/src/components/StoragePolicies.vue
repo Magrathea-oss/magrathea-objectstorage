@@ -702,13 +702,18 @@ select.form-input {
   -webkit-appearance: none;
   -moz-appearance: none;
   cursor: pointer;
-  background-color: var(--bg-card);
+  background: var(--bg-secondary);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%239898b0' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.75rem center;
   background-size: 12px;
   padding-right: 2rem;
   color: var(--text-primary);
+  border: 1px solid var(--border-glass);
+  border-radius: 8px;
+  padding-top: 0.6rem;
+  padding-bottom: 0.6rem;
+  padding-left: 0.75rem;
 }
 
 .form-actions {
