@@ -13,8 +13,8 @@
       </div>
     </div>
 
-    <!-- Tabs -->
-    <div class="docs-tabs">
+    <!-- Tabs (hidden for single-doc views like ADR) -->
+    <div class="docs-tabs" v-if="activeTab !== 'adr'">
       <button
         v-for="tab in tabs"
         :key="tab.id"
@@ -59,11 +59,12 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import DocBlockRenderer from './DocBlockRenderer.vue'
 
 const { t } = useI18n()
 const router = useRouter()
+const route = useRoute()
 
 const { locale } = useI18n()
 
@@ -92,6 +93,10 @@ function getDocUrl(tabId) {
     const lang = locale.value || 'en'
     return `/docs/index.${lang}.json`
   }
+  if (tabId === 'adr') {
+    const adrId = route.params.id
+    return `/docs/adr/${adrId}.json`
+  }
   return tabId === 'arc42' ? '/docs/arc42.json' : '/docs/test-report.json'
 }
 
@@ -107,7 +112,7 @@ async function fetchDocs() {
   error.value = null
   const tab = activeTab.value
 
-  const cacheKey = tab === 'usermanual' ? (locale.value || 'en') : tab
+  const cacheKey = tab === 'adr' ? `adr-${route.params.id}` : (tab === 'usermanual' ? (locale.value || 'en') : tab)
 
   // Return cached if available
   if (docCache.value[cacheKey]) {

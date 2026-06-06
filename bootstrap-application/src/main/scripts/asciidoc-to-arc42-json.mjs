@@ -186,6 +186,46 @@ function parsePipeTable(text) {
   return { headers, rows };
 }
 
+function convertAdrLinks(obj) {
+  if (!obj || typeof obj !== 'object') return;
+  if (Array.isArray(obj)) {
+    for (const item of obj) convertAdrLinks(item);
+    return;
+  }
+  if (obj.html && typeof obj.html === 'string') {
+    obj.html = convertTextAdrLinks(obj.html);
+  }
+  if (obj.text && typeof obj.text === 'string') {
+    obj.text = convertTextAdrLinks(obj.text);
+  }
+  if (obj.title && typeof obj.title === 'string') {
+    obj.title = obj.title.replace(
+      /ADR[- ]?(\d{1,4})/g,
+      '<a href="/docs/adr/$1">ADR $1</a>'
+    );
+  }
+  for (const val of Object.values(obj)) {
+    if (typeof val === 'object' && val !== null) convertAdrLinks(val);
+  }
+}
+
+/**
+ * Convert ADR references in a text string to links.
+ */
+function convertTextAdrLinks(text) {
+  // Convert "ADR 0008" or "ADR-0008" or "ADR 8" to links
+  text = text.replace(
+    /ADR[- ]?(\d{1,4})/g,
+    '<a href="/docs/adr/$1">ADR $1</a>'
+  );
+  // Also convert [ADR 0008](...) style
+  text = text.replace(
+    /\[ADR[- ]?(\d{1,4})\]\([^)]*\)/g,
+    '<a href="/docs/adr/$1">ADR $1</a>'
+  );
+  return text;
+}
+
 function convertPipeTables(obj) {
   if (!obj || typeof obj !== 'object') return;
   if (Array.isArray(obj)) {
@@ -239,6 +279,7 @@ const jsonTree = blockToJson(doc);
 
 fixImagesInTree(jsonTree);
 convertPipeTables(jsonTree);
+convertAdrLinks(jsonTree);
 
 // Wrap with metadata
 const output = {

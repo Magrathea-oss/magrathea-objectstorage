@@ -13,6 +13,10 @@
       </ul>
     </div>
 
+    <div v-else-if="block.type === 'image'" class="docs-image">
+      <img :src="block.src || extractSrc(block.html)" :alt="block.alt || ''" class="docs-image-img" />
+    </div>
+
     <div v-else-if="block.type === 'table'" class="docs-table-wrapper">
       <table class="docs-table">
         <thead v-if="block.headers && block.headers.length">
@@ -43,6 +47,12 @@ defineProps({
     default: () => []
   }
 })
+
+function extractSrc(html) {
+  if (!html) return '';
+  const match = html.match(/src="([^"]+)"/);
+  return match ? match[1] : '';
+}
 </script>
 
 <style scoped>
@@ -98,5 +108,16 @@ defineProps({
 .docs-list li {
   margin: 0.3em 0;
   color: var(--text-secondary);
+}
+
+.docs-image {
+  margin: 1em 0;
+  text-align: center;
+}
+.docs-image-img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
 }
 </style>

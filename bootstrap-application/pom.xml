@@ -137,6 +137,17 @@
                         <goals><goal>exec</goal></goals>
                     </execution>
                     <execution>
+                        <id>convert-adr-to-json</id>
+                        <phase>generate-resources</phase>
+                        <configuration>
+                            <executable>node</executable>
+                            <arguments>
+                                <argument>${project.basedir}/src/main/scripts/adr-to-json.mjs</argument>
+                            </arguments>
+                        </configuration>
+                        <goals><goal>exec</goal></goals>
+                    </execution>
+                    <execution>
                         <id>npm-run-build</id>
                         <phase>generate-resources</phase>
                         <goals>

@@ -30,6 +30,12 @@ const routes = [
     component: DocsViewer,
     props: { initialDocType: 'testreport' },
   },
+  {
+    path: '/docs/adr/:id',
+    name: 'docs-adr',
+    component: DocsViewer,
+    props: { initialDocType: 'adr' },
+  },
 ]
 
 export default createRouter({
