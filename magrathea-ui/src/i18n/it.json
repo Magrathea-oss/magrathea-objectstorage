@@ -8,6 +8,8 @@
     "buckets": "Bucket",
     "objects": "Oggetti",
     "health": "Salute",
+    "storagePolicies": "Policies di Storage",
+    "docs": "Documentazione",
     "settings": "Impostazioni"
   },
   "buckets": {
@@ -36,11 +38,37 @@
     "uptime": "Uptime",
     "version": "Versione"
   },
+  "storagePolicies": {
+    "title": "Policies di Storage",
+    "create": "Crea Policy",
+    "createPolicy": "Crea Nuova Policy",
+    "editPolicy": "Modifica Policy",
+    "delete": "Elimina",
+    "edit": "Modifica",
+    "name": "Nome Policy",
+    "type": "Tipo",
+    "description": "Descrizione",
+    "bucket": "Bucket",
+    "configuration": "Configurazione",
+    "loading": "Caricamento policies...",
+    "empty": "Nessuna policy configurata.",
+    "deleteConfirm": "Elimina Policy",
+    "deleteWarning": "Sei sicuro di voler eliminare la policy '{name}'? Questa azione non può essere annullata."
+  },
+  "docs": {
+    "title": "Documentazione",
+    "loading": "Caricamento documentazione...",
+    "back": "Indietro",
+    "generated": "Documentazione generata"
+  },
   "actions": {
     "refresh": "Aggiorna",
     "cancel": "Annulla",
     "confirm": "Conferma",
-    "close": "Chiudi"
+    "close": "Chiudi",
+    "retry": "Riprova",
+    "save": "Salva",
+    "actions": "Azioni"
   },
   "errors": {
     "general": "Errore generico",

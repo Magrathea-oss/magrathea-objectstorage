@@ -8,6 +8,8 @@
     "buckets": "Buckets",
     "objects": "Objekte",
     "health": "Systemstatus",
+    "storagePolicies": "Speicherrichtlinien",
+    "docs": "Dokumentation",
     "settings": "Einstellungen"
   },
   "buckets": {
@@ -36,11 +38,37 @@
     "uptime": "Betriebszeit",
     "version": "Version"
   },
+  "storagePolicies": {
+    "title": "Speicherrichtlinien",
+    "create": "Richtlinie erstellen",
+    "createPolicy": "Neue Richtlinie erstellen",
+    "editPolicy": "Richtlinie bearbeiten",
+    "delete": "Löschen",
+    "edit": "Bearbeiten",
+    "name": "Richtlinienname",
+    "type": "Typ",
+    "description": "Beschreibung",
+    "bucket": "Bucket",
+    "configuration": "Konfiguration",
+    "loading": "Richtlinien werden geladen...",
+    "empty": "Keine Richtlinien konfiguriert.",
+    "deleteConfirm": "Richtlinie löschen",
+    "deleteWarning": "Sind Sie sicher, dass Sie die Richtlinie '{name}' löschen möchten? Dieser Vorgang kann nicht rückgängig gemacht werden."
+  },
+  "docs": {
+    "title": "Dokumentation",
+    "loading": "Dokumentation wird geladen...",
+    "back": "Zurück",
+    "generated": "Generierte Dokumentation"
+  },
   "actions": {
     "refresh": "Aktualisieren",
     "cancel": "Abbrechen",
     "confirm": "Bestätigen",
-    "close": "Schließen"
+    "close": "Schließen",
+    "retry": "Wiederholen",
+    "save": "Speichern",
+    "actions": "Aktionen"
   },
   "errors": {
     "general": "Ein Fehler ist aufgetreten",

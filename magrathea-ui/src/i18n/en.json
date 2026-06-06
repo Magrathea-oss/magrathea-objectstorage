@@ -8,6 +8,8 @@
     "buckets": "Buckets",
     "objects": "Objects",
     "health": "Health",
+    "storagePolicies": "Storage Policies",
+    "docs": "Docs",
     "settings": "Settings"
   },
   "buckets": {
@@ -36,11 +38,37 @@
     "uptime": "Uptime",
     "version": "Version"
   },
+  "storagePolicies": {
+    "title": "Storage Policies",
+    "create": "Create Policy",
+    "createPolicy": "Create New Policy",
+    "editPolicy": "Edit Policy",
+    "delete": "Delete",
+    "edit": "Edit",
+    "name": "Policy Name",
+    "type": "Type",
+    "description": "Description",
+    "bucket": "Bucket",
+    "configuration": "Configuration",
+    "loading": "Loading policies...",
+    "empty": "No policies configured yet.",
+    "deleteConfirm": "Delete Policy",
+    "deleteWarning": "Are you sure you want to delete the policy '{name}'? This action cannot be undone."
+  },
+  "docs": {
+    "title": "Documentation",
+    "loading": "Loading documentation...",
+    "back": "Back",
+    "generated": "Generated documentation"
+  },
   "actions": {
     "refresh": "Refresh",
     "cancel": "Cancel",
     "confirm": "Confirm",
-    "close": "Close"
+    "close": "Close",
+    "retry": "Retry",
+    "save": "Save",
+    "actions": "Actions"
   },
   "errors": {
     "general": "An error occurred",

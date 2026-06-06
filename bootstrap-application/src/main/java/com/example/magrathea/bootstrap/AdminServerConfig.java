@@ -58,7 +58,11 @@ public class AdminServerConfig {
                 ServerResponse.ok()
                     .contentType(MediaType.valueOf("image/svg+xml"))
                     .body(BodyInserters.fromResource(new ClassPathResource("static/icons.svg")))))
-            .and(RouterFunctions.resources("/docs/**", new ClassPathResource("static/docs/")));
+            .and(RouterFunctions.resources("/docs/**", new ClassPathResource("static/docs/")))
+            .and(route(GET("/{path:^(?!admin|assets|docs|favicon|icons).*$}"), req ->
+                ServerResponse.ok()
+                    .contentType(MediaType.TEXT_HTML)
+                    .body(BodyInserters.fromResource(new ClassPathResource("static/index.html")))));
 
         HttpHandler httpHandler = RouterFunctions.toHttpHandler(router);
         ReactorHttpHandlerAdapter adapter = new ReactorHttpHandlerAdapter(httpHandler);

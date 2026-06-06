@@ -8,6 +8,8 @@
     "buckets": "存储桶",
     "objects": "对象",
     "health": "系统健康",
+    "storagePolicies": "存储策略",
+    "docs": "文档",
     "settings": "设置"
   },
   "buckets": {
@@ -36,11 +38,37 @@
     "uptime": "运行时间",
     "version": "版本"
   },
+  "storagePolicies": {
+    "title": "存储策略",
+    "create": "创建策略",
+    "createPolicy": "创建新策略",
+    "editPolicy": "编辑策略",
+    "delete": "删除",
+    "edit": "编辑",
+    "name": "策略名称",
+    "type": "类型",
+    "description": "描述",
+    "bucket": "存储桶",
+    "configuration": "配置",
+    "loading": "正在加载策略...",
+    "empty": "尚未配置任何策略。",
+    "deleteConfirm": "删除策略",
+    "deleteWarning": "确定要删除策略 '{name}' 吗？此操作无法撤销。"
+  },
+  "docs": {
+    "title": "文档",
+    "loading": "正在加载文档...",
+    "back": "返回",
+    "generated": "生成的文档"
+  },
   "actions": {
     "refresh": "刷新",
     "cancel": "取消",
     "confirm": "确认",
-    "close": "关闭"
+    "close": "关闭",
+    "retry": "重试",
+    "save": "保存",
+    "actions": "操作"
   },
   "errors": {
     "general": "发生错误",

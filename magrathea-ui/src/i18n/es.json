@@ -8,6 +8,8 @@
     "buckets": "Buckets",
     "objects": "Objetos",
     "health": "Salud",
+    "storagePolicies": "Políticas de Almacenamiento",
+    "docs": "Documentación",
     "settings": "Ajustes"
   },
   "buckets": {
@@ -36,11 +38,37 @@
     "uptime": "Tiempo Activo",
     "version": "Versión"
   },
+  "storagePolicies": {
+    "title": "Políticas de Almacenamiento",
+    "create": "Crear Política",
+    "createPolicy": "Crear Nueva Política",
+    "editPolicy": "Editar Política",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "name": "Nombre de Política",
+    "type": "Tipo",
+    "description": "Descripción",
+    "bucket": "Bucket",
+    "configuration": "Configuración",
+    "loading": "Cargando políticas...",
+    "empty": "No hay políticas configuradas.",
+    "deleteConfirm": "Eliminar Política",
+    "deleteWarning": "¿Estás seguro de que quieres eliminar la política '{name}'? Esta acción no se puede deshacer."
+  },
+  "docs": {
+    "title": "Documentación",
+    "loading": "Cargando documentación...",
+    "back": "Atrás",
+    "generated": "Documentación generada"
+  },
   "actions": {
     "refresh": "Actualizar",
     "cancel": "Cancelar",
     "confirm": "Confirmar",
-    "close": "Cerrar"
+    "close": "Cerrar",
+    "retry": "Reintentar",
+    "save": "Guardar",
+    "actions": "Acciones"
   },
   "errors": {
     "general": "Error genérico",

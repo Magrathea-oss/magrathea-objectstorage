@@ -30,74 +30,90 @@
 
     <!-- Main content -->
     <main class="main">
-      <!-- Hero card -->
-      <section class="hero-card">
-        <div class="hero-icon">☁</div>
-        <div class="hero-info">
-          <h2>{{ $t('app.title') }}</h2>
-          <p>{{ $t('app.subtitle') }}</p>
-          <div class="hero-meta">
-            <span class="meta-badge">S3 Compatible</span>
-            <span class="meta-badge">WebFlux</span>
-            <span class="meta-badge">Java 21</span>
-          </div>
-        </div>
-      </section>
+      <!-- Router View for routed pages -->
+      <router-view v-if="routeIsActive" />
 
-      <!-- Dashboard grid -->
-      <section class="dashboard">
-        <div class="card" @click="section = 'buckets'">
-          <div class="card-icon">🗂</div>
-          <div class="card-label">{{ $t('nav.buckets') }}</div>
-          <div class="card-desc">Manage your S3 buckets</div>
-        </div>
-        <div class="card" @click="section = 'objects'">
-          <div class="card-icon">📦</div>
-          <div class="card-label">{{ $t('nav.objects') }}</div>
-          <div class="card-desc">Browse and manage objects</div>
-        </div>
-        <div class="card" @click="section = 'health'">
-          <div class="card-icon">❤️</div>
-          <div class="card-label">{{ $t('nav.health') }}</div>
-          <div class="card-desc">System status and metrics</div>
-        </div>
-        <div class="card">
-          <div class="card-icon">⚙</div>
-          <div class="card-label">{{ $t('nav.settings') }}</div>
-          <div class="card-desc">Configure preferences</div>
-        </div>
-      </section>
+      <!-- Home dashboard (shown when no route is active) -->
+      <template v-else>
+        <!-- Hero card -->
+        <section class="hero-card">
+          <div class="hero-icon">☁</div>
+          <div class="hero-info">
+            <h2>{{ $t('app.title') }}</h2>
+            <p>{{ $t('app.subtitle') }}</p>
+            <div class="hero-meta">
+              <span class="meta-badge">S3 Compatible</span>
+              <span class="meta-badge">WebFlux</span>
+              <span class="meta-badge">Java 21</span>
+            </div>
+          </div>
+        </section>
 
-      <!-- Terminal log -->
-      <section class="terminal">
-        <div class="terminal-header">
-          <span class="terminal-dot red"></span>
-          <span class="terminal-dot yellow"></span>
-          <span class="terminal-dot green"></span>
-          <span class="terminal-title">magrathea-console</span>
-        </div>
-        <div class="terminal-body">
-          <div class="terminal-line">
-            <span class="prompt">$</span>
-            <span class="cmd">server start — port 8080</span>
-            <span class="status ok">✓</span>
+        <!-- Dashboard grid -->
+        <section class="dashboard">
+          <div class="card" @click="navigateTo('buckets')">
+            <div class="card-icon">🗂</div>
+            <div class="card-label">{{ $t('nav.buckets') }}</div>
+            <div class="card-desc">Manage your S3 buckets</div>
           </div>
-          <div class="terminal-line">
-            <span class="prompt">$</span>
-            <span class="cmd">admin-api — port 8081</span>
-            <span class="status ok">✓</span>
+          <div class="card" @click="navigateTo('objects')">
+            <div class="card-icon">📦</div>
+            <div class="card-label">{{ $t('nav.objects') }}</div>
+            <div class="card-desc">Browse and manage objects</div>
           </div>
-          <div class="terminal-line">
-            <span class="prompt">$</span>
-            <span class="cmd">frontend — port 5173</span>
-            <span class="status ok">✓</span>
+          <div class="card" @click="navigateTo('health')">
+            <div class="card-icon">❤️</div>
+            <div class="card-label">{{ $t('nav.health') }}</div>
+            <div class="card-desc">System status and metrics</div>
           </div>
-          <div class="terminal-line blink">
-            <span class="prompt">$</span>
-            <span class="cmd cursor">_</span>
+          <div class="card" @click="navigateTo('storagePolicies')">
+            <div class="card-icon">📋</div>
+            <div class="card-label">{{ $t('nav.storagePolicies') }}</div>
+            <div class="card-desc">Manage storage policies</div>
           </div>
-        </div>
-      </section>
+          <div class="card" @click="navigateTo('docs')">
+            <div class="card-icon">📄</div>
+            <div class="card-label">{{ $t('nav.docs') }}</div>
+            <div class="card-desc">View documentation</div>
+          </div>
+          <div class="card" @click="navigateTo('settings')">
+            <div class="card-icon">⚙</div>
+            <div class="card-label">{{ $t('nav.settings') }}</div>
+            <div class="card-desc">Configure preferences</div>
+          </div>
+        </section>
+
+        <!-- Terminal log -->
+        <section class="terminal">
+          <div class="terminal-header">
+            <span class="terminal-dot red"></span>
+            <span class="terminal-dot yellow"></span>
+            <span class="terminal-dot green"></span>
+            <span class="terminal-title">magrathea-console</span>
+          </div>
+          <div class="terminal-body">
+            <div class="terminal-line">
+              <span class="prompt">$</span>
+              <span class="cmd">server start — port 8080</span>
+              <span class="status ok">✓</span>
+            </div>
+            <div class="terminal-line">
+              <span class="prompt">$</span>
+              <span class="cmd">admin-api — port 8081</span>
+              <span class="status ok">✓</span>
+            </div>
+            <div class="terminal-line">
+              <span class="prompt">$</span>
+              <span class="cmd">frontend — port 5173</span>
+              <span class="status ok">✓</span>
+            </div>
+            <div class="terminal-line blink">
+              <span class="prompt">$</span>
+              <span class="cmd cursor">_</span>
+            </div>
+          </div>
+        </section>
+      </template>
     </main>
 
     <!-- Footer -->
@@ -113,16 +129,36 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter, useRoute } from 'vue-router'
 import { locales, localeNames } from './i18n/index.js'
 
 const { locale } = useI18n()
+const router = useRouter()
+const route = useRoute()
+
 const section = ref('buckets')
+
+const routeIsActive = computed(() => {
+  return route.name !== 'home' && route.name !== undefined
+})
 
 function switchLocale(loc) {
   locale.value = loc
   localStorage.setItem('magrathea-lang', loc)
+}
+
+function navigateTo(target) {
+  const routeMap = {
+    buckets: '/',
+    objects: '/',
+    health: '/',
+    storagePolicies: '/storage-policies',
+    docs: '/docs',
+    settings: '/',
+  }
+  router.push(routeMap[target] || '/')
 }
 
 // Restore saved language
