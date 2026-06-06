@@ -3,9 +3,14 @@
     <!-- Header -->
     <div class="sp-header">
       <h2 class="sp-title">{{ $t('storagePolicies.title') }}</h2>
-      <button class="sp-create-btn" @click="openCreateForm">
-        {{ $t('storagePolicies.create') }}
-      </button>
+      <div class="sp-header-actions">
+        <button class="sp-dashboard-btn" @click="router.push('/')">
+          ← {{ $t('nav.dashboard') }}
+        </button>
+        <button class="sp-create-btn" @click="openCreateForm">
+          {{ $t('storagePolicies.create') }}
+        </button>
+      </div>
     </div>
 
     <!-- Loading -->
@@ -26,21 +31,59 @@
       <table class="sp-table">
         <thead>
           <tr>
-            <th>{{ $t('storagePolicies.name') }}</th>
-            <th>{{ $t('storagePolicies.type') }}</th>
-            <th>{{ $t('storagePolicies.description') }}</th>
-            <th>{{ $t('storagePolicies.bucket') }}</th>
+            <th>{{ $t('storagePolicies.storageClassId') }}</th>
+            <th>{{ $t('storagePolicies.chunking') }}</th>
+            <th>{{ $t('storagePolicies.dedup') }}</th>
+            <th>{{ $t('storagePolicies.compression') }}</th>
+            <th>{{ $t('storagePolicies.encryption') }}</th>
+            <th>{{ $t('storagePolicies.erasureCoding') }}</th>
+            <th>{{ $t('storagePolicies.replication') }}</th>
             <th class="th-actions">{{ $t('actions.actions') }}</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="policy in policies" :key="policy.id">
-            <td class="cell-name">{{ policy.name }}</td>
-            <td>
-              <span :class="['policy-badge', policy.type]">{{ policy.type }}</span>
+          <tr v-for="policy in policies" :key="policy.storageClassId">
+            <td class="cell-id">{{ policy.storageClassId }}</td>
+            <td class="cell-nested">
+              <span v-if="policy.chunking">
+                {{ $t('storagePolicies.chunkSize') }}: {{ policy.chunking.chunkSize }}<br>
+                {{ $t('storagePolicies.alignment') }}: {{ policy.chunking.alignment }}
+              </span>
+              <span v-else class="cell-na">—</span>
             </td>
-            <td class="cell-desc">{{ policy.description || '—' }}</td>
-            <td>{{ policy.bucketName || '—' }}</td>
+            <td class="cell-nested">
+              <span v-if="policy.dedup">
+                {{ $t('storagePolicies.dedupAlgorithm') }}: {{ policy.dedup.algorithm }}<br>
+                {{ $t('storagePolicies.dedupScope') }}: {{ policy.dedup.scope }}
+              </span>
+              <span v-else class="cell-na">—</span>
+            </td>
+            <td class="cell-nested">
+              <span v-if="policy.compression">
+                {{ $t('storagePolicies.compressionAlgorithm') }}: {{ policy.compression.algorithm }}<br>
+                {{ $t('storagePolicies.compressionLevel') }}: {{ policy.compression.level }}
+              </span>
+              <span v-else class="cell-na">—</span>
+            </td>
+            <td class="cell-nested">
+              <span v-if="policy.encryption">
+                {{ $t('storagePolicies.encryptionAlgorithm') }}: {{ policy.encryption.algorithm }}
+              </span>
+              <span v-else class="cell-na">—</span>
+            </td>
+            <td class="cell-nested">
+              <span v-if="policy.erasureCoding">
+                {{ $t('storagePolicies.dataBlocks') }}: {{ policy.erasureCoding.dataBlocks }}<br>
+                {{ $t('storagePolicies.parityBlocks') }}: {{ policy.erasureCoding.parityBlocks }}
+              </span>
+              <span v-else class="cell-na">—</span>
+            </td>
+            <td class="cell-nested">
+              <span v-if="policy.replication">
+                {{ $t('storagePolicies.replicationFactor') }}: {{ policy.replication.factor }}
+              </span>
+              <span v-else class="cell-na">—</span>
+            </td>
             <td class="cell-actions">
               <button class="action-btn edit" @click="openEditForm(policy)">
                 {{ $t('actions.edit') }}
@@ -68,30 +111,104 @@
         </div>
         <form class="modal-form" @submit.prevent="savePolicy">
           <div class="form-group">
-            <label>{{ $t('storagePolicies.name') }}</label>
-            <input v-model="form.name" class="form-input" required />
+            <label>{{ $t('storagePolicies.storageClassId') }}</label>
+            <input v-model="form.storageClassId" class="form-input" required />
           </div>
-          <div class="form-group">
-            <label>{{ $t('storagePolicies.type') }}</label>
-            <select v-model="form.type" class="form-input" required>
-              <option value="RETENTION">Retention</option>
-              <option value="REPLICATION">Replication</option>
-              <option value="TIERED">Tiered</option>
-              <option value="COMPLIANCE">Compliance</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>{{ $t('storagePolicies.description') }}</label>
-            <textarea v-model="form.description" class="form-input" rows="3"></textarea>
-          </div>
-          <div class="form-group">
-            <label>{{ $t('storagePolicies.bucket') }}</label>
-            <input v-model="form.bucketName" class="form-input" placeholder="Optional bucket name" />
-          </div>
-          <div class="form-group">
-            <label>{{ $t('storagePolicies.configuration') }}</label>
-            <textarea v-model="form.configuration" class="form-input code-input" rows="6" placeholder="JSON configuration"></textarea>
-          </div>
+
+          <fieldset>
+            <legend>{{ $t('storagePolicies.chunking') }}</legend>
+            <div class="form-row">
+              <div class="form-group">
+                <label>{{ $t('storagePolicies.chunkSize') }}</label>
+                <input v-model="form.chunking.chunkSize" class="form-input" type="number" min="1" />
+              </div>
+              <div class="form-group">
+                <label>{{ $t('storagePolicies.alignment') }}</label>
+                <select v-model="form.chunking.alignment" class="form-input">
+                  <option value="BYTE">Byte</option>
+                  <option value="BLOCK">Block</option>
+                  <option value="STRIPE">Stripe</option>
+                </select>
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>{{ $t('storagePolicies.dedup') }}</legend>
+            <div class="form-row">
+              <div class="form-group">
+                <label>{{ $t('storagePolicies.dedupAlgorithm') }}</label>
+                <select v-model="form.dedup.algorithm" class="form-input">
+                  <option value="SHA256">SHA256</option>
+                  <option value="BLAKE2">BLAKE2</option>
+                  <option value="XXHASH">XXHash</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>{{ $t('storagePolicies.dedupScope') }}</label>
+                <select v-model="form.dedup.scope" class="form-input">
+                  <option value="OBJECT">Object</option>
+                  <option value="BUCKET">Bucket</option>
+                  <option value="GLOBAL">Global</option>
+                </select>
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>{{ $t('storagePolicies.compression') }}</legend>
+            <div class="form-row">
+              <div class="form-group">
+                <label>{{ $t('storagePolicies.compressionAlgorithm') }}</label>
+                <select v-model="form.compression.algorithm" class="form-input">
+                  <option value="GZIP">GZIP</option>
+                  <option value="SNAPPY">Snappy</option>
+                  <option value="ZSTD">Zstd</option>
+                  <option value="LZ4">LZ4</option>
+                  <option value="BROTLI">Brotli</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>{{ $t('storagePolicies.compressionLevel') }}</label>
+                <input v-model="form.compression.level" class="form-input" type="number" min="0" max="22" />
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>{{ $t('storagePolicies.encryption') }}</legend>
+            <div class="form-group">
+              <label>{{ $t('storagePolicies.encryptionAlgorithm') }}</label>
+              <select v-model="form.encryption.algorithm" class="form-input">
+                <option value="">— {{ $t('actions.none') }} —</option>
+                <option value="AES256">AES256</option>
+                <option value="CHACHA20">ChaCha20</option>
+              </select>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>{{ $t('storagePolicies.erasureCoding') }}</legend>
+            <div class="form-row">
+              <div class="form-group">
+                <label>{{ $t('storagePolicies.dataBlocks') }}</label>
+                <input v-model="form.erasureCoding.dataBlocks" class="form-input" type="number" min="1" />
+              </div>
+              <div class="form-group">
+                <label>{{ $t('storagePolicies.parityBlocks') }}</label>
+                <input v-model="form.erasureCoding.parityBlocks" class="form-input" type="number" min="0" />
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>{{ $t('storagePolicies.replication') }}</legend>
+            <div class="form-group">
+              <label>{{ $t('storagePolicies.replicationFactor') }}</label>
+              <input v-model="form.replication.factor" class="form-input" type="number" min="1" max="10" />
+            </div>
+          </fieldset>
+
           <div class="form-actions">
             <button type="button" class="btn-cancel" @click="closeModal">{{ $t('actions.cancel') }}</button>
             <button type="submit" class="btn-save">{{ $t('actions.save') }}</button>
@@ -108,7 +225,7 @@
           <button class="modal-close" @click="closeDeleteConfirm">✕</button>
         </div>
         <div class="modal-body">
-          <p>{{ $t('storagePolicies.deleteWarning', { name: policyToDelete?.name }) }}</p>
+          <p>{{ $t('storagePolicies.deleteWarning', { storageClassId: policyToDelete?.storageClassId }) }}</p>
         </div>
         <div class="form-actions">
           <button class="btn-cancel" @click="closeDeleteConfirm">{{ $t('actions.cancel') }}</button>
@@ -122,8 +239,10 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 
 const { t } = useI18n()
+const router = useRouter()
 
 const policies = ref([])
 const loading = ref(true)
@@ -133,14 +252,17 @@ const isEditing = ref(false)
 const showDeleteConfirm = ref(false)
 const policyToDelete = ref(null)
 
-const form = ref({
-  id: null,
-  name: '',
-  type: 'RETENTION',
-  description: '',
-  bucketName: '',
-  configuration: '',
+const emptyForm = () => ({
+  storageClassId: '',
+  chunking: { chunkSize: '', alignment: 'BYTE' },
+  dedup: { algorithm: 'SHA256', scope: 'OBJECT' },
+  compression: { algorithm: 'GZIP', level: '' },
+  encryption: { algorithm: '' },
+  erasureCoding: { dataBlocks: '', parityBlocks: '' },
+  replication: { factor: '' },
 })
+
+const form = ref(emptyForm())
 
 const API_BASE = '/admin'
 
@@ -160,19 +282,32 @@ async function fetchPolicies() {
 
 function openCreateForm() {
   isEditing.value = false
-  form.value = { id: null, name: '', type: 'RETENTION', description: '', bucketName: '', configuration: '' }
+  form.value = emptyForm()
   showModal.value = true
 }
 
 function openEditForm(policy) {
   isEditing.value = true
   form.value = {
-    id: policy.id,
-    name: policy.name || '',
-    type: policy.type || 'RETENTION',
-    description: policy.description || '',
-    bucketName: policy.bucketName || '',
-    configuration: policy.configuration || '',
+    storageClassId: policy.storageClassId || '',
+    chunking: policy.chunking
+      ? { chunkSize: policy.chunking.chunkSize ?? '', alignment: policy.chunking.alignment || 'BYTE' }
+      : { chunkSize: '', alignment: 'BYTE' },
+    dedup: policy.dedup
+      ? { algorithm: policy.dedup.algorithm || 'SHA256', scope: policy.dedup.scope || 'OBJECT' }
+      : { algorithm: 'SHA256', scope: 'OBJECT' },
+    compression: policy.compression
+      ? { algorithm: policy.compression.algorithm || 'GZIP', level: policy.compression.level ?? '' }
+      : { algorithm: 'GZIP', level: '' },
+    encryption: policy.encryption
+      ? { algorithm: policy.encryption.algorithm || '' }
+      : { algorithm: '' },
+    erasureCoding: policy.erasureCoding
+      ? { dataBlocks: policy.erasureCoding.dataBlocks ?? '', parityBlocks: policy.erasureCoding.parityBlocks ?? '' }
+      : { dataBlocks: '', parityBlocks: '' },
+    replication: policy.replication
+      ? { factor: policy.replication.factor ?? '' }
+      : { factor: '' },
   }
   showModal.value = true
 }
@@ -181,22 +316,44 @@ function closeModal() {
   showModal.value = false
 }
 
+function buildPayload() {
+  const payload = {
+    storageClassId: form.value.storageClassId,
+    chunking: form.value.chunking.chunkSize !== ''
+      ? { chunkSize: Number(form.value.chunking.chunkSize), alignment: form.value.chunking.alignment }
+      : null,
+    dedup: form.value.dedup.algorithm
+      ? { algorithm: form.value.dedup.algorithm, scope: form.value.dedup.scope }
+      : null,
+    compression: form.value.compression.algorithm
+      ? { algorithm: form.value.compression.algorithm, level: form.value.compression.level !== '' ? Number(form.value.compression.level) : null }
+      : null,
+    encryption: form.value.encryption.algorithm
+      ? { algorithm: form.value.encryption.algorithm }
+      : null,
+    erasureCoding: form.value.erasureCoding.dataBlocks !== ''
+      ? { dataBlocks: Number(form.value.erasureCoding.dataBlocks), parityBlocks: Number(form.value.erasureCoding.parityBlocks) }
+      : null,
+    replication: form.value.replication.factor !== ''
+      ? { factor: Number(form.value.replication.factor) }
+      : null,
+  }
+  return payload
+}
+
 async function savePolicy() {
-  const isNew = !form.value.id
-  const url = `${API_BASE}/storage-policies${isNew ? '' : `/${form.value.id}`}`
+  const isNew = !isEditing.value
+  const url = isNew
+    ? `${API_BASE}/storage-policies`
+    : `${API_BASE}/storage-policies/${form.value.storageClassId}`
   const method = isNew ? 'POST' : 'PUT'
 
   try {
+    const payload = buildPayload()
     const res = await fetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: form.value.name,
-        type: form.value.type,
-        description: form.value.description,
-        bucketName: form.value.bucketName || null,
-        configuration: form.value.configuration ? JSON.parse(form.value.configuration) : {},
-      }),
+      body: JSON.stringify(payload),
     })
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
     closeModal()
@@ -219,7 +376,7 @@ function closeDeleteConfirm() {
 async function deletePolicy() {
   if (!policyToDelete.value) return
   try {
-    const res = await fetch(`${API_BASE}/storage-policies/${policyToDelete.value.id}`, {
+    const res = await fetch(`${API_BASE}/storage-policies/${policyToDelete.value.storageClassId}`, {
       method: 'DELETE',
     })
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
@@ -243,6 +400,8 @@ onMounted(fetchPolicies)
   align-items: center;
   justify-content: space-between;
   margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 1rem;
 }
 
 .sp-title {
@@ -252,6 +411,27 @@ onMounted(fetchPolicies)
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+.sp-header-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.sp-dashboard-btn {
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: var(--accent-teal);
+  color: #fff;
+  border: 1px solid var(--accent-teal);
+  transition: all 0.2s;
+}
+
+.sp-dashboard-btn:hover {
+  background: var(--accent);
+  box-shadow: 0 0 16px var(--accent-glow);
 }
 
 .sp-create-btn {
@@ -347,50 +527,21 @@ onMounted(fetchPolicies)
   background: var(--bg-card-hover);
 }
 
-.cell-name {
+.cell-id {
   font-weight: 600;
   color: var(--text-primary);
+  font-family: var(--font-mono);
 }
 
-.cell-desc {
+.cell-nested {
+  font-size: 0.85rem;
+  line-height: 1.5;
   color: var(--text-secondary);
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.policy-badge {
-  display: inline-block;
-  padding: 0.2rem 0.6rem;
-  border-radius: 999px;
-  font-size: 0.7rem;
-  font-weight: 500;
-  text-transform: uppercase;
-}
-
-.policy-badge.RETENTION {
-  background: rgba(124, 92, 255, 0.15);
-  color: var(--accent);
-  border: 1px solid rgba(124, 92, 255, 0.25);
-}
-
-.policy-badge.REPLICATION {
-  background: rgba(54, 214, 184, 0.15);
-  color: var(--accent-teal);
-  border: 1px solid rgba(54, 214, 184, 0.25);
-}
-
-.policy-badge.TIERED {
-  background: rgba(255, 122, 92, 0.15);
-  color: var(--accent-orange);
-  border: 1px solid rgba(255, 122, 92, 0.25);
-}
-
-.policy-badge.COMPLIANCE {
-  background: rgba(92, 255, 122, 0.15);
-  color: var(--accent-green);
-  border: 1px solid rgba(92, 255, 122, 0.25);
+.cell-na {
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 .th-actions {
@@ -458,7 +609,7 @@ onMounted(fetchPolicies)
   border: 1px solid var(--border-glass);
   border-radius: 16px;
   width: 90%;
-  max-width: 600px;
+  max-width: 680px;
   max-height: 90vh;
   overflow-y: auto;
   padding: 2rem;
@@ -503,13 +654,37 @@ onMounted(fetchPolicies)
 .modal-form {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.25rem;
+}
+
+.modal-form fieldset {
+  border: 1px solid var(--border-glass);
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+.modal-form legend {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding: 0 0.5rem;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+}
+
+.form-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.form-row .form-group {
+  flex: 1;
+  min-width: 120px;
 }
 
 .form-group label {
@@ -531,12 +706,6 @@ onMounted(fetchPolicies)
 .form-input:focus {
   border-color: var(--accent);
   outline: none;
-}
-
-.form-input.code-input {
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  resize: vertical;
 }
 
 select.form-input {

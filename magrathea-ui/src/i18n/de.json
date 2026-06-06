@@ -5,6 +5,7 @@
     "footer": "Magrathea ObjectStore — S3-kompatibler Speicher"
   },
   "nav": {
+    "dashboard": "Dashboard",
     "buckets": "Buckets",
     "objects": "Objekte",
     "health": "Systemstatus",
@@ -45,15 +46,27 @@
     "editPolicy": "Richtlinie bearbeiten",
     "delete": "Löschen",
     "edit": "Bearbeiten",
-    "name": "Richtlinienname",
-    "type": "Typ",
-    "description": "Beschreibung",
-    "bucket": "Bucket",
-    "configuration": "Konfiguration",
+    "storageClassId": "Speicherklassen-ID",
+    "chunking": "Chunking",
+    "chunkSize": "Chunk-Größe",
+    "alignment": "Ausrichtung",
+    "dedup": "Deduplikation",
+    "dedupAlgorithm": "Algorithmus",
+    "dedupScope": "Bereich",
+    "compression": "Komprimierung",
+    "compressionAlgorithm": "Algorithmus",
+    "compressionLevel": "Stufe",
+    "encryption": "Verschlüsselung",
+    "encryptionAlgorithm": "Algorithmus",
+    "erasureCoding": "Erasure Coding",
+    "dataBlocks": "Datenblöcke",
+    "parityBlocks": "Paritätsblöcke",
+    "replication": "Replikation",
+    "replicationFactor": "Faktor",
     "loading": "Richtlinien werden geladen...",
     "empty": "Keine Richtlinien konfiguriert.",
     "deleteConfirm": "Richtlinie löschen",
-    "deleteWarning": "Sind Sie sicher, dass Sie die Richtlinie '{name}' löschen möchten? Dieser Vorgang kann nicht rückgängig gemacht werden."
+    "deleteWarning": "Sind Sie sicher, dass Sie die Richtlinie für '{storageClassId}' löschen möchten? Dieser Vorgang kann nicht rückgängig gemacht werden."
   },
   "docs": {
     "title": "Dokumentation",
@@ -62,6 +75,7 @@
     "generated": "Generierte Dokumentation"
   },
   "actions": {
+    "none": "Keine",
     "refresh": "Aktualisieren",
     "cancel": "Abbrechen",
     "confirm": "Bestätigen",

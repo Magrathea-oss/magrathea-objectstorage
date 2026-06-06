@@ -7,6 +7,9 @@
         <button class="docs-nav-btn" @click="navigateBack" :disabled="!canGoBack">
           ← {{ $t('docs.back') }}
         </button>
+        <button class="docs-dashboard-btn" @click="router.push('/')">
+          ← {{ $t('nav.dashboard') }}
+        </button>
         <button class="docs-refresh-btn" @click="refreshDocs">
           {{ $t('actions.refresh') }}
         </button>
@@ -56,24 +59,24 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 
 const { t } = useI18n()
+const router = useRouter()
 
 const loading = ref(true)
 const error = ref(null)
 const htmlContent = ref('')
-const docUrl = ref('/admin/docs/index.html')
+const docUrl = ref('/docs/index.html')
 const useIframe = ref(true)
 const canGoBack = ref(false)
 const lastUpdated = ref('')
-
-const API_BASE = '/admin'
 
 async function fetchDocs() {
   loading.value = true
   error.value = null
   try {
-    const res = await fetch(`${API_BASE}/docs/index.html`)
+    const res = await fetch('/docs/index.html')
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
     const html = await res.text()
     htmlContent.value = html
@@ -87,7 +90,7 @@ async function fetchDocs() {
 
 function refreshDocs() {
   // Force re-fetch by clearing cache via a timestamp parameter
-  docUrl.value = `/admin/docs/index.html?t=${Date.now()}`
+  docUrl.value = `/docs/index.html?t=${Date.now()}`
   fetchDocs()
 }
 
@@ -158,6 +161,7 @@ onMounted(fetchDocs)
 }
 
 .docs-nav-btn,
+.docs-dashboard-btn,
 .docs-refresh-btn {
   padding: 0.4rem 1rem;
   border-radius: 8px;
@@ -180,6 +184,17 @@ onMounted(fetchDocs)
 .docs-nav-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.docs-dashboard-btn {
+  background: var(--accent-teal);
+  color: #fff;
+  border: 1px solid var(--accent-teal);
+}
+
+.docs-dashboard-btn:hover {
+  background: var(--accent);
+  box-shadow: 0 0 16px var(--accent-glow);
 }
 
 .docs-refresh-btn {

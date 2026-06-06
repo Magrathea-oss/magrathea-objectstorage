@@ -5,6 +5,7 @@
     "footer": "Magrathea ObjectStore — Storage Compatibile S3"
   },
   "nav": {
+    "dashboard": "Dashboard",
     "buckets": "Bucket",
     "objects": "Oggetti",
     "health": "Salute",
@@ -45,15 +46,27 @@
     "editPolicy": "Modifica Policy",
     "delete": "Elimina",
     "edit": "Modifica",
-    "name": "Nome Policy",
-    "type": "Tipo",
-    "description": "Descrizione",
-    "bucket": "Bucket",
-    "configuration": "Configurazione",
+    "storageClassId": "ID Classe di Storage",
+    "chunking": "Chunking",
+    "chunkSize": "Dimensione Chunk",
+    "alignment": "Allineamento",
+    "dedup": "Deduplicazione",
+    "dedupAlgorithm": "Algoritmo",
+    "dedupScope": "Ambito",
+    "compression": "Compressione",
+    "compressionAlgorithm": "Algoritmo",
+    "compressionLevel": "Livello",
+    "encryption": "Crittografia",
+    "encryptionAlgorithm": "Algoritmo",
+    "erasureCoding": "Erasure Coding",
+    "dataBlocks": "Blocchi Dati",
+    "parityBlocks": "Blocchi di Parità",
+    "replication": "Replica",
+    "replicationFactor": "Fattore",
     "loading": "Caricamento policies...",
     "empty": "Nessuna policy configurata.",
     "deleteConfirm": "Elimina Policy",
-    "deleteWarning": "Sei sicuro di voler eliminare la policy '{name}'? Questa azione non può essere annullata."
+    "deleteWarning": "Sei sicuro di voler eliminare la policy per '{storageClassId}'? Questa azione non può essere annullata."
   },
   "docs": {
     "title": "Documentazione",
@@ -62,6 +75,7 @@
     "generated": "Documentazione generata"
   },
   "actions": {
+    "none": "Nessuno",
     "refresh": "Aggiorna",
     "cancel": "Annulla",
     "confirm": "Conferma",

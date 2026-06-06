@@ -5,6 +5,7 @@
     "footer": "Magrathea ObjectStore — S3-Compatible Storage"
   },
   "nav": {
+    "dashboard": "Dashboard",
     "buckets": "Buckets",
     "objects": "Objects",
     "health": "Health",
@@ -45,15 +46,27 @@
     "editPolicy": "Edit Policy",
     "delete": "Delete",
     "edit": "Edit",
-    "name": "Policy Name",
-    "type": "Type",
-    "description": "Description",
-    "bucket": "Bucket",
-    "configuration": "Configuration",
+    "storageClassId": "Storage Class ID",
+    "chunking": "Chunking",
+    "chunkSize": "Chunk Size",
+    "alignment": "Alignment",
+    "dedup": "Deduplication",
+    "dedupAlgorithm": "Algorithm",
+    "dedupScope": "Scope",
+    "compression": "Compression",
+    "compressionAlgorithm": "Algorithm",
+    "compressionLevel": "Level",
+    "encryption": "Encryption",
+    "encryptionAlgorithm": "Algorithm",
+    "erasureCoding": "Erasure Coding",
+    "dataBlocks": "Data Blocks",
+    "parityBlocks": "Parity Blocks",
+    "replication": "Replication",
+    "replicationFactor": "Factor",
     "loading": "Loading policies...",
     "empty": "No policies configured yet.",
     "deleteConfirm": "Delete Policy",
-    "deleteWarning": "Are you sure you want to delete the policy '{name}'? This action cannot be undone."
+    "deleteWarning": "Are you sure you want to delete the policy for '{storageClassId}'? This action cannot be undone."
   },
   "docs": {
     "title": "Documentation",
@@ -62,6 +75,7 @@
     "generated": "Generated documentation"
   },
   "actions": {
+    "none": "None",
     "refresh": "Refresh",
     "cancel": "Cancel",
     "confirm": "Confirm",
