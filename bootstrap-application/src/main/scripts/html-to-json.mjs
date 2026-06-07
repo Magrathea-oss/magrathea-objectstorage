@@ -27,28 +27,31 @@ function parseArgs() {
   const args = process.argv.slice(2);
   let inputPath = null;
   let outputPath = null;
+  let fixLinks = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--input' && i + 1 < args.length) {
       inputPath = args[++i];
     } else if (args[i] === '--output' && i + 1 < args.length) {
       outputPath = args[++i];
+    } else if (args[i] === '--fix-links') {
+      fixLinks = true;
     }
   }
 
   if (!inputPath) {
-    console.error('Usage: node html-to-json.mjs --input <path> [--output <path>]');
+    console.error('Usage: node html-to-json.mjs --input <path> [--output <path>] [--fix-links]');
     process.exit(1);
   }
 
-  return { inputPath, outputPath };
+  return { inputPath, outputPath, fixLinks };
 }
 
 // ──────────────────────────────────────────────────────────────
 // Main
 // ──────────────────────────────────────────────────────────────
 
-const { inputPath, outputPath } = parseArgs();
+const { inputPath, outputPath, fixLinks } = parseArgs();
 
 // Resolve relative to magrathea-objectstorage root
 const magratheaRoot = resolve(scriptDir, '../../../..');
@@ -76,6 +79,7 @@ const htmlContent = readFileSync(resolvedInput, 'utf8');
 const jsonTree = convert(htmlContent, 'html', {
   imageBasePath: '/docs/',
   cssBasePath: '/docs/',
+  fixHtmlLinks: fixLinks,
 });
 
 // Wrap with metadata

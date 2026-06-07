@@ -195,12 +195,11 @@
                             <arguments>
                                 <argument>-c</argument>
                                 <argument>
-                                    for f in */target/site/clover/*.html; do
-                                      if [ -f "$f" ]; then
-                                        out="bootstrap-application/target/classes/static/docs/clover-json/$(basename $f .html).json"
+                                    find */target/site/clover -name '*.html' -print0 2>/dev/null | while IFS= read -r -d '' f; do
+                                        relpath=$(echo "$f" | sed 's|.*/target/site/clover/||')
+                                        out="bootstrap-application/target/classes/static/docs/clover-json/${relpath%.html}.json"
                                         mkdir -p "$(dirname "$out")"
-                                        node bootstrap-application/src/main/scripts/html-to-json.mjs --input "$f" --output "$out"
-                                      fi
+                                        node bootstrap-application/src/main/scripts/html-to-json.mjs --input "$f" --output "$out" --fix-links
                                     done
                                 </argument>
                             </arguments>

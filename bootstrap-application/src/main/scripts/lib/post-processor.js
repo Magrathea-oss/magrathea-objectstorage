@@ -6,6 +6,7 @@
  *   - convertAdrLinks(tree)          — transform ADR references to links
  *   - convertPipeTables(tree)        — convert pipe-table paragraphs to typed table blocks
  *   - fixCssReferences(tree, basePath) — resolve relative CSS paths
+ *   - fixHtmlLinks(tree) — convert .html hrefs to .json hrefs
  *
  * Each function mutates the tree in-place.
  */
@@ -200,6 +201,49 @@ export function fixCssReferences(obj, basePath = '/') {
 }
 
 // ──────────────────────────────────────────────────────────────
+// HTML link fixing (.html → .json)
+// ──────────────────────────────────────────────────────────────
+
+/**
+ * Replace .html hrefs with .json hrefs in HTML strings.
+ * @param {string} html - HTML string to fix
+ * @returns {string} fixed HTML
+ */
+export function fixHtmlLinksInHtml(html) {
+  if (!html || typeof html !== 'string') return html;
+  // Replace href="...html" followed by optional query string and/or fragment
+  // with href="...json" preserving query/fragment
+  return html.replace(
+    /href="([^"]+?)\.html((\?[^"]*)?(#[^"]*)?)?"/g,
+    (match, path, suffix) => {
+      const rest = suffix || '';
+      return `href="${path}.json${rest}"`;
+    }
+  );
+}
+
+/**
+ * Walk the JSON tree and fix HTML href references (.html → .json).
+ * @param {object} obj - JSON tree node
+ */
+export function fixHtmlLinks(obj) {
+  if (!obj || typeof obj !== 'object') return;
+  if (Array.isArray(obj)) {
+    for (const item of obj) fixHtmlLinks(item);
+    return;
+  }
+  if (obj.html && typeof obj.html === 'string') {
+    obj.html = fixHtmlLinksInHtml(obj.html);
+  }
+  if (obj.text && typeof obj.text === 'string') {
+    obj.text = fixHtmlLinksInHtml(obj.text);
+  }
+  for (const val of Object.values(obj)) {
+    if (typeof val === 'object' && val !== null) fixHtmlLinks(val);
+  }
+}
+
+// ──────────────────────────────────────────────────────────────
 // Aggregate post-processor
 // ──────────────────────────────────────────────────────────────
 
@@ -211,10 +255,13 @@ export function fixCssReferences(obj, basePath = '/') {
  * @param {string} [options.cssBasePath='/'] - Base path for relative CSS URLs
  */
 export function applyPostProcessors(tree, options = {}) {
-  const { imageBasePath = '/', cssBasePath = '/' } = options;
+  const { imageBasePath = '/', cssBasePath = '/', fixHtmlLinks: doFixHtmlLinks = false } = options;
 
   convertAdrLinks(tree);
   convertPipeTables(tree);
   fixImagePaths(tree, imageBasePath);
   fixCssReferences(tree, cssBasePath);
+  if (doFixHtmlLinks) {
+    fixHtmlLinks(tree);
+  }
 }
