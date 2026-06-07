@@ -40,7 +40,7 @@
     </div>
 
     <!-- JSON-rendered content -->
-    <div v-else class="docs-content">
+    <div v-else class="docs-content" @click="handleDocLinkClick">
       <div class="docs-json" v-if="docData">
         <template v-for="section in (docData?.document?.sections || [])" :key="section.id">
           <h2 :id="section.id" class="docs-section-title">{{ section.title }}</h2>
@@ -129,38 +129,45 @@ watch(locale, () => {
 })
 
 async function fetchDocs() {
+  const url = getDocUrl(activeTab.value)
+  await loadJson(url)
+}
+
+function switchTab(tabId) {
+  activeTab.value = tabId
+  fetchDocs()
+}
+
+function handleDocLinkClick(event) {
+  // Intercept clicks on <a> tags inside docs content to load JSON internally
+  const link = event.target.closest('a')
+  if (!link) return
+  const href = link.getAttribute('href')
+  if (!href) return
+  // Only handle links to JSON files in docs
+  if (!href.startsWith('/docs/') || !href.endsWith('.json')) return
+  event.preventDefault()
+  // Extract the tab ID from the href path
+  const pathParts = href.replace('/docs/', '').split('/')
+  const tabId = pathParts[0].replace('-json', '')
+  // Load the JSON
+  loadJson(href)
+}
+
+async function loadJson(url) {
   loading.value = true
   error.value = null
-  const tab = activeTab.value
-
-  const cacheKey = tab === 'adr' ? `adr-${route.params.id}` : (tab === 'usermanual' ? (locale.value || 'en') : tab)
-
-  // Return cached if available
-  if (docCache.value[cacheKey]) {
-    docData.value = docCache.value[cacheKey]
-    loading.value = false
-    lastUpdated.value = new Date().toLocaleString()
-    return
-  }
-
   try {
-    const url = getDocUrl(tab)
     const res = await fetch(url)
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
     const json = await res.json()
     docData.value = json
-    docCache.value[cacheKey] = json
     lastUpdated.value = new Date().toLocaleString()
   } catch (e) {
     error.value = e.message || t('errors.general')
   } finally {
     loading.value = false
   }
-}
-
-function switchTab(tabId) {
-  activeTab.value = tabId
-  fetchDocs()
 }
 
 function refreshDocs() {
