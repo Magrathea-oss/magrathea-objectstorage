@@ -229,7 +229,14 @@ export function fixHtmlLinksInHtml(html) {
 export function fixHtmlLinks(obj) {
   if (!obj || typeof obj !== 'object') return;
   if (Array.isArray(obj)) {
-    for (const item of obj) fixHtmlLinks(item);
+    for (let i = 0; i < obj.length; i++) {
+      const item = obj[i];
+      if (typeof item === 'string') {
+        obj[i] = fixHtmlLinksInHtml(item);
+      } else {
+        fixHtmlLinks(item);
+      }
+    }
     return;
   }
   if (obj.html && typeof obj.html === 'string') {
@@ -237,6 +244,9 @@ export function fixHtmlLinks(obj) {
   }
   if (obj.text && typeof obj.text === 'string') {
     obj.text = fixHtmlLinksInHtml(obj.text);
+  }
+  if (obj.title && typeof obj.title === 'string') {
+    obj.title = fixHtmlLinksInHtml(obj.title);
   }
   for (const val of Object.values(obj)) {
     if (typeof val === 'object' && val !== null) fixHtmlLinks(val);
