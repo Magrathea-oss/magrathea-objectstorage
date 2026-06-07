@@ -104,15 +104,21 @@ const tabs = [
 ]
 
 function getDocUrl(tabId) {
-  if (tabId === 'usermanual') {
-    const lang = locale.value || 'en'
-    return `/docs/index.${lang}.json`
-  }
+  // ADR special case: load from route params
   if (tabId === 'adr') {
     const adrId = route.params.id
     return `/docs/adr/${adrId}.json`
   }
-  return tabId === 'arc42' ? '/docs/arc42.json' : '/docs/test-report.json'
+  // Find the tab definition and call its url function
+  const tab = tabs.find(t => t.id === tabId)
+  if (!tab) return '/docs/index.en.json'
+  const urlFn = tab.url
+  if (tabId === 'usermanual') {
+    // User manual needs locale param
+    const lang = locale.value || 'en'
+    return urlFn(lang)
+  }
+  return typeof urlFn === 'function' ? urlFn() : urlFn
 }
 
 // Watch locale changes → reload docs
