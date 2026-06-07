@@ -45,11 +45,11 @@
                     <parameters>true</parameters>
                 </configuration>
             </plugin>
-            <!-- Clover code coverage reporting -->
+            <!-- OpenClover code coverage reporting (open-source fork of Clover) -->
             <plugin>
-                <groupId>com.atlassian.clover</groupId>
+                <groupId>org.openclover</groupId>
                 <artifactId>clover-maven-plugin</artifactId>
-                <version>4.4.0</version>
+                <version>4.5.2</version>
                 <configuration>
                     <generateHtml>true</generateHtml>
                     <flushOnApplicationStop>true</flushOnApplicationStop>
@@ -60,7 +60,7 @@
             <!-- Cucumber BDD reporting -->
             <plugin>
                 <groupId>net.masterthought</groupId>
-                <artifactId>cucumber-reporting-maven-plugin</artifactId>
+                <artifactId>maven-cucumber-reporting</artifactId>
                 <version>5.7.0</version>
                 <configuration>
                     <projectName>Magrathea ObjectStore</projectName>
@@ -186,14 +186,14 @@
             <build>
                 <plugins>
                     <plugin>
-                        <groupId>com.atlassian.clover</groupId>
+                        <groupId>org.openclover</groupId>
                         <artifactId>clover-maven-plugin</artifactId>
+                        <version>4.5.2</version>
                         <executions>
                             <execution>
                                 <id>clover</id>
                                 <phase>verify</phase>
                                 <goals>
-                                    <goal>setup</goal>
                                     <goal>instrument</goal>
                                     <goal>aggregate</goal>
                                     <goal>clover</goal>

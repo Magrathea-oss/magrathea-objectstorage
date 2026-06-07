@@ -23,7 +23,8 @@
         <plugins>
             <plugin>
                 <groupId>net.masterthought</groupId>
-                <artifactId>cucumber-reporting-maven-plugin</artifactId>
+                <artifactId>maven-cucumber-reporting</artifactId>
+                <version>5.7.0</version>
                 <executions>
                     <execution>
                         <id>cucumber-report</id>
