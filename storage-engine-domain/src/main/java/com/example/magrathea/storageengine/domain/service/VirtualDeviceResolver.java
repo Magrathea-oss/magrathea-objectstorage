@@ -34,7 +34,7 @@ public class VirtualDeviceResolver {
 
         // Dedup is enabled — build a DedupDevice with proper namespace and workflow key
         DedupConfig dedupConfig = effectivePolicy.dedup().get();
-        DedupNamespace namespace;
+        DedupNamespace namespace = null;
         switch (dedupConfig.scope()) {
             case GLOBAL_LEVEL -> namespace = DedupNamespace.GlobalDedupNamespace.INSTANCE;
             case BUCKET_LEVEL -> namespace = new DedupNamespace.BucketDedupNamespace(bucketRef);
