@@ -35,14 +35,11 @@ public class VirtualDeviceResolver {
 
         // Dedup is enabled — build a DedupDevice with proper namespace and workflow key
         DedupConfig dedupConfig = effectivePolicy.dedup().get();
-        DedupNamespace namespace;
-        if (dedupConfig.scope() == DedupScope.GLOBAL_LEVEL) {
-            namespace = DedupNamespace.GlobalDedupNamespace.INSTANCE;
-        } else if (dedupConfig.scope() == DedupScope.BUCKET_LEVEL) {
-            namespace = new DedupNamespace.BucketDedupNamespace(bucketRef);
-        } else {
-            throw new IllegalStateException("Unknown dedup scope: " + dedupConfig.scope());
-        }
+        final BucketRef ref = bucketRef;
+        DedupNamespace namespace = switch (dedupConfig.scope()) {
+            case GLOBAL_LEVEL -> DedupNamespace.GlobalDedupNamespace.INSTANCE;
+            case BUCKET_LEVEL -> new DedupNamespace.BucketDedupNamespace(ref);
+        };
 
         WorkflowCompatibilityKey workflowKey = WorkflowCompatibilityKey.from(effectivePolicy);
         return new VirtualDevice.DedupDevice(namespace, workflowKey);
