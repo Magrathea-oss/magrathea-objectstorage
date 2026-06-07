@@ -162,6 +162,29 @@
                             </arguments>
                         </configuration>
                     </execution>
+                    <execution>
+                        <id>copy-reports-to-static</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>bash</executable>
+                            <workingDirectory>${project.basedir}/../</workingDirectory>
+                            <arguments>
+                                <argument>-c</argument>
+                                <argument>
+                                    mkdir -p bootstrap-application/target/classes/static/docs/apidocs &amp;&amp;
+                                    cp -r */target/site/apidocs/* bootstrap-application/target/classes/static/docs/apidocs/ 2&gt;/dev/null || true;
+                                    cp -r target/site/apidocs/* bootstrap-application/target/classes/static/docs/apidocs/ 2&gt;/dev/null || true;
+                                    mkdir -p bootstrap-application/target/classes/static/docs/clover &amp;&amp;
+                                    cp -r */target/clover/*.html bootstrap-application/target/classes/static/docs/clover/ 2&gt;/dev/null || true;
+                                    mkdir -p bootstrap-application/target/classes/static/docs/cucumber &amp;&amp;
+                                    cp -r */target/cucumber/*.html bootstrap-application/target/classes/static/docs/cucumber/ 2&gt;/dev/null || true
+                                </argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
             <plugin>

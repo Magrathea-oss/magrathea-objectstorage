@@ -20,6 +20,21 @@
                 <directory>src/test/resources</directory>
             </testResource>
         </testResources>
+        <plugins>
+            <plugin>
+                <groupId>net.masterthought</groupId>
+                <artifactId>cucumber-reporting-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>cucumber-report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
     </build>
 
     <dependencies>

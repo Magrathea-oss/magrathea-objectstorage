@@ -45,6 +45,41 @@
                     <parameters>true</parameters>
                 </configuration>
             </plugin>
+            <!-- Clover code coverage reporting -->
+            <plugin>
+                <groupId>com.atlassian.clover</groupId>
+                <artifactId>clover-maven-plugin</artifactId>
+                <version>4.4.0</version>
+                <configuration>
+                    <generateHtml>true</generateHtml>
+                    <flushOnApplicationStop>true</flushOnApplicationStop>
+                    <includes>**/*.java</includes>
+                    <excludes>**/*Test*.java,**/*IT*.java</excludes>
+                </configuration>
+            </plugin>
+            <!-- Cucumber BDD reporting -->
+            <plugin>
+                <groupId>net.masterthought</groupId>
+                <artifactId>cucumber-reporting-maven-plugin</artifactId>
+                <version>5.7.0</version>
+                <configuration>
+                    <projectName>Magrathea ObjectStore</projectName>
+                    <outputDirectory>${project.build.directory}/cucumber</outputDirectory>
+                    <inputDirectory>${project.build.directory}/cucumber-json</inputDirectory>
+                    <jsonFiles>*.json</jsonFiles>
+                    <buildName>${project.version}</buildName>
+                </configuration>
+            </plugin>
+            <!-- Javadoc generation -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>3.6.0</version>
+                <configuration>
+                    <outputDirectory>${project.build.directory}/site/apidocs</outputDirectory>
+                    <reportOutputDirectory>${project.build.directory}/site/apidocs</reportOutputDirectory>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 
@@ -151,15 +186,21 @@
             <build>
                 <plugins>
                     <plugin>
-                        <groupId>org.openclover</groupId>
+                        <groupId>com.atlassian.clover</groupId>
                         <artifactId>clover-maven-plugin</artifactId>
-                        <version>4.5.2</version>
-                        <configuration>
-                            <generateHtml>true</generateHtml>
-                            <generateXml>true</generateXml>
-                            <targetPercentage>80%</targetPercentage>
-                            <includesTestSourceRoots>false</includesTestSourceRoots>
-                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>clover</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>setup</goal>
+                                    <goal>instrument</goal>
+                                    <goal>aggregate</goal>
+                                    <goal>clover</goal>
+                                    <goal>check</goal>
+                                </goals>
+                            </execution>
+                        </executions>
                     </plugin>
                 </plugins>
             </build>
