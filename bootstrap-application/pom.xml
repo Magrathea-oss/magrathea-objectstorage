@@ -185,6 +185,48 @@
                             </arguments>
                         </configuration>
                     </execution>
+                    <execution>
+                        <id>convert-clover-to-json</id>
+                        <phase>generate-resources</phase>
+                        <goals><goal>exec</goal></goals>
+                        <configuration>
+                            <executable>bash</executable>
+                            <workingDirectory>${project.basedir}/../</workingDirectory>
+                            <arguments>
+                                <argument>-c</argument>
+                                <argument>
+                                    for f in */target/site/clover/*.html; do
+                                      if [ -f "$f" ]; then
+                                        out="bootstrap-application/target/classes/static/docs/clover-json/$(basename $f .html).json"
+                                        mkdir -p "$(dirname "$out")"
+                                        node bootstrap-application/src/main/scripts/html-to-json.mjs --input "$f" --output "$out"
+                                      fi
+                                    done
+                                </argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>convert-cucumber-to-json</id>
+                        <phase>generate-resources</phase>
+                        <goals><goal>exec</goal></goals>
+                        <configuration>
+                            <executable>bash</executable>
+                            <workingDirectory>${project.basedir}/../</workingDirectory>
+                            <arguments>
+                                <argument>-c</argument>
+                                <argument>
+                                    for f in */target/cucumber/cucumber-html-reports/*.html; do
+                                      if [ -f "$f" ]; then
+                                        out="bootstrap-application/target/classes/static/docs/cucumber-json/$(basename $f .html).json"
+                                        mkdir -p "$(dirname "$out")"
+                                        node bootstrap-application/src/main/scripts/html-to-json.mjs --input "$f" --output "$out"
+                                      fi
+                                    done
+                                </argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
             <plugin>

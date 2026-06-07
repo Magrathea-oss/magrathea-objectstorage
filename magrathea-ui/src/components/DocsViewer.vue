@@ -26,31 +26,21 @@
       </button>
     </div>
 
-    <!-- HTML iframe content (Clover, Cucumber, Javadoc) -->
-    <div v-if="isHtmlTab" class="docs-iframe-container">
-      <iframe
-        :src="activeTabUrl"
-        class="docs-iframe"
-        frameborder="0"
-        title="{{ activeTabLabel }}"
-      ></iframe>
-    </div>
-
-    <!-- Loading (only for JSON tabs) -->
-    <div v-if="loading && !isHtmlTab" class="docs-loading">
+    <!-- Loading -->
+    <div v-if="loading" class="docs-loading">
       <span class="loading-spinner"></span>
       <span>{{ $t('docs.loading') }}</span>
     </div>
 
-    <!-- Error (only for JSON tabs) -->
-    <div v-else-if="error && !isHtmlTab" class="docs-error">
+    <!-- Error -->
+    <div v-else-if="error" class="docs-error">
       <span class="error-icon">⚠</span>
       <span>{{ error }}</span>
       <button class="docs-retry-btn" @click="fetchDocs">{{ $t('actions.retry') }}</button>
     </div>
 
     <!-- JSON-rendered content -->
-    <div v-else-if="!isHtmlTab" class="docs-content">
+    <div v-else class="docs-content">
       <div class="docs-json" v-if="docData">
         <template v-for="section in (docData?.document?.sections || [])" :key="section.id">
           <h2 :id="section.id" class="docs-section-title">{{ section.title }}</h2>
@@ -92,11 +82,6 @@ const lastUpdated = ref('')
 const docCache = ref({})
 const activeTab = ref(props.initialDocType)
 
-const isHtmlTab = computed(() => {
-  const tab = tabs.find(t => t.id === activeTab.value)
-  return tab ? tab.isHtml : false
-})
-
 const activeTabUrl = computed(() => {
   const tab = tabs.find(t => t.id === activeTab.value)
   if (!tab) return ''
@@ -114,8 +99,8 @@ const tabs = [
   { id: 'arc42', label: 'ARC42', url: () => '/docs/arc42.json', isHtml: false },
   { id: 'testreport', label: 'Test Report', url: () => '/docs/test-report.json', isHtml: false },
   { id: 'apidocs', label: 'Javadoc', url: () => '/docs/apidocs/index.html', isHtml: true },
-  { id: 'clover', label: 'Clover', url: () => '/docs/clover/index.html', isHtml: true },
-  { id: 'cucumber', label: 'Cucumber', url: () => '/docs/cucumber/index.html', isHtml: true },
+  { id: 'clover', label: 'Clover', url: () => '/docs/clover-json/dashboard.json', isHtml: false },
+  { id: 'cucumber', label: 'Cucumber', url: () => '/docs/cucumber-json/overview-features.json', isHtml: false },
 ]
 
 function getDocUrl(tabId) {
@@ -169,14 +154,7 @@ async function fetchDocs() {
 
 function switchTab(tabId) {
   activeTab.value = tabId
-  const tab = tabs.find(t => t.id === tabId)
-  if (tab && tab.isHtml) {
-    // HTML tabs: no JSON fetch needed, just show iframe
-    loading.value = false
-    error.value = null
-  } else {
-    fetchDocs()
-  }
+  fetchDocs()
 }
 
 function refreshDocs() {
@@ -381,25 +359,6 @@ onMounted(fetchDocs)
   padding: 2rem;
   overflow-y: auto;
   max-height: calc(100vh - 10rem);
-}
-
-/* HTML iframe container */
-.docs-iframe-container {
-  flex: 1;
-  background: var(--bg-card);
-  border: 1px solid var(--border-glass);
-  border-radius: 12px;
-  overflow: hidden;
-  padding: 0;
-  max-height: calc(100vh - 10rem);
-}
-
-.docs-iframe {
-  width: 100%;
-  height: 100%;
-  border: none;
-  background: #fff;
-  border-radius: 12px;
 }
 
 .docs-json {
