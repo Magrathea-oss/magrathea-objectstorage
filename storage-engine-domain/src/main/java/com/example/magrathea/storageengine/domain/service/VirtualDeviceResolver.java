@@ -3,6 +3,7 @@ package com.example.magrathea.storageengine.domain.service;
 import com.example.magrathea.storageengine.domain.valueobject.BucketRef;
 import com.example.magrathea.storageengine.domain.valueobject.DedupConfig;
 import com.example.magrathea.storageengine.domain.valueobject.DedupNamespace;
+import com.example.magrathea.storageengine.domain.valueobject.DedupScope;
 import com.example.magrathea.storageengine.domain.valueobject.EffectiveStoragePolicy;
 import com.example.magrathea.storageengine.domain.valueobject.VirtualDevice;
 import com.example.magrathea.storageengine.domain.valueobject.WorkflowCompatibilityKey;
@@ -34,11 +35,13 @@ public class VirtualDeviceResolver {
 
         // Dedup is enabled — build a DedupDevice with proper namespace and workflow key
         DedupConfig dedupConfig = effectivePolicy.dedup().get();
-        DedupNamespace namespace = null;
-        switch (dedupConfig.scope()) {
-            case GLOBAL_LEVEL -> namespace = DedupNamespace.GlobalDedupNamespace.INSTANCE;
-            case BUCKET_LEVEL -> namespace = new DedupNamespace.BucketDedupNamespace(bucketRef);
-            default -> throw new IllegalStateException("Unknown dedup scope: " + dedupConfig.scope());
+        DedupNamespace namespace;
+        if (dedupConfig.scope() == DedupScope.GLOBAL_LEVEL) {
+            namespace = DedupNamespace.GlobalDedupNamespace.INSTANCE;
+        } else if (dedupConfig.scope() == DedupScope.BUCKET_LEVEL) {
+            namespace = new DedupNamespace.BucketDedupNamespace(bucketRef);
+        } else {
+            throw new IllegalStateException("Unknown dedup scope: " + dedupConfig.scope());
         }
 
         WorkflowCompatibilityKey workflowKey = WorkflowCompatibilityKey.from(effectivePolicy);
