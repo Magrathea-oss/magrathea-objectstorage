@@ -144,14 +144,18 @@ function handleDocLinkClick(event) {
   if (!link) return
   const href = link.getAttribute('href')
   if (!href) return
-  // Only handle links to JSON files in docs
-  if (!href.startsWith('/docs/') || !href.endsWith('.json')) return
+  // Only handle links ending with .json
+  if (!href.endsWith('.json')) return
   event.preventDefault()
-  // Extract the tab ID from the href path
-  const pathParts = href.replace('/docs/', '').split('/')
-  const tabId = pathParts[0].replace('-json', '')
-  // Load the JSON
-  loadJson(href)
+  // Resolve relative paths against the current docs base URL
+  let url = href
+  if (!href.startsWith('/docs/') && !href.startsWith('http')) {
+    // Relative path: prepend the current docs directory
+    const baseUrl = getDocUrl(activeTab.value)
+    const baseDir = baseUrl.substring(0, baseUrl.lastIndexOf('/') + 1)
+    url = baseDir + href
+  }
+  loadJson(url)
 }
 
 async function loadJson(url) {
