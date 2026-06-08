@@ -99,7 +99,7 @@ const tabs = [
   { id: 'arc42', label: 'ARC42', url: () => '/docs/arc42.json', isHtml: false },
   { id: 'testreport', label: 'Test Report', url: () => '/docs/test-report.json', isHtml: false },
   { id: 'apidocs', label: 'Javadoc', url: () => '/docs/apidocs/index.html', isHtml: true },
-  { id: 'clover', label: 'Clover', url: () => '/docs/clover-json/dashboard.json', isHtml: false },
+  { id: 'clover', label: 'JaCoCo', url: () => '/docs/jacoco-json/dashboard.json', isHtml: false },
   { id: 'cucumber', label: 'Cucumber', url: () => '/docs/cucumber-json/overview-features.json', isHtml: false },
 ]
 

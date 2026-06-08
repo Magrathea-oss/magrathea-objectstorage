@@ -177,8 +177,8 @@
                                     mkdir -p bootstrap-application/target/classes/static/docs/apidocs &amp;&amp;
                                     cp -r */target/site/apidocs/* bootstrap-application/target/classes/static/docs/apidocs/ 2&gt;/dev/null || true;
                                     cp -r target/site/apidocs/* bootstrap-application/target/classes/static/docs/apidocs/ 2&gt;/dev/null || true;
-                                    mkdir -p bootstrap-application/target/classes/static/docs/clover &amp;&amp;
-                                    cp -r */target/clover/*.html bootstrap-application/target/classes/static/docs/clover/ 2&gt;/dev/null || true;
+                                    mkdir -p bootstrap-application/target/classes/static/docs/jacoco &amp;&amp;
+                                    cp -r */target/site/jacoco/*.html bootstrap-application/target/classes/static/docs/jacoco/ 2&gt;/dev/null || true;
                                     mkdir -p bootstrap-application/target/classes/static/docs/cucumber &amp;&amp;
                                     cp -r */target/cucumber/*.html bootstrap-application/target/classes/static/docs/cucumber/ 2&gt;/dev/null || true
                                 </argument>
@@ -186,7 +186,7 @@
                         </configuration>
                     </execution>
                     <execution>
-                        <id>convert-clover-to-json</id>
+                        <id>convert-jacoco-to-json</id>
                         <phase>generate-resources</phase>
                         <goals><goal>exec</goal></goals>
                         <configuration>
@@ -195,9 +195,9 @@
                             <arguments>
                                 <argument>-c</argument>
                                 <argument>
-                                    find */target/site/clover -name '*.html' -print0 2>/dev/null | while IFS= read -r -d '' f; do
-                                        relpath=$(echo "$f" | sed 's|.*/target/site/clover/||')
-                                        out="bootstrap-application/target/classes/static/docs/clover-json/${relpath%.html}.json"
+                                    find */target/site/jacoco -name '*.html' -print0 2>/dev/null | while IFS= read -r -d '' f; do
+                                        relpath=$(echo "$f" | sed 's|.*/target/site/jacoco/||')
+                                        out="bootstrap-application/target/classes/static/docs/jacoco-json/${relpath%.html}.json"
                                         mkdir -p "$(dirname "$out")"
                                         node bootstrap-application/src/main/scripts/html-to-json.mjs --input "$f" --output "$out" --fix-links
                                     done
