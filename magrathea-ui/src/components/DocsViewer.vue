@@ -96,6 +96,7 @@ const docData = ref(null)
 const lastUpdated = ref('')
 const docCache = ref({})
 const activeTab = ref(props.initialDocType)
+const currentDocUrl = ref('')
 
 const activeTabHtml = computed(() => {
   const tab = tabs.find(t => t.id === activeTab.value)
@@ -175,13 +176,19 @@ function handleDocLinkClick(event) {
   // Only handle links ending with .json
   if (!href.endsWith('.json')) return
   event.preventDefault()
-  // Resolve relative paths against the current docs base URL
+  // Resolve relative paths against the current document URL (not the tab URL)
   let url = href
   if (!href.startsWith('/docs/') && !href.startsWith('http')) {
-    // Relative path: prepend the current docs directory
-    const baseUrl = getDocUrl(activeTab.value)
-    const baseDir = baseUrl.substring(0, baseUrl.lastIndexOf('/') + 1)
-    url = baseDir + href
+    // Relative path: resolve against currentDocUrl using the URL constructor
+    // This correctly handles ../foo.json, ../../foo.json, and same-directory links
+    if (currentDocUrl.value) {
+      url = new URL(href, currentDocUrl.value).toString()
+    } else {
+      // Fallback: prepend the current docs directory
+      const baseUrl = getDocUrl(activeTab.value)
+      const baseDir = baseUrl.substring(0, baseUrl.lastIndexOf('/') + 1)
+      url = baseDir + href
+    }
   }
   loadJson(url)
 }
@@ -195,6 +202,8 @@ async function loadJson(url) {
     const json = await res.json()
     docData.value = json
     lastUpdated.value = new Date().toLocaleString()
+    // Track the URL that was actually loaded, for correct relative link resolution
+    currentDocUrl.value = url
   } catch (e) {
     error.value = e.message || t('errors.general')
   } finally {

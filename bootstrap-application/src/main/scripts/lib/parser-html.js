@@ -47,16 +47,18 @@ function toHtml(node) {
 
 /**
  * Depth-first traversal yielding all element nodes (nodeType === 1).
+ * Optionally skips children of nodes in skipDescendantsOf.
  * @param {object} node - Root node to walk from
+ * @param {Set<object>} [skipDescendantsOf] - Set of nodes whose children to skip
  * @returns {object[]} Array of element nodes in document order
  */
-function walk(node) {
+function walk(node, skipDescendantsOf) {
   const result = [];
   if (!node) return result;
   if (node.nodeType === 1) result.push(node);
-  if (node.childNodes) {
+  if (node.childNodes && !(skipDescendantsOf && skipDescendantsOf.has(node))) {
     for (const child of node.childNodes) {
-      result.push(...walk(child));
+      result.push(...walk(child, skipDescendantsOf));
     }
   }
   return result;
@@ -145,6 +147,56 @@ function parseTable(tableNode) {
 }
 
 // ──────────────────────────────────────────────────────────────
+// Div-table parser (Javadoc 21 summary-table)
+// ──────────────────────────────────────────────────────────────
+
+/**
+ * Parse a <div class="summary-table ..."> element into headers + rows.
+ * Javadoc 21 uses div-based tables where:
+ *   - Children with class "table-header" form the header row
+ *   - Remaining div children are grouped by header count to form data rows
+ * @param {object} divNode - Parsed <div class="summary-table"> element
+ * @returns {object|null} { type: 'table', headers, rows } or null
+ */
+function parseDivTable(divNode) {
+  const children = divNode.childNodes.filter(
+    child => child.nodeType === 1 && child.tagName?.toLowerCase() === 'div'
+  );
+  if (!children.length) return null;
+
+  // Extract header cells: divs with class "table-header"
+  const headerDivs = children.filter(c => {
+    const cls = c.getAttribute('class') || '';
+    return cls.includes('table-header');
+  });
+
+  const headers = headerDivs.map(c => c.innerHTML?.trim() || '');
+  if (!headers.length) return null;
+
+  const numCols = headers.length;
+
+  // Data rows: group remaining divs by numCols
+  const dataDivs = children.filter(c => {
+    const cls = c.getAttribute('class') || '';
+    return !cls.includes('table-header');
+  });
+
+  const rows = [];
+  for (let i = 0; i + numCols - 1 < dataDivs.length; i += numCols) {
+    const row = [];
+    for (let j = 0; j < numCols; j++) {
+      row.push(dataDivs[i + j].innerHTML?.trim() || '');
+    }
+    // Skip empty rows
+    if (row.some(cell => cell.length > 0)) {
+      rows.push(row);
+    }
+  }
+
+  return { type: 'table', headers, rows };
+}
+
+// ──────────────────────────────────────────────────────────────
 // List parser
 // ──────────────────────────────────────────────────────────────
 
@@ -203,11 +255,22 @@ export function parseHtml(html) {
   // Target main content area (skip nav/header/footer)
   const main = root.querySelector('main') || root.querySelector('body') || root;
 
+  // Collect all summary-table divs so we can skip their children during walk
+  const summaryTableDivs = new Set();
+  for (const el of walk(main)) {
+    if (el.tagName?.toLowerCase() === 'div') {
+      const cls = el.getAttribute('class') || '';
+      if (cls.includes('summary-table')) {
+        summaryTableDivs.add(el);
+      }
+    }
+  }
+
   let currentSection = null;
   let sectionLevel = 0;
 
-  // Walk all element nodes depth-first
-  for (const node of walk(main)) {
+  // Walk all element nodes depth-first, skipping children of summary-table divs
+  for (const node of walk(main, summaryTableDivs)) {
     // Skip navigation / unwanted elements
     if (SKIP_TAGS.has(node.tagName?.toLowerCase())) continue;
     if (isNavigation(node)) continue;
@@ -231,8 +294,17 @@ export function parseHtml(html) {
       continue;
     }
 
-    // ── Paragraphs / divs → paragraph blocks ──
+    // ── Paragraphs / divs → paragraph blocks (or div-tables) ──
     if (tag === 'p' || tag === 'div' || tag === 'blockquote') {
+      // Check if this div is a Javadoc 21 summary-table
+      if (tag === 'div') {
+        const cls = node.getAttribute('class') || '';
+        if (cls.includes('summary-table')) {
+          const table = parseDivTable(node);
+          if (table) addBlock(currentSection, table);
+          continue;
+        }
+      }
       const htmlContent = node.innerHTML?.trim();
       if (htmlContent) {
         addBlock(currentSection, { type: 'paragraph', html: node.toString() });
