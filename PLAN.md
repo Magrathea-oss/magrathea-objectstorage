@@ -196,3 +196,10 @@ mvn -N verify -Paws-cli-tests
 ```
 
 Expected: all tests pass, AWS CLI tests pass.
+
+---
+
+## TODO / Future Work
+
+- [ ] Replicare test `@webclient` (256) come `@awscli` — creare step definition AWS CLI e feature file duplicati
+
