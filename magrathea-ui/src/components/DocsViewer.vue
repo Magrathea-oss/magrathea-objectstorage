@@ -55,7 +55,7 @@
     </div>
 
     <!-- JSON-rendered content -->
-    <div v-else class="docs-content" @click="handleDocLinkClick">
+    <div v-else class="docs-content" :class="{ 'docs-javadoc': activeTab === 'apidocs' }" @click="handleDocLinkClick">
       <div class="docs-json" v-if="docData">
         <template v-for="section in (docData?.document?.sections || [])" :key="section.id">
           <h2 :id="section.id" class="docs-section-title">{{ section.title }}</h2>
