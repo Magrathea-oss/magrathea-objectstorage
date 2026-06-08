@@ -1,5 +1,7 @@
+@webclient
 Feature: S3 runtime bucket configuration effects
 
+  @webclient
   Scenario: BucketOwnerEnforced ownership controls cannot be reverted
     Given bucket "ownership-runtime-bucket" exists
     When bucket ownership controls are set directly for "ownership-runtime-bucket" to "BucketOwnerEnforced"
@@ -7,6 +9,7 @@ Feature: S3 runtime bucket configuration effects
     When bucket ownership controls are set directly for "ownership-runtime-bucket" to "ObjectWriter"
     Then the response status is 409
 
+  @webclient
   Scenario: PublicAccessBlock blocks public bucket policies
     Given bucket "pab-policy-bucket" exists
     When bucket public access block is configured for "pab-policy-bucket" with blockPublicAcls "false", ignorePublicAcls "false", blockPublicPolicy "true", restrictPublicBuckets "false"

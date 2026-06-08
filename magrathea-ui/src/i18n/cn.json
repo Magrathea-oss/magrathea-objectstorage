@@ -71,7 +71,8 @@
     "title": "文档",
     "loading": "正在加载文档...",
     "back": "返回",
-    "generated": "生成的文档"
+    "generated": "生成的文档",
+    "openInNewTab": "在新标签页中打开"
   },
   "actions": {
     "none": "无",

@@ -1,8 +1,10 @@
+@awscli
 Feature: AWS CLI PutObject — Header Compatibility
 
   Background:
     Given bucket "test-bucket" exists
 
+  @awscli
   Scenario: AWS CLI put-object succeeds with default headers
     Given an object with key "aws-cli-default.txt" and content "AWS CLI default test"
     When the object is stored via AWS CLI with default headers

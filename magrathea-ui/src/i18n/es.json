@@ -71,7 +71,8 @@
     "title": "Documentación",
     "loading": "Cargando documentación...",
     "back": "Atrás",
-    "generated": "Documentación generada"
+    "generated": "Documentación generada",
+    "openInNewTab": "Abrir en nueva pestaña"
   },
   "actions": {
     "none": "Ninguno",

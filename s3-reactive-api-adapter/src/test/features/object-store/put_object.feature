@@ -1,3 +1,4 @@
+@webclient
 Feature: S3-compatible PutObject API — Anomaly Tests (Analysis-Complete)
 
   Background:
@@ -5,12 +6,14 @@ Feature: S3-compatible PutObject API — Anomaly Tests (Analysis-Complete)
 
   # ── Success scenarios (current working behavior) ──
 
+  @webclient
   Scenario: Put an object
     Given an object with key "hello.txt" and content "Hello Magrathea!"
     When the object is stored via S3 API
     Then the response status is 200
     And the object appears in the object list
 
+  @webclient
   Scenario: Put an object with PARANOIC_MODE storage class
     Given an object with key "paranoid.txt" and content "Top secret"
     When the object is stored via S3 API with storage class "PARANOIC_MODE"
@@ -20,6 +23,7 @@ Feature: S3-compatible PutObject API — Anomaly Tests (Analysis-Complete)
   # ── Anomaly tests — AWS API Compliance Gaps ──
 
   # F4: Metadata headers ignored
+  @webclient
   Scenario: Put object stores user metadata headers
     Given an object with key "meta-test.txt" and content "data"
     When the object is stored via S3 API with metadata header "x-amz-meta-project" value "magrathea"
@@ -27,6 +31,7 @@ Feature: S3-compatible PutObject API — Anomaly Tests (Analysis-Complete)
     And the object metadata returned by HEAD contains header "x-amz-meta-project" with value "magrathea"
 
   # F5: SSE headers ignored — server-side encryption
+  @webclient
   Scenario: Put object stores SSE encryption header
     Given an object with key "sse-test.txt" and content "data"
     When the object is stored via S3 API with header "x-amz-server-side-encryption" value "AES256"
@@ -34,6 +39,7 @@ Feature: S3-compatible PutObject API — Anomaly Tests (Analysis-Complete)
     And the object metadata returned by HEAD contains header "x-amz-server-side-encryption" with value "AES256"
 
   # F5: SSE-C customer algorithm ignored
+  @webclient
   Scenario: Put object stores SSE-C customer algorithm
     Given an object with key "ssec-test.txt" and content "data"
     When the object is stored via S3 API with header "x-amz-server-side-encryption-customer-algorithm" value "AES256"
@@ -41,6 +47,7 @@ Feature: S3-compatible PutObject API — Anomaly Tests (Analysis-Complete)
     And the object metadata returned by HEAD contains header "x-amz-server-side-encryption-customer-algorithm" with value "AES256"
 
   # M4: x-amz-checksum-sha256 header ignored
+  @webclient
   Scenario: Put object stores checksum SHA256 header
     Given an object with key "checksum-test.txt" and content "data"
     When the object is stored via S3 API with header "x-amz-checksum-sha256" value "deadbeef1234567890abcdef1234567890"
@@ -48,6 +55,7 @@ Feature: S3-compatible PutObject API — Anomaly Tests (Analysis-Complete)
     And the object metadata returned by HEAD contains header "x-amz-checksum-sha256" with value "deadbeef1234567890abcdef1234567890"
 
   # M5: x-amz-version-id — not present for bucket without versioning
+  @webclient
   Scenario: Put object does not return version-id when versioning disabled
     Given an object with key "version-test.txt" and content "data"
     When the object is stored via S3 API
@@ -55,47 +63,55 @@ Feature: S3-compatible PutObject API — Anomaly Tests (Analysis-Complete)
     And the response header "x-amz-version-id" is absent
 
   # M1: x-amz-expected-bucket-owner ignored
+  @webclient
   Scenario: Put object with expected bucket owner
     Given an object with key "owner-test.txt" and content "data"
     When the object is stored via S3 API with header "x-amz-expected-bucket-owner" value "expected-owner"
     Then the response status is 200
 
   # AWS CLI default headers — handler ignores these
+  @webclient
   Scenario: Put object ignores x-amz-checksum-crc64nvme (AWS CLI v2 default)
     Given an object with key "crc64-test.txt" and content "data"
     When the object is stored via S3 API with header "x-amz-checksum-crc64nvme" value "crc64value"
     Then the response status is 200
     And the object metadata returned by HEAD contains header "x-amz-checksum-crc64nvme" with value "crc64value"
 
+  @webclient
   Scenario: Put object ignores x-amz-sdk-checksum-algorithm (AWS CLI v2 default)
     Given an object with key "sdk-checksum-test.txt" and content "data"
     When the object is stored via S3 API with header "x-amz-sdk-checksum-algorithm" value "crc64nvme"
     Then the response status is 200
     And the object metadata returned by HEAD contains header "x-amz-sdk-checksum-algorithm" with value "crc64nvme"
 
+  @webclient
   Scenario: Put object ignores X-Amz-Date (SigV4 — not validated)
     Given an object with key "date-test.txt" and content "data"
     When the object is stored via S3 API with header "X-Amz-Date" value "20260527T000000Z"
     Then the response status is 200
     # SigV4 validation is NOT IMPLEMENTED — handler accepts any date
 
+  @webclient
   Scenario: Put object ignores X-Amz-Content-SHA256 (SigV4 — not validated)
     Given an object with key "sha-test.txt" and content "data"
     When the object is stored via S3 API with header "X-Amz-Content-SHA256" value "unhashedpayload"
     Then the response status is 200
     # SigV4 validation is NOT IMPLEMENTED — handler accepts any SHA256
 
+  @webclient
   Scenario: Put object ignores Authorization header (SigV4 — not validated)
     Given an object with key "auth-test.txt" and content "data"
     When the object is stored via S3 API with header "Authorization" value "AWS4-HMAC-SHA256 Credential=.../s3/aws4_request"
     Then the response status is 200
     # SigV4 validation is NOT IMPLEMENTED — handler accepts any Authorization value
 
+  @webclient
   Scenario: Put object ignores User-Agent header
     Given an object with key "ua-test.txt" and content "data"
     When the object is stored via S3 API with header "User-Agent" value "aws-sdk-v2"
     Then the response status is 200
 
+  @webclient
   Scenario: Put object ignores Expect header (100-continue)
     Given an object with key "expect-test.txt" and content "data"
     When the object is stored via S3 API with header "Expect" value "100-continue"
@@ -103,6 +119,7 @@ Feature: S3-compatible PutObject API — Anomaly Tests (Analysis-Complete)
 
   # ── Checksum header tests ──
 
+  @webclient
   Scenario: Put object with Content-MD5 header echoes Content-MD5 and uses ETag = md5
     Given an object with key "content-md5-test.txt" and content "data"
     When the object is stored via S3 API with Content-MD5 header "dGVzdA=="
@@ -110,12 +127,14 @@ Feature: S3-compatible PutObject API — Anomaly Tests (Analysis-Complete)
     And the response ETag header is "\"dGVzdA==\""
     And the object metadata returned by HEAD contains header "Content-MD5" with value "dGVzdA=="
 
+  @webclient
   Scenario: Put object without any checksum header succeeds (200 OK)
     Given an object with key "no-checksum-test.txt" and content "data"
     When the object is stored via S3 API without checksum headers
     Then the response status is 200
     And the object appears in the object list
 
+  @webclient
   Scenario: Put object with direct x-amz-checksum header (no SDK hint) succeeds and echoes in HEAD
     Given an object with key "direct-checksum-test.txt" and content "data"
     When the object is stored via S3 API with direct checksum header "x-amz-checksum-crc32c" value "AAAAAA=="
@@ -128,6 +147,7 @@ Feature: S3-compatible PutObject API — Anomaly Tests (Analysis-Complete)
   # The handler generates the S3Object.Id and passes it to objectService.saveObjectWithContent(),
   # which creates the aggregate via S3Object.create().
   # For copyObject, the handler still creates a CreatingS3Object directly (partial D1).
+  @webclient
   Scenario: Handler delegates to service for object creation — D1 resolved for putObject
     Given an object with key "d1-resolved.txt" and content "data"
     When the object is stored via S3 API with multiple headers
@@ -141,6 +161,7 @@ Feature: S3-compatible PutObject API — Anomaly Tests (Analysis-Complete)
 
   # ── G13: SSE-KMS scenario ──
 
+  @webclient
   Scenario: PutObject with SSE-KMS
     Given an object with key "sse-kms-test.txt" and content "data"
     When the object is stored via S3 API with SSE header "x-amz-server-side-encryption" value "aws:kms" and KMS key "test-key"
@@ -150,6 +171,7 @@ Feature: S3-compatible PutObject API — Anomaly Tests (Analysis-Complete)
 
   # ── G13: Storage class STANDARD scenario ──
 
+  @webclient
   Scenario: PutObject with storage class STANDARD
     Given an object with key "standard-test.txt" and content "data"
     When the object is stored via S3 API with storage class "STANDARD"
@@ -158,6 +180,7 @@ Feature: S3-compatible PutObject API — Anomaly Tests (Analysis-Complete)
 
   # ── G13: Checksum echo in GET scenario ──
 
+  @webclient
   Scenario: PutObject with checksum echo in GET
     Given an object with key "checksum-get-test.txt" and content "data"
     When the object is stored via S3 API with header "x-amz-checksum-sha256" value "deadbeef"
@@ -166,6 +189,7 @@ Feature: S3-compatible PutObject API — Anomaly Tests (Analysis-Complete)
 
   # ── Failure scenarios ──
 
+  @webclient
   Scenario: Copy object with metadata directive returns 200
     Given object "copy-source.txt" exists with content "Copy source data"
     When the object with key "copy-source.txt" is copied to "copy-target.txt" with metadata "REPLACE"
@@ -173,11 +197,13 @@ Feature: S3-compatible PutObject API — Anomaly Tests (Analysis-Complete)
 
   # ── State machine operation scenarios ──
 
+  @webclient
   Scenario: Lock an existing object
     Given object "lock-me.txt" exists with content "Lockable data"
     When object "lock-me.txt" is locked via S3 API with mode "COMPLIANCE" and duration 30 days
     Then the response status is 200
 
+  @webclient
   Scenario: Archive an existing object
     Given object "archive-me.txt" exists with content "Archivable data"
     When object "archive-me.txt" is archived via S3 API
@@ -185,6 +211,7 @@ Feature: S3-compatible PutObject API — Anomaly Tests (Analysis-Complete)
 
   # ── S3Object write state machine integration ──
 
+  @webclient
   Scenario: S3Object lifecycle — create, read, overwrite, delete
     Given an object with key "sm-lifecycle.txt" and content "First version"
     When the object is stored via S3 API

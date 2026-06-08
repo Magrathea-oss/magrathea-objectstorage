@@ -1,7 +1,9 @@
+@webclient
 Feature: S3-compatible Multipart Upload Operations
 
   # ── Success scenarios ──
 
+  @webclient
   Scenario: Initiate multipart upload
     Given bucket "test-multipart-bucket" exists
     And an object key "test-key.txt"
@@ -9,6 +11,7 @@ Feature: S3-compatible Multipart Upload Operations
     Then the response status is 200
     And the initiate response contains an upload ID
 
+  @webclient
   Scenario: Upload a part
     Given bucket "test-multipart-bucket" exists
     And an object key "test-key.txt"
@@ -17,6 +20,7 @@ Feature: S3-compatible Multipart Upload Operations
     Then the response status is 200
     And the upload part response contains an ETag
 
+  @webclient
   Scenario: List parts
     Given bucket "test-multipart-bucket" exists
     And an object key "test-key.txt"
@@ -26,6 +30,7 @@ Feature: S3-compatible Multipart Upload Operations
     Then the response status is 200
     And the list parts response contains 1 part
 
+  @webclient
   Scenario: Complete multipart upload
     Given bucket "test-multipart-bucket" exists
     And an object key "test-key.txt"
@@ -36,6 +41,7 @@ Feature: S3-compatible Multipart Upload Operations
     And the complete response contains an ETag
 
 
+  @webclient
   Scenario: Abort multipart upload
     Given bucket "test-multipart-bucket" exists
     And an object key "test-key.txt"
@@ -43,6 +49,7 @@ Feature: S3-compatible Multipart Upload Operations
     When the multipart upload is aborted
     Then the response status is 204
 
+  @webclient
   Scenario: List multipart uploads
     Given bucket "test-multipart-bucket" exists
     And an object key "list-uploads-key.txt"
@@ -53,18 +60,21 @@ Feature: S3-compatible Multipart Upload Operations
 
   # ── Failure scenarios ──
 
+  @webclient
   Scenario: Initiate multipart upload to nonexistent bucket
     Given a bucket name "nonexistent-bucket"
     And an object key "test-key.txt"
     When a multipart upload is initiated for nonexistent bucket
     Then the response status is 404
 
+  @webclient
   Scenario: Upload part to nonexistent upload
     Given bucket "test-multipart-bucket" exists
     And an object key "test-key.txt"
     When an invalid part is uploaded with uploadId "INVALID"
     Then the response status is 404
 
+  @webclient
   Scenario: Complete nonexistent multipart upload
     Given bucket "test-multipart-bucket" exists
     And an object key "test-key.txt"

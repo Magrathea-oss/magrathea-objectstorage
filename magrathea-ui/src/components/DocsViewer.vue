@@ -39,6 +39,21 @@
       <button class="docs-retry-btn" @click="fetchDocs">{{ $t('actions.retry') }}</button>
     </div>
 
+    <!-- HTML content (iframe for Javadoc) -->
+    <div v-else-if="activeTabHtml" class="docs-iframe-wrapper">
+      <iframe
+        class="docs-iframe"
+        :src="activeTabUrl"
+        frameborder="0"
+        title="Javadoc"
+      ></iframe>
+      <div class="docs-iframe-controls">
+        <a :href="activeTabUrl" target="_blank" class="docs-open-new-tab">
+          {{ $t('docs.openInNewTab') }}
+        </a>
+      </div>
+    </div>
+
     <!-- JSON-rendered content -->
     <div v-else class="docs-content" @click="handleDocLinkClick">
       <div class="docs-json" v-if="docData">
@@ -81,6 +96,11 @@ const docData = ref(null)
 const lastUpdated = ref('')
 const docCache = ref({})
 const activeTab = ref(props.initialDocType)
+
+const activeTabHtml = computed(() => {
+  const tab = tabs.find(t => t.id === activeTab.value)
+  return tab ? tab.isHtml : false
+})
 
 const activeTabUrl = computed(() => {
   const tab = tabs.find(t => t.id === activeTab.value)
@@ -129,7 +149,15 @@ watch(locale, () => {
 })
 
 async function fetchDocs() {
-  const url = getDocUrl(activeTab.value)
+  const tabId = activeTab.value
+  const tab = tabs.find(t => t.id === tabId)
+  if (tab && tab.isHtml) {
+    // HTML tab: set iframe src directly, no JSON loading
+    loading.value = false
+    docData.value = null
+    return
+  }
+  const url = getDocUrl(tabId)
   await loadJson(url)
 }
 
@@ -444,6 +472,47 @@ onMounted(fetchDocs)
 .docs-list li {
   margin: 0.3em 0;
   color: var(--text-secondary);
+}
+
+/* Iframe for HTML docs (Javadoc) */
+.docs-iframe-wrapper {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.docs-iframe {
+  width: 100%;
+  flex: 1;
+  min-height: calc(100vh - 12rem);
+  border: none;
+  background: #fff;
+}
+
+.docs-iframe-controls {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border-glass);
+  text-align: center;
+}
+
+.docs-open-new-tab {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 0.4rem 1rem;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.docs-open-new-tab:hover {
+  background: var(--accent);
+  color: #fff;
 }
 
 /* Footer */

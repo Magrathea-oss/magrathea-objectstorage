@@ -71,7 +71,8 @@
     "title": "Documentation",
     "loading": "Loading documentation...",
     "back": "Back",
-    "generated": "Generated documentation"
+    "generated": "Generated documentation",
+    "openInNewTab": "Open in new tab"
   },
   "actions": {
     "none": "None",
