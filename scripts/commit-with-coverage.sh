@@ -4,7 +4,7 @@ set -u
 # ──────────────────────────────────────────────────────────────
 # commit-with-coverage.sh
 # 
-# 1. Runs full test suite with Clover coverage
+# 1. Runs full test suite with JaCoCo coverage
 # 2. Extracts coverage metrics
 # 3. Commits with coverage summary in message
 # 4. Pushes
@@ -37,16 +37,26 @@ mvn clean -q || {
 
 echo ""
 echo "=============================================="
-echo "  Running tests with Clover coverage..."
+echo "  Running tests with JaCoCo coverage..."
 echo "=============================================="
-mvn -Pcoverage clover:setup test clover:aggregate clover:clover -q || {
+mvn -Pcoverage test jacoco:report -q || {
     echo "❌ Tests failed — aborting commit"
     exit 1
 }
 echo "  ✅ Tests passed"
 echo ""
 
-# ── Step 1b: Run AWS CLI compatibility tests ──
+# ── Step 1b: Generate JaCoCo HTML reports ──
+echo "=============================================="
+echo "  Generating coverage reports..."
+echo "=============================================="
+mvn -Pcoverage jacoco:report -q || {
+    echo "⚠️  Report generation failed — continuing without HTML"
+}
+echo "  ✅ Reports generated"
+echo ""
+
+# ── Step 1c: Run AWS CLI compatibility tests ──
 echo "=============================================="
 echo "  Running AWS CLI compatibility tests..."
 echo "=============================================="
@@ -62,31 +72,42 @@ fi
 echo ""
 
 # ── Step 2: Extract coverage metrics ──
-CLOVER_XML="$PROJECT_DIR/target/site/clover/clover.xml"
-if [ ! -f "$CLOVER_XML" ]; then
-    echo "⚠️  Clover report not found — commit without coverage data"
-    COVERAGE_LINE=""
-else
-    COVERAGE_LINE=$(python3 -c "
+COVERAGE_LINE=""
+for MODULE in "s3-reactive-api-adapter" "object-store-domain"; do
+    XML="$PROJECT_DIR/$MODULE/target/site/jacoco/jacoco.xml"
+    if [ ! -f "$XML" ]; then
+        echo "⚠️  JaCoCo report not found for $MODULE — skipping"
+        continue
+    fi
+    METRICS=$(python3 -c "
 import xml.etree.ElementTree as ET
-p = '$CLOVER_XML'
+p = '$XML'
 root = ET.parse(p).getroot()
-for elem in root.iter('metrics'):
-    m = elem.attrib
-    break
-pairs = [
-    ('Elements', 'coveredelements', 'elements'),
-    ('Statements', 'coveredstatements', 'statements'),
-    ('Methods', 'coveredmethods', 'methods'),
-]
-parts = []
-for label, c, t in pairs:
-    cv = int(m.get(c, 0)); tv = int(m.get(t, 0))
-    pct = (cv/tv*100) if tv else 0.0
-    parts.append(f'{label}={pct:.1f}%')
-print(f'Coverage: {\" | \".join(parts)}')
+counters = root.findall('.//counter')
+totals = {}
+for c in counters:
+    typ = c.get('type')
+    missed = int(c.get('missed', 0))
+    covered = int(c.get('covered', 0))
+    if typ not in totals:
+        totals[typ] = {'missed': 0, 'covered': 0}
+    totals[typ]['missed'] += missed
+    totals[typ]['covered'] += covered
+instr = totals.get('INSTRUCTION', {'covered': 0, 'missed': 0})
+branch = totals.get('BRANCH', {'covered': 0, 'missed': 0})
+line = totals.get('LINE', {'covered': 0, 'missed': 0})
+i_pct = instr['covered']/(instr['covered']+instr['missed'])*100 if (instr['covered']+instr['missed']) else 0
+b_pct = branch['covered']/(branch['covered']+branch['missed'])*100 if (branch['covered']+branch['missed']) else 0
+l_pct = line['covered']/(line['covered']+line['missed'])*100 if (line['covered']+line['missed']) else 0
+print(f'Instruction={i_pct:.1f}% | Branch={b_pct:.1f}% | Line={l_pct:.1f}%')
     ")
+    COVERAGE_LINE="$COVERAGE_LINE$MODULE: $METRICS
+"
+done
+if [ -n "$COVERAGE_LINE" ]; then
     echo "  $COVERAGE_LINE"
+else
+    echo "⚠️  No coverage data found — commit without coverage"
 fi
 
 # ── Step 3: Stage all changes ──
@@ -102,7 +123,7 @@ else
     if [ -n "$USER_MSG" ]; then
         COMMIT_MSG="$USER_MSG"
     elif [ -n "$COVERAGE_LINE" ]; then
-        COMMIT_MSG="update $(git diff --cached --name-only | head -1 | sed 's/.*\///') — $COVERAGE_LINE"
+        COMMIT_MSG="update $(git diff --cached --name-only | head -1 | sed 's/.*\///') — $(echo "$COVERAGE_LINE" | head -1)"
     else
         COMMIT_MSG="update"
     fi
