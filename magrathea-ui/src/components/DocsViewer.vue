@@ -183,9 +183,11 @@ function handleDocLinkClick(event) {
     // This correctly handles ../foo.json, ../../foo.json, and same-directory links
     if (currentDocUrl.value) {
       // Resolve relative paths (including ../ and ../../) against currentDocUrl
-      // Use URL constructor with origin to make a valid base URL
-      const origin = window.location.origin
-      const base = origin + currentDocUrl.value
+      // currentDocUrl may be a full URL (after first resolution) or a relative path (initial load)
+      // Use URL constructor with origin only if currentDocUrl is a path (not a full URL)
+      const base = currentDocUrl.value.startsWith('http')
+        ? currentDocUrl.value
+        : window.location.origin + currentDocUrl.value
       url = new URL(href, base).toString()
     } else {
       // Fallback: prepend the current docs directory
