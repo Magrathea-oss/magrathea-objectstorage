@@ -10,6 +10,14 @@ Generated: 2026-06-05T08:40:11+02:00
 | Maven Surefire | See section | See section | See section | Latest reports under `*/target/surefire-reports` |
 | Clover coverage | See section | - | - | Latest report under `target/site/clover` |
 
+### AWS CLI Test Status
+
+| Feature | Status | Note |
+|---|---|---|
+| WebClient scenarios (256) | ✅ Running | Standard Cucumber via Java WebClient |
+| AWS CLI scenarios (planned) | ❌ Not implemented | Da replicare da `@webclient` a `@awscli` |
+| `test-aws-cli.sh` | ✅ Standalone | Script indipendente, non integrato in Cucumber |
+
 ## AWS CLI S3 Compatibility
 
 Bucket: `magrathea-cli-test-1780641560-106784`
@@ -315,6 +323,14 @@ Report HTML: `target/site/clover/index.html`
 | CopyObject nonexistent source | ✅ | Expected failure |
 | PutObject nonexistent bucket | ✅ | Expected failure |
 | GetObjectAcl nonexistent | ✅ | Expected failure |
+
+### Cucumber AWS CLI Test Status
+
+| Category | Status | Note |
+|---|---|---|
+| `@webclient` scenarios (256) | ✅ Implementati | Standard Cucumber via Java WebClient |
+| `@awscli` scenarios | ❌ **Mancanti** | Da replicare da `@webclient` a `@awscli` |
+| `test-aws-cli.sh` | ✅ Standalone | Script indipendente, non integrato in Cucumber |
 
 ## Not Implemented Yet
 
