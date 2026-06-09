@@ -120,7 +120,27 @@ function extractLang(root) {
 // ──────────────────────────────────────────────────────────────
 
 /**
+ * Extract colspan/rowspan from a cell element, returning
+ * { text, colspan, rowspan } if attributes present, else plain string.
+ * @param {object} cell - Parsed <th> or <td> element
+ * @returns {string|object} Plain string if no span, object with text/colspan/rowspan
+ */
+function extractCell(cell) {
+  const text = cell.innerHTML?.trim() || '';
+  const colspanAttr = cell.getAttribute('colspan');
+  const rowspanAttr = cell.getAttribute('rowspan');
+  const colspan = colspanAttr ? parseInt(colspanAttr, 10) : 1;
+  const rowspan = rowspanAttr ? parseInt(rowspanAttr, 10) : 1;
+  if (colspan > 1 || rowspan > 1) {
+    return { text, colspan, rowspan };
+  }
+  return text;
+}
+
+/**
  * Parse a <table> element into headers + rows.
+ * Headers/cells are strings by default, but become objects
+ * { text, colspan, rowspan } when colspan or rowspan > 1.
  * @param {object} tableNode - Parsed <table> element
  * @returns {object|null} { type: 'table', headers, rows } or null
  */
@@ -130,7 +150,7 @@ function parseTable(tableNode) {
 
   // Headers from <th> in first row
   const firstRowCells = rows[0].querySelectorAll('th, td');
-  const headers = firstRowCells.map(cell => cell.innerHTML?.trim() || '');
+  const headers = firstRowCells.map(cell => extractCell(cell));
 
   // Data rows (skip first row if it was all <th>)
   const isHeaderRow = rows[0].querySelectorAll('th').length > 0;
@@ -139,7 +159,7 @@ function parseTable(tableNode) {
 
   for (let i = dataStart; i < rows.length; i++) {
     const cells = rows[i].querySelectorAll('td, th');
-    const row = cells.map(cell => cell.innerHTML?.trim() || '');
+    const row = cells.map(cell => extractCell(cell));
     if (row.length) dataRows.push(row);
   }
 
@@ -170,7 +190,7 @@ function parseDivTable(divNode) {
     return cls.includes('table-header');
   });
 
-  const headers = headerDivs.map(c => c.innerHTML?.trim() || '');
+  const headers = headerDivs.map(c => extractCell(c));
   if (!headers.length) return null;
 
   const numCols = headers.length;
@@ -185,10 +205,10 @@ function parseDivTable(divNode) {
   for (let i = 0; i + numCols - 1 < dataDivs.length; i += numCols) {
     const row = [];
     for (let j = 0; j < numCols; j++) {
-      row.push(dataDivs[i + j].innerHTML?.trim() || '');
+      row.push(extractCell(dataDivs[i + j]));
     }
     // Skip empty rows
-    if (row.some(cell => cell.length > 0)) {
+    if (row.some(cell => typeof cell === 'string' ? cell.length > 0 : cell.text.length > 0)) {
       rows.push(row);
     }
   }

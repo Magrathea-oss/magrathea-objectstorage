@@ -9,7 +9,12 @@
 
     <div v-else-if="block.type === 'list'" class="docs-list-wrapper">
       <ul class="docs-list">
-        <li v-for="(item, li) in (block.items || [])" :key="'l'+li" v-html="item.text || item"></li>
+        <li v-for="(item, li) in (block.items || [])" :key="'l'+li" >
+          <template v-if="typeof item === 'string'">{{ item }}</template>
+          <span v-else-if="item.text" v-html="item.text"></span>
+          <DocBlockRenderer v-else-if="item.blocks" :blocks="item.blocks" />
+          <template v-else>{{ item }}</template>
+        </li>
       </ul>
     </div>
 
@@ -21,12 +26,18 @@
       <table class="docs-table">
         <thead v-if="block.headers && block.headers.length">
           <tr>
-            <th v-for="(h, hi) in block.headers" :key="'h'+hi" v-html="h"></th>
+            <th v-for="(h, hi) in block.headers" :key="'h'+hi"
+              :colspan="h.colspan || 1"
+              :rowspan="h.rowspan || 1"
+              v-html="h.text || h"></th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="(row, ri) in (block.rows || [])" :key="'r'+ri">
-            <td v-for="(cell, ci) in row" :key="'c'+ci" v-html="cell"></td>
+            <td v-for="(cell, ci) in row" :key="'c'+ci"
+              :colspan="cell.colspan || 1"
+              :rowspan="cell.rowspan || 1"
+              v-html="cell.text || cell"></td>
           </tr>
         </tbody>
       </table>
