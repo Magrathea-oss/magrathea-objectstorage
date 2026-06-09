@@ -201,6 +201,9 @@
                                         mkdir -p "$(dirname "$out")"
                                         node bootstrap-application/src/main/scripts/html-to-json.mjs --input "$f" --output "$out" --fix-links
                                     done
+                                    node bootstrap-application/src/main/scripts/generate-jacoco-dashboard.mjs \
+                                        --static-dir bootstrap-application/target/classes/static/docs/jacoco-json \
+                                        --output bootstrap-application/target/classes/static/docs/jacoco-json/dashboard.json
                                 </argument>
                             </arguments>
                         </configuration>

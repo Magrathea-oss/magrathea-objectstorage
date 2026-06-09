@@ -8,6 +8,7 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 @Suite
 @SelectClasspathResource("awscli")
 @ConfigurationParameter(key = "cucumber.glue", value = "com.example.magrathea.s3api.awscli")
+@ConfigurationParameter(key = "cucumber.plugin", value = "pretty,json:target/cucumber-json/cucumber-awscli.json")
 @SpringJUnitConfig(AwsCliCucumberConfig.class)
 public class AwsCliCucumberTest {
 }
