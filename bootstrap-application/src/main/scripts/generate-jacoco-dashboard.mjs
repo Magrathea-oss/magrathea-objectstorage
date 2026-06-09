@@ -68,8 +68,8 @@ for (const mi of MODULE_INDEX_FILES) {
 }
 
 if (modules.length === 0) {
-  console.error('No module data loaded. Cannot generate dashboard.');
-  process.exit(1);
+  console.log('WARNING: No module data loaded. Cannot generate dashboard.');
+  process.exit(0);
 }
 
 // Build dashboard
