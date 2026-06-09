@@ -109,7 +109,7 @@ function blockToJson(node) {
       const height = node.getAttribute('height') || '';
       const attrs = width ? (height ? ` width="${width}" height="${height}"` : ` width="${width}"`) : '';
       const html = `<img src="${target}" alt="${alt}"${attrs}>`;
-      return { type: 'image', html };
+      return { type: 'image', src: target, alt, html };
     }
 
     case 'admonition': {

@@ -16,6 +16,31 @@
 // ──────────────────────────────────────────────────────────────
 
 /**
+ * Resolve a relative image path against a base URL path.
+ * Paths with ../ prefixes are resolved by stripping the leading
+ * relative components: the ../ moves up from the source file location
+ * (which is under the basePath), so we remove the ../ prefix and
+ * prepend the basePath.
+ *
+ * @param {string} src - The relative image path from the source
+ * @param {string} basePath - Base URL path for images
+ * @returns {string} Resolved absolute path
+ */
+export function resolveImagePath(src, basePath = '/') {
+  if (!src) return src;
+  // If already absolute, return as-is
+  if (src.startsWith('/') || src.startsWith('http://') || src.startsWith('https://')) {
+    return src;
+  }
+  // Strip leading ../ prefixes — they point up from the source file
+  // directory (which is under basePath), so we just remove them and
+  // prepend the basePath.
+  const stripped = src.replace(/^(?:\.\.\/)+/, '');
+  const base = basePath.replace(/^\/?/, '/').replace(/\/+$/, '') + '/';
+  return (base + stripped).replace(/\/+/g, '/');
+}
+
+/**
  * Replace a relative image src with an absolute path.
  * @param {string} html - HTML string to fix
  * @param {string} basePath - Base URL path to prepend
@@ -23,15 +48,16 @@
  */
 export function fixImagePathsInHtml(html, basePath = '/') {
   if (!html || typeof html !== 'string') return html;
-  // Replace <img src="foo.png"> (relative, no leading /) with <img src="/base/foo.png">
+  // Replace <img src="foo.png"> (relative, no leading /) with resolved path
   return html.replace(
-    /<img\s+src="(?!\/)([^"]+)"/g,
-    (match, src) => `<img src="${basePath}${src}"`
+    /<img\s+src="(?!\/|http)([^"]+)"/g,
+    (match, src) => `<img src="${resolveImagePath(src, basePath)}"`
   );
 }
 
 /**
- * Walk the JSON tree and fix image paths in all html/text properties.
+ * Walk the JSON tree and fix image paths in all html/text properties
+ * AND directly on image block src fields.
  * @param {object} obj - JSON tree node
  * @param {string} basePath - Base URL path for images
  */
@@ -40,6 +66,10 @@ export function fixImagePaths(obj, basePath = '/') {
   if (Array.isArray(obj)) {
     for (const item of obj) fixImagePaths(item, basePath);
     return;
+  }
+  // Fix src field directly on image blocks
+  if (obj.type === 'image' && obj.src && typeof obj.src === 'string' && !obj.src.startsWith('/')) {
+    obj.src = resolveImagePath(obj.src, basePath);
   }
   if (obj.html && typeof obj.html === 'string') {
     obj.html = fixImagePathsInHtml(obj.html, basePath);
@@ -96,6 +126,84 @@ export function convertAdrLinks(obj) {
   }
   for (const val of Object.values(obj)) {
     if (typeof val === 'object' && val !== null) convertAdrLinks(val);
+  }
+}
+
+// ──────────────────────────────────────────────────────────────
+// Paragraph image extraction
+// ──────────────────────────────────────────────────────────────
+
+/**
+ * Extract <img> tag attributes from an HTML string.
+ * Returns null if no img tag is found.
+ *
+ * @param {string} html - HTML string possibly containing <img>
+ * @returns {{ src: string, alt: string, width: string, height: string } | null}
+ */
+export function extractImgAttributes(html) {
+  if (!html || typeof html !== 'string') return null;
+  const match = html.match(/<img\s+src="([^"]+)"\s+alt="([^"]*)"(?:\s+width="([^"]*)")?(?:\s+height="([^"]*)")?\s*>/);
+  if (!match) return null;
+  return {
+    src: match[1],
+    alt: match[2] || '',
+    width: match[3] || '',
+    height: match[4] || '',
+  };
+}
+
+/**
+ * Walk the JSON tree and replace paragraph blocks containing only an <img> tag
+ * with typed image blocks.
+ *
+ * If a paragraph has text before/after the img, it is split:
+ *   - text-only parts remain as paragraph blocks
+ *   - the img part becomes an image block
+ *
+ * @param {object} obj - JSON tree node (mutated in-place)
+ */
+export function convertParagraphImages(obj) {
+  if (!obj || typeof obj !== 'object') return;
+  if (Array.isArray(obj)) {
+    for (let i = 0; i < obj.length; i++) {
+      const item = obj[i];
+      if (item && item.type === 'paragraph' && item.html) {
+        const attrs = extractImgAttributes(item.html);
+        if (attrs) {
+          // Check if the paragraph has text outside the img tag
+          const imgTag = item.html.match(/<img[^>]*>/);
+          if (imgTag) {
+            const before = item.html.slice(0, imgTag.index);
+            const after = item.html.slice(imgTag.index + imgTag[0].length);
+            const replacement = [];
+            if (before.trim()) {
+              replacement.push({ type: 'paragraph', html: before });
+            }
+            replacement.push({
+              type: 'image',
+              src: attrs.src,
+              alt: attrs.alt,
+              html: imgTag[0],
+              ...(attrs.width ? { width: attrs.width } : {}),
+              ...(attrs.height ? { height: attrs.height } : {}),
+            });
+            if (after.trim()) {
+              replacement.push({ type: 'paragraph', html: after });
+            }
+            // Replace the paragraph with the split blocks
+            obj.splice(i, 1, ...replacement);
+            // Adjust index to account for inserted blocks
+            i += replacement.length - 1;
+          }
+        }
+      } else if (typeof item === 'object') {
+        convertParagraphImages(item);
+      }
+    }
+    return;
+  }
+  for (const val of Object.values(obj)) {
+    if (typeof val === 'object' && val !== null) convertParagraphImages(val);
   }
 }
 
@@ -268,6 +376,7 @@ export function applyPostProcessors(tree, options = {}) {
   const { imageBasePath = '/', cssBasePath = '/', fixHtmlLinks: doFixHtmlLinks = false } = options;
 
   convertAdrLinks(tree);
+  convertParagraphImages(tree);
   convertPipeTables(tree);
   fixImagePaths(tree, imageBasePath);
   fixCssReferences(tree, cssBasePath);
