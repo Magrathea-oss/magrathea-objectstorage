@@ -137,21 +137,24 @@ export function convertAdrLinks(obj) {
 
 /**
  * Extract <img> tag attributes from an HTML string.
- * Returns null if no img tag is found.
+ * Uses node-html-parser (already imported) to properly parse the <img> element,
+ * so attribute order does not matter. Handles any extra attributes (e.g. title).
  *
  * @param {string} html - HTML string possibly containing <img>
  * @returns {{ src: string, alt: string, width: string, height: string } | null}
  */
 export function extractImgAttributes(html) {
   if (!html || typeof html !== 'string') return null;
-  const match = html.match(/<img\s+src="([^"]+)"\s+alt="([^"]*)"(?:\s+width="([^"]*)")?(?:\s+height="([^"]*)")?\s*>/);
-  if (!match) return null;
-  return {
-    src: match[1],
-    alt: match[2] || '',
-    width: match[3] || '',
-    height: match[4] || '',
-  };
+  // Use node-html-parser to find the img element
+  const root = parse(html);
+  const img = root.querySelector('img');
+  if (!img) return null;
+  const src = img.getAttribute('src') || '';
+  const alt = img.getAttribute('alt') || '';
+  const width = img.getAttribute('width') || '';
+  const height = img.getAttribute('height') || '';
+  if (!src) return null;
+  return { src, alt, width, height };
 }
 
 /**

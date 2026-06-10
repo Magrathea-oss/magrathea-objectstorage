@@ -272,22 +272,27 @@ export function parseHtml(html) {
   // Target main content area (skip nav/header/footer)
   const main = root.querySelector('main') || root.querySelector('body') || root;
 
-  // Collect all summary-table divs so we can skip their children during walk
-  const summaryTableDivs = new Set();
+  // Collect elements whose children should be skipped during walk:
+  //   - summary-table divs (Javadoc 21 style)
+  //   - <table> elements (images inside <td> should stay as cell content)
+  const skipChildrenOf = new Set();
   for (const el of walk(main)) {
-    if (el.tagName?.toLowerCase() === 'div') {
+    const tag = el.tagName?.toLowerCase();
+    if (tag === 'div') {
       const cls = el.getAttribute('class') || '';
       if (cls.includes('summary-table')) {
-        summaryTableDivs.add(el);
+        skipChildrenOf.add(el);
       }
+    } else if (tag === 'table') {
+      skipChildrenOf.add(el);
     }
   }
 
   let currentSection = null;
   let sectionLevel = 0;
 
-  // Walk all element nodes depth-first, skipping children of summary-table divs
-  for (const node of walk(main, summaryTableDivs)) {
+  // Walk all element nodes depth-first, skipping children of table / summary-table
+  for (const node of walk(main, skipChildrenOf)) {
     // Skip navigation / unwanted elements
     if (SKIP_TAGS.has(node.tagName?.toLowerCase())) continue;
     if (isNavigation(node)) continue;
@@ -351,7 +356,14 @@ export function parseHtml(html) {
       const height = node.getAttribute('height') || '';
       const attrs = width ? (height ? ` width="${width}" height="${height}"` : ` width="${width}"`) : '';
       const htmlContent = `<img src="${src}" alt="${alt}"${attrs}>`;
-      addBlock(currentSection, { type: 'image', html: htmlContent });
+      addBlock(currentSection, {
+        type: 'image',
+        src: src || undefined,
+        alt: alt || undefined,
+        html: htmlContent,
+        ...(width ? { width } : {}),
+        ...(height ? { height } : {}),
+      });
       continue;
     }
 
