@@ -24,6 +24,45 @@
             <groupId>com.example</groupId>
             <artifactId>admin-api-adapter</artifactId>
         </dependency>
+        <!-- Dependencies below ensure all module class files are available
+             for JaCoCo aggregate coverage report. They use provided scope
+             so they are not duplicated in the Spring Boot fat JAR.
+             (Transitive dependencies already include these modules.) -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>object-store-domain</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>object-store-reactive-application</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>object-store-reactive-repository-application</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>storage-engine-domain</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>storage-engine-application</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>storage-engine-infrastructure</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>object-store-reactive-repository-storage-engine-infrastructure</artifactId>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>
