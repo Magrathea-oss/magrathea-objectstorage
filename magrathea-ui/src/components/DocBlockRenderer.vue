@@ -11,7 +11,7 @@
       <ul class="docs-list">
         <li v-for="(item, li) in (block.items || [])" :key="'l'+li" >
           <template v-if="typeof item === 'string'">{{ item }}</template>
-          <span v-else-if="item.text" v-html="item.text"></span>
+          <span v-else-if="item.text !== undefined" v-html="item.text"></span>
           <DocBlockRenderer v-else-if="item.blocks" :blocks="item.blocks" />
           <template v-else>{{ item }}</template>
         </li>

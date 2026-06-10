@@ -173,6 +173,15 @@ function handleDocLinkClick(event) {
   if (!link) return
   const href = link.getAttribute('href')
   if (!href) return
+
+  // Handle ADR links (without .json extension) — navigate via Vue router
+  if (href.startsWith('/docs/adr/')) {
+    event.preventDefault()
+    const adrId = href.replace('/docs/adr/', '').replace(/\/$/, '')
+    router.push(`/docs/adr/${adrId}`)
+    return
+  }
+
   // Only handle links ending with .json
   if (!href.endsWith('.json')) return
   event.preventDefault()
