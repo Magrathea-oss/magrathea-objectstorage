@@ -121,9 +121,9 @@ function extractLang(root) {
 
 /**
  * Extract colspan/rowspan from a cell element, returning
- * { text, colspan, rowspan } if attributes present, else plain string.
+ * { text, colspan, rowspan } always for <th> and <td>.
  * @param {object} cell - Parsed <th> or <td> element
- * @returns {string|object} Plain string if no span, object with text/colspan/rowspan
+ * @returns {object} Object with text/colspan/rowspan
  */
 function extractCell(cell) {
   const text = cell.innerHTML?.trim() || '';
@@ -131,16 +131,12 @@ function extractCell(cell) {
   const rowspanAttr = cell.getAttribute('rowspan');
   const colspan = colspanAttr ? parseInt(colspanAttr, 10) : 1;
   const rowspan = rowspanAttr ? parseInt(rowspanAttr, 10) : 1;
-  if (colspan > 1 || rowspan > 1) {
-    return { text, colspan, rowspan };
-  }
-  return text;
+  return { text, colspan, rowspan };
 }
 
 /**
  * Parse a <table> element into headers + rows.
- * Headers/cells are strings by default, but become objects
- * { text, colspan, rowspan } when colspan or rowspan > 1.
+ * Every header/cell is an object { text, colspan, rowspan }.
  * @param {object} tableNode - Parsed <table> element
  * @returns {object|null} { type: 'table', headers, rows } or null
  */
@@ -175,6 +171,7 @@ function parseTable(tableNode) {
  * Javadoc 21 uses div-based tables where:
  *   - Children with class "table-header" form the header row
  *   - Remaining div children are grouped by header count to form data rows
+ * Every header/cell is an object { text, colspan, rowspan }.
  * @param {object} divNode - Parsed <div class="summary-table"> element
  * @returns {object|null} { type: 'table', headers, rows } or null
  */

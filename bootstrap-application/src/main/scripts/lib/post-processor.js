@@ -11,6 +11,8 @@
  * Each function mutates the tree in-place.
  */
 
+import { parse } from 'node-html-parser';
+
 // ──────────────────────────────────────────────────────────────
 // Image path fixing
 // ──────────────────────────────────────────────────────────────
@@ -208,6 +210,108 @@ export function convertParagraphImages(obj) {
 }
 
 // ──────────────────────────────────────────────────────────────
+// Paragraph table extraction
+// ──────────────────────────────────────────────────────────────
+
+/**
+ * Extract <table> tag from an HTML string and parse it into a table block.
+ * Uses node-html-parser to parse the table element.
+ * Returns null if no <table> tag is found or parsing fails.
+ *
+ * @param {string} html - HTML string possibly containing <table>
+ * @returns {object|null} Table block { type: 'table', headers, rows } or null
+ */
+export function extractTableFromHtml(html) {
+  if (!html || typeof html !== 'string') return null;
+  const tableMatch = html.match(/<table[^>]*>.*<\/table>/s);
+  if (!tableMatch) return null;
+  const tableHtml = tableMatch[0];
+  try {
+    const root = parse(tableHtml);
+    const tableNode = root.querySelector('table');
+    if (!tableNode) return null;
+
+    const rows = tableNode.querySelectorAll('tr');
+    if (!rows.length) return null;
+
+    // Headers from <th> in first row
+    const firstRowCells = rows[0].querySelectorAll('th, td');
+    const headers = firstRowCells.map(cell => ({
+      text: cell.innerHTML?.trim() || '',
+      colspan: parseInt(cell.getAttribute('colspan') || '1', 10),
+      rowspan: parseInt(cell.getAttribute('rowspan') || '1', 10),
+    }));
+
+    // Data rows (skip first row if it was all <th>)
+    const isHeaderRow = rows[0].querySelectorAll('th').length > 0;
+    const dataStart = isHeaderRow ? 1 : 0;
+    const dataRows = [];
+
+    for (let i = dataStart; i < rows.length; i++) {
+      const cells = rows[i].querySelectorAll('td, th');
+      const row = cells.map(cell => ({
+        text: cell.innerHTML?.trim() || '',
+        colspan: parseInt(cell.getAttribute('colspan') || '1', 10),
+        rowspan: parseInt(cell.getAttribute('rowspan') || '1', 10),
+      }));
+      if (row.length) dataRows.push(row);
+    }
+
+    return { type: 'table', headers, rows: dataRows };
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Walk the JSON tree and replace paragraph blocks containing <table> tags
+ * with typed table blocks.
+ *
+ * If a paragraph has text before/after the table, it is split:
+ *   - text-only parts remain as paragraph blocks
+ *   - the table part becomes a table block
+ *
+ * @param {object} obj - JSON tree node (mutated in-place)
+ */
+export function convertParagraphTables(obj) {
+  if (!obj || typeof obj !== 'object') return;
+  if (Array.isArray(obj)) {
+    for (let i = 0; i < obj.length; i++) {
+      const item = obj[i];
+      if (item && item.type === 'paragraph' && item.html) {
+        const table = extractTableFromHtml(item.html);
+        if (table) {
+          // Check if the paragraph has text outside the <table> tag
+          const tableTag = item.html.match(/<table[^>]*>[\s\S]*?<\/table>/);
+          if (tableTag) {
+            const before = item.html.slice(0, tableTag.index);
+            const after = item.html.slice(tableTag.index + tableTag[0].length);
+            const replacement = [];
+            if (before.trim()) {
+              replacement.push({ type: 'paragraph', html: before });
+            }
+            replacement.push(table);
+            if (after.trim()) {
+              replacement.push({ type: 'paragraph', html: after });
+            }
+            // Replace the paragraph with the split blocks
+            obj.splice(i, 1, ...replacement);
+            // Adjust index to account for inserted blocks
+            i += replacement.length - 1;
+          }
+        }
+      } else if (typeof item === 'object') {
+        convertParagraphTables(item);
+      }
+    }
+    return;
+  }
+  for (const val of Object.values(obj)) {
+    if (typeof val === 'object' && val !== null) convertParagraphTables(val);
+  }
+}
+
+// ──────────────────────────────────────────────────────────────
 // Pipe-table conversion
 // ──────────────────────────────────────────────────────────────
 
@@ -377,6 +481,7 @@ export function applyPostProcessors(tree, options = {}) {
 
   convertAdrLinks(tree);
   convertParagraphImages(tree);
+  convertParagraphTables(tree);
   convertPipeTables(tree);
   fixImagePaths(tree, imageBasePath);
   fixCssReferences(tree, cssBasePath);
