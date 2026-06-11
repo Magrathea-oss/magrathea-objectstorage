@@ -1,0 +1,27 @@
+{
+  "title": "RetentionCommand.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "RetentionCommand.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_retentioncommand_java",
+        "title": "RetentionCommand.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.s3api.dto.command;\n\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;\n\n/**\n * Command DTO for PUT /{bucket}/{key}?retention — PutObjectRetention XML body.\n */\n@JacksonXmlRootElement(localName = \"Retention\")\n<span class=\"nc\" id=\"L10\">public record RetentionCommand(</span>\n    @JacksonXmlProperty(localName = \"Mode\")\n    String mode,\n    @JacksonXmlProperty(localName = \"RetainUntilDate\")\n    String retainUntilDate\n) {\n    public boolean isCompliance() {\n<span class=\"nc\" id=\"L17\">        return \"COMPLIANCE\".equals(mode);</span>\n    }\n\n    public boolean isGovernance() {\n<span class=\"nc\" id=\"L21\">        return \"GOVERNANCE\".equals(mode);</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

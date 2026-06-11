@@ -1,0 +1,370 @@
+{
+  "title": "ZstdCompressionAdapter",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "ZstdCompressionAdapter",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_zstdcompressionadapter",
+        "title": "ZstdCompressionAdapter",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "table",
+            "headers": [
+              {
+                "text": "Element",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed Instructions",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Cov.",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed Branches",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Cov.",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Cxty",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Lines",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Methods",
+                "colspan": 1,
+                "rowspan": 1
+              }
+            ],
+            "rows": [
+              [
+                {
+                  "text": "Element",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed Instructions",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Cov.",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed Branches",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Cov.",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Cxty",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Lines",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Methods",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "Total",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "85 of 85",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "4 of 4",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "5",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "5",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "26",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "26",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"ZstdCompressionAdapter.java.json#L25\" class=\"el_method\">compress(byte[], CompressionConfig)</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"120\" height=\"10\" title=\"43\" alt=\"43\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"120\" height=\"10\" title=\"2\" alt=\"2\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "13",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "13",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"ZstdCompressionAdapter.java.json#L49\" class=\"el_method\">decompress(byte[])</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"108\" height=\"10\" title=\"39\" alt=\"39\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"120\" height=\"10\" title=\"2\" alt=\"2\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "12",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "12",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"ZstdCompressionAdapter.java.json#L14\" class=\"el_method\">ZstdCompressionAdapter()</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"8\" height=\"10\" title=\"3\" alt=\"3\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ]
+            ]
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

@@ -1,0 +1,313 @@
+{
+  "title": "StorageClass",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "StorageClass",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_storageclass",
+        "title": "StorageClass",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "table",
+            "headers": [
+              {
+                "text": "Element",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed Instructions",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Cov.",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed Branches",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Cov.",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Cxty",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Lines",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Methods",
+                "colspan": 1,
+                "rowspan": 1
+              }
+            ],
+            "rows": [
+              [
+                {
+                  "text": "Element",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed Instructions",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Cov.",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed Branches",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Cov.",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Cxty",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Lines",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Methods",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "Total",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0 of 72",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0 of 0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "8",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"StorageClass.java.json#L10\" class=\"el_method\">static {...}</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"120\" height=\"10\" title=\"57\" alt=\"57\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"StorageClass.java.json#L8\" class=\"el_method\">StorageClass(String, String, long, double)</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"31\" height=\"10\" title=\"15\" alt=\"15\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ]
+            ]
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

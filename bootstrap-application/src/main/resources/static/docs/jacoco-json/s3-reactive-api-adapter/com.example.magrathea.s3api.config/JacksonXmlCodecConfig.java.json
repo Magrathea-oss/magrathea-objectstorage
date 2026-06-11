@@ -1,0 +1,27 @@
+{
+  "title": "JacksonXmlCodecConfig.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "JacksonXmlCodecConfig.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_jacksonxmlcodecconfig_java",
+        "title": "JacksonXmlCodecConfig.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.s3api.config;\n\nimport org.springframework.context.annotation.Configuration;\nimport org.springframework.http.MediaType;\nimport org.springframework.http.codec.AbstractJacksonDecoder;\nimport org.springframework.http.codec.AbstractJacksonEncoder;\nimport org.springframework.http.codec.ServerCodecConfigurer;\nimport org.springframework.web.reactive.config.WebFluxConfigurer;\nimport tools.jackson.dataformat.xml.XmlMapper;\n\n/**\n * Registers Jackson 3 XML encoder and decoder for WebFlux.\n * Spring Boot 4 uses Jackson 3 natively; jackson-dataformat-xml 3.x provides\n * XmlMapper. This config adds application/xml request/response support to WebFlux codecs.\n */\n@Configuration\n<span class=\"fc\" id=\"L17\">public class JacksonXmlCodecConfig implements WebFluxConfigurer {</span>\n\n    @Override\n    public void configureHttpMessageCodecs(ServerCodecConfigurer configurer) {\n<span class=\"fc\" id=\"L21\">        var builder = XmlMapper.builder();</span>\n<span class=\"fc\" id=\"L22\">        configurer.customCodecs().register(new JacksonXmlEncoder(builder));</span>\n<span class=\"fc\" id=\"L23\">        configurer.customCodecs().register(new JacksonXmlDecoder(builder));</span>\n<span class=\"fc\" id=\"L24\">    }</span>\n\n    /**\n     * Jackson 3 XML encoder — extends AbstractJacksonEncoder<XmlMapper>.\n     * Handles application/xml and text/xml media types.\n     */\n    public static final class JacksonXmlEncoder\n            extends AbstractJacksonEncoder<XmlMapper> {\n\n<span class=\"fc\" id=\"L33\">        private static final MediaType[] DEFAULT_XML_MEDIA_TYPES = {</span>\n            MediaType.APPLICATION_XML,\n            MediaType.TEXT_XML,\n            new MediaType(\"application\", \"*+xml\")\n        };\n\n        public JacksonXmlEncoder(XmlMapper.Builder builder) {\n<span class=\"fc\" id=\"L40\">            super(builder, DEFAULT_XML_MEDIA_TYPES);</span>\n<span class=\"fc\" id=\"L41\">        }</span>\n\n        public JacksonXmlEncoder(XmlMapper mapper) {\n<span class=\"nc\" id=\"L44\">            super(mapper, DEFAULT_XML_MEDIA_TYPES);</span>\n<span class=\"nc\" id=\"L45\">        }</span>\n    }\n\n    /**\n     * Jackson 3 XML decoder — extends AbstractJacksonDecoder<XmlMapper>.\n     * Deserializes application/xml request bodies into annotated records.\n     */\n    public static final class JacksonXmlDecoder\n            extends AbstractJacksonDecoder<XmlMapper> {\n\n<span class=\"fc\" id=\"L55\">        private static final MediaType[] DEFAULT_XML_MEDIA_TYPES = {</span>\n            MediaType.APPLICATION_XML,\n            MediaType.TEXT_XML,\n            new MediaType(\"application\", \"*+xml\")\n        };\n\n        public JacksonXmlDecoder(XmlMapper.Builder builder) {\n<span class=\"fc\" id=\"L62\">            super(builder, DEFAULT_XML_MEDIA_TYPES);</span>\n<span class=\"fc\" id=\"L63\">        }</span>\n\n        public JacksonXmlDecoder(XmlMapper mapper) {\n<span class=\"nc\" id=\"L66\">            super(mapper, DEFAULT_XML_MEDIA_TYPES);</span>\n<span class=\"nc\" id=\"L67\">        }</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

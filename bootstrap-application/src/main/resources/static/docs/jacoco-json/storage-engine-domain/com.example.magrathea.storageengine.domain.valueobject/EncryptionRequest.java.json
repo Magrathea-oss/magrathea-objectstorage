@@ -1,0 +1,27 @@
+{
+  "title": "EncryptionRequest.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "EncryptionRequest.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_encryptionrequest_java",
+        "title": "EncryptionRequest.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.storageengine.domain.valueobject;\n\nimport java.util.Optional;\n\npublic record EncryptionRequest(EncryptionMode mode, Optional<KeyReference> keyReference) {\n<span class=\"nc\" id=\"L6\">    public EncryptionRequest {</span>\n<span class=\"nc\" id=\"L7\">        java.util.Objects.requireNonNull(mode, \"mode must not be null\");</span>\n<span class=\"nc\" id=\"L8\">        java.util.Objects.requireNonNull(keyReference, \"keyReference must not be null\");</span>\n<span class=\"nc\" id=\"L9\">    }</span>\n\n    public static EncryptionRequest of(EncryptionMode mode, Optional<KeyReference> keyReference) {\n<span class=\"nc\" id=\"L12\">        return new EncryptionRequest(mode, keyReference);</span>\n    }\n\n    public static EncryptionRequest none() {\n<span class=\"nc\" id=\"L16\">        return new EncryptionRequest(EncryptionMode.NONE, Optional.empty());</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

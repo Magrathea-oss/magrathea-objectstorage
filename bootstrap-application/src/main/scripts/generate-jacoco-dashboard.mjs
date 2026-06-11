@@ -30,11 +30,11 @@ if (!staticDir || !outputPath) {
   process.exit(1);
 }
 
-// Known module index files
+// Known module index files (actual module names from JaCoCo HTML conversion)
 const MODULE_INDEX_FILES = [
-  { name: 'object-store-domain', file: 'object-store-domain.json' },
-  { name: 'object-store-reactive-application', file: 'com.example.magrathea.reactive.application.service/index.json' },
-  { name: 's3-reactive-api-adapter', file: 'index.json' },
+  { name: 'storage-engine-domain', file: 'storage-engine-domain/index.json' },
+  { name: 'storage-engine-application', file: 'storage-engine-application/index.json' },
+  { name: 'object-store-reactive-repository-application', file: 'object-store-reactive-repository-application/index.json' },
 ];
 
 function loadModule(name, relPath) {

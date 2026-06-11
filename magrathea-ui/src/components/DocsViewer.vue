@@ -182,11 +182,15 @@ function handleDocLinkClick(event) {
     return
   }
 
+  // Strip hash fragment before checking extension
+  const hrefNoHash = href.split('#')[0]
   // Only handle links ending with .json
-  if (!href.endsWith('.json')) return
+  if (!hrefNoHash.endsWith('.json')) return
   event.preventDefault()
+  // Preserve hash fragment for scrolling after load
+  const hash = href.includes('#') ? href.substring(href.indexOf('#')) : ''
   // Resolve relative paths against the current document URL (not the tab URL)
-  let url = href
+  let url = hrefNoHash
   if (!href.startsWith('/docs/') && !href.startsWith('http')) {
     // Relative path: resolve against currentDocUrl using the URL constructor
     // This correctly handles ../foo.json, ../../foo.json, and same-directory links
@@ -197,18 +201,18 @@ function handleDocLinkClick(event) {
       const base = currentDocUrl.value.startsWith('http')
         ? currentDocUrl.value
         : window.location.origin + currentDocUrl.value
-      url = new URL(href, base).toString()
+      url = new URL(hrefNoHash, base).toString()
     } else {
       // Fallback: prepend the current docs directory
       const baseUrl = getDocUrl(activeTab.value)
       const baseDir = baseUrl.substring(0, baseUrl.lastIndexOf('/') + 1)
-      url = baseDir + href
+      url = baseDir + hrefNoHash
     }
   }
-  loadJson(url)
+  loadJson(url, hash)
 }
 
-async function loadJson(url) {
+async function loadJson(url, hash) {
   loading.value = true
   error.value = null
   try {
@@ -219,6 +223,17 @@ async function loadJson(url) {
     lastUpdated.value = new Date().toLocaleString()
     // Track the URL that was actually loaded, for correct relative link resolution
     currentDocUrl.value = url
+    // If there's a hash fragment, scroll to the element after render
+    if (hash) {
+      const scrollId = hash.startsWith('#') ? hash.substring(1) : hash
+      // Use setTimeout to wait for DOM update (next microtask), then scroll
+      setTimeout(() => {
+        const el = document.getElementById(scrollId)
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+      }, 100)
+    }
   } catch (e) {
     error.value = e.message || t('errors.general')
   } finally {

@@ -1,0 +1,363 @@
+{
+  "title": "storage-engine-infrastructure",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "storage-engine-infrastructure",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_storage_engine_infrastructure",
+        "title": "storage-engine-infrastructure",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "table",
+            "headers": [
+              {
+                "text": "Element",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed Instructions",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Cov.",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed Branches",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Cov.",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Cxty",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Lines",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Methods",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Classes",
+                "colspan": 1,
+                "rowspan": 1
+              }
+            ],
+            "rows": [
+              [
+                {
+                  "text": "Element",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed Instructions",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Cov.",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed Branches",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Cov.",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Cxty",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Lines",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Methods",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Classes",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "Total",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1.827 of 1.827",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "74 of 74",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "116",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "116",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "369",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "369",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "79",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "79",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "17",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "17",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"com.example.magrathea.storageengine.infrastructure.filesystem/index.json\" class=\"el_package\">com.example.magrathea.storageengine.infrastructure.filesystem</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"120\" height=\"10\" title=\"1.573\" alt=\"1.573\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"120\" height=\"10\" title=\"44\" alt=\"44\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "88",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "88",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "317",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "317",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "66",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "66",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "15",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "15",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"com.example.magrathea.storageengine.infrastructure.chaos/index.json\" class=\"el_package\">com.example.magrathea.storageengine.infrastructure.chaos</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"19\" height=\"10\" title=\"254\" alt=\"254\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"81\" height=\"10\" title=\"30\" alt=\"30\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "28",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "28",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "52",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "52",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "13",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "13",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ]
+            ]
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

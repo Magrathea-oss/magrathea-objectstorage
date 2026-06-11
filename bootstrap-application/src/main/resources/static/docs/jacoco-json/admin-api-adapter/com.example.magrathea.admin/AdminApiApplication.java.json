@@ -1,0 +1,27 @@
+{
+  "title": "AdminApiApplication.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "AdminApiApplication.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_adminapiapplication_java",
+        "title": "AdminApiApplication.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.admin;\n\nimport org.springframework.boot.autoconfigure.SpringBootApplication;\nimport org.springframework.boot.builder.SpringApplicationBuilder;\n\n@SpringBootApplication\n<span class=\"nc\" id=\"L7\">public class AdminApiApplication {</span>\n\n    public static void main(String[] args) {\n<span class=\"nc\" id=\"L10\">        new SpringApplicationBuilder(AdminApiApplication.class)</span>\n<span class=\"nc\" id=\"L11\">            .properties(\"server.port=${admin.server.port:8081}\")</span>\n<span class=\"nc\" id=\"L12\">            .run(args);</span>\n<span class=\"nc\" id=\"L13\">    }</span>\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

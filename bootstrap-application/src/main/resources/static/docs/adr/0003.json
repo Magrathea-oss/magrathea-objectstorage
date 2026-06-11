@@ -1,0 +1,95 @@
+{
+  "adr": 3,
+  "title": "3. BinaryContent vs DataBuffer boundary",
+  "status": "Accepted",
+  "lang": "en",
+  "document": {
+    "type": "document",
+    "title": "3. BinaryContent vs DataBuffer boundary",
+    "sections": [
+      {
+        "id": "_3_binarycontent_vs_databuffer_boundary",
+        "title": "3. BinaryContent vs DataBuffer boundary",
+        "level": 1,
+        "blocks": []
+      },
+      {
+        "id": "",
+        "title": "",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Date: 2026-05-21"
+          }
+        ],
+        "level": 0
+      },
+      {
+        "id": "_status",
+        "title": "Status",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Accepted"
+          }
+        ]
+      },
+      {
+        "id": "_context",
+        "title": "Context",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Binary content exists in two representations: domain semantics (content-type, filename, size, compression, checksum) and infrastructure bytes (byte[], DataBuffer, Flux<DataBuffer>). Mixing byte[] in domain violates zero-framework purity and creates an uncontrollable dependency on binary data representation."
+          }
+        ]
+      },
+      {
+        "id": "_decision",
+        "title": "Decision",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "<strong>Domain</strong>: <code>BinaryContent</code> value object holds ONLY metadata descriptors — NO byte[]",
+                "blocks": []
+              },
+              {
+                "text": "content-type, filename, size, metadata map, compression type, checksum",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Infrastructure</strong>: <code>BinaryContentAdapter</code> converts between domain metadata and DataBuffer/byte[]",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Content store</strong>: uses <code>ConcurrentHashMap<String, byte[]></code> for simplicity (infrastructure only)",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Streaming</strong>: <code>Flux<DataBuffer></code> for HTTP request/response body",
+                "blocks": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "_consequences",
+        "title": "Consequences",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "<strong>Positive</strong>: domain remains pure, binary handling is infrastructure concern, streaming is reactive-native\n<strong>Negative</strong>: adapter overhead, two representations to maintain"
+          }
+        ]
+      }
+    ]
+  }
+}

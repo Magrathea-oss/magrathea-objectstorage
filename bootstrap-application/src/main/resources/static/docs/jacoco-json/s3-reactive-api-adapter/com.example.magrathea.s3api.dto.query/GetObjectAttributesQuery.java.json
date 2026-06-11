@@ -1,0 +1,27 @@
+{
+  "title": "GetObjectAttributesQuery.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "GetObjectAttributesQuery.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_getobjectattributesquery_java",
+        "title": "GetObjectAttributesQuery.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.s3api.dto.query;\n\nimport com.example.magrathea.objectstore.domain.aggregate.S3Object;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;\n\n/**\n * Response for GET /{bucket}/{key}?attributes.\n */\n@JacksonXmlRootElement(localName = \"GetObjectAttributesOutput\")\n<span class=\"fc\" id=\"L11\">public record GetObjectAttributesQuery(</span>\n    @JacksonXmlProperty(localName = \"Key\")\n    String key,\n    @JacksonXmlProperty(localName = \"ContentType\")\n    String contentType,\n    @JacksonXmlProperty(localName = \"ObjectSize\")\n    long size,\n    @JacksonXmlProperty(localName = \"StorageClass\")\n    String storageClass,\n    @JacksonXmlProperty(localName = \"ETag\")\n    String etag\n) {\n    public static GetObjectAttributesQuery from(S3Object obj) {\n<span class=\"fc\" id=\"L24\">        return new GetObjectAttributesQuery(</span>\n<span class=\"fc\" id=\"L25\">            obj.key().key(),</span>\n            null, // contentType not stored on sealed hierarchy\n<span class=\"fc\" id=\"L27\">            obj.size(),</span>\n<span class=\"fc bfc\" id=\"L28\" title=\"All 2 branches covered.\">            obj.storageClass() != null ? obj.storageClass() : \"STANDARD\",</span>\n            \"\\\"\\\"\"\n        );\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

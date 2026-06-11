@@ -1,0 +1,3244 @@
+{
+  "title": "com.example.magrathea.s3api.dto.query",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "com.example.magrathea.s3api.dto.query",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_com_example_magrathea_s3api_dto_query",
+        "title": "com.example.magrathea.s3api.dto.query",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "table",
+            "headers": [
+              {
+                "text": "Element",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed Instructions",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Cov.",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed Branches",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Cov.",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Cxty",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Lines",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Methods",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Classes",
+                "colspan": 1,
+                "rowspan": 1
+              }
+            ],
+            "rows": [
+              [
+                {
+                  "text": "Element",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed Instructions",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Cov.",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed Branches",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Cov.",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Cxty",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Lines",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Methods",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Classes",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "Total",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "466 of 1.667",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "72%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "22 of 35",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "37%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "64",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "179",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "64",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "236",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "47",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "160",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "18",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "83",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"SelectObjectContentQuery.java.json\" class=\"el_source\">SelectObjectContentQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"66\" height=\"10\" title=\"63\" alt=\"63\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "6",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "6",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "6",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "6",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "6",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "6",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "5",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "5",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"BucketCorsQuery.java.json\" class=\"el_source\">BucketCorsQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"53\" height=\"10\" title=\"50\" alt=\"50\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"28\" height=\"10\" title=\"27\" alt=\"27\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "35%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"120\" height=\"10\" title=\"6\" alt=\"6\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "5",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "8",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "10",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "4",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"BucketLifecycleQuery.java.json\" class=\"el_source\">BucketLifecycleQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"47\" height=\"10\" title=\"45\" alt=\"45\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"72\" height=\"10\" title=\"68\" alt=\"68\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "60%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"60\" height=\"10\" title=\"3\" alt=\"3\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"60\" height=\"10\" title=\"3\" alt=\"3\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "50%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "6",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "11",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "15",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "8",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "5",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"ObjectLockConfigurationQuery.java.json\" class=\"el_source\">ObjectLockConfigurationQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"41\" height=\"10\" title=\"39\" alt=\"39\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"44\" height=\"10\" title=\"42\" alt=\"42\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "51%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"40\" height=\"10\" title=\"2\" alt=\"2\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "6",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "11",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "6",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"ListObjectsV2Query.java.json\" class=\"el_source\">ListObjectsV2Query.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"24\" height=\"10\" title=\"23\" alt=\"23\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"52\" height=\"10\" title=\"49\" alt=\"49\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "68%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "6",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "14",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"ListObjectsQuery.java.json\" class=\"el_source\">ListObjectsQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"24\" height=\"10\" title=\"23\" alt=\"23\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"52\" height=\"10\" title=\"49\" alt=\"49\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "68%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "6",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "14",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"ListAllMyBucketsResultQuery.java.json\" class=\"el_source\">ListAllMyBucketsResultQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"24\" height=\"10\" title=\"23\" alt=\"23\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"50\" height=\"10\" title=\"48\" alt=\"48\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "67%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "8",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "4",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "11",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "8",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"TaggingQuery.java.json\" class=\"el_source\">TaggingQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"22\" height=\"10\" title=\"21\" alt=\"21\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"ListVersionsQuery.java.json\" class=\"el_source\">ListVersionsQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"21\" height=\"10\" title=\"20\" alt=\"20\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"42\" height=\"10\" title=\"40\" alt=\"40\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "66%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "5",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "12",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"ListDirectoryBucketsQuery.java.json\" class=\"el_source\">ListDirectoryBucketsQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"19\" height=\"10\" title=\"18\" alt=\"18\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"BucketIntelligentTieringQuery.java.json\" class=\"el_source\">BucketIntelligentTieringQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"18\" height=\"10\" title=\"17\" alt=\"17\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"32\" height=\"10\" title=\"31\" alt=\"31\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "64%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"20\" height=\"10\" title=\"1\" alt=\"1\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"20\" height=\"10\" title=\"1\" alt=\"1\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "50%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "5",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "4",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"BucketMetricsQuery.java.json\" class=\"el_source\">BucketMetricsQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"18\" height=\"10\" title=\"17\" alt=\"17\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"27\" height=\"10\" title=\"26\" alt=\"26\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "60%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"20\" height=\"10\" title=\"1\" alt=\"1\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"20\" height=\"10\" title=\"1\" alt=\"1\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "50%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "5",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "4",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"RetentionQuery.java.json\" class=\"el_source\">RetentionQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"15\" height=\"10\" title=\"15\" alt=\"15\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"LegalHoldQuery.java.json\" class=\"el_source\">LegalHoldQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"15\" height=\"10\" title=\"15\" alt=\"15\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"40\" height=\"10\" title=\"2\" alt=\"2\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"CreateSessionQuery.java.json\" class=\"el_source\">CreateSessionQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"11\" height=\"10\" title=\"11\" alt=\"11\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"AccessControlPolicyQuery.java.json\" class=\"el_source\">AccessControlPolicyQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"8\" height=\"10\" title=\"8\" alt=\"8\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"54\" height=\"10\" title=\"51\" alt=\"51\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "86%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"80\" height=\"10\" title=\"4\" alt=\"4\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"20\" height=\"10\" title=\"1\" alt=\"1\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "20%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "4",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "9",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "4",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "12",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "5",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "4",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"BucketInventoryQuery.java.json\" class=\"el_source\">BucketInventoryQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"7\" height=\"10\" title=\"7\" alt=\"7\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"66\" height=\"10\" title=\"63\" alt=\"63\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "90%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"40\" height=\"10\" title=\"2\" alt=\"2\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"40\" height=\"10\" title=\"2\" alt=\"2\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "50%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "12",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "5",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"BucketAnalyticsQuery.java.json\" class=\"el_source\">BucketAnalyticsQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"6\" height=\"10\" title=\"6\" alt=\"6\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"39\" height=\"10\" title=\"37\" alt=\"37\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "86%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"20\" height=\"10\" title=\"1\" alt=\"1\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"20\" height=\"10\" title=\"1\" alt=\"1\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "50%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "5",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "4",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"BucketReplicationQuery.java.json\" class=\"el_source\">BucketReplicationQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"5\" height=\"10\" title=\"5\" alt=\"5\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"61\" height=\"10\" title=\"58\" alt=\"58\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "92%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "5",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "6",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "5",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"BucketWebsiteQuery.java.json\" class=\"el_source\">BucketWebsiteQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"5\" height=\"10\" title=\"5\" alt=\"5\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"39\" height=\"10\" title=\"37\" alt=\"37\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "88%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "5",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"PublicAccessBlockQuery.java.json\" class=\"el_source\">PublicAccessBlockQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"5\" height=\"10\" title=\"5\" alt=\"5\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"38\" height=\"10\" title=\"36\" alt=\"36\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "87%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"BucketEncryptionQuery.java.json\" class=\"el_source\">BucketEncryptionQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"5\" height=\"10\" title=\"5\" alt=\"5\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"28\" height=\"10\" title=\"27\" alt=\"27\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "84%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"BucketLoggingQuery.java.json\" class=\"el_source\">BucketLoggingQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"5\" height=\"10\" title=\"5\" alt=\"5\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"23\" height=\"10\" title=\"22\" alt=\"22\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "81%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"BucketOwnershipControlsQuery.java.json\" class=\"el_source\">BucketOwnershipControlsQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"5\" height=\"10\" title=\"5\" alt=\"5\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"23\" height=\"10\" title=\"22\" alt=\"22\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "81%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"BucketRequestPaymentQuery.java.json\" class=\"el_source\">BucketRequestPaymentQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"5\" height=\"10\" title=\"5\" alt=\"5\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"18\" height=\"10\" title=\"17\" alt=\"17\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "77%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"BucketAccelerateQuery.java.json\" class=\"el_source\">BucketAccelerateQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"5\" height=\"10\" title=\"5\" alt=\"5\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"18\" height=\"10\" title=\"17\" alt=\"17\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "77%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"LocationConstraintQuery.java.json\" class=\"el_source\">LocationConstraintQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"5\" height=\"10\" title=\"5\" alt=\"5\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"12\" height=\"10\" title=\"12\" alt=\"12\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "70%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"BucketNotificationQuery.java.json\" class=\"el_source\">BucketNotificationQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"60\" height=\"10\" title=\"57\" alt=\"57\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "5",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "5",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"ListPartsQuery.java.json\" class=\"el_source\">ListPartsQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"48\" height=\"10\" title=\"46\" alt=\"46\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "5",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "5",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "5",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"ListMultipartUploadsQuery.java.json\" class=\"el_source\">ListMultipartUploadsQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"43\" height=\"10\" title=\"41\" alt=\"41\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "5",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "5",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "5",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"GetObjectAttributesQuery.java.json\" class=\"el_source\">GetObjectAttributesQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"38\" height=\"10\" title=\"36\" alt=\"36\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"40\" height=\"10\" title=\"2\" alt=\"2\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "5",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"AbacConfigurationQuery.java.json\" class=\"el_source\">AbacConfigurationQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"35\" height=\"10\" title=\"33\" alt=\"33\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"MetadataConfigurationQuery.java.json\" class=\"el_source\">MetadataConfigurationQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"22\" height=\"10\" title=\"21\" alt=\"21\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"MetadataTableConfigurationQuery.java.json\" class=\"el_source\">MetadataTableConfigurationQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"22\" height=\"10\" title=\"21\" alt=\"21\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"DeleteResultQuery.java.json\" class=\"el_source\">DeleteResultQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"20\" height=\"10\" title=\"19\" alt=\"19\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "4",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"CompleteMultipartUploadQuery.java.json\" class=\"el_source\">CompleteMultipartUploadQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"20\" height=\"10\" title=\"19\" alt=\"19\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"InitiateMultipartUploadQuery.java.json\" class=\"el_source\">InitiateMultipartUploadQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"20\" height=\"10\" title=\"19\" alt=\"19\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"JournalTableConfigurationQuery.java.json\" class=\"el_source\">JournalTableConfigurationQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"15\" height=\"10\" title=\"15\" alt=\"15\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"InventoryTableConfigurationQuery.java.json\" class=\"el_source\">InventoryTableConfigurationQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"15\" height=\"10\" title=\"15\" alt=\"15\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"VersioningConfigurationQuery.java.json\" class=\"el_source\">VersioningConfigurationQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"15\" height=\"10\" title=\"15\" alt=\"15\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"40\" height=\"10\" title=\"2\" alt=\"2\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"CopyObjectResultQuery.java.json\" class=\"el_source\">CopyObjectResultQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"15\" height=\"10\" title=\"15\" alt=\"15\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"ErrorQuery.java.json\" class=\"el_source\">ErrorQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"15\" height=\"10\" title=\"15\" alt=\"15\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"BucketInventoryListQuery.java.json\" class=\"el_source\">BucketInventoryListQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"12\" height=\"10\" title=\"12\" alt=\"12\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"BucketAnalyticsListQuery.java.json\" class=\"el_source\">BucketAnalyticsListQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"12\" height=\"10\" title=\"12\" alt=\"12\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"UploadPartResultQuery.java.json\" class=\"el_source\">UploadPartResultQuery.java</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"11\" height=\"10\" title=\"11\" alt=\"11\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ]
+            ]
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

@@ -1,0 +1,1567 @@
+{
+  "title": "S3ObjectMetadataHandler",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "S3ObjectMetadataHandler",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_s3objectmetadatahandler",
+        "title": "S3ObjectMetadataHandler",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "table",
+            "headers": [
+              {
+                "text": "Element",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed Instructions",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Cov.",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed Branches",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Cov.",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Cxty",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Lines",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Methods",
+                "colspan": 1,
+                "rowspan": 1
+              }
+            ],
+            "rows": [
+              [
+                {
+                  "text": "Element",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed Instructions",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Cov.",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed Branches",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Cov.",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Cxty",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Lines",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Methods",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "Total",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "213 of 508",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "58%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "8 of 16",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "50%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "18",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "32",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "52",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "130",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "12",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "24",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"S3ObjectMetadataHandler.java.json#L219\" class=\"el_method\">lambda$putObjectRetention$11(String, String, RetentionCommand)</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"59\" height=\"10\" title=\"43\" alt=\"43\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"20\" height=\"10\" title=\"2\" alt=\"2\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "9",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "9",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"S3ObjectMetadataHandler.java.json#L167\" class=\"el_method\">getObjectLegalHold(ServerRequest)</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"37\" height=\"10\" title=\"27\" alt=\"27\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"S3ObjectMetadataHandler.java.json#L196\" class=\"el_method\">getObjectRetention(ServerRequest)</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"37\" height=\"10\" title=\"27\" alt=\"27\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"S3ObjectMetadataHandler.java.json#L200\" class=\"el_method\">lambda$getObjectRetention$10(ObjectLockConfiguration)</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"28\" height=\"10\" title=\"21\" alt=\"21\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "6",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "6",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"S3ObjectMetadataHandler.java.json#L180\" class=\"el_method\">putObjectLegalHold(ServerRequest)</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"27\" height=\"10\" title=\"20\" alt=\"20\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "5",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "5",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"S3ObjectMetadataHandler.java.json#L215\" class=\"el_method\">putObjectRetention(ServerRequest)</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"27\" height=\"10\" title=\"20\" alt=\"20\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "5",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "5",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"S3ObjectMetadataHandler.java.json#L183\" class=\"el_method\">lambda$putObjectLegalHold$9(String, String, LegalHoldCommand)</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"20\" height=\"10\" title=\"15\" alt=\"15\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"20\" height=\"10\" title=\"2\" alt=\"2\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "4",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "4",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"S3ObjectMetadataHandler.java.json#L72\" class=\"el_method\">lambda$getObjectTagging$2(S3Object)</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"16\" height=\"10\" title=\"12\" alt=\"12\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"S3ObjectMetadataHandler.java.json#L129\" class=\"el_method\">lambda$updateObjectEncryption$7(ServerRequest, String, String, S3Object)</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"11\" height=\"10\" title=\"8\" alt=\"8\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"108\" height=\"10\" title=\"79\" alt=\"79\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "90%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"40\" height=\"10\" title=\"4\" alt=\"4\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"80\" height=\"10\" title=\"8\" alt=\"8\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "66%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "4",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "22",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"S3ObjectMetadataHandler.java.json#L170\" class=\"el_method\">lambda$getObjectLegalHold$8(LegalHold)</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"11\" height=\"10\" title=\"8\" alt=\"8\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"S3ObjectMetadataHandler.java.json#L86\" class=\"el_method\">lambda$putObjectTagging$4(ServerRequest, S3Object)</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"8\" height=\"10\" title=\"6\" alt=\"6\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"S3ObjectMetadataHandler.java.json#L103\" class=\"el_method\">lambda$deleteObjectTagging$5(S3Object)</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"4\" height=\"10\" title=\"3\" alt=\"3\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"S3ObjectMetadataHandler.java.json#L89\" class=\"el_method\">lambda$putObjectTagging$3(TaggingCommand)</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"4\" height=\"10\" title=\"3\" alt=\"3\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"S3ObjectMetadataHandler.java.json#L125\" class=\"el_method\">updateObjectEncryption(ServerRequest)</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"41\" height=\"10\" title=\"30\" alt=\"30\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"S3ObjectMetadataHandler.java.json#L52\" class=\"el_method\">putObjectAcl(ServerRequest)</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"37\" height=\"10\" title=\"27\" alt=\"27\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"S3ObjectMetadataHandler.java.json#L83\" class=\"el_method\">putObjectTagging(ServerRequest)</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"37\" height=\"10\" title=\"27\" alt=\"27\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"S3ObjectMetadataHandler.java.json#L39\" class=\"el_method\">getObjectAcl(ServerRequest)</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"35\" height=\"10\" title=\"26\" alt=\"26\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"S3ObjectMetadataHandler.java.json#L67\" class=\"el_method\">getObjectTagging(ServerRequest)</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"35\" height=\"10\" title=\"26\" alt=\"26\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"S3ObjectMetadataHandler.java.json#L98\" class=\"el_method\">deleteObjectTagging(ServerRequest)</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"35\" height=\"10\" title=\"26\" alt=\"26\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"S3ObjectMetadataHandler.java.json#L112\" class=\"el_method\">getObjectAttributes(ServerRequest)</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"35\" height=\"10\" title=\"26\" alt=\"26\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"S3ObjectMetadataHandler.java.json#L57\" class=\"el_method\">lambda$putObjectAcl$1(ServerRequest, S3Object)</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"11\" height=\"10\" title=\"8\" alt=\"8\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"S3ObjectMetadataHandler.java.json#L115\" class=\"el_method\">lambda$getObjectAttributes$6(S3Object)</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"9\" height=\"10\" title=\"7\" alt=\"7\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"S3ObjectMetadataHandler.java.json#L42\" class=\"el_method\">lambda$getObjectAcl$0(S3Object)</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"9\" height=\"10\" title=\"7\" alt=\"7\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"S3ObjectMetadataHandler.java.json#L33\" class=\"el_method\">S3ObjectMetadataHandler(ReactiveObjectService)</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"8\" height=\"10\" title=\"6\" alt=\"6\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ]
+            ]
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

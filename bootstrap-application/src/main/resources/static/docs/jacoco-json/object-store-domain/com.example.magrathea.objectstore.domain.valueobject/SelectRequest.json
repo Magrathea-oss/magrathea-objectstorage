@@ -1,0 +1,313 @@
+{
+  "title": "SelectRequest",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "SelectRequest",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_selectrequest",
+        "title": "SelectRequest",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "table",
+            "headers": [
+              {
+                "text": "Element",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed Instructions",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Cov.",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed Branches",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Cov.",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Cxty",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Lines",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Methods",
+                "colspan": 1,
+                "rowspan": 1
+              }
+            ],
+            "rows": [
+              [
+                {
+                  "text": "Element",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed Instructions",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Cov.",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed Branches",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Cov.",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Cxty",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Lines",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Methods",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "Total",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "52 of 52",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "4 of 4",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "4",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "4",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "10",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "10",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"SelectRequest.java.json#L20\" class=\"el_method\">SelectRequest(String, String, SelectRequest.InputSerialization, SelectRequest.OutputSerialization)</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"120\" height=\"10\" title=\"44\" alt=\"44\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"120\" height=\"10\" title=\"4\" alt=\"4\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "3",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "9",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "9",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"SelectRequest.java.json#L35\" class=\"el_method\">of(String, SelectRequest.InputSerialization, SelectRequest.OutputSerialization)</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"21\" height=\"10\" title=\"8\" alt=\"8\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ]
+            ]
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

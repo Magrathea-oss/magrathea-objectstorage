@@ -1,0 +1,27 @@
+{
+  "title": "BucketCorsQuery.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "BucketCorsQuery.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_bucketcorsquery_java",
+        "title": "BucketCorsQuery.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.s3api.dto.query;\n\nimport com.example.magrathea.objectstore.domain.valueobject.CorsConfiguration;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;\n\nimport java.util.List;\nimport java.util.Optional;\n\n/**\n * Response for GET /{bucket}?cors (GetBucketCors).\n */\n@JacksonXmlRootElement(localName = \"CORSConfiguration\")\n<span class=\"fc\" id=\"L15\">public record BucketCorsQuery(</span>\n    @JacksonXmlProperty(localName = \"CORSRule\")\n    List<CorsRuleEntry> corsRules\n) {\n    public static BucketCorsQuery from(String bucket, Optional<CorsConfiguration> config) {\n<span class=\"nc bnc\" id=\"L20\" title=\"All 6 branches missed.\">        if (config.isEmpty() || config.get().corsRules() == null || config.get().corsRules().isEmpty()) {</span>\n<span class=\"nc\" id=\"L21\">            throw new IllegalArgumentException(\"No CORS configuration\");</span>\n        }\n<span class=\"nc\" id=\"L23\">        var rules = config.get().corsRules().stream()</span>\n<span class=\"nc\" id=\"L24\">            .map(r -> new CorsRuleEntry(</span>\n<span class=\"nc\" id=\"L25\">                r.allowedOrigins(), r.allowedMethods(), r.allowedHeaders(),</span>\n<span class=\"nc\" id=\"L26\">                r.maxAgeSeconds(), r.exposeHeaders(), r.id()))</span>\n<span class=\"nc\" id=\"L27\">            .toList();</span>\n<span class=\"nc\" id=\"L28\">        return new BucketCorsQuery(rules);</span>\n    }\n\n\n<span class=\"fc\" id=\"L32\">    public record CorsRuleEntry(</span>\n        @JacksonXmlElementWrapper(localName = \"AllowedOrigin\", useWrapping = false)\n        @JacksonXmlProperty(localName = \"AllowedOrigin\")\n        List<String> allowedOrigins,\n        @JacksonXmlElementWrapper(localName = \"AllowedMethod\", useWrapping = false)\n        @JacksonXmlProperty(localName = \"AllowedMethod\")\n        List<String> allowedMethods,\n        @JacksonXmlElementWrapper(localName = \"AllowedHeader\", useWrapping = false)\n        @JacksonXmlProperty(localName = \"AllowedHeader\")\n        List<String> allowedHeaders,\n        @JacksonXmlProperty(localName = \"MaxAgeSeconds\")\n        Integer maxAgeSeconds,\n        @JacksonXmlElementWrapper(localName = \"ExposeHeader\", useWrapping = false)\n        @JacksonXmlProperty(localName = \"ExposeHeader\")\n        List<String> exposeHeaders,\n        @JacksonXmlProperty(localName = \"ID\")\n        String id\n    ) {}\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

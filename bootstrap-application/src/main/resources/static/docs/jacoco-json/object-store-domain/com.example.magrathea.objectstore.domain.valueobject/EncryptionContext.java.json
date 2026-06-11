@@ -1,0 +1,27 @@
+{
+  "title": "EncryptionContext.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "EncryptionContext.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_encryptioncontext_java",
+        "title": "EncryptionContext.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.objectstore.domain.valueobject;\n\nimport java.util.Map;\nimport java.util.Objects;\n\n/**\n * Encryption context as a map of key-value pairs.\n */\npublic record EncryptionContext(Map<String, String> context) {\n<span class=\"nc\" id=\"L10\">    public EncryptionContext {</span>\n<span class=\"nc\" id=\"L11\">        Objects.requireNonNull(context, \"context must not be null\");</span>\n<span class=\"nc\" id=\"L12\">    }</span>\n\n    public static EncryptionContext of(Map<String, String> context) {\n<span class=\"nc\" id=\"L15\">        return new EncryptionContext(Map.copyOf(context));</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

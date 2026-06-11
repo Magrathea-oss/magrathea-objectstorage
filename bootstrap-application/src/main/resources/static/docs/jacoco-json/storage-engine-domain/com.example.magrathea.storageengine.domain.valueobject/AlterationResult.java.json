@@ -1,0 +1,27 @@
+{
+  "title": "AlterationResult.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "AlterationResult.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_alterationresult_java",
+        "title": "AlterationResult.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.storageengine.domain.valueobject;\n\nimport java.util.Optional;\n\npublic record AlterationResult(boolean applied, Optional<String> faultType) {\n<span class=\"nc\" id=\"L6\">    public AlterationResult {</span>\n<span class=\"nc\" id=\"L7\">        java.util.Objects.requireNonNull(faultType, \"faultType must not be null\");</span>\n<span class=\"nc\" id=\"L8\">    }</span>\n\n    public static AlterationResult of(boolean applied, Optional<String> faultType) {\n<span class=\"nc\" id=\"L11\">        return new AlterationResult(applied, faultType);</span>\n    }\n\n    public static AlterationResult notApplied() {\n<span class=\"nc\" id=\"L15\">        return new AlterationResult(false, Optional.empty());</span>\n    }\n\n    public static AlterationResult wasApplied() {\n<span class=\"nc\" id=\"L19\">        return new AlterationResult(true, Optional.empty());</span>\n    }\n\n    public static AlterationResult fault(String faultType) {\n<span class=\"nc\" id=\"L23\">        return new AlterationResult(false, Optional.of(faultType));</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

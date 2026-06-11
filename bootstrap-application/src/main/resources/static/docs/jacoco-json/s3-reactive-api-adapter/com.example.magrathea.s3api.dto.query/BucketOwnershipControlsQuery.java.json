@@ -1,0 +1,27 @@
+{
+  "title": "BucketOwnershipControlsQuery.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "BucketOwnershipControlsQuery.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_bucketownershipcontrolsquery_java",
+        "title": "BucketOwnershipControlsQuery.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.s3api.dto.query;\n\nimport com.example.magrathea.objectstore.domain.aggregate.Bucket;\nimport com.example.magrathea.objectstore.domain.valueobject.BucketOwnershipControls;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;\n\nimport java.util.Optional;\n\n/**\n * Response for GET /{bucket}?ownershipControls (GetBucketOwnershipControls).\n */\n@JacksonXmlRootElement(localName = \"OwnershipControls\")\n<span class=\"fc\" id=\"L14\">public record BucketOwnershipControlsQuery(</span>\n    @JacksonXmlProperty(localName = \"ID\")\n    String ruleId,\n    @JacksonXmlProperty(localName = \"Ownership\")\n    String ownership\n) {\n    public static BucketOwnershipControlsQuery from(Optional<BucketOwnershipControls> controls) {\n<span class=\"pc\" id=\"L21\">        var c = controls.orElseThrow(() -> new IllegalArgumentException(\"No ownership controls\"));</span>\n<span class=\"fc\" id=\"L22\">        return new BucketOwnershipControlsQuery(c.ruleId(), c.ownership());</span>\n    }\n\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

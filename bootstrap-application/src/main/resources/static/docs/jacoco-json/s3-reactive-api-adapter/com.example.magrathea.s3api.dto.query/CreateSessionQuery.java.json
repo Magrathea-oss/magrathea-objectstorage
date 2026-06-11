@@ -1,0 +1,27 @@
+{
+  "title": "CreateSessionQuery.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "CreateSessionQuery.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_createsessionquery_java",
+        "title": "CreateSessionQuery.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.s3api.dto.query;\n\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;\n\n/**\n * Response for POST /{bucket}?session (CreateSession).\n *\n * <pre>{@code\n * <CreateSessionResult>\n *   <SessionToken>abc123...</SessionToken>\n * </CreateSessionResult>\n * }</pre>\n */\n@JacksonXmlRootElement(localName = \"CreateSessionResult\")\n<span class=\"nc\" id=\"L16\">public record CreateSessionQuery(</span>\n    @JacksonXmlProperty(localName = \"SessionToken\")\n    String sessionToken\n) {\n\n    public static CreateSessionQuery from(String token) {\n<span class=\"nc\" id=\"L22\">        return new CreateSessionQuery(token);</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

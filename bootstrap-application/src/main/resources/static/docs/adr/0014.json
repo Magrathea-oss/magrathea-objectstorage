@@ -1,0 +1,464 @@
+{
+  "adr": 14,
+  "title": "ADR 0014 — Storage Engine Bounded Context",
+  "status": "Accepted",
+  "lang": "en",
+  "document": {
+    "type": "document",
+    "title": "ADR 0014 — Storage Engine Bounded Context",
+    "sections": [
+      {
+        "id": "_adr_0014_storage_engine_bounded_context",
+        "title": "ADR 0014 — Storage Engine Bounded Context",
+        "level": 1,
+        "blocks": []
+      },
+      {
+        "id": "_context",
+        "title": "Context",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "The Object Store S3 API domain (<code>object-store-domain</code>) is a pure model of S3 concepts: buckets, objects, multipart uploads, ACLs, tagging, encryption, and legal hold. Its repository interfaces (<code>object-store-reactive-repository-application</code>) abstract persistence behind command/query ports. The initial infrastructure module (<code>object-store-reactive-infrastructure</code>) provides in-memory implementations suitable for development and single-node deployments."
+          },
+          {
+            "type": "paragraph",
+            "html": "Production deployments require a persistent, scalable storage backend. The Storage Engine bounded context was created as a separate domain model for object persistence, independent of the S3 API domain. It defines storage-specific concepts: chunk-level pipelines, content-addressed deduplication, erasure coding, replication, device topology, and chaos engineering."
+          }
+        ]
+      },
+      {
+        "id": "_decision",
+        "title": "Decision",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "section",
+            "id": "_1_module_layout_four_new_modules",
+            "title": "1. Module Layout — Four New Modules",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "paragraph",
+            "html": "Three Storage Engine modules plus one Anti-Corruption Layer/adapter module:"
+          },
+          {
+            "type": "table",
+            "headers": [
+              "Module",
+              "Purpose"
+            ],
+            "rows": [
+              [
+                "`storage-engine-domain`",
+                "Storage Engine domain model: policy, workflow, device, trace, manifest — zero framework dependencies"
+              ],
+              [
+                "`storage-engine-application`",
+                "Storage Engine reactive orchestration: ports, Chunker, ReactiveStorageOrchestrator"
+              ],
+              [
+                "`storage-engine-infrastructure`",
+                "Storage Engine filesystem cluster backend: FileSystemStorageCluster, content-address index, manifest repository, chaos decorator"
+              ],
+              [
+                "`object-store-reactive-repository-storage-engine-infrastructure`",
+                "Anti-Corruption Layer + adapter: translates Object Store repository commands into Storage Engine commands"
+              ]
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_2_two_backend_repository_strategy",
+            "title": "2. Two-Backend Repository Strategy",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "paragraph",
+            "html": "Two concrete implementations of the Object Store repository interfaces coexist:"
+          },
+          {
+            "type": "table",
+            "headers": [
+              "Profile",
+              "Backend",
+              "Module"
+            ],
+            "rows": [
+              [
+                "`single-node` (default)",
+                "In-memory repositories",
+                "`object-store-reactive-infrastructure`"
+              ],
+              [
+                "`storage-engine`",
+                "Storage Engine filesystem cluster",
+                "`object-store-reactive-repository-storage-engine-infrastructure`"
+              ]
+            ]
+          },
+          {
+            "type": "paragraph",
+            "html": "The Storage Engine backend is selectable via Spring profile or Maven profile at deployment time.\nThe ACL/adapter module is the only module that depends on both bounded contexts; all other modules\nremain decoupled."
+          },
+          {
+            "type": "section",
+            "id": "_3_anti_corruption_layer_design",
+            "title": "3. Anti-Corruption Layer Design",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "paragraph",
+            "html": "<code>object-store-reactive-repository-storage-engine-infrastructure</code> is the sole integration point between\nthe two bounded contexts. It implements the Object Store repository interfaces by:"
+          },
+          {
+            "type": "paragraph",
+            "html": "Storage Engine domain commands (e.g., <code>RegisterDeviceCommand</code>, <code>CompleteUpload</code>)"
+          },
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "Translating Object Store commands (e.g., <code>CreateBucketCommand</code>, <code>PutObjectCommand</code>) into",
+                "blocks": []
+              },
+              {
+                "text": "Mapping S3 domain aggregates to Storage Engine concepts",
+                "blocks": []
+              },
+              {
+                "text": "Delegating persistence to the Storage Engine bounded context via its application ports",
+                "blocks": []
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "html": "This layer prevents Storage Engine concepts from leaking into the Object Store domain and vice versa."
+          },
+          {
+            "type": "section",
+            "id": "_4_fixed_6_step_pipeline",
+            "title": "4. Fixed 6-Step Pipeline",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "paragraph",
+            "html": "The Storage Engine defines a fixed pipeline for every chunk write. The order is immutable:"
+          },
+          {
+            "type": "paragraph",
+            "html": "``<code>\nDEDUP → COMPRESS → CRYPT → ERASURE_CODING → REPLICATION → STORE\n</code>``"
+          },
+          {
+            "type": "paragraph",
+            "html": "Each step is modeled as a <code>StepPlan</code> entry with <code>StepExecutionTrace</code> recording the actual outcome:"
+          },
+          {
+            "type": "table",
+            "headers": [
+              "Outcome",
+              "Meaning"
+            ],
+            "rows": [
+              [
+                "`EXECUTED`",
+                "Step ran and completed normally"
+              ],
+              [
+                "`SKIPPED`",
+                "Step was skipped due to policy or device capability"
+              ],
+              [
+                "`BYPASSED`",
+                "Step was bypassed (e.g., by chaos injection)"
+              ]
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_5_virtualdevice_sealed_hierarchy",
+            "title": "5. VirtualDevice Sealed Hierarchy",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "paragraph",
+            "html": "<code>VirtualDevice</code> is a sealed type representing a logical storage device:"
+          },
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "<strong>BucketDevice</strong> — non-dedup device; content is stored as-is per bucket",
+                "blocks": []
+              },
+              {
+                "text": "<strong>DedupDevice</strong> — content-addressed device; deduplication is enabled",
+                "blocks": []
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "html": "The sealed hierarchy prevents extension outside the domain and ensures all device types\nare handled exhaustively."
+          },
+          {
+            "type": "section",
+            "id": "_6_dedupnamespace",
+            "title": "6. DedupNamespace",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "paragraph",
+            "html": "<code>DedupNamespace</code> controls the scope of content-addressed deduplication:"
+          },
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "<strong>GlobalDedupNamespace</strong> — deduplication across all buckets",
+                "blocks": []
+              },
+              {
+                "text": "<strong>BucketDedupNamespace</strong> — deduplication within a single bucket",
+                "blocks": []
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "html": "The namespace is resolved from the effective storage policy at upload time."
+          },
+          {
+            "type": "section",
+            "id": "_7_device_identity_two_deterministic_keys",
+            "title": "7. Device Identity — Two Deterministic Keys",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "paragraph",
+            "html": "<code>VirtualDevice</code> identity is determined by two hashed keys:"
+          },
+          {
+            "type": "paragraph",
+            "html": "Two devices with the same workflow key produce identical chunk-level behavior."
+          },
+          {
+            "type": "paragraph",
+            "html": "Used for content-address index lookups."
+          },
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "<strong>WorkflowCompatibilityKey</strong> — derived from pipeline configuration (which steps are active).",
+                "blocks": []
+              },
+              {
+                "text": "<strong>DeviceConfigurationHash</strong> — derived from all device properties including the workflow key.",
+                "blocks": []
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "html": "The erasure coding (EC) step contributes to the device configuration hash. Replication does not,\nbecause replication is a storage-layer concern that does not change the content-addressed identity."
+          },
+          {
+            "type": "section",
+            "id": "_8_completeupload_common_upload_phase",
+            "title": "8. CompleteUpload — Common Upload Phase",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "paragraph",
+            "html": "<code>CompleteUpload</code> is a domain concept shared by both PutObject and MultipartUpload. It represents\nthe point at which the upload is finalized at the object level before the chunk-level pipeline runs.\nThis phase:"
+          },
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "Validates the upload context (bucket, key, policy)",
+                "blocks": []
+              },
+              {
+                "text": "Resolves the effective storage policy",
+                "blocks": []
+              },
+              {
+                "text": "Selects or creates the target <code>VirtualDevice</code>",
+                "blocks": []
+              },
+              {
+                "text": "Emits the <code>CompleteUploadEvent</code> that triggers the chunk pipeline",
+                "blocks": []
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_9_chaos_engineering",
+            "title": "9. Chaos Engineering",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "paragraph",
+            "html": "A <code>FaultInjectingStorageCluster</code> decorator wraps the real <code>FileSystemStorageCluster</code>. It introduces\nan <strong>alter</strong> step that executes after checksum computation and before verify. The alter step can:"
+          },
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "Corrupt a byte at a random position",
+                "blocks": []
+              },
+              {
+                "text": "Skip the write (simulate write failure)",
+                "blocks": []
+              },
+              {
+                "text": "Introduce latency",
+                "blocks": []
+              },
+              {
+                "text": "Bypass the verify step",
+                "blocks": []
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "html": "The alter step is controlled by a chaos probability parameter, enabling reproducible fault injection\nin tests and non-deterministic injection in production-like environments."
+          },
+          {
+            "type": "paragraph",
+            "html": "The pipeline position for chaos is: DEDUP → COMPRESS → CRYPT → ERASURE_CODING → REPLICATION → ALTER → STORE.\nAlter happens after checksum (so the checksum is of the unaltered data) and before verify (so verify\ndetects the alteration)."
+          }
+        ]
+      },
+      {
+        "id": "_consequences",
+        "title": "Consequences",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "The ACL/adapter module is the only bridge between the two bounded contexts."
+          },
+          {
+            "type": "paragraph",
+            "html": "deployments use the Storage Engine backend. Profile selection is straightforward."
+          },
+          {
+            "type": "paragraph",
+            "html": "chunk processing across all writes. EC and replication roles are clearly separated."
+          },
+          {
+            "type": "paragraph",
+            "html": "DedupNamespace provides flexible deduplication scope."
+          },
+          {
+            "type": "paragraph",
+            "html": "deterministic and composable. EC inclusion in the hash ensures that devices with different\nEC configurations are distinct."
+          },
+          {
+            "type": "paragraph",
+            "html": "the domain or application layers. The alter-after-checksum-before-verify position ensures\nchecksums validate the pre-alter data."
+          },
+          {
+            "type": "paragraph",
+            "html": "object level before chunk-level processing."
+          },
+          {
+            "type": "paragraph",
+            "html": "to the Storage Engine bounded context. If the Storage Engine domain changes, the adapter must\nbe updated."
+          },
+          {
+            "type": "paragraph",
+            "html": "content-address index, manifest persistence). Its correctness depends on rigorous testing\nand integration verification."
+          },
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "<strong>Positive</strong>: Domain purity is maintained — the S3 API domain has no dependency on storage-engine concepts.",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Positive</strong>: Two-backend strategy enables development with in-memory repositories while production",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Positive</strong>: The fixed pipeline order prevents accidental reordering and ensures consistent",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Positive</strong>: VirtualDevice sealed hierarchy makes device types explicit and exhaustive.",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Positive</strong>: Device identity via WorkflowCompatibilityKey and DeviceConfigurationHash is",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Positive</strong>: Chaos engineering is built into the infrastructure decorator, not scattered across",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Positive</strong>: CompleteUpload as a common phase unifies PutObject and MultipartUpload at the",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Negative</strong>: The ACL/adapter module creates a dependency from the Object Store infrastructure",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Risk</strong>: The Storage Engine bounded context is complex (6-step pipeline, device topology,",
+                "blocks": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "_status",
+        "title": "Status",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Accepted"
+          }
+        ]
+      },
+      {
+        "id": "_date",
+        "title": "Date",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "2026-05-30"
+          }
+        ]
+      }
+    ]
+  }
+}

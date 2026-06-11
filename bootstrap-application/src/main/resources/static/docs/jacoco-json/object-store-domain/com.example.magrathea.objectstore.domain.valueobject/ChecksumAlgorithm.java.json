@@ -1,0 +1,27 @@
+{
+  "title": "ChecksumAlgorithm.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "ChecksumAlgorithm.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_checksumalgorithm_java",
+        "title": "ChecksumAlgorithm.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.objectstore.domain.valueobject;\n\nimport java.util.Arrays;\nimport java.util.Optional;\n\n/**\n * All checksum algorithms supported by AWS S3.\n * Maps to x-amz-sdk-checksum-algorithm and x-amz-checksum-&lt;alg&gt; headers.\n */\n<span class=\"fc\" id=\"L10\">public enum ChecksumAlgorithm {</span>\n<span class=\"fc\" id=\"L11\">    CRC32(\"crc32\"),</span>\n<span class=\"fc\" id=\"L12\">    CRC32C(\"crc32c\"),</span>\n<span class=\"fc\" id=\"L13\">    CRC64NVME(\"crc64nvme\"),</span>\n<span class=\"fc\" id=\"L14\">    SHA1(\"sha1\"),</span>\n<span class=\"fc\" id=\"L15\">    SHA256(\"sha256\"),</span>\n<span class=\"fc\" id=\"L16\">    SHA512(\"sha512\"),</span>\n<span class=\"fc\" id=\"L17\">    XXHASH64(\"xxhash64\"),</span>\n<span class=\"fc\" id=\"L18\">    XXHASH3(\"xxhash3\"),</span>\n<span class=\"fc\" id=\"L19\">    XXHASH128(\"xxhash128\"),</span>\n<span class=\"fc\" id=\"L20\">    MD5(\"md5\"); // legacy Content-MD5</span>\n\n    private final String apiName;\n\n<span class=\"fc\" id=\"L24\">    ChecksumAlgorithm(String apiName) {</span>\n<span class=\"fc\" id=\"L25\">        this.apiName = apiName;</span>\n<span class=\"fc\" id=\"L26\">    }</span>\n\n    public String apiName() {\n<span class=\"fc\" id=\"L29\">        return apiName;</span>\n    }\n\n    /**\n     * Resolve from AWS API header value (e.g., \"sha256\", \"crc64nvme\").\n     * Returns empty for unknown/invalid algorithm names.\n     */\n    public static Optional<ChecksumAlgorithm> fromApiName(String name) {\n<span class=\"fc bfc\" id=\"L37\" title=\"All 2 branches covered.\">        if (name == null) {</span>\n<span class=\"fc\" id=\"L38\">            return Optional.empty();</span>\n        }\n<span class=\"fc\" id=\"L40\">        return Arrays.stream(values())</span>\n<span class=\"fc\" id=\"L41\">            .filter(algorithm -> algorithm.apiName.equals(name))</span>\n<span class=\"fc\" id=\"L42\">            .findFirst();</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

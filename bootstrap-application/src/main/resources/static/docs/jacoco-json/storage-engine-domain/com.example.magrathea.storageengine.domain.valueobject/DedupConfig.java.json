@@ -1,0 +1,27 @@
+{
+  "title": "DedupConfig.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "DedupConfig.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_dedupconfig_java",
+        "title": "DedupConfig.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.storageengine.domain.valueobject;\n\npublic record DedupConfig(\n        DedupScope scope,\n        FingerprintAlgorithm algorithm,\n        long chunkSize,\n        ChunkAlignment alignment) {\n<span class=\"nc\" id=\"L8\">    public DedupConfig {</span>\n<span class=\"nc\" id=\"L9\">        java.util.Objects.requireNonNull(scope, \"scope must not be null\");</span>\n<span class=\"nc\" id=\"L10\">        java.util.Objects.requireNonNull(algorithm, \"algorithm must not be null\");</span>\n<span class=\"nc\" id=\"L11\">        java.util.Objects.requireNonNull(alignment, \"alignment must not be null\");</span>\n<span class=\"nc bnc\" id=\"L12\" title=\"All 2 branches missed.\">        if (chunkSize <= 0) throw new IllegalArgumentException(\"chunkSize must be positive: \" + chunkSize);</span>\n<span class=\"nc\" id=\"L13\">    }</span>\n\n    public static DedupConfig of(DedupScope scope, FingerprintAlgorithm algorithm) {\n<span class=\"nc\" id=\"L16\">        return new DedupConfig(scope, algorithm, 1048576L, ChunkAlignment.NONE);</span>\n    }\n\n    public static DedupConfig of(DedupScope scope, FingerprintAlgorithm algorithm, long chunkSize, ChunkAlignment alignment) {\n<span class=\"nc\" id=\"L20\">        return new DedupConfig(scope, algorithm, chunkSize, alignment);</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

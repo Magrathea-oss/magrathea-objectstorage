@@ -1,0 +1,27 @@
+{
+  "title": "BucketWebsiteConfiguration.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "BucketWebsiteConfiguration.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_bucketwebsiteconfiguration_java",
+        "title": "BucketWebsiteConfiguration.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.objectstore.domain.valueobject;\n\nimport java.util.List;\nimport java.util.Objects;\n\n/**\n * AWS S3 bucket website configuration — value object.\n * Pure domain — NO framework dependencies.\n */\npublic record BucketWebsiteConfiguration(\n    String bucketName,\n    String indexDocument,\n    String errorDocument,\n    String redirectAllRequestsTo,\n    String routingRuleRedirectHost,\n    String routingRuleRedirectProtocol\n) {\n<span class=\"fc\" id=\"L18\">    public BucketWebsiteConfiguration {</span>\n<span class=\"fc\" id=\"L19\">        Objects.requireNonNull(bucketName);</span>\n<span class=\"fc\" id=\"L20\">    }</span>\n\n    public boolean hasWebsite() {\n<span class=\"pc bpc\" id=\"L23\" title=\"4 of 6 branches missed.\">        return (indexDocument != null && !indexDocument.isBlank())</span>\n<span class=\"pc bnc\" id=\"L24\" title=\"All 2 branches missed.\">            || (redirectAllRequestsTo != null && !redirectAllRequestsTo.isBlank());</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

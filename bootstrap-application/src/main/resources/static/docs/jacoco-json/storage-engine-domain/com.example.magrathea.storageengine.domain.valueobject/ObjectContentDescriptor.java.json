@@ -1,0 +1,27 @@
+{
+  "title": "ObjectContentDescriptor.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "ObjectContentDescriptor.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_objectcontentdescriptor_java",
+        "title": "ObjectContentDescriptor.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.storageengine.domain.valueobject;\n\npublic record ObjectContentDescriptor(String mimeType, long objectSize) {\n<span class=\"nc\" id=\"L4\">    public ObjectContentDescriptor {</span>\n<span class=\"nc\" id=\"L5\">        java.util.Objects.requireNonNull(mimeType, \"mimeType must not be null\");</span>\n<span class=\"nc bnc\" id=\"L6\" title=\"All 2 branches missed.\">        if (mimeType.isBlank()) {</span>\n<span class=\"nc\" id=\"L7\">            throw new IllegalArgumentException(\"mimeType must not be blank\");</span>\n        }\n<span class=\"nc bnc\" id=\"L9\" title=\"All 2 branches missed.\">        if (objectSize < 0) {</span>\n<span class=\"nc\" id=\"L10\">            throw new IllegalArgumentException(\"objectSize must be >= 0: \" + objectSize);</span>\n        }\n<span class=\"nc\" id=\"L12\">    }</span>\n\n    public static ObjectContentDescriptor of(String mimeType, long objectSize) {\n<span class=\"nc\" id=\"L15\">        return new ObjectContentDescriptor(mimeType, objectSize);</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

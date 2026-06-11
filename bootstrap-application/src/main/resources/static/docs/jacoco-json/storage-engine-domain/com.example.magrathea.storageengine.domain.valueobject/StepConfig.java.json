@@ -1,0 +1,27 @@
+{
+  "title": "StepConfig.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "StepConfig.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_stepconfig_java",
+        "title": "StepConfig.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.storageengine.domain.valueobject;\n\npublic sealed interface StepConfig {\n    StepId stepId();\n\n    record DedupStepConfig(DedupConfig config) implements StepConfig {\n<span class=\"nc\" id=\"L7\">        public DedupStepConfig {</span>\n<span class=\"nc\" id=\"L8\">            java.util.Objects.requireNonNull(config, \"config must not be null\");</span>\n<span class=\"nc\" id=\"L9\">        }</span>\n\n        @Override\n        public StepId stepId() {\n<span class=\"nc\" id=\"L13\">            return StepId.DEDUP;</span>\n        }\n    }\n\n    record CompressStepConfig(CompressionConfig config) implements StepConfig {\n<span class=\"nc\" id=\"L18\">        public CompressStepConfig {</span>\n<span class=\"nc\" id=\"L19\">            java.util.Objects.requireNonNull(config, \"config must not be null\");</span>\n<span class=\"nc\" id=\"L20\">        }</span>\n\n        @Override\n        public StepId stepId() {\n<span class=\"nc\" id=\"L24\">            return StepId.COMPRESS;</span>\n        }\n    }\n\n    record CryptStepConfig(EncryptionConfig config) implements StepConfig {\n<span class=\"nc\" id=\"L29\">        public CryptStepConfig {</span>\n<span class=\"nc\" id=\"L30\">            java.util.Objects.requireNonNull(config, \"config must not be null\");</span>\n<span class=\"nc\" id=\"L31\">        }</span>\n\n        @Override\n        public StepId stepId() {\n<span class=\"nc\" id=\"L35\">            return StepId.CRYPT;</span>\n        }\n    }\n\n    record ECStepConfig(ErasureCodingConfig config) implements StepConfig {\n<span class=\"nc\" id=\"L40\">        public ECStepConfig {</span>\n<span class=\"nc\" id=\"L41\">            java.util.Objects.requireNonNull(config, \"config must not be null\");</span>\n<span class=\"nc\" id=\"L42\">        }</span>\n\n        @Override\n        public StepId stepId() {\n<span class=\"nc\" id=\"L46\">            return StepId.ERASURE_CODING;</span>\n        }\n    }\n\n    record ReplicationStepConfig(ReplicationConfig config) implements StepConfig {\n<span class=\"nc\" id=\"L51\">        public ReplicationStepConfig {</span>\n<span class=\"nc\" id=\"L52\">            java.util.Objects.requireNonNull(config, \"config must not be null\");</span>\n<span class=\"nc\" id=\"L53\">        }</span>\n\n        @Override\n        public StepId stepId() {\n<span class=\"nc\" id=\"L57\">            return StepId.REPLICATION;</span>\n        }\n    }\n\n    record StoreStepConfig(VirtualDevice targetDevice) implements StepConfig {\n<span class=\"nc\" id=\"L62\">        public StoreStepConfig {</span>\n<span class=\"nc\" id=\"L63\">            java.util.Objects.requireNonNull(targetDevice, \"targetDevice must not be null\");</span>\n<span class=\"nc\" id=\"L64\">        }</span>\n\n        @Override\n        public StepId stepId() {\n<span class=\"nc\" id=\"L68\">            return StepId.STORE;</span>\n        }\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

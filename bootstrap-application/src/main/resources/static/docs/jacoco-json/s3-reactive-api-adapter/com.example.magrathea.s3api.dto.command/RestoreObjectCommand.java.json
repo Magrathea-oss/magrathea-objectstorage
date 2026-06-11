@@ -1,0 +1,27 @@
+{
+  "title": "RestoreObjectCommand.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "RestoreObjectCommand.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_restoreobjectcommand_java",
+        "title": "RestoreObjectCommand.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.s3api.dto.command;\n\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;\n\n/**\n * Command DTO for POST /{bucket}/{key}?restore (RestoreObject).\n * S3 RestoreObject XML body for restoring an object from Glacier/Deep Archive.\n */\n@JacksonXmlRootElement(localName = \"RestoreObject\")\n<span class=\"fc\" id=\"L11\">public record RestoreObjectCommand(</span>\n    @JacksonXmlProperty(localName = \"RestoreRequest\")\n    RestoreRequest restoreRequest\n) {\n<span class=\"fc\" id=\"L15\">    public record RestoreRequest(</span>\n        @JacksonXmlProperty(localName = \"GlacierJobParameters\")\n        GlacierJobParameters glacierJobParameters,\n        @JacksonXmlProperty(localName = \"Tier\")\n        String tier,\n        @JacksonXmlProperty(localName = \"Days\")\n        int days\n    ) {\n<span class=\"fc\" id=\"L23\">        public record GlacierJobParameters(</span>\n            @JacksonXmlProperty(localName = \"Tier\")\n            String tier\n        ) {}\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "title": "RetentionQuery.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "RetentionQuery.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_retentionquery_java",
+        "title": "RetentionQuery.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.s3api.dto.query;\n\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;\n\n/**\n * Response DTO for GET /{bucket}/{key}?retention — GetObjectRetention.\n */\n@JacksonXmlRootElement(localName = \"Retention\")\n<span class=\"nc\" id=\"L10\">public record RetentionQuery(</span>\n    @JacksonXmlProperty(localName = \"Mode\")\n    String mode,\n    @JacksonXmlProperty(localName = \"RetainUntilDate\")\n    String retainUntilDate\n) {\n    public static RetentionQuery from(String mode, String retainUntilDate) {\n<span class=\"nc\" id=\"L17\">        return new RetentionQuery(mode, retainUntilDate);</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

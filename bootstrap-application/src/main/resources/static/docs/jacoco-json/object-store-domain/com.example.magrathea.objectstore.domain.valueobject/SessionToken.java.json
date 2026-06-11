@@ -1,0 +1,27 @@
+{
+  "title": "SessionToken.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "SessionToken.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_sessiontoken_java",
+        "title": "SessionToken.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.objectstore.domain.valueobject;\n\nimport java.util.Objects;\n\n/**\n * SessionToken — a value object representing an S3 session token.\n * <p>\n * Encapsulates the token string returned by CreateSession for delegated\n * authorization in directory buckets.\n * </p>\n * Pure domain — NO framework dependencies.\n */\npublic record SessionToken(\n    String value\n) {\n\n<span class=\"nc\" id=\"L17\">    public SessionToken {</span>\n<span class=\"nc\" id=\"L18\">        Objects.requireNonNull(value);</span>\n<span class=\"nc bnc\" id=\"L19\" title=\"All 2 branches missed.\">        if (value.isBlank()) throw new IllegalArgumentException(\"Session token must not be blank\");</span>\n<span class=\"nc\" id=\"L20\">    }</span>\n\n    /**\n     * Factory method.\n     */\n    public static SessionToken of(String value) {\n<span class=\"nc\" id=\"L26\">        return new SessionToken(value);</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

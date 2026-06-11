@@ -1,0 +1,27 @@
+{
+  "title": "AbacConfigurationQuery.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "AbacConfigurationQuery.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_abacconfigurationquery_java",
+        "title": "AbacConfigurationQuery.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.s3api.dto.query;\n\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;\n\nimport java.util.List;\n\n/**\n * Response for GET /{bucket}?abac (GetBucketAbac).\n *\n * <pre>{@code\n * <AbacConfiguration>\n *   <AbacRule>\n *     <Id>rule-id</Id>\n *     <Principal>arn:aws:iam::...:user/...</Principal>\n *     <Resource>arn:aws:s3:::bucket/*</Resource>\n *     <Action>s3:GetObject</Action>\n *     <Condition>\n *       <Tag>department</Tag>\n *       <Value>engineering</Value>\n *     </Condition>\n *   </AbacRule>\n * </AbacConfiguration>\n * }</pre>\n */\n@JacksonXmlRootElement(localName = \"AbacConfiguration\")\n<span class=\"fc\" id=\"L28\">public record AbacConfigurationQuery(</span>\n    @JacksonXmlElementWrapper(localName = \"AbacRule\", useWrapping = false)\n    @JacksonXmlProperty(localName = \"AbacRule\")\n    List<AbacRuleEntry> rules\n) {\n<span class=\"fc\" id=\"L33\">    public record AbacRuleEntry(</span>\n        @JacksonXmlProperty(localName = \"Id\")\n        String id,\n        @JacksonXmlProperty(localName = \"Principal\")\n        String principal,\n        @JacksonXmlProperty(localName = \"Resource\")\n        String resource,\n        @JacksonXmlProperty(localName = \"Action\")\n        String action,\n        @JacksonXmlElementWrapper(localName = \"Condition\", useWrapping = false)\n        @JacksonXmlProperty(localName = \"Condition\")\n        List<ConditionEntry> conditions\n    ) {}\n\n<span class=\"fc\" id=\"L47\">    public record ConditionEntry(</span>\n        @JacksonXmlProperty(localName = \"Tag\")\n        String tag,\n        @JacksonXmlProperty(localName = \"Value\")\n        String value\n    ) {}\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

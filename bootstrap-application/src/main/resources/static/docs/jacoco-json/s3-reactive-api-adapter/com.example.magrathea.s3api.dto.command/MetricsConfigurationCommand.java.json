@@ -1,0 +1,27 @@
+{
+  "title": "MetricsConfigurationCommand.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "MetricsConfigurationCommand.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_metricsconfigurationcommand_java",
+        "title": "MetricsConfigurationCommand.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.s3api.dto.command;\n\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;\n\n/**\n * Command DTO for PutBucketMetricsConfiguration XML body.\n */\n@JacksonXmlRootElement(localName = \"MetricsConfiguration\")\n<span class=\"fc\" id=\"L10\">public record MetricsConfigurationCommand(</span>\n    @JacksonXmlProperty(localName = \"Id\")\n    String id,\n    @JacksonXmlProperty(localName = \"Filter\")\n    MetricsFilter filter\n) {\n<span class=\"nc\" id=\"L16\">    public record MetricsFilter(</span>\n        @JacksonXmlProperty(localName = \"Prefix\")\n        String prefix\n    ) {}\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "title": "LocationConstraintQuery.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "LocationConstraintQuery.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_locationconstraintquery_java",
+        "title": "LocationConstraintQuery.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.s3api.dto.query;\n\nimport com.example.magrathea.objectstore.domain.valueobject.Region;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlText;\n\n/**\n * Response for GET /{bucket}?location.\n */\n@JacksonXmlRootElement(localName = \"LocationConstraint\")\n<span class=\"fc\" id=\"L11\">public record LocationConstraintQuery(</span>\n    @JacksonXmlText\n    String value\n) {\n    public static LocationConstraintQuery from(Region region) {\n<span class=\"fc\" id=\"L16\">        return new LocationConstraintQuery(region.id());</span>\n    }\n\n    public static LocationConstraintQuery from(String region) {\n<span class=\"nc\" id=\"L20\">        return new LocationConstraintQuery(region);</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "title": "ObjectLockConfiguration.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "ObjectLockConfiguration.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_objectlockconfiguration_java",
+        "title": "ObjectLockConfiguration.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.objectstore.domain.valueobject;\n\nimport java.time.Duration;\nimport java.time.Instant;\nimport java.util.Objects;\n\n/**\n * ObjectLockConfiguration — a value object holding the object lock configuration for an S3Object.\n * <p>\n * Object lock modes:\n * <ul>\n *   <li>{@code GOVERNANCE} — users with s3:PutObjectLockConfiguration and s3:BypassGovernanceRetention\n *       can override the retention period</li>\n *   <li>{@code COMPLIANCE} — no one can override the retention period</li>\n * </ul>\n * When {@code legalHold} is true, the object is under a legal hold regardless of retention mode.\n * </p>\n * Pure domain — NO framework dependencies.\n */\npublic record ObjectLockConfiguration(\n    ObjectLockMode mode,\n    RetentionPeriod retention,\n    boolean legalHold\n) {\n\n<span class=\"fc\" id=\"L26\">    public ObjectLockConfiguration {</span>\n<span class=\"fc\" id=\"L27\">        Objects.requireNonNull(mode);</span>\n<span class=\"fc\" id=\"L28\">        Objects.requireNonNull(retention);</span>\n<span class=\"fc\" id=\"L29\">    }</span>\n\n    /**\n     * Factory method — create a new lock configuration with retention (no legal hold).\n     *\n     * @param mode      the lock mode (GOVERNANCE or COMPLIANCE)\n     * @param retention the retention period\n     * @return a new {@code ObjectLockConfiguration}\n     */\n    public static ObjectLockConfiguration of(ObjectLockMode mode, RetentionPeriod retention) {\n<span class=\"fc\" id=\"L39\">        return new ObjectLockConfiguration(mode, retention, false);</span>\n    }\n\n    /**\n     * Factory method — create a new lock configuration with retention and optional legal hold.\n     *\n     * @param mode      the lock mode (GOVERNANCE or COMPLIANCE)\n     * @param retention the retention period\n     * @param legalHold true to apply a legal hold\n     * @return a new {@code ObjectLockConfiguration}\n     */\n    public static ObjectLockConfiguration of(ObjectLockMode mode, RetentionPeriod retention, boolean legalHold) {\n<span class=\"fc\" id=\"L51\">        return new ObjectLockConfiguration(mode, retention, legalHold);</span>\n    }\n\n    /**\n     * Object lock modes as defined by AWS S3 Object Lock.\n     */\n<span class=\"fc\" id=\"L57\">    public enum ObjectLockMode {</span>\n<span class=\"fc\" id=\"L58\">        GOVERNANCE,</span>\n<span class=\"fc\" id=\"L59\">        COMPLIANCE</span>\n    }\n\n    /**\n     * RetentionPeriod — a value object holding a retention duration and when it was applied.\n     */\n    public record RetentionPeriod(\n        Duration duration,\n        Instant appliedAt\n    ) {\n\n<span class=\"fc\" id=\"L70\">        public RetentionPeriod {</span>\n<span class=\"fc\" id=\"L71\">            Objects.requireNonNull(duration);</span>\n<span class=\"fc\" id=\"L72\">            Objects.requireNonNull(appliedAt);</span>\n<span class=\"pc bpc\" id=\"L73\" title=\"2 of 4 branches missed.\">            if (duration.isNegative() || duration.isZero()) {</span>\n<span class=\"nc\" id=\"L74\">                throw new IllegalArgumentException(\"Retention duration must be positive\");</span>\n            }\n<span class=\"fc\" id=\"L76\">        }</span>\n\n        /**\n         * Factory method — create a retention period from a positive duration.\n         *\n         * @param duration  the retention duration (must be positive)\n         * @param appliedAt the instant when the retention was applied\n         * @return a new {@code RetentionPeriod}\n         */\n        public static RetentionPeriod of(Duration duration, Instant appliedAt) {\n<span class=\"nc\" id=\"L86\">            return new RetentionPeriod(duration, appliedAt);</span>\n        }\n\n        /**\n         * Factory method — create a retention period starting now.\n         *\n         * @param duration the retention duration (must be positive)\n         * @return a new {@code RetentionPeriod}\n         */\n        public static RetentionPeriod startingNow(Duration duration) {\n<span class=\"fc\" id=\"L96\">            Objects.requireNonNull(duration);</span>\n<span class=\"pc bpc\" id=\"L97\" title=\"2 of 4 branches missed.\">            if (duration.isNegative() || duration.isZero()) {</span>\n<span class=\"nc\" id=\"L98\">                throw new IllegalArgumentException(\"Retention duration must be positive\");</span>\n            }\n<span class=\"fc\" id=\"L100\">            return new RetentionPeriod(duration, Instant.now());</span>\n        }\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

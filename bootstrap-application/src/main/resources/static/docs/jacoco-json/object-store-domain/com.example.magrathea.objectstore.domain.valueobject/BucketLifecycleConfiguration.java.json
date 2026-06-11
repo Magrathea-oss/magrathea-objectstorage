@@ -1,0 +1,27 @@
+{
+  "title": "BucketLifecycleConfiguration.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "BucketLifecycleConfiguration.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_bucketlifecycleconfiguration_java",
+        "title": "BucketLifecycleConfiguration.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.objectstore.domain.valueobject;\n\nimport java.time.Duration;\nimport java.util.List;\nimport java.util.Objects;\n\n/**\n * AWS S3 bucket lifecycle configuration — value object.\n * Pure domain — NO framework dependencies.\n */\npublic record BucketLifecycleConfiguration(\n    String bucketName,\n    List<LifecycleRule> rules\n) {\n<span class=\"fc\" id=\"L15\">    public BucketLifecycleConfiguration {</span>\n<span class=\"fc\" id=\"L16\">        Objects.requireNonNull(bucketName);</span>\n<span class=\"fc bfc\" id=\"L17\" title=\"All 2 branches covered.\">        if (rules != null) {</span>\n<span class=\"fc\" id=\"L18\">            rules = List.copyOf(rules);</span>\n        }\n<span class=\"fc\" id=\"L20\">    }</span>\n\n    public record LifecycleRule(\n        String id,\n        String status,\n        String prefix,\n        Expiration expiration,\n        NoncurrentVersionExpiration noncurrentVersionExpiration,\n        AbortIncompleteMultipartUpload abortIncompleteMultipartUpload\n    ) {\n<span class=\"fc\" id=\"L30\">        public LifecycleRule {</span>\n<span class=\"fc\" id=\"L31\">            Objects.requireNonNull(status);</span>\n<span class=\"pc bpc\" id=\"L32\" title=\"3 of 4 branches missed.\">            if (\"Enabled\".equals(status) || \"Disabled\".equals(status)) {</span>\n                // valid status\n            }\n<span class=\"fc\" id=\"L35\">        }</span>\n    }\n\n<span class=\"fc\" id=\"L38\">    public record Expiration(</span>\n        String days,\n        String date\n    ) {}\n\n<span class=\"fc\" id=\"L43\">    public record NoncurrentVersionExpiration(</span>\n        String noncurrentDays\n    ) {}\n\n<span class=\"fc\" id=\"L47\">    public record AbortIncompleteMultipartUpload(</span>\n        String daysAfterInitiation\n    ) {}\n\n    public boolean hasRules() {\n<span class=\"pc bpc\" id=\"L52\" title=\"1 of 4 branches missed.\">        return rules != null && !rules.isEmpty();</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

@@ -215,6 +215,37 @@ input {
   margin: 0.5em 0;
 }
 
+/* ──────────────────────────────────────────────────────
+   JaCoCo source code highlighting (applied globally)
+   ────────────────────────────────────────────────────── */
+pre span.fc,
+span.fc {
+  background-color: #ccffcc;
+  color: #000;
+}
+pre span.nc,
+span.nc {
+  background-color: #ffaaaa;
+  color: #000;
+}
+pre span.pc,
+span.pc {
+  background-color: #ffffcc;
+  color: #000;
+}
+pre span.bfc,
+span.bfc {
+  background-image: url(/docs/jacoco-resources/branchfc.gif);
+}
+pre span.bnc,
+span.bnc {
+  background-image: url(/docs/jacoco-resources/branchnc.gif);
+}
+pre span.bpc,
+span.bpc {
+  background-image: url(/docs/jacoco-resources/branchpc.gif);
+}
+
 /* Extends/implements */
 .docs-javadoc .extends-implements {
   margin: 0.5em 0;

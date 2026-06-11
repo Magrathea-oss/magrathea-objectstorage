@@ -1,0 +1,27 @@
+{
+  "title": "BucketLifecycleQuery.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "BucketLifecycleQuery.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_bucketlifecyclequery_java",
+        "title": "BucketLifecycleQuery.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.s3api.dto.query;\n\nimport com.example.magrathea.objectstore.domain.aggregate.Bucket;\nimport com.example.magrathea.objectstore.domain.valueobject.BucketLifecycleConfiguration;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;\n\nimport java.util.List;\nimport java.util.Optional;\n\n/**\n * Response for GET /{bucket}?lifecycle (GetBucketLifecycleConfiguration).\n */\n@JacksonXmlRootElement(localName = \"LifecycleConfiguration\")\n<span class=\"fc\" id=\"L16\">public record BucketLifecycleQuery(</span>\n    @JacksonXmlElementWrapper(localName = \"Rule\")\n    @JacksonXmlProperty(localName = \"Rule\")\n    List<RuleEntry> rules\n) {\n    public static BucketLifecycleQuery from(Optional<BucketLifecycleConfiguration> config) {\n<span class=\"fc\" id=\"L22\">        var rules = config.map(c -> c.rules().stream()</span>\n<span class=\"fc\" id=\"L23\">            .map(r -> new RuleEntry(</span>\n<span class=\"fc\" id=\"L24\">                r.id(), r.status(), r.prefix(),</span>\n<span class=\"pc bpc\" id=\"L25\" title=\"1 of 2 branches missed.\">                r.expiration() != null ? new ExpirationEntry(r.expiration().days(), r.expiration().date()) : null,</span>\n<span class=\"pc bpc\" id=\"L26\" title=\"1 of 2 branches missed.\">                r.noncurrentVersionExpiration() != null</span>\n<span class=\"pc\" id=\"L27\">                    ? new NoncurrentVersionExpirationEntry(r.noncurrentVersionExpiration().noncurrentDays()) : null,</span>\n<span class=\"pc bpc\" id=\"L28\" title=\"1 of 2 branches missed.\">                r.abortIncompleteMultipartUpload() != null</span>\n<span class=\"pc\" id=\"L29\">                    ? new AbortIncompleteMultipartUploadEntry(r.abortIncompleteMultipartUpload().daysAfterInitiation()) : null))</span>\n<span class=\"fc\" id=\"L30\">            .toList()).orElse(List.of());</span>\n<span class=\"fc\" id=\"L31\">        return new BucketLifecycleQuery(rules);</span>\n    }\n\n\n<span class=\"fc\" id=\"L35\">    public record RuleEntry(</span>\n        @JacksonXmlProperty(localName = \"ID\")\n        String id,\n        @JacksonXmlProperty(localName = \"Status\")\n        String status,\n        @JacksonXmlProperty(localName = \"Prefix\")\n        String prefix,\n        @JacksonXmlProperty(localName = \"Expiration\")\n        ExpirationEntry expiration,\n        @JacksonXmlProperty(localName = \"NoncurrentVersionExpiration\")\n        NoncurrentVersionExpirationEntry noncurrentVersionExpiration,\n        @JacksonXmlProperty(localName = \"AbortIncompleteMultipartUpload\")\n        AbortIncompleteMultipartUploadEntry abortIncompleteMultipartUpload\n    ) {}\n\n<span class=\"nc\" id=\"L50\">    public record ExpirationEntry(</span>\n        String days,\n        String date\n    ) {}\n\n<span class=\"nc\" id=\"L55\">    public record NoncurrentVersionExpirationEntry(</span>\n        String noncurrentDays\n    ) {}\n\n<span class=\"nc\" id=\"L59\">    public record AbortIncompleteMultipartUploadEntry(</span>\n        String daysAfterInitiation\n    ) {}\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "title": "BucketRequestPaymentConfiguration.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "BucketRequestPaymentConfiguration.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_bucketrequestpaymentconfiguration_java",
+        "title": "BucketRequestPaymentConfiguration.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.objectstore.domain.valueobject;\n\nimport java.util.Objects;\n\n/**\n * AWS S3 bucket request payment configuration — value object.\n * Pure domain — NO framework dependencies.\n */\npublic record BucketRequestPaymentConfiguration(\n    String bucketName,\n    String payer\n) {\n<span class=\"fc\" id=\"L13\">    public BucketRequestPaymentConfiguration {</span>\n<span class=\"fc\" id=\"L14\">        Objects.requireNonNull(bucketName);</span>\n        // payer: \"Requester\" or \"BucketOwner\"\n<span class=\"fc\" id=\"L16\">    }</span>\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

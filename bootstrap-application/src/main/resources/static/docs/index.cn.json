@@ -1,0 +1,212 @@
+{
+  "title": "Magrathea ObjectStore — 用户手册",
+  "lang": "cn",
+  "document": {
+    "type": "document",
+    "title": "Magrathea ObjectStore — 用户手册",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_前端概述",
+        "title": "前端概述",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Magrathea ObjectStore 包含一个基于 Vue.js 的管理前端，运行在 8081 端口。"
+          },
+          {
+            "type": "section",
+            "id": "_访问前端",
+            "title": "访问前端",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "在浏览器中打开："
+              },
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "<code><a href=\"http://localhost:8081/\" class=\"bare\">http://localhost:8081/</a></code> — 默认",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code><a href=\"http://&lt;host&gt;:8081/\" class=\"bare\">http://&lt;host&gt;:8081/</a></code> — 从局域网的其他机器",
+                    "blocks": []
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "html": "前端由管理服务器（独立的嵌入式 Netty，端口 8081）提供，独立于端口 8080 上的 S3 API。"
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_页面",
+            "title": "页面",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "table",
+                "headers": [
+                  "页面",
+                  "URL",
+                  "描述"
+                ],
+                "rows": [
+                  [
+                    "仪表盘",
+                    "<code>/</code>",
+                    "玻璃拟态设计概览"
+                  ],
+                  [
+                    "存储桶",
+                    "<code>/buckets</code>",
+                    "S3 存储桶管理"
+                  ],
+                  [
+                    "存储策略",
+                    "<code>/storage-policies</code>",
+                    "存储策略配置（管理 API）"
+                  ],
+                  [
+                    "文档",
+                    "<code>/docs</code>",
+                    "本用户手册"
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_语言支持",
+            "title": "语言支持",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "前端通过 vue-i18n 支持 5 种语言："
+              },
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "English (en)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Italiano (it)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Español (es)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Deutsch (de)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "中文 (cn)",
+                    "blocks": []
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "html": "可以通过右上角的语言选择器切换语言。"
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_主题",
+            "title": "主题",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "界面采用玻璃拟态设计："
+              },
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "磨砂玻璃背景 (<code>backdrop-filter: blur</code>)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "渐变覆盖层",
+                    "blocks": []
+                  },
+                  {
+                    "text": "平滑过渡",
+                    "blocks": []
+                  },
+                  {
+                    "text": "深色主题与强调色",
+                    "blocks": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_管理_api",
+            "title": "管理 API",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "管理 API 采用 REST 风格并支持 HATEOAS，在端口 8081 上可用："
+              },
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "<code>GET /admin/health</code> — 健康检查",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>GET /admin/storage-policies</code> — 列出所有存储策略",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>GET /admin/storage-policies/{id}</code> — 获取单个策略",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>POST /admin/storage-policies</code> — 创建策略",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>PUT /admin/storage-policies/{id}</code> — 更新策略",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>DELETE /admin/storage-policies/{id}</code> — 删除策略",
+                    "blocks": []
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "html": "所有响应均包含用于 HATEOAS 导航的 <code>_links</code>。"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

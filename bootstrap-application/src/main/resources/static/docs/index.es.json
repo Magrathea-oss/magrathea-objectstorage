@@ -1,0 +1,212 @@
+{
+  "title": "Magrathea ObjectStore — Manual de Usuario",
+  "lang": "es",
+  "document": {
+    "type": "document",
+    "title": "Magrathea ObjectStore — Manual de Usuario",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_visión_general_del_frontend",
+        "title": "Visión General del Frontend",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Magrathea ObjectStore incluye un frontend de administración basado en Vue.js, servido en el puerto 8081."
+          },
+          {
+            "type": "section",
+            "id": "_acceso_al_frontend",
+            "title": "Acceso al Frontend",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "Abre tu navegador en:"
+              },
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "<code><a href=\"http://localhost:8081/\" class=\"bare\">http://localhost:8081/</a></code> — por defecto",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code><a href=\"http://&lt;host&gt;:8081/\" class=\"bare\">http://&lt;host&gt;:8081/</a></code> — desde otra máquina en la LAN",
+                    "blocks": []
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "html": "El frontend es servido por el servidor de administración (Netty embebido independiente en el puerto 8081), independiente de la API S3 en el puerto 8080."
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_páginas",
+            "title": "Páginas",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "table",
+                "headers": [
+                  "Página",
+                  "URL",
+                  "Descripción"
+                ],
+                "rows": [
+                  [
+                    "Dashboard",
+                    "<code>/</code>",
+                    "Vista general con diseño glassmorphism"
+                  ],
+                  [
+                    "Buckets",
+                    "<code>/buckets</code>",
+                    "Gestión de buckets S3"
+                  ],
+                  [
+                    "Storage Policies",
+                    "<code>/storage-policies</code>",
+                    "Configuración de políticas de almacenamiento (API Admin)"
+                  ],
+                  [
+                    "Documentación",
+                    "<code>/docs</code>",
+                    "Este manual de usuario"
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_idiomas_soportados",
+            "title": "Idiomas Soportados",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "El frontend soporta 5 idiomas mediante vue-i18n:"
+              },
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "English (en)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Italiano (it)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Español (es)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Deutsch (de)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "中文 (cn)",
+                    "blocks": []
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "html": "El idioma se puede cambiar mediante el selector de idioma en la esquina superior derecha."
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_tema",
+            "title": "Tema",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "La interfaz utiliza un diseño glassmorphism con:"
+              },
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "Fondos de vidrio esmerilado (<code>backdrop-filter: blur</code>)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Superposiciones de gradientes",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Transiciones suaves",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Tema oscuro con colores de acento",
+                    "blocks": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_api_de_administración",
+            "title": "API de Administración",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "La API de administración es REST con HATEOAS, disponible en el puerto 8081:"
+              },
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "<code>GET /admin/health</code> — verificación de salud",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>GET /admin/storage-policies</code> — listar todas las políticas de almacenamiento",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>GET /admin/storage-policies/{id}</code> — obtener una política",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>POST /admin/storage-policies</code> — crear una política",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>PUT /admin/storage-policies/{id}</code> — actualizar una política",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>DELETE /admin/storage-policies/{id}</code> — eliminar una política",
+                    "blocks": []
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "html": "Todas las respuestas incluyen <code>_links</code> para navegación HATEOAS."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "title": "UploadPartResultQuery.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "UploadPartResultQuery.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_uploadpartresultquery_java",
+        "title": "UploadPartResultQuery.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.s3api.dto.query;\n\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;\n\n/**\n * Response for UploadPart and UploadPartCopy.\n */\n@JacksonXmlRootElement(localName = \"UploadPartResult\")\n<span class=\"fc\" id=\"L10\">public record UploadPartResultQuery(</span>\n    @JacksonXmlProperty(localName = \"ETag\")\n    String etag\n) {\n    public static UploadPartResultQuery from(String etag) {\n<span class=\"fc\" id=\"L15\">        return new UploadPartResultQuery(etag);</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

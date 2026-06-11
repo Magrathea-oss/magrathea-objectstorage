@@ -1,0 +1,27 @@
+{
+  "title": "StepId.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "StepId.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_stepid_java",
+        "title": "StepId.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.storageengine.domain.valueobject;\n\n<span class=\"nc\" id=\"L3\">public enum StepId {</span>\n<span class=\"nc\" id=\"L4\">    DEDUP,</span>\n<span class=\"nc\" id=\"L5\">    COMPRESS,</span>\n<span class=\"nc\" id=\"L6\">    CRYPT,</span>\n<span class=\"nc\" id=\"L7\">    ERASURE_CODING,</span>\n<span class=\"nc\" id=\"L8\">    REPLICATION,</span>\n<span class=\"nc\" id=\"L9\">    STORE</span>\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "title": "DedupScope.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "DedupScope.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_dedupscope_java",
+        "title": "DedupScope.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.storageengine.domain.valueobject;\n\n<span class=\"nc\" id=\"L3\">public enum DedupScope {</span>\n<span class=\"nc\" id=\"L4\">    BUCKET_LEVEL,</span>\n<span class=\"nc\" id=\"L5\">    GLOBAL_LEVEL</span>\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

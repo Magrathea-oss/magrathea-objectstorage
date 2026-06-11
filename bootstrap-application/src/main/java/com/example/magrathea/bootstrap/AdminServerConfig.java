@@ -61,7 +61,7 @@ public class AdminServerConfig {
             .and(route(
                 GET("/docs/**").and(req -> {
                     String path = req.path();
-                    return !path.matches(".*\\.(json|png|svg|html)$");
+                    return !path.matches(".*\\.(json|png|svg|html|css|js)$");
                 }),
                 req -> ServerResponse.ok()
                     .contentType(MediaType.TEXT_HTML)

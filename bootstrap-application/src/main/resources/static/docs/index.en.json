@@ -1,0 +1,212 @@
+{
+  "title": "Magrathea ObjectStore — User Manual",
+  "lang": "en",
+  "document": {
+    "type": "document",
+    "title": "Magrathea ObjectStore — User Manual",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_frontend_overview",
+        "title": "Frontend Overview",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Magrathea ObjectStore includes a Vue.js-based administration frontend served on port 8081."
+          },
+          {
+            "type": "section",
+            "id": "_accessing_the_frontend",
+            "title": "Accessing the Frontend",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "Open your browser to:"
+              },
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "<code><a href=\"http://localhost:8081/\" class=\"bare\">http://localhost:8081/</a></code> — default",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code><a href=\"http://&lt;host&gt;:8081/\" class=\"bare\">http://&lt;host&gt;:8081/</a></code> — from another machine on the LAN",
+                    "blocks": []
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "html": "The frontend is served by the admin server (separate embedded Netty on port 8081), independent from the S3 API on port 8080."
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_pages",
+            "title": "Pages",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "table",
+                "headers": [
+                  "Page",
+                  "URL",
+                  "Description"
+                ],
+                "rows": [
+                  [
+                    "Dashboard",
+                    "<code>/</code>",
+                    "Overview with glassmorphism design"
+                  ],
+                  [
+                    "Buckets",
+                    "<code>/buckets</code>",
+                    "S3 bucket management"
+                  ],
+                  [
+                    "Storage Policies",
+                    "<code>/storage-policies</code>",
+                    "Storage policy configuration (Admin API)"
+                  ],
+                  [
+                    "Documentation",
+                    "<code>/docs</code>",
+                    "This user manual"
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_language_support",
+            "title": "Language Support",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "The frontend supports 5 languages via vue-i18n:"
+              },
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "English (en)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Italian (it)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Español (es)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Deutsch (de)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "中文 (cn)",
+                    "blocks": []
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "html": "Language can be switched via the language selector in the top-right corner."
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_theme",
+            "title": "Theme",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "The UI uses a glassmorphism design with:"
+              },
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "Frosted glass backgrounds (<code>backdrop-filter: blur</code>)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Gradient overlays",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Smooth transitions",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Dark theme with accent colors",
+                    "blocks": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_admin_api",
+            "title": "Admin API",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "The admin API is REST with HATEOAS, available on port 8081:"
+              },
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "<code>GET /admin/health</code> — health check",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>GET /admin/storage-policies</code> — list all storage policies",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>GET /admin/storage-policies/{id}</code> — get a single policy",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>POST /admin/storage-policies</code> — create a policy",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>PUT /admin/storage-policies/{id}</code> — update a policy",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>DELETE /admin/storage-policies/{id}</code> — delete a policy",
+                    "blocks": []
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "html": "All responses include <code>_links</code> for HATEOAS navigation."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "title": "EncryptionKeyReference.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "EncryptionKeyReference.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_encryptionkeyreference_java",
+        "title": "EncryptionKeyReference.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.objectstore.domain.valueobject;\n\nimport java.util.Objects;\n\n/**\n * Reference to a KMS key or customer-managed key.\n */\npublic record EncryptionKeyReference(String keyId) {\n<span class=\"fc\" id=\"L9\">    public EncryptionKeyReference {</span>\n<span class=\"fc\" id=\"L10\">        Objects.requireNonNull(keyId, \"keyId must not be null\");</span>\n<span class=\"fc\" id=\"L11\">    }</span>\n\n    public static EncryptionKeyReference of(String keyId) {\n<span class=\"fc\" id=\"L14\">        return new EncryptionKeyReference(keyId);</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

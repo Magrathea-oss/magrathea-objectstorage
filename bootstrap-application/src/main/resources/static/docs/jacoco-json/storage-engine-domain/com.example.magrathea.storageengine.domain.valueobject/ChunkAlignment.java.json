@@ -1,0 +1,27 @@
+{
+  "title": "ChunkAlignment.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "ChunkAlignment.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_chunkalignment_java",
+        "title": "ChunkAlignment.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.storageengine.domain.valueobject;\n\n<span class=\"nc\" id=\"L3\">public enum ChunkAlignment {</span>\n<span class=\"nc\" id=\"L4\">    NONE,</span>\n<span class=\"nc\" id=\"L5\">    BLOCK_BOUNDARY</span>\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

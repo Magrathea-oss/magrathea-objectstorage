@@ -1,0 +1,27 @@
+{
+  "title": "DeleteObjectsCommand.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "DeleteObjectsCommand.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_deleteobjectscommand_java",
+        "title": "DeleteObjectsCommand.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.s3api.dto.command;\n\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;\n\nimport java.util.List;\n\n/**\n * Command DTO for DeleteObjects XML body (POST /{bucket}?delete).\n */\n@JacksonXmlRootElement(localName = \"Delete\")\n<span class=\"fc\" id=\"L13\">public record DeleteObjectsCommand(</span>\n    @JacksonXmlElementWrapper(localName = \"Object\", useWrapping = false)\n    @JacksonXmlProperty(localName = \"Object\")\n    List<ObjectEntry> objects\n) {\n<span class=\"fc\" id=\"L18\">    public record ObjectEntry(</span>\n        @JacksonXmlProperty(localName = \"Key\")\n        String key\n    ) {}\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

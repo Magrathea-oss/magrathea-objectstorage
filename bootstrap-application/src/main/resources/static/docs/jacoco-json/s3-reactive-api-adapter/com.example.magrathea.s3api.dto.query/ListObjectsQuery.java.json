@@ -1,0 +1,27 @@
+{
+  "title": "ListObjectsQuery.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "ListObjectsQuery.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_listobjectsquery_java",
+        "title": "ListObjectsQuery.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.s3api.dto.query;\n\nimport com.example.magrathea.objectstore.domain.aggregate.S3Object;\nimport reactor.core.publisher.Flux;\nimport reactor.core.publisher.Mono;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;\n\nimport java.util.List;\n\n/**\n * Response for GET /{bucket} (ListObjects).\n * Uses Jackson XML annotations for serialization via JacksonXmlEncoder.\n */\n@JacksonXmlRootElement(localName = \"ListBucketResult\")\n<span class=\"fc\" id=\"L17\">public record ListObjectsQuery(</span>\n    @JacksonXmlProperty(localName = \"Bucket\")\n    String bucket,\n    @JacksonXmlElementWrapper(useWrapping = false)\n    @JacksonXmlProperty(localName = \"Contents\")\n    List<ContentEntry> contents\n) {\n<span class=\"fc\" id=\"L24\">    public record ContentEntry(</span>\n        @JacksonXmlProperty(localName = \"Key\")\n        String key,\n        @JacksonXmlProperty(localName = \"ContentType\")\n        String contentType,\n        @JacksonXmlProperty(localName = \"Size\")\n        long size,\n        @JacksonXmlProperty(localName = \"ETag\")\n        String eTag\n    ) {}\n\n    /**\n     * Builds ListBucketResult reactively from Flux<S3Object>.\n     * Maps each S3Object to ContentEntry, collects list, then builds POJO.\n     */\n    public static Mono<ListObjectsQuery> from(String bucket, Flux<S3Object> objects) {\n<span class=\"fc\" id=\"L40\">        return objects</span>\n<span class=\"fc\" id=\"L41\">            .map(o -> new ContentEntry(</span>\n<span class=\"fc\" id=\"L42\">                o.key().key(),</span>\n                null, // contentType not stored on sealed hierarchy\n<span class=\"fc\" id=\"L44\">                o.size(),</span>\n                \"\\\"\\\"\"\n            ))\n<span class=\"fc\" id=\"L47\">            .collectList()</span>\n<span class=\"fc\" id=\"L48\">            .map(list -> new ListObjectsQuery(bucket, list));</span>\n    }\n\n    /**\n     * Convenience overload from a List<S3Object> (non-reactive).\n     * Kept for backward compatibility until all handlers are updated.\n     */\n    public static ListObjectsQuery from(String bucket, List<S3Object> objects) {\n<span class=\"nc\" id=\"L56\">        List<ContentEntry> entries = objects.stream()</span>\n<span class=\"nc\" id=\"L57\">            .map(o -> new ContentEntry(</span>\n<span class=\"nc\" id=\"L58\">                o.key().key(),</span>\n                null, // contentType not stored on sealed hierarchy\n<span class=\"nc\" id=\"L60\">                o.size(),</span>\n                \"\\\"\\\"\"\n            ))\n<span class=\"nc\" id=\"L63\">            .toList();</span>\n<span class=\"nc\" id=\"L64\">        return new ListObjectsQuery(bucket, entries);</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

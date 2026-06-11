@@ -1,0 +1,27 @@
+{
+  "title": "PolicyDecisionReason.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "PolicyDecisionReason.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_policydecisionreason_java",
+        "title": "PolicyDecisionReason.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.storageengine.domain.valueobject;\n\npublic record PolicyDecisionReason(String code, String description) {\n<span class=\"nc\" id=\"L4\">    public PolicyDecisionReason {</span>\n<span class=\"nc\" id=\"L5\">        java.util.Objects.requireNonNull(code, \"code must not be null\");</span>\n<span class=\"nc\" id=\"L6\">        java.util.Objects.requireNonNull(description, \"description must not be null\");</span>\n<span class=\"nc bnc\" id=\"L7\" title=\"All 2 branches missed.\">        if (code.isBlank()) {</span>\n<span class=\"nc\" id=\"L8\">            throw new IllegalArgumentException(\"code must not be blank\");</span>\n        }\n<span class=\"nc bnc\" id=\"L10\" title=\"All 2 branches missed.\">        if (description.isBlank()) {</span>\n<span class=\"nc\" id=\"L11\">            throw new IllegalArgumentException(\"description must not be blank\");</span>\n        }\n<span class=\"nc\" id=\"L13\">    }</span>\n\n    public static PolicyDecisionReason of(String code, String description) {\n<span class=\"nc\" id=\"L16\">        return new PolicyDecisionReason(code, description);</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

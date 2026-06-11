@@ -1,0 +1,27 @@
+{
+  "title": "ECOutcome.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "ECOutcome.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_ecoutcome_java",
+        "title": "ECOutcome.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.storageengine.application.port;\n\nimport com.example.magrathea.storageengine.domain.valueobject.NodeId;\n\nimport java.util.List;\n\n/**\n * Outcome of erasure coding: data nodes, parity nodes, and the encoded data block.\n */\npublic record ECOutcome(\n        List<NodeId> dataNodes,\n        List<NodeId> parityNodes,\n        byte[] encodedData) {\n\n<span class=\"nc\" id=\"L15\">    public ECOutcome {</span>\n<span class=\"nc\" id=\"L16\">        java.util.Objects.requireNonNull(dataNodes, \"dataNodes must not be null\");</span>\n<span class=\"nc\" id=\"L17\">        java.util.Objects.requireNonNull(parityNodes, \"parityNodes must not be null\");</span>\n<span class=\"nc\" id=\"L18\">        java.util.Objects.requireNonNull(encodedData, \"encodedData must not be null\");</span>\n<span class=\"nc\" id=\"L19\">    }</span>\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

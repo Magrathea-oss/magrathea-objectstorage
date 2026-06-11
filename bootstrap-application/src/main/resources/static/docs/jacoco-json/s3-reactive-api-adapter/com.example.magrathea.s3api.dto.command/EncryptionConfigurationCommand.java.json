@@ -1,0 +1,27 @@
+{
+  "title": "EncryptionConfigurationCommand.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "EncryptionConfigurationCommand.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_encryptionconfigurationcommand_java",
+        "title": "EncryptionConfigurationCommand.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.s3api.dto.command;\n\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;\n\n/**\n * Command DTO for PutBucketEncryptionConfiguration XML body.\n */\n@JacksonXmlRootElement(localName = \"ServerSideEncryptionConfiguration\")\n<span class=\"fc\" id=\"L10\">public record EncryptionConfigurationCommand(</span>\n    @JacksonXmlProperty(localName = \"RuleID\")\n    String ruleId,\n    @JacksonXmlProperty(localName = \"Algorithm\")\n    String algorithm,\n    @JacksonXmlProperty(localName = \"KMSKeyId\")\n    String kmsKeyId\n) {}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

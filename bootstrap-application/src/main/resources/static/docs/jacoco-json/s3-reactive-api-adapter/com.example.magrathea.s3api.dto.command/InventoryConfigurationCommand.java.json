@@ -1,0 +1,27 @@
+{
+  "title": "InventoryConfigurationCommand.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "InventoryConfigurationCommand.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_inventoryconfigurationcommand_java",
+        "title": "InventoryConfigurationCommand.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.s3api.dto.command;\n\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;\n\n/**\n * Command DTO for PutBucketInventoryConfiguration XML body.\n */\n@JacksonXmlRootElement(localName = \"InventoryConfiguration\")\n<span class=\"fc\" id=\"L10\">public record InventoryConfigurationCommand(</span>\n    @JacksonXmlProperty(localName = \"Id\")\n    String id,\n    @JacksonXmlProperty(localName = \"Destination\")\n    InventoryDestination destination,\n    @JacksonXmlProperty(localName = \"Schedule\")\n    InventorySchedule schedule,\n    @JacksonXmlProperty(localName = \"Enabled\")\n    String enabled\n) {\n<span class=\"fc\" id=\"L20\">    public record InventoryDestination(</span>\n        @JacksonXmlProperty(localName = \"Format\")\n        String format\n    ) {}\n\n<span class=\"fc\" id=\"L25\">    public record InventorySchedule(</span>\n        @JacksonXmlProperty(localName = \"Frequency\")\n        String frequency\n    ) {}\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

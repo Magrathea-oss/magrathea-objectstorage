@@ -1,0 +1,27 @@
+{
+  "title": "DeletedS3Object.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "DeletedS3Object.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_deleteds3object_java",
+        "title": "DeletedS3Object.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.objectstore.domain.aggregate;\n\nimport com.example.magrathea.objectstore.domain.event.ObjectStoreEvent;\nimport com.example.magrathea.objectstore.domain.valueobject.ObjectKey;\n\nimport java.time.ZonedDateTime;\nimport java.util.List;\nimport java.util.Map;\n\n/**\n * Terminal state — object has been deleted.\n * No valid transitions — this is a final state.\n */\npublic final class DeletedS3Object extends S3Object {\n\n    DeletedS3Object(ObjectKey key, String storageClass,\n                    Map<String, String> userMetadata,\n                    ZonedDateTime createdAt,\n                    WriteState writeState, List<ObjectStoreEvent> events) {\n<span class=\"fc\" id=\"L20\">        super(key, storageClass, userMetadata, null, null, 0L, createdAt, writeState, events);</span>\n<span class=\"fc\" id=\"L21\">    }</span>\n\n    @Override\n    public S3Object clearEvents() {\n<span class=\"fc\" id=\"L25\">        return new DeletedS3Object(key(), storageClass(), userMetadata(),</span>\n<span class=\"fc\" id=\"L26\">            createdAt(), writeState(), List.of());</span>\n    }\n\n    @Override\n    protected S3Object withWriteState(WriteState newState) {\n<span class=\"nc\" id=\"L31\">        return new DeletedS3Object(key(), storageClass(), userMetadata(),</span>\n<span class=\"nc\" id=\"L32\">            createdAt(), newState, domainEvents());</span>\n    }\n\n    @Override\n    public String toString() {\n<span class=\"nc\" id=\"L37\">        return \"DeletedS3Object[key=\" + key() + \",writeState=\" + writeState() + \"]\";</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

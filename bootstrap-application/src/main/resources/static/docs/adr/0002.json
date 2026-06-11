@@ -1,0 +1,103 @@
+{
+  "adr": 2,
+  "title": "2. Zero-dependency domain purity",
+  "status": "Accepted",
+  "lang": "en",
+  "document": {
+    "type": "document",
+    "title": "2. Zero-dependency domain purity",
+    "sections": [
+      {
+        "id": "_2_zero_dependency_domain_purity",
+        "title": "2. Zero-dependency domain purity",
+        "level": 1,
+        "blocks": []
+      },
+      {
+        "id": "",
+        "title": "",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Date: 2026-05-21"
+          }
+        ],
+        "level": 0
+      },
+      {
+        "id": "_status",
+        "title": "Status",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Accepted"
+          }
+        ]
+      },
+      {
+        "id": "_context",
+        "title": "Context",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Domain modules must remain purely business logic with no framework coupling. Spring annotations, JPA, and reactive types would create an uncontrollable dependency on the framework, making domain logic untestable without Spring context and violating DDD principles."
+          }
+        ]
+      },
+      {
+        "id": "_decision",
+        "title": "Decision",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Domain modules (<code>*-domain</code>, <code>shared-domain</code>) have ZERO framework dependencies:"
+          },
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "NO Spring imports (no @Service, @Component, @Repository, @Autowired)",
+                "blocks": []
+              },
+              {
+                "text": "NO JPA annotations (no @Entity, @Table, @Column)",
+                "blocks": []
+              },
+              {
+                "text": "NO reactive types (no Mono, Flux, DataBuffer)",
+                "blocks": []
+              },
+              {
+                "text": "NO byte[] in BinaryContent — metadata only",
+                "blocks": []
+              },
+              {
+                "text": "Repository interfaces return <code>CompletableFuture</code> (Java SE standard)",
+                "blocks": []
+              },
+              {
+                "text": "Only allowed dependency: <code>jakarta.validation-api</code> (spec only, provided scope)",
+                "blocks": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "_consequences",
+        "title": "Consequences",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "<strong>Positive</strong>: domain testable with pure JUnit (no Spring context), domain code is portable, framework-swapping possible\n<strong>Negative</strong>: mapping layer needed between domain CompletableFuture and application Mono/Flux"
+          }
+        ]
+      }
+    ]
+  }
+}

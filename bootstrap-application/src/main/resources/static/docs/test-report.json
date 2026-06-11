@@ -1,0 +1,1755 @@
+{
+  "title": "Magrathea ObjectStorage Test Report",
+  "lang": "en",
+  "document": {
+    "type": "document",
+    "title": "",
+    "sections": [
+      {
+        "id": "_magrathea_objectstorage_test_report",
+        "title": "Magrathea ObjectStorage Test Report",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Generated: 2026-06-05T08:40:11+02:00"
+          }
+        ]
+      },
+      {
+        "id": "_summary",
+        "title": "Summary",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "table",
+            "headers": [
+              "Suite",
+              "Passed",
+              "Failed",
+              "Total",
+              "Notes"
+            ],
+            "rows": [
+              [
+                "AWS CLI S3 compatibility",
+                "46",
+                "82",
+                "128",
+                "Endpoint: `http://localhost:8080`"
+              ],
+              [
+                "Maven Surefire",
+                "See section",
+                "See section",
+                "See section",
+                "Latest reports under `*/target/surefire-reports`"
+              ],
+              [
+                "Clover coverage",
+                "See section",
+                "-",
+                "-",
+                "Latest report under `target/site/clover`"
+              ]
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_aws_cli_test_status",
+            "title": "AWS CLI Test Status",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "table",
+            "headers": [
+              "Feature",
+              "Status",
+              "Note"
+            ],
+            "rows": [
+              [
+                "WebClient scenarios (256)",
+                "✅ Running",
+                "Standard Cucumber via Java WebClient"
+              ],
+              [
+                "AWS CLI scenarios (planned)",
+                "❌ Not implemented",
+                "Da replicare da `@webclient` a `@awscli`"
+              ],
+              [
+                "`test-aws-cli.sh`",
+                "✅ Standalone",
+                "Script indipendente, non integrato in Cucumber"
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "id": "_aws_cli_s3_compatibility",
+        "title": "AWS CLI S3 Compatibility",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Bucket: <code>magrathea-cli-test-1780641560-106784</code>"
+          },
+          {
+            "type": "table",
+            "headers": [
+              "Check",
+              "Status",
+              "Notes"
+            ],
+            "rows": [
+              [
+                "ListBuckets",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "CreateBucket",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "HeadBucket existing",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "PutObject",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "PutObject header capture",
+                "✅ Passed",
+                "Headers documented"
+              ],
+              [
+                "HeadObject existing",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "PutObjectAcl",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetObjectAcl",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "PutObjectTagging",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetObjectTagging",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "DeleteObjectTagging",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetObjectAttributes",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetObject",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetObject content matches",
+                "❌ Failed",
+                "Expected success, exit code 2"
+              ],
+              [
+                "ListObjects",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "ListObjectsV2",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetBucketLocation",
+                "❌ Failed",
+                "Expected success, exit code 255"
+              ],
+              [
+                "PutBucketAcl",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetBucketAcl",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "PutBucketTagging",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetBucketTagging",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "DeleteBucketTagging",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetBucketVersioning initial",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "PutBucketVersioning Enabled",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetBucketVersioning enabled",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "ListObjectVersions",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "CopyObject",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "HeadObject copy existing",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "DeleteObjects",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "HeadObject copy after DeleteObjects",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "PutObject PARANOIC_MODE",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "HeadObject PARANOIC_MODE",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetObjectAttributes PARANOIC_MODE",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "DeleteObject PARANOIC_MODE",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "DeleteObject",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "PutObject SSE-S3 AES256",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "HeadObject SSE-S3 AES256",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "DeleteObject SSE-S3",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "PutObject STANDARD storage class",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "HeadObject STANDARD",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetObjectAttributes STANDARD",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "DeleteObject STANDARD",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "HeadObject after DeleteObject",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "PutBucketCors",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetBucketCors",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "DeleteBucketCors",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetBucketCors nonexistent",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "GetBucketCors after delete",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "PutBucketLifecycleConfiguration",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetBucketLifecycleConfiguration",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "DeleteBucketLifecycleConfiguration",
+                "❌ Failed",
+                "Expected success, exit code 252"
+              ],
+              [
+                "GetBucketLifecycleConfiguration nonexistent",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "GetBucketLifecycleConfiguration after delete",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "PutBucketPolicy",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetBucketPolicy",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "DeleteBucketPolicy",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetBucketPolicy nonexistent",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "GetBucketPolicy after delete",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "PutBucketEncryption",
+                "❌ Failed",
+                "Expected success, exit code 252"
+              ],
+              [
+                "GetBucketEncryption",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "DeleteBucketEncryption",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetBucketEncryption nonexistent",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "GetBucketEncryption after delete",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "PutBucketLogging",
+                "❌ Failed",
+                "Expected success, exit code 252"
+              ],
+              [
+                "GetBucketLogging",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "DeleteBucketLogging",
+                "❌ Failed",
+                "Expected success, exit code 252"
+              ],
+              [
+                "GetBucketLogging nonexistent",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "GetBucketLogging after delete",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "PutBucketWebsite",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetBucketWebsite",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "DeleteBucketWebsite",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetBucketWebsite nonexistent",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "GetBucketWebsite after delete",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "PutBucketNotification",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetBucketNotification",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetBucketNotification nonexistent",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "PutBucketReplication",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetBucketReplication",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "DeleteBucketReplication",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetBucketReplication nonexistent",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "GetBucketReplication after delete",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "PutBucketRequestPayment",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetBucketRequestPayment",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetBucketRequestPayment nonexistent",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "PutBucketOwnershipControls",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetBucketOwnershipControls",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "DeleteBucketOwnershipControls",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetBucketOwnershipControls nonexistent",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "GetBucketOwnershipControls after delete",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "PutPublicAccessBlock",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetPublicAccessBlock",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "DeletePublicAccessBlock",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetPublicAccessBlock nonexistent",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "GetPublicAccessBlock after delete",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "PutBucketAccelerateConfiguration",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetBucketAccelerateConfiguration",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetBucketAccelerateConfiguration nonexistent",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "PutBucketAnalyticsConfiguration",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetBucketAnalyticsConfiguration",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "ListBucketAnalyticsConfigurations",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "DeleteBucketAnalyticsConfiguration",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetBucketAnalyticsConfiguration nonexistent bucket",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "GetBucketAnalyticsConfiguration missing id",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "DeleteBucketAnalyticsConfiguration nonexistent bucket",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "DeleteBucketAnalyticsConfiguration missing id",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "PutBucketAnalyticsConfiguration nonexistent bucket",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "ListBucketAnalyticsConfigurations nonexistent bucket",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "PutBucketInventoryConfiguration",
+                "❌ Failed",
+                "Expected success, exit code 252"
+              ],
+              [
+                "GetBucketInventoryConfiguration",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "ListBucketInventoryConfigurations",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "DeleteBucketInventoryConfiguration",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "GetBucketInventoryConfiguration nonexistent bucket",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "GetBucketInventoryConfiguration missing id",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "DeleteBucketInventoryConfiguration nonexistent bucket",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "DeleteBucketInventoryConfiguration missing id",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "PutBucketInventoryConfiguration nonexistent bucket",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "ListBucketInventoryConfigurations nonexistent bucket",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "DeleteBucket",
+                "❌ Failed",
+                "Expected success, exit code 254"
+              ],
+              [
+                "HeadBucket after DeleteBucket",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "GetObject nonexistent",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "HeadObject nonexistent",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "GetBucketLocation nonexistent",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "GetBucketVersioning nonexistent",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "GetBucketAcl nonexistent",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "GetBucketTagging nonexistent",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "CopyObject nonexistent source",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "PutObject nonexistent bucket",
+                "✅ Passed",
+                "Expected failure"
+              ],
+              [
+                "GetObjectAcl nonexistent",
+                "✅ Passed",
+                "Expected failure"
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "id": "_maven_surefire_results",
+        "title": "Maven Surefire Results",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "table",
+            "headers": [
+              "Module",
+              "Report",
+              "Tests",
+              "Failures",
+              "Errors",
+              "Skipped",
+              "Status"
+            ],
+            "rows": [
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.BucketAccelerateConfigurationTest.txt",
+                "3",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.BucketAnalyticsConfigurationTest.txt",
+                "4",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.BucketConfigurationTest.txt",
+                "8",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.BucketEncryptionConfigurationTest.txt",
+                "4",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.BucketIntelligentTieringConfigurationTest.txt",
+                "4",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.BucketInventoryConfigurationTest.txt",
+                "4",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.BucketLifecycleConfigurationTest.txt",
+                "8",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.BucketLoggingConfigurationTest.txt",
+                "3",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.BucketMetricsConfigurationTest.txt",
+                "4",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.BucketNotificationConfigurationTest.txt",
+                "3",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.BucketOwnershipControlsTest.txt",
+                "2",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.BucketPolicyTest.txt",
+                "4",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.BucketReplicationConfigurationTest.txt",
+                "3",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.BucketRequestPaymentConfigurationTest.txt",
+                "3",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.BucketTest.txt",
+                "54",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.BucketWebsiteConfigurationTest.txt",
+                "4",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.ChecksumAlgorithmTest.txt",
+                "5",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.ContentDescriptorTest.txt",
+                "8",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.CorsConfigurationTest.txt",
+                "7",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.EncryptionConfigurationTest.txt",
+                "10",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.EncryptionTypeTest.txt",
+                "2",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.MultipartUploadTest.txt",
+                "9",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.ObjectKeyTest.txt",
+                "11",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.ObjectStoreEventTest.txt",
+                "45",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.PartNumberTest.txt",
+                "4",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.PublicAccessBlockConfigurationTest.txt",
+                "3",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.RegionTest.txt",
+                "4",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.S3ObjectTest.txt",
+                "49",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.StorageClassTest.txt",
+                "7",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.UploadIdTest.txt",
+                "4",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-domain",
+                "com.example.magrathea.objectstore.domain.UploadPartTest.txt",
+                "4",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "object-store-reactive-application",
+                "com.example.magrathea.reactive.application.service.CucumberTest.txt",
+                "18",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "s3-reactive-api-adapter",
+                "com.example.magrathea.s3api.awscli.AwsCliCucumberTest.txt",
+                "1",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "s3-reactive-api-adapter",
+                "com.example.magrathea.s3api.cucumber.ObjectStoreCucumberTest.txt",
+                "238",
+                "0",
+                "0",
+                "0",
+                "✅ Passed"
+              ],
+              [
+                "**Total**",
+                "",
+                "**544**",
+                "**0**",
+                "**0**",
+                "**0**",
+                "**✅ Passed**"
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "id": "_clover_coverage",
+        "title": "Clover Coverage",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "table",
+            "headers": [
+              "Metric",
+              "Covered",
+              "Total",
+              "Coverage"
+            ],
+            "rows": [
+              [
+                "Clover",
+                "-",
+                "-",
+                "⚠️ Not generated"
+              ]
+            ]
+          },
+          {
+            "type": "paragraph",
+            "html": "Report HTML: <code>target/site/clover/index.html</code>"
+          }
+        ]
+      },
+      {
+        "id": "_implemented_s3_operation_coverage",
+        "title": "Implemented S3 Operation Coverage",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "table",
+            "headers": [
+              "Operation",
+              "CLI command",
+              "Covered by AWS CLI script"
+            ],
+            "rows": [
+              [
+                "ListBuckets",
+                "`aws s3api list-buckets`",
+                "✅"
+              ],
+              [
+                "CreateBucket",
+                "`aws s3api create-bucket`",
+                "✅"
+              ],
+              [
+                "HeadBucket",
+                "`aws s3api head-bucket`",
+                "✅"
+              ],
+              [
+                "PutObject",
+                "`aws s3api put-object`",
+                "✅"
+              ],
+              [
+                "HeadObject",
+                "`aws s3api head-object`",
+                "✅"
+              ],
+              [
+                "GetObject",
+                "`aws s3api get-object`",
+                "✅"
+              ],
+              [
+                "GetObjectAcl",
+                "`aws s3api get-object-acl`",
+                "✅"
+              ],
+              [
+                "PutObjectAcl",
+                "`aws s3api put-object-acl`",
+                "✅"
+              ],
+              [
+                "GetObjectTagging",
+                "`aws s3api get-object-tagging`",
+                "✅"
+              ],
+              [
+                "PutObjectTagging",
+                "`aws s3api put-object-tagging`",
+                "✅"
+              ],
+              [
+                "DeleteObjectTagging",
+                "`aws s3api delete-object-tagging`",
+                "✅"
+              ],
+              [
+                "GetObjectAttributes",
+                "`aws s3api get-object-attributes`",
+                "✅"
+              ],
+              [
+                "ListObjects",
+                "`aws s3api list-objects`",
+                "✅"
+              ],
+              [
+                "ListObjectsV2",
+                "`aws s3api list-objects-v2`",
+                "✅"
+              ],
+              [
+                "GetBucketLocation",
+                "`aws s3api get-bucket-location`",
+                "✅"
+              ],
+              [
+                "GetBucketAcl",
+                "`aws s3api get-bucket-acl`",
+                "✅"
+              ],
+              [
+                "PutBucketAcl",
+                "`aws s3api put-bucket-acl`",
+                "✅"
+              ],
+              [
+                "GetBucketTagging",
+                "`aws s3api get-bucket-tagging`",
+                "✅"
+              ],
+              [
+                "PutBucketTagging",
+                "`aws s3api put-bucket-tagging`",
+                "✅"
+              ],
+              [
+                "DeleteBucketTagging",
+                "`aws s3api delete-bucket-tagging`",
+                "✅"
+              ],
+              [
+                "GetBucketVersioning",
+                "`aws s3api get-bucket-versioning`",
+                "✅"
+              ],
+              [
+                "PutBucketVersioning",
+                "`aws s3api put-bucket-versioning`",
+                "✅"
+              ],
+              [
+                "ListObjectVersions",
+                "`aws s3api list-object-versions`",
+                "✅"
+              ],
+              [
+                "CopyObject",
+                "`aws s3api copy-object`",
+                "✅"
+              ],
+              [
+                "PutObject PARANOIC_MODE",
+                "`aws s3api put-object --storage-class PARANOIC_MODE`",
+                "✅"
+              ],
+              [
+                "HeadObject PARANOIC_MODE",
+                "`aws s3api head-object`",
+                "✅"
+              ],
+              [
+                "GetObjectAttributes PARANOIC_MODE",
+                "`aws s3api get-object-attributes`",
+                "✅"
+              ],
+              [
+                "DeleteObject PARANOIC_MODE",
+                "`aws s3api delete-object`",
+                "✅"
+              ],
+              [
+                "PutObject SSE-S3 AES256",
+                "",
+                "✅"
+              ],
+              [
+                "HeadObject SSE-S3 AES256",
+                "",
+                "✅"
+              ],
+              [
+                "DeleteObject SSE-S3",
+                "",
+                "✅"
+              ],
+              [
+                "PutObject STANDARD storage class",
+                "",
+                "✅"
+              ],
+              [
+                "HeadObject STANDARD",
+                "",
+                "✅"
+              ],
+              [
+                "GetObjectAttributes STANDARD",
+                "",
+                "✅"
+              ],
+              [
+                "DeleteObject STANDARD",
+                "",
+                "✅"
+              ],
+              [
+                "DeleteObject",
+                "`aws s3api delete-object`",
+                "✅"
+              ],
+              [
+                "DeleteObjects",
+                "`aws s3api delete-objects`",
+                "✅"
+              ],
+              [
+                "PutBucketCors",
+                "`aws s3api put-bucket-cors`",
+                "✅"
+              ],
+              [
+                "GetBucketCors",
+                "`aws s3api get-bucket-cors`",
+                "✅"
+              ],
+              [
+                "DeleteBucketCors",
+                "`aws s3api delete-bucket-cors`",
+                "✅"
+              ],
+              [
+                "PutBucketLifecycleConfiguration",
+                "`aws s3api put-bucket-lifecycle-configuration`",
+                "✅"
+              ],
+              [
+                "GetBucketLifecycleConfiguration",
+                "`aws s3api get-bucket-lifecycle-configuration`",
+                "✅"
+              ],
+              [
+                "DeleteBucketLifecycleConfiguration",
+                "`aws s3api delete-bucket-lifecycle-configuration`",
+                "✅"
+              ],
+              [
+                "PutBucketPolicy",
+                "`aws s3api put-bucket-policy`",
+                "✅"
+              ],
+              [
+                "GetBucketPolicy",
+                "`aws s3api get-bucket-policy`",
+                "✅"
+              ],
+              [
+                "DeleteBucketPolicy",
+                "`aws s3api delete-bucket-policy`",
+                "✅"
+              ],
+              [
+                "PutBucketEncryption",
+                "`aws s3api put-bucket-encryption`",
+                "✅"
+              ],
+              [
+                "GetBucketEncryption",
+                "`aws s3api get-bucket-encryption`",
+                "✅"
+              ],
+              [
+                "DeleteBucketEncryption",
+                "`aws s3api delete-bucket-encryption`",
+                "✅"
+              ],
+              [
+                "PutBucketLogging",
+                "`aws s3api put-bucket-logging`",
+                "✅"
+              ],
+              [
+                "GetBucketLogging",
+                "`aws s3api get-bucket-logging`",
+                "✅"
+              ],
+              [
+                "DeleteBucketLogging",
+                "`aws s3api delete-bucket-logging`",
+                "✅"
+              ],
+              [
+                "PutBucketWebsite",
+                "`aws s3api put-bucket-website`",
+                "✅"
+              ],
+              [
+                "GetBucketWebsite",
+                "`aws s3api get-bucket-website`",
+                "✅"
+              ],
+              [
+                "DeleteBucketWebsite",
+                "`aws s3api delete-bucket-website`",
+                "✅"
+              ],
+              [
+                "PutBucketNotification",
+                "`aws s3api put-bucket-notification-configuration`",
+                "✅"
+              ],
+              [
+                "GetBucketNotification",
+                "`aws s3api get-bucket-notification-configuration`",
+                "✅"
+              ],
+              [
+                "PutBucketReplication",
+                "`aws s3api put-bucket-replication`",
+                "✅"
+              ],
+              [
+                "GetBucketReplication",
+                "`aws s3api get-bucket-replication`",
+                "✅"
+              ],
+              [
+                "DeleteBucketReplication",
+                "`aws s3api delete-bucket-replication`",
+                "✅"
+              ],
+              [
+                "PutBucketRequestPayment",
+                "`aws s3api put-bucket-request-payment`",
+                "✅"
+              ],
+              [
+                "GetBucketRequestPayment",
+                "`aws s3api get-bucket-request-payment`",
+                "✅"
+              ],
+              [
+                "PutBucketOwnershipControls",
+                "`aws s3api put-bucket-ownership-controls`",
+                "✅"
+              ],
+              [
+                "GetBucketOwnershipControls",
+                "`aws s3api get-bucket-ownership-controls`",
+                "✅"
+              ],
+              [
+                "DeleteBucketOwnershipControls",
+                "`aws s3api delete-bucket-ownership-controls`",
+                "✅"
+              ],
+              [
+                "PutPublicAccessBlock",
+                "`aws s3api put-public-access-block`",
+                "✅"
+              ],
+              [
+                "GetPublicAccessBlock",
+                "`aws s3api get-public-access-block`",
+                "✅"
+              ],
+              [
+                "DeletePublicAccessBlock",
+                "`aws s3api delete-public-access-block`",
+                "✅"
+              ],
+              [
+                "PutBucketAccelerateConfiguration",
+                "`aws s3api put-bucket-accelerate-configuration`",
+                "✅"
+              ],
+              [
+                "GetBucketAccelerateConfiguration",
+                "`aws s3api get-bucket-accelerate-configuration`",
+                "✅"
+              ],
+              [
+                "PutBucketAnalyticsConfiguration",
+                "",
+                "✅"
+              ],
+              [
+                "GetBucketAnalyticsConfiguration",
+                "",
+                "✅"
+              ],
+              [
+                "DeleteBucketAnalyticsConfiguration",
+                "",
+                "✅"
+              ],
+              [
+                "ListBucketAnalyticsConfigurations",
+                "",
+                "✅"
+              ],
+              [
+                "PutBucketInventoryConfiguration",
+                "",
+                "✅"
+              ],
+              [
+                "GetBucketInventoryConfiguration",
+                "",
+                "✅"
+              ],
+              [
+                "DeleteBucketInventoryConfiguration",
+                "",
+                "✅"
+              ],
+              [
+                "ListBucketInventoryConfigurations",
+                "",
+                "✅"
+              ],
+              [
+                "DeleteBucket",
+                "`aws s3api delete-bucket`",
+                "✅"
+              ]
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_failure_tests",
+            "title": "Failure Tests",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "table",
+            "headers": [
+              "Check",
+              "Status",
+              "Notes"
+            ],
+            "rows": [
+              [
+                "GetBucketCors nonexistent",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "GetBucketCors after delete",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "GetBucketLifecycleConfiguration nonexistent",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "GetBucketLifecycleConfiguration after delete",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "GetBucketPolicy nonexistent",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "GetBucketPolicy after delete",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "GetBucketEncryption nonexistent",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "GetBucketEncryption after delete",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "GetBucketLogging nonexistent",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "GetBucketLogging after delete",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "GetBucketAnalyticsConfiguration nonexistent bucket",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "GetBucketAnalyticsConfiguration missing id",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "DeleteBucketAnalyticsConfiguration nonexistent bucket",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "DeleteBucketAnalyticsConfiguration missing id",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "PutBucketAnalyticsConfiguration nonexistent bucket",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "ListBucketAnalyticsConfigurations nonexistent bucket",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "GetBucketInventoryConfiguration nonexistent bucket",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "GetBucketInventoryConfiguration missing id",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "DeleteBucketInventoryConfiguration nonexistent bucket",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "DeleteBucketInventoryConfiguration missing id",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "PutBucketInventoryConfiguration nonexistent bucket",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "ListBucketInventoryConfigurations nonexistent bucket",
+                "✅",
+                "Expected failure"
+              ]
+            ]
+          },
+          {
+            "type": "table",
+            "headers": [
+              "Check",
+              "Status",
+              "Notes"
+            ],
+            "rows": [
+              [
+                "GetObject nonexistent",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "HeadObject nonexistent",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "GetBucketLocation nonexistent",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "GetBucketVersioning nonexistent",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "GetBucketAcl nonexistent",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "GetBucketTagging nonexistent",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "CopyObject nonexistent source",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "PutObject nonexistent bucket",
+                "✅",
+                "Expected failure"
+              ],
+              [
+                "GetObjectAcl nonexistent",
+                "✅",
+                "Expected failure"
+              ]
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_cucumber_aws_cli_test_status",
+            "title": "Cucumber AWS CLI Test Status",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "table",
+            "headers": [
+              "Category",
+              "Status",
+              "Note"
+            ],
+            "rows": [
+              [
+                "`@webclient` scenarios (256)",
+                "✅ Implementati",
+                "Standard Cucumber via Java WebClient"
+              ],
+              [
+                "`@awscli` scenarios",
+                "❌ **Mancanti**",
+                "Da replicare da `@webclient` a `@awscli`"
+              ],
+              [
+                "`test-aws-cli.sh`",
+                "✅ Standalone",
+                "Script indipendente, non integrato in Cucumber"
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "id": "_not_implemented_yet",
+        "title": "Not Implemented Yet",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Operations not listed above are intentionally outside the current implementation and are tracked in <code>PLAN.md</code>."
+          }
+        ]
+      }
+    ]
+  }
+}

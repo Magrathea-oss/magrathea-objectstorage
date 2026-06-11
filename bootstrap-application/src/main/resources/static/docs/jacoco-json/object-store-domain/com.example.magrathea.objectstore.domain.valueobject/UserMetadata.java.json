@@ -1,0 +1,27 @@
+{
+  "title": "UserMetadata.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "UserMetadata.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_usermetadata_java",
+        "title": "UserMetadata.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.objectstore.domain.valueobject;\n\nimport java.util.Collections;\nimport java.util.Map;\nimport java.util.Objects;\n\n/**\n * UserMetadata — a value object that encapsulates user-defined metadata headers\n * ({@code x-amz-meta-*}).\n * <p>\n * Holds an immutable {@link Map} of header name → header value pairs.\n * </p>\n * <p>\n * Pure domain — NO framework dependencies.\n */\npublic record UserMetadata(Map<String, String> entries) {\n\n<span class=\"fc\" id=\"L18\">    public UserMetadata {</span>\n<span class=\"fc\" id=\"L19\">        Objects.requireNonNull(entries, \"entries must not be null\");</span>\n<span class=\"fc\" id=\"L20\">        entries = Map.copyOf(entries);</span>\n<span class=\"fc\" id=\"L21\">    }</span>\n\n    /**\n     * Creates a {@code UserMetadata} from the given map of user metadata entries.\n     *\n     * @param entries the user metadata entries (header name → value)\n     * @return a new {@code UserMetadata}\n     */\n    public static UserMetadata of(Map<String, String> entries) {\n<span class=\"fc\" id=\"L30\">        return new UserMetadata(entries);</span>\n    }\n\n    /**\n     * Returns the value for the given metadata key, or {@code null} if absent.\n     *\n     * @param key the metadata header name\n     * @return the corresponding value, or {@code null}\n     */\n    public String get(String key) {\n<span class=\"nc\" id=\"L40\">        return entries.get(key);</span>\n    }\n\n    /**\n     * Returns {@code true} if this container holds no metadata entries.\n     *\n     * @return {@code true} if empty\n     */\n    public boolean isEmpty() {\n<span class=\"nc\" id=\"L49\">        return entries.isEmpty();</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

@@ -1,0 +1,2751 @@
+{
+  "title": "Magrathea ObjectStore — Architecture Documentation (ARC42)",
+  "lang": "en",
+  "document": {
+    "type": "document",
+    "title": "<span class=\"image\"><img src=\"/docs/arc42/images/arc42-logo.png\" alt=\"arc42\"></span> Magrathea ObjectStore — Architecture Documentation",
+    "sections": [
+      {
+        "type": "preamble",
+        "html": "<div class=\"paragraph\">\n<p><strong>About arc42</strong></p>\n</div>\n<div class=\"paragraph lead\">\n<p>arc42, the template for documentation of software and system architecture.</p>\n</div>\n<div class=\"paragraph\">\n<p>Template Version 1.0.0. Generated from ARC42 template, 2026-06-11</p>\n</div>\n<div class=\"paragraph\">\n<p>Created, maintained and &#169; by Dr. Peter Hruschka, Dr. Gernot Starke and contributors.\nSee <a href=\"https://arc42.org\" class=\"bare\">https://arc42.org</a>.</p>\n</div>\n<hr>\n<div style=\"page-break-after: always;\"></div>"
+      },
+      {
+        "type": "section",
+        "id": "section-introduction-and-goals",
+        "title": "Introduction and Goals",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "The Magrathea ObjectStore project implements an <strong>AWS S3-compatible object storage</strong> built with Spring Boot 4 WebFlux and Java 21."
+          },
+          {
+            "type": "paragraph",
+            "html": "It provides a lightweight, single-node implementation of the AWS S3 REST API for development, testing, and small-scale deployments."
+          },
+          {
+            "type": "section",
+            "id": "_goals",
+            "title": "Goals",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "<strong>S3 API compatibility</strong>: implement the in-scope AWS S3 REST API operation set (111/111), including Phase F advanced/specialized operations",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>Reactive by design</strong>: full WebFlux non-blocking I/O, DataBuffer streaming for binary content",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>Domain-Driven Design</strong>: pure domain with zero framework dependencies, hexagonal architecture",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>Testability</strong>: 3-layer testing (JUnit domain, Cucumber BDD integration, AWS CLI compatibility)",
+                    "blocks": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_stakeholders",
+            "title": "Stakeholders",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "table",
+                "headers": [
+                  "Role",
+                  "Contact",
+                  "Expectations"
+                ],
+                "rows": [
+                  [
+                    "Developer",
+                    "Development team",
+                    "Clean DDD code, reactive patterns, comprehensive tests"
+                  ],
+                  [
+                    "Tester",
+                    "QA team",
+                    "Cucumber BDD scenarios, AWS CLI compatibility verification"
+                  ],
+                  [
+                    "Architect",
+                    "Architecture team",
+                    "ARC42 documentation, ADRs, C4 diagrams, DDD compliance"
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_motivation",
+            "title": "Motivation",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "The project serves as both a production-quality S3-compatible storage and a reference implementation of Java DDD + Spring Boot 4 reactive patterns with hexagonal architecture."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "section",
+        "id": "section-architecture-constraints",
+        "title": "Architecture Constraints",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "section",
+            "id": "_technical_constraints",
+            "title": "Technical Constraints",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "<strong>Java 21</strong>: latest LTS, records, sealed interfaces, pattern matching",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>Spring Boot 4 WebFlux</strong>: reactive non-blocking stack",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>Maven multi-module</strong>: flat sibling modules per bounded context",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>S3-only HTTP API</strong>: public HTTP endpoints MUST be AWS S3-compatible; non-S3 internal REST APIs are not allowed",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>Pluggable S3 adapter</strong>: S3 API lives in <code>s3-reactive-api-adapter</code> and is loaded via Spring Boot auto-configuration, not component scanning",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>S3 API toggle</strong>: <code>s3.api.enabled=false</code> disables S3 routes even when the module is present",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>RouterFunction</strong>: NO <code>@Controller</code>, NO <code>@RequestMapping</code> — functional WebFlux style only",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>XML serialization</strong>: Jackson 3 XML annotated record objects (<code>tools.jackson.dataformat.xml.annotation.*</code>) with <code>XmlMapper</code>, NOT StringBuilder",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>Jackson 3 XML</strong>: dependency <code>tools.jackson.dataformat:jackson-dataformat-xml</code>, NOT <code>com.fasterxml.jackson.dataformat:jackson-dataformat-xml</code>",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>XML codec</strong>: custom <code>JacksonXmlEncoder</code> extending <code>AbstractJacksonEncoder&lt;XmlMapper&gt;</code> must be registered via <code>WebFluxConfigurer</code> or <code>HandlerStrategies</code>",
+                    "blocks": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_domain_constraints",
+            "title": "Domain Constraints",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "<code>object-store-domain</code>: uses ONLY AWS S3 native terminology — no custom abstractions like BinaryContent",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>object-store-domain</code>: zero dependencies except test dependencies",
+                    "blocks": []
+                  },
+                  {
+                    "text": "No <code>shared-domain</code> module exists",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>storage-engine-domain</code>, <code>storage-engine-application</code>, <code>storage-engine-infrastructure</code>, and <code>object-store-reactive-repository-storage-engine-infrastructure</code> are fully implemented. They form the Storage Engine bounded context for persistent, scalable object storage, selectable via Spring profile (<code>storage-engine</code>) as an alternative to the in-memory backend",
+                    "blocks": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_infrastructure_constraints",
+            "title": "Infrastructure Constraints",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "<code>object-store-reactive-infrastructure</code>: reactive repository implementations only; no HTTP API routes",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>InMemoryReactiveS3ObjectRepository</code>: reactive in-memory S3 object metadata + content store via Mono/Flux",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>ContentStore</code> is removed; object content is saved through <code>S3ObjectRepository.save(S3ObjectWrite)</code>",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>S3ObjectWrite</code> and <code>S3ObjectContent</code> are domain interfaces without framework types; their application implementations carry <code>Flux&lt;DataBuffer&gt;</code>",
+                    "blocks": []
+                  },
+                  {
+                    "text": "byte[] only exists inside repository content storage internals, never in domain signatures",
+                    "blocks": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_xml_serialization_constraints",
+            "title": "XML Serialization Constraints",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "<strong>FORBIDDEN: regex XML parsing</strong> — <code>java.util.regex.Pattern</code>, <code>String.contains()</code>, and <code>extractXmlValue()</code> for XML are forbidden. All XML parsing must use Jackson 3 codec",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>JacksonXmlDecoder mandatory</strong>: <code>JacksonXmlCodecConfig</code> must register both the encoder (response) and the decoder (request) for XML. Without the decoder, <code>request.bodyToMono(Dto.class)</code> will not work",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>Command/Query DTO pattern</strong>: every PUT/POST receiving XML uses a Jackson XML-annotated Command DTO; every GET producing XML uses a Query DTO. No generic \"request\" or \"response\" DTOs",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>DTOs in separate files</strong>: each Command/Query DTO lives in a dedicated file in the <code>dto/command/</code> or <code>dto/query/</code> package. No monolithic files (e.g., no <code>S3Request.java</code>)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>No custom parsers</strong>: no classes like <code>S3XmlParser</code> wrapping <code>XmlMapper</code>. The framework deserializes directly — <code>S3XmlParser</code> and <code>S3XmlResponses</code> removed, <a href=\"/docs/adr/0008\">ADR 0008</a> implemented and verified",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>Application DTO as Command</strong>: XML Command DTOs may coincide with application DTOs (e.g., <code>CorsConfigurationCommand</code>) if they have the required Jackson XML annotations",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>Mapping in handler</strong>: conversion from XML Command to domain value object occurs in the handler, not in a separate parser",
+                    "blocks": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_testing_constraints",
+            "title": "Testing Constraints",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "Domain tests: pure JUnit, NO Spring context",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Integration tests: Cucumber BDD with WebTestClient in <code>s3-reactive-api-adapter</code>",
+                    "blocks": []
+                  },
+                  {
+                    "text": "AWS CLI compatibility tests: <code>test-aws-cli.sh</code>, also runnable via Maven profile <code>aws-cli-tests</code>",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Coverage verification: OpenClover profile <code>coverage</code>",
+                    "blocks": []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "section",
+        "id": "section-context-and-scope",
+        "title": "Context and Scope",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "section",
+            "id": "_business_context",
+            "title": "Business Context",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "Magrathea ObjectStore provides an S3-compatible REST API. Users interact with it via HTTP to store and retrieve objects in buckets."
+              },
+              {
+                "type": "image",
+                "src": "/docs/c4/images/SystemContext.png",
+                "alt": "System Context",
+                "html": "<img src=\"/docs/c4/images/SystemContext.png\" alt=\"System Context\" width=\"600\">"
+              },
+              {
+                "type": "paragraph",
+                "html": "The system context shows:\n- <strong>User</strong>: end user interacting via HTTPS — S3-compatible API\n- <strong>Magrathea ObjectStore</strong>: Spring Boot 4 reactive S3-compatible object storage"
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_technical_context",
+            "title": "Technical Context",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "table",
+                "headers": [
+                  "Communication Partner",
+                  "Input",
+                  "Output",
+                  "Protocol"
+                ],
+                "rows": [
+                  [
+                    "User (AWS CLI, SDK, HTTP client)",
+                    "S3 REST API requests (XML/JSON) including analytics (<code>?analytics</code>), inventory (<code>?inventory</code>), metrics (<code>?metrics</code>), intelligent-tiering (<code>?intelligent-tiering</code>), ABAC (<code>?abac</code>), object lock (<code>?object-lock</code>), metadata config (<code>?metadata-config</code>), metadata table config (<code>?metadata-table-config</code>), session (<code>?session</code>), directory bucket (<code>?directory-buckets</code>), torrent (<code>?torrent</code>), restore (<code>?restore</code>), select (<code>?select</code>), rename (<code>?rename</code>), legal hold (<code>?legal-hold</code>), retention (<code>?retention</code>) queries",
+                    "S3 REST API responses (XML/JSON)",
+                    "HTTPS"
+                  ],
+                  [
+                    "User (binary upload)",
+                    "Binary data via HTTP PUT",
+                    "—",
+                    "HTTP body"
+                  ],
+                  [
+                    "User (binary download)",
+                    "—",
+                    "Binary data via HTTP GET",
+                    "HTTP body"
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "section",
+        "id": "section-solution-strategy",
+        "title": "Solution Strategy",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "section",
+            "id": "_architecture_strategy",
+            "title": "Architecture Strategy",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "<strong>Hexagonal Architecture</strong> (Ports and Adapters): domain is pure business logic, application and infrastructure are adapters",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>DDD with strategic design</strong>: ObjectStore domain with reserved <code>storage-engine-*</code> modules for future persistence/storage-engine work",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>Reactive by design</strong>: WebFlux RouterFunction, DataBuffer streaming, native Mono/Flux application and repository interfaces",
+                    "blocks": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_key_technical_decisions",
+            "title": "Key Technical Decisions",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "table",
+                "headers": [
+                  "Decision",
+                  "Rationale"
+                ],
+                "rows": [
+                  [
+                    "Maven multi-module per bounded context",
+                    "Enforces dependency boundaries, domain isolation"
+                  ],
+                  [
+                    "Records for aggregates/value objects",
+                    "Immutability, zero boilerplate, Java 21 idiomatic"
+                  ],
+                  [
+                    "Sealed interfaces for domain events",
+                    "Exhaustive pattern matching, type safety"
+                  ],
+                  [
+                    "Reactive repository interfaces",
+                    "Native Mono/Flux command/query APIs for non-blocking service composition"
+                  ],
+                  [
+                    "RouterFunction over @Controller",
+                    "Functional style, precise content negotiation"
+                  ],
+                  [
+                    "Jackson XML for S3 responses",
+                    "Auto-serialization, no StringBuilder XML"
+                  ],
+                  [
+                    "DataBuffer for binary streaming",
+                    "Reactive non-blocking I/O, WebFlux native"
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_bucket_configuration_redesign_adr_0011",
+            "title": "Bucket Configuration Redesign (<a href=\"/docs/adr/0011\">ADR 0011</a>)",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "<a href=\"/docs/adr/0011\">ADR 0011</a> records a course correction: each configuration feature (CORS, Lifecycle, Encryption, etc.) is modeled as a dedicated value object on the Bucket aggregate with specific <code>with*()</code> / <code>without*()</code> methods and a specific domain event type per config change, replacing the earlier flat <code>Bucket.Configuration</code> record."
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_reactive_migration_adr_0010",
+            "title": "Reactive Migration (<a href=\"/docs/adr/0010\">ADR 0010</a>)",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "<a href=\"/docs/adr/0010\">ADR 0010</a> records a course correction that completed the reactive migration from <a href=\"/docs/adr/0009\">ADR 0009</a>. All application services now return <code>Mono&lt;T&gt;</code> or <code>Flux&lt;T&gt;</code> natively (no <code>.join()</code>), handlers chain reactive operators directly (no <code>.subscribeOn()</code>), and repository implementations are fully reactive (no <code>Mono.fromCallable</code> stubs). Runtime effects (CORS validation, Website routing, OwnershipControls enforcement, PublicAccessBlock evaluation, Accelerate headers, RequestPayment enforcement) were added."
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_handler_minimal_pattern",
+            "title": "Handler Minimal Pattern",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "All handlers (except <code>S3BucketConfigHandler</code>) follow the <strong>extract → delegate → response</strong> pattern:"
+              },
+              {
+                "type": "list",
+                "style": "arabic",
+                "items": [
+                  {
+                    "text": "<strong>Extract</strong>: <code>S3RequestExtractor</code> parses HTTP headers, path variables, and query parameters into typed primitives and DTOs",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>Delegate</strong>: The handler calls a single reactive service method — no validation, no bucket checks, no ETag computation",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>Response</strong>: <code>S3ResponseBuilder</code> or direct XML serialization converts the service result into an HTTP response",
+                    "blocks": []
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "html": "All cross-cutting concerns (validation, bucket existence checks, CORS, website routing, ETag) are <strong>postponed to the repository layer</strong>."
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_registry_based_handler_dispatch",
+            "title": "Registry-Based Handler Dispatch",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "The <code>S3BucketConfigHandler</code> uses a registry/strategy pattern to dispatch configuration operations without copypasta. Each config type has a <code>ConfigHandlerStrategy</code> implementation registered in <code>ConfigHandlerRegistry</code>; adding a new config type requires only one strategy class and its registration."
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_quality_strategy",
+            "title": "Quality Strategy",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "<strong>Testability</strong>: domain tested with pure JUnit (no Spring), integration tested with Cucumber BDD, S3 compatibility verified with AWS CLI",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>Simplicity</strong>: single-node in-memory stores for metadata and content",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>Traceability</strong>: ADRs document every architectural decision, ARC42 provides full architecture documentation",
+                    "blocks": []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "section",
+        "id": "section-building-block-view",
+        "title": "Building Block View",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "section",
+            "id": "_level_1_container_diagram",
+            "title": "Level 1 — Container Diagram",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "The system is composed of five container runtime modules:"
+              },
+              {
+                "type": "image",
+                "src": "/docs/c4/images/Container.png",
+                "alt": "Container Diagram",
+                "html": "<img src=\"/docs/c4/images/Container.png\" alt=\"Container Diagram\" width=\"600\">"
+              },
+              {
+                "type": "section",
+                "id": "_s3_reactive_api_adapter_http_adapter",
+                "title": "s3-reactive-api-adapter (HTTP adapter)",
+                "level": 3,
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "html": "<strong>Blackbox Description:</strong>\nExposes the S3-compatible REST API via RouterFunction WebFlux. Translates HTTP/XML/binary requests into calls to reactive application services. Serializes XML responses with Jackson 3."
+                  },
+                  {
+                    "type": "paragraph",
+                    "html": "Handlers follow a strict <strong>minimal pattern</strong>:\n- <strong>Extract</strong> HTTP headers, path variables, and query parameters into primitives/DTOs via <code>S3RequestExtractor</code>\n- <strong>Delegate</strong> to reactive application services (no validation, no bucket checks, no ETag computation)\n- <strong>Response</strong> via <code>S3ResponseBuilder</code> or direct XML serialization"
+                  },
+                  {
+                    "type": "paragraph",
+                    "html": "All validation, bucket existence checks, ETag computation, CORS validation, and website routing are <strong>postponed to the repository layer</strong>."
+                  },
+                  {
+                    "type": "list",
+                    "style": "ulist",
+                    "items": [
+                      {
+                        "text": "<strong>Provided Interface:</strong> S3 REST API (111/111 in-scope operations)",
+                        "blocks": []
+                      },
+                      {
+                        "text": "<strong>Required Interface:</strong> ReactiveBucketService, ReactiveObjectService, ReactiveMultipartUploadService",
+                        "blocks": []
+                      },
+                      {
+                        "text": "<strong>Technology:</strong> Spring Boot 4 WebFlux, Java 21, RouterFunction, Jackson 3 XML",
+                        "blocks": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "section",
+                "id": "_reactive_object_store_reactive_object_storage_capability",
+                "title": "reactive-object-store (Reactive object storage capability)",
+                "level": 3,
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "html": "<strong>Blackbox Description:</strong>\nImplements reactive object CRUD, multipart upload, content retrieval, and Phase F advanced object use cases using Mono/Flux. Contains reactive application services (ReactiveObjectService, ReactiveMultipartUploadService), domain aggregates (S3Object, MultipartUpload), and repository ports."
+                  },
+                  {
+                    "type": "list",
+                    "style": "ulist",
+                    "items": [
+                      {
+                        "text": "<strong>Provided Interface:</strong> ReactiveObjectService, ReactiveMultipartUploadService",
+                        "blocks": []
+                      },
+                      {
+                        "text": "<strong>Required Interface:</strong> BucketRepository (read), S3ObjectCommandRepository, S3ObjectQueryRepository, MultipartUploadCommandRepository, MultipartUploadQueryRepository",
+                        "blocks": []
+                      },
+                      {
+                        "text": "<strong>Technology:</strong> Java 21, Spring @Service, Reactor Mono/Flux, domain aggregates",
+                        "blocks": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "section",
+                "id": "_reactive_bucket_management_reactive_bucket_management_capability",
+                "title": "reactive-bucket-management (Reactive bucket management capability)",
+                "level": 3,
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "html": "<strong>Blackbox Description:</strong>\nImplements reactive bucket lifecycle, metadata (ACL, tagging), configuration (CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate), advanced configuration (analytics, inventory, metrics, intelligent-tiering), and Phase F bucket metadata/ABAC/object-lock configuration use cases using Mono/Flux. Contains ReactiveBucketService, the Bucket aggregate root (with dedicated configuration value objects and domain events), and repository ports. Configuration lives inside the Bucket aggregate — there is no separate configuration service."
+                  },
+                  {
+                    "type": "list",
+                    "style": "ulist",
+                    "items": [
+                      {
+                        "text": "<strong>Provided Interface:</strong> ReactiveBucketService",
+                        "blocks": []
+                      },
+                      {
+                        "text": "<strong>Required Interface:</strong> BucketCommandRepository, BucketQueryRepository",
+                        "blocks": []
+                      },
+                      {
+                        "text": "<strong>Technology:</strong> Java 21, Spring @Service, Reactor Mono/Flux, domain aggregates",
+                        "blocks": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "section",
+                "id": "_reactive_repository_application_cqs_repository_interfaces",
+                "title": "reactive-repository-application (CQS repository interfaces)",
+                "level": 3,
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "html": "<strong>Blackbox Description:</strong>\nImplements the Command-Query Separation (CQS) pattern at the application layer. Provides separate command and query repository interfaces for each aggregate (Bucket, S3Object, MultipartUpload). Bridges domain repository ports to reactive persistence adapters."
+                  },
+                  {
+                    "type": "list",
+                    "style": "ulist",
+                    "items": [
+                      {
+                        "text": "<strong>Provided Interface:</strong> BucketCommandRepository, BucketQueryRepository, S3ObjectCommandRepository, S3ObjectQueryRepository, MultipartUploadCommandRepository, MultipartUploadQueryRepository",
+                        "blocks": []
+                      },
+                      {
+                        "text": "<strong>Required Interface:</strong> Reactive persistence implementations",
+                        "blocks": []
+                      },
+                      {
+                        "text": "<strong>Technology:</strong> Java 21, Mono/Flux, CQS pattern",
+                        "blocks": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "section",
+                "id": "_reactive_infrastructure_in_process_reactive_database",
+                "title": "reactive-infrastructure (In-process reactive database)",
+                "level": 3,
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "html": "<strong>Blackbox Description:</strong>\nImplements reactive in-memory repositories with ConcurrentHashMap using Mono/Flux. Not an external database — resets when the process stops."
+                  },
+                  {
+                    "type": "list",
+                    "style": "ulist",
+                    "items": [
+                      {
+                        "text": "<strong>Provided Interface:</strong> InMemoryReactiveBucketRepository, InMemoryReactiveS3ObjectRepository, InMemoryReactiveMultipartUploadRepository",
+                        "blocks": []
+                      },
+                      {
+                        "text": "<strong>Required Interface:</strong> CQS repository interfaces",
+                        "blocks": []
+                      },
+                      {
+                        "text": "<strong>Technology:</strong> Java 21, ConcurrentHashMap, Reactor",
+                        "blocks": []
+                      },
+                      {
+                        "text": "<strong>Tag:</strong> Database",
+                        "blocks": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_level_2_component_diagram_s3_reactive_api_adapter",
+            "title": "Level 2 — Component Diagram (s3-reactive-api-adapter)",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "image",
+                "src": "/docs/c4/images/S3ReactiveApiAdapterComponents.png",
+                "alt": "S3 Reactive API Adapter Components",
+                "html": "<img src=\"/docs/c4/images/S3ReactiveApiAdapterComponents.png\" alt=\"S3 Reactive API Adapter Components\" width=\"600\">"
+              },
+              {
+                "type": "table",
+                "headers": [
+                  "Component",
+                  "Responsibility",
+                  "Handler Pattern"
+                ],
+                "rows": [
+                  [
+                    "<code>S3PathRouter</code>",
+                    "Entry point RouterFunction: defines S3 routes and dispatches requests to handlers",
+                    "—"
+                  ],
+                  [
+                    "<code>S3BucketOperationsHandler</code>",
+                    "Bucket lifecycle: create, delete, head, list, location, versioning, directory-bucket listing",
+                    "✅ Minimal (extract → delegate → response)"
+                  ],
+                  [
+                    "<code>S3BucketMetadataHandler</code>",
+                    "Bucket metadata: ACL, tagging",
+                    "✅ Minimal (extract → delegate → response)"
+                  ],
+                  [
+                    "<code>S3BucketConfigHandler</code>",
+                    "Bucket configuration: CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate, analytics, inventory, metrics, intelligent-tiering, ABAC, object lock, bucket metadata/table configuration",
+                    "⏳ Excluded (complex registry + ConcurrentHashMap — postponed)"
+                  ],
+                  [
+                    "<code>S3ObjectOperationsHandler</code>",
+                    "Object CRUD, copy, multi-delete, rename, torrent, restore, select, Object Lambda response",
+                    "✅ Minimal (extract → delegate → response)"
+                  ],
+                  [
+                    "<code>S3ObjectMetadataHandler</code>",
+                    "Object metadata: ACL, tagging, attributes, legal hold, retention, encryption metadata",
+                    "✅ Minimal (extract → delegate → response)"
+                  ],
+                  [
+                    "<code>S3MultipartHandler</code>",
+                    "Multipart upload lifecycle: initiate, upload, complete, abort, list",
+                    "✅ Minimal (extract → delegate → response)"
+                  ],
+                  [
+                    "<code>S3SessionHandler</code>",
+                    "CreateSession support for Phase F session management",
+                    "✅ Minimal (extract → delegate → response)"
+                  ],
+                  [
+                    "<code>S3WebSupport</code>",
+                    "Shared request predicates, parsing, lookup, error helpers",
+                    "—"
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_level_2_component_diagram_reactive_object_store",
+            "title": "Level 2 — Component Diagram (reactive-object-store)",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "image",
+                "src": "/docs/c4/images/ReactiveObjectStoreComponents.png",
+                "alt": "Reactive Object Store Components",
+                "html": "<img src=\"/docs/c4/images/ReactiveObjectStoreComponents.png\" alt=\"Reactive Object Store Components\" width=\"600\">"
+              },
+              {
+                "type": "table",
+                "headers": [
+                  "Component",
+                  "Responsibility"
+                ],
+                "rows": [
+                  [
+                    "<code>ReactiveObjectService</code>",
+                    "Reactive application service: object CRUD, metadata, listing, content retrieval via Mono/Flux"
+                  ],
+                  [
+                    "<code>ReactiveMultipartUploadService</code>",
+                    "Reactive application service: multipart upload session and part lifecycle via Mono/Flux"
+                  ],
+                  [
+                    "<code>S3Object</code>",
+                    "Domain aggregate: object identity, key, ETag, storage class, metadata"
+                  ],
+                  [
+                    "<code>MultipartUpload</code>",
+                    "Domain aggregate: multipart state, uploaded parts, completion/abort"
+                  ],
+                  [
+                    "<code>S3ObjectRepository port</code>",
+                    "Repository port: object metadata and binary content persistence"
+                  ],
+                  [
+                    "<code>MultipartUploadRepository port</code>",
+                    "Repository port: multipart upload persistence"
+                  ],
+                  [
+                    "<code>BucketRepository read port</code>",
+                    "Read-side repository port: bucket existence validation"
+                  ],
+                  [
+                    "<code>DefaultS3ObjectWrite / DefaultS3ObjectContent</code>",
+                    "Application-layer content boundary: Flux&lt;DataBuffer&gt; without leaking into the domain"
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_level_2_component_diagram_reactive_bucket_management",
+            "title": "Level 2 — Component Diagram (reactive-bucket-management)",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "image",
+                "src": "/docs/c4/images/ReactiveBucketManagementComponents.png",
+                "alt": "Reactive Bucket Management Components",
+                "html": "<img src=\"/docs/c4/images/ReactiveBucketManagementComponents.png\" alt=\"Reactive Bucket Management Components\" width=\"600\">"
+              },
+              {
+                "type": "table",
+                "headers": [
+                  "Component",
+                  "Responsibility"
+                ],
+                "rows": [
+                  [
+                    "<code>ReactiveBucketService</code>",
+                    "Reactive application service: bucket lifecycle, versioning, CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate, analytics, inventory, metrics, intelligent-tiering, ABAC, object lock, and metadata configuration via Mono/Flux"
+                  ],
+                  [
+                    "<code>Bucket</code>",
+                    "Domain aggregate root: bucket identity, name, region, storage class, versioning, encryption, and dedicated configuration fields per config type (CORS, Lifecycle, Encryption, Logging, Website, Notification, Replication, Policy, PublicAccessBlock, OwnershipControls, RequestPayment, Accelerate, plus multi-instance maps for Analytics, Inventory, Metrics, Intelligent-Tiering). Emits specific ObjectStoreEvent subtypes per config change (e.g., <code>BucketLifecycleConfigurationChanged</code>, <code>BucketNotificationConfigurationChanged</code>). Each config feature has a dedicated <code>with*()</code> / <code>without*()</code> method — no generic <code>withConfiguration()</code> / flat <code>Configuration</code> record."
+                  ],
+                  [
+                    "<code>BucketRepository port</code>",
+                    "Repository port: bucket metadata and configuration persistence"
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_level_2_component_diagram_reactive_repository_application",
+            "title": "Level 2 — Component Diagram (reactive-repository-application)",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "image",
+                "src": "/docs/c4/images/ReactiveRepositoryApplicationComponents.png",
+                "alt": "Reactive Repository Application Components",
+                "html": "<img src=\"/docs/c4/images/ReactiveRepositoryApplicationComponents.png\" alt=\"Reactive Repository Application Components\" width=\"600\">"
+              },
+              {
+                "type": "table",
+                "headers": [
+                  "Component",
+                  "Responsibility"
+                ],
+                "rows": [
+                  [
+                    "<code>BucketCommandRepository</code>",
+                    "Command repository: bucket writes (save, delete) via Mono&lt;Void&gt;"
+                  ],
+                  [
+                    "<code>BucketQueryRepository</code>",
+                    "Query repository: bucket reads (find by id, find by name) via Mono&lt;Bucket&gt;"
+                  ],
+                  [
+                    "<code>S3ObjectCommandRepository</code>",
+                    "Command repository: object writes (save, delete) via Mono&lt;Void&gt;"
+                  ],
+                  [
+                    "<code>S3ObjectQueryRepository</code>",
+                    "Query repository: object reads (find by id, find by bucket, list) via Mono&lt;Flux&lt;S3Object&gt;&gt;"
+                  ],
+                  [
+                    "<code>MultipartUploadCommandRepository</code>",
+                    "Command repository: multipart upload writes (save, delete, update parts) via Mono&lt;Void&gt;"
+                  ],
+                  [
+                    "<code>MultipartUploadQueryRepository</code>",
+                    "Query repository: multipart upload reads (find by upload id, list by bucket) via Mono&lt;Flux&lt;MultipartUpload&gt;&gt;"
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_level_2_component_diagram_reactive_infrastructure",
+            "title": "Level 2 — Component Diagram (reactive-infrastructure)",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "image",
+                "src": "/docs/c4/images/ReactiveInfrastructureComponents.png",
+                "alt": "Reactive Infrastructure Components",
+                "html": "<img src=\"/docs/c4/images/ReactiveInfrastructureComponents.png\" alt=\"Reactive Infrastructure Components\" width=\"600\">"
+              },
+              {
+                "type": "table",
+                "headers": [
+                  "Component",
+                  "Responsibility"
+                ],
+                "rows": [
+                  [
+                    "<code>InMemoryReactiveBucketRepository</code>",
+                    "In-memory reactive BucketRepository: ConcurrentHashMap for bucket aggregates and configuration via Mono/Flux"
+                  ],
+                  [
+                    "<code>InMemoryReactiveS3ObjectRepository</code>",
+                    "In-memory reactive S3ObjectRepository: ConcurrentHashMap for metadata and raw bytes via Mono/Flux"
+                  ],
+                  [
+                    "<code>InMemoryReactiveMultipartUploadRepository</code>",
+                    "In-memory reactive MultipartUploadRepository: ConcurrentHashMap for upload sessions via Mono/Flux"
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_level_3_code_view_aggregate_root_patterns",
+            "title": "Level 3 — Code View (Aggregate Root Patterns)",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "The domain aggregates follow a strict state transition pattern:"
+              },
+              {
+                "type": "section",
+                "id": "_bucket_aggregate",
+                "title": "Bucket Aggregate",
+                "level": 3,
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "html": "<code>Bucket</code> is the root aggregate for bucket management. It enforces all state transitions through dedicated <code>with*()</code> methods:"
+                  },
+                  {
+                    "type": "code",
+                    "html": "<pre><code>public interface Bucket {\n    // Lifecycle\n    Bucket withVersioningEnabled();\n    Bucket withVersioningSuspended();\n    Bucket withDeleted();\n\n    // Configuration (one per config type)\n    Bucket withCorsConfiguration(CorsConfiguration cors);\n    Bucket withoutCorsConfiguration();\n    Bucket withLifecycleConfiguration(BucketLifecycleConfiguration lifecycle);\n    Bucket withoutLifecycleConfiguration();\n    Bucket withEncryptionConfiguration(BucketEncryptionConfiguration encryption);\n    Bucket withoutEncryptionConfiguration();\n    Bucket withLoggingConfiguration(BucketLoggingConfiguration logging);\n    Bucket withoutLoggingConfiguration();\n    Bucket withWebsiteConfiguration(BucketWebsiteConfiguration website);\n    Bucket withoutWebsiteConfiguration();\n    Bucket withNotificationConfiguration(BucketNotificationConfiguration notification);\n    Bucket withoutNotificationConfiguration();\n    Bucket withReplicationConfiguration(BucketReplicationConfiguration replication);\n    Bucket withoutReplicationConfiguration();\n    Bucket withPolicy(BucketPolicy policy);\n    Bucket withoutPolicy();\n    Bucket withPublicAccessBlockConfiguration(PublicAccessBlockConfiguration publicAccessBlock);\n    Bucket withoutPublicAccessBlockConfiguration();\n    Bucket withOwnershipControls(BucketOwnershipControls ownershipControls);\n    Bucket withoutOwnershipControls();\n    Bucket withRequestPaymentConfiguration(BucketRequestPaymentConfiguration requestPayment);\n    Bucket withoutRequestPaymentConfiguration();\n    Bucket withAccelerateConfiguration(BucketAccelerateConfiguration accelerate);\n    Bucket withoutAccelerateConfiguration();\n\n    // Multi-instance config (analytics, inventory, metrics, intelligent-tiering)\n    Bucket withAnalyticsConfiguration(String id, BucketAnalyticsConfiguration analytics);\n    Bucket withoutAnalyticsConfiguration(String id);\n    Bucket withInventoryConfiguration(String id, BucketInventoryConfiguration inventory);\n    Bucket withoutInventoryConfiguration(String id);\n    Bucket withMetricsConfiguration(String id, BucketMetricsConfiguration metrics);\n    Bucket withoutMetricsConfiguration(String id);\n    Bucket withIntelligentTieringConfiguration(String id, BucketIntelligentTieringConfiguration tiering);\n    Bucket withoutIntelligentTieringConfiguration(String id);\n\n    // Domain event access\n    List&lt;ObjectStoreEvent&gt; domainEvents();\n    Bucket clearEvents();\n}</code></pre>"
+                  }
+                ]
+              },
+              {
+                "type": "section",
+                "id": "_s3object_aggregate",
+                "title": "S3Object Aggregate",
+                "level": 3,
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "html": "<code>S3Object</code> enforces state transitions for object lifecycle, metadata, ACL, tagging, legal hold, retention, and encryption:"
+                  },
+                  {
+                    "type": "code",
+                    "html": "<pre><code>public interface S3Object {\n    S3Object withDeleted();\n    S3Object withEtag(String etag);\n    S3Object withStorageClass(StorageClass storageClass);\n    S3Object withAcl(AccessControlPolicy acl);\n    S3Object withTagging(Map&lt;String, String&gt; tagging);\n    S3Object withLegalHold(LegalHold legalHold);\n    S3Object withoutLegalHold();\n    S3Object withRetention(RetentionPeriod retention);\n    S3Object withoutRetention();\n    S3Object withEncryption(EncryptionConfiguration encryption);\n    S3Object withoutEncryption();\n    List&lt;ObjectStoreEvent&gt; domainEvents();\n    S3Object clearEvents();\n}</code></pre>"
+                  }
+                ]
+              },
+              {
+                "type": "section",
+                "id": "_multipartupload_aggregate",
+                "title": "MultipartUpload Aggregate",
+                "level": 3,
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "html": "<code>MultipartUpload</code> enforces multipart upload lifecycle transitions:"
+                  },
+                  {
+                    "type": "code",
+                    "html": "<pre><code>public interface MultipartUpload {\n    MultipartUpload withPartUploaded(UploadPart part);\n    MultipartUpload withCompleted();\n    MultipartUpload withAborted();\n    List&lt;ObjectStoreEvent&gt; domainEvents();\n    MultipartUpload clearEvents();\n}</code></pre>"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_registry_based_handler_dispatch_2",
+            "title": "Registry-Based Handler Dispatch",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "The <code>S3BucketConfigHandler</code> uses a registry/strategy pattern to dispatch configuration operations:"
+              },
+              {
+                "type": "code",
+                "html": "<pre><code>public class S3BucketConfigHandler {\n    private final ConfigHandlerRegistry registry;\n\n    Mono&lt;ServerResponse&gt; handleGet(ServerRequest request, ConfigType type) {\n        ConfigHandlerStrategy strategy = registry.lookup(type);\n        // strategy performs GET using typed methods\n        return strategy.handleGet(request);\n    }\n\n    Mono&lt;ServerResponse&gt; handlePut(ServerRequest request, ConfigType type) {\n        ConfigHandlerStrategy strategy = registry.lookup(type);\n        // strategy performs PUT using typed methods\n        return strategy.handlePut(request);\n    }\n\n    Mono&lt;ServerResponse&gt; handleDelete(ServerRequest request, ConfigType type) {\n        ConfigHandlerStrategy strategy = registry.lookup(type);\n        // strategy performs DELETE using typed methods\n        return strategy.handleDelete(request);\n    }\n}</code></pre>"
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_important_interfaces",
+            "title": "Important Interfaces",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "table",
+                "headers": [
+                  "Interface",
+                  "Description",
+                  "Connected Containers"
+                ],
+                "rows": [
+                  [
+                    "S3 REST API",
+                    "Public HTTP API — only AWS S3-compatible endpoints",
+                    "User ↔ s3-reactive-api-adapter"
+                  ],
+                  [
+                    "Reactive service calls",
+                    "ReactiveBucketService, ReactiveObjectService, ReactiveMultipartUploadService via Mono/Flux",
+                    "s3-reactive-api-adapter ↔ reactive-object-store / reactive-bucket-management"
+                  ],
+                  [
+                    "CQS repository interfaces",
+                    "Mono/Flux-based command and query ports",
+                    "reactive-object-store / reactive-bucket-management ↔ reactive-repository-application"
+                  ],
+                  [
+                    "Repository implementations",
+                    "Reactive in-memory adapters",
+                    "reactive-repository-application ↔ reactive-infrastructure"
+                  ],
+                  [
+                    "Bucket lookup",
+                    "Bucket existence validation",
+                    "reactive-object-store → reactive-bucket-management"
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "section",
+        "id": "section-runtime-view",
+        "title": "Runtime View",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "The runtime view describes the key interaction scenarios of the Magrathea ObjectStore system. These scenarios illustrate how the building blocks collaborate to implement S3-compatible operations."
+          },
+          {
+            "type": "section",
+            "id": "_scenario_1_createbucket",
+            "title": "Scenario 1 — CreateBucket",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "image",
+                "src": "/docs/c4/images/CreateBucketRuntime.png",
+                "alt": "CreateBucket Runtime",
+                "html": "<img src=\"/docs/c4/images/CreateBucketRuntime.png\" alt=\"CreateBucket Runtime\" width=\"600\">"
+              },
+              {
+                "type": "paragraph",
+                "html": "<strong>Flow:</strong>\n1. User → s3-reactive-api-adapter: <code>PUT /{bucket}</code>\n2. s3-reactive-api-adapter → reactive-bucket-management: CreateBucket use case\n3. reactive-bucket-management → reactive-repository-application: Save Bucket aggregate via command repository\n4. reactive-repository-application → reactive-infrastructure: Persist Bucket aggregate"
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_scenario_2_putobject",
+            "title": "Scenario 2 — PutObject",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "image",
+                "src": "/docs/c4/images/PutObjectRuntime.png",
+                "alt": "PutObject Runtime",
+                "html": "<img src=\"/docs/c4/images/PutObjectRuntime.png\" alt=\"PutObject Runtime\" width=\"600\">"
+              },
+              {
+                "type": "paragraph",
+                "html": "<strong>Flow:</strong>\n1. User → s3-reactive-api-adapter: <code>PUT /{bucket}/{key}</code>\n2. s3-reactive-api-adapter → reactive-object-store: PutObject use case (handler delegates directly — no bucket check in handler)\n3. reactive-object-store → reactive-repository-application: Save object metadata and bytes via command repository\n4. reactive-repository-application → reactive-infrastructure: Persist object metadata and bytes"
+              },
+              {
+                "type": "paragraph",
+                "html": "<strong>Note:</strong> Bucket existence validation is postponed to the repository layer. The handler does not verify bucket existence before delegating."
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_scenario_3_getobject",
+            "title": "Scenario 3 — GetObject",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "image",
+                "src": "/docs/c4/images/GetObjectRuntime.png",
+                "alt": "GetObject Runtime",
+                "html": "<img src=\"/docs/c4/images/GetObjectRuntime.png\" alt=\"GetObject Runtime\" width=\"600\">"
+              },
+              {
+                "type": "paragraph",
+                "html": "<strong>Flow:</strong>\n1. User → s3-reactive-api-adapter: <code>GET /{bucket}/{key}</code>\n2. s3-reactive-api-adapter → reactive-object-store: GetObject use case (handler delegates directly — no bucket check in handler)\n3. reactive-object-store → reactive-repository-application: Read object metadata and bytes via query repository\n4. reactive-repository-application → reactive-infrastructure: Read object metadata and bytes from persistence"
+              },
+              {
+                "type": "paragraph",
+                "html": "<strong>Note:</strong> Bucket existence validation is postponed to the repository layer. The handler does not verify bucket existence before delegating."
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_scenario_4_multipart_upload_lifecycle",
+            "title": "Scenario 4 — Multipart Upload Lifecycle",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "image",
+                "src": "/docs/c4/images/MultipartUploadRuntime.png",
+                "alt": "MultipartUpload Runtime",
+                "html": "<img src=\"/docs/c4/images/MultipartUploadRuntime.png\" alt=\"MultipartUpload Runtime\" width=\"600\">"
+              },
+              {
+                "type": "paragraph",
+                "html": "<strong>Flow:</strong>\n1. User → s3-reactive-api-adapter: POST/PUT/GET/DELETE multipart endpoints\n2. s3-reactive-api-adapter → reactive-object-store: Multipart upload lifecycle use cases\n3. reactive-object-store → reactive-repository-application: Write multipart upload state via command repository\n4. reactive-object-store → reactive-repository-application: Read multipart upload state via query repository\n5. reactive-repository-application → reactive-infrastructure: Persist multipart upload state\n6. reactive-repository-application → reactive-infrastructure: Read multipart upload state from persistence"
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_scenario_5_bucket_configuration_cors_lifecycle_policy_encryption_logging_website_notification_replication_request_payment_ownership_controls_public_access_block_accelerate_analytics_inventory_metrics_intelligent_tiering_abac_object_lock_metadata_configuration",
+            "title": "Scenario 5 — Bucket Configuration (CORS, Lifecycle, Policy, Encryption, Logging, Website, Notification, Replication, Request Payment, Ownership Controls, Public Access Block, Accelerate, Analytics, Inventory, Metrics, Intelligent-Tiering, ABAC, Object Lock, Metadata Configuration)",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "image",
+                "src": "/docs/c4/images/BucketConfigurationRuntime.png",
+                "alt": "Bucket Configuration Runtime",
+                "html": "<img src=\"/docs/c4/images/BucketConfigurationRuntime.png\" alt=\"Bucket Configuration Runtime\" width=\"600\">"
+              },
+              {
+                "type": "paragraph",
+                "html": "<strong>Flow:</strong>\n1. User → s3-reactive-api-adapter: <code>GET/PUT/DELETE /{bucket}?{config}</code> with query parameter identifying the configuration type\n2. s3-reactive-api-adapter → reactive-bucket-management: <code>S3BucketConfigHandler</code> dispatches to <code>ReactiveBucketService.{get|put|delete}{Config}</code> based on query parameter\n3. reactive-bucket-management → reactive-repository-application: <code>BucketCommandRepository.{save|delete}</code> or <code>BucketQueryRepository.{find}</code> reads/writes configuration via the Bucket aggregate root\n4. reactive-repository-application → reactive-infrastructure: <code>InMemoryReactiveBucketRepository</code> persists updated Bucket aggregate with configuration"
+              },
+              {
+                "type": "paragraph",
+                "html": "<strong>Configuration types and query parameters:</strong>"
+              },
+              {
+                "type": "table",
+                "headers": [
+                  "Configuration",
+                  "Query Param",
+                  "List support",
+                  "Domain Value Object"
+                ],
+                "rows": [
+                  [
+                    "CORS",
+                    "<code>?cors</code>",
+                    "No",
+                    "<code>CorsConfiguration</code>"
+                  ],
+                  [
+                    "Lifecycle",
+                    "<code>?lifecycle</code>",
+                    "No",
+                    "<code>BucketLifecycleConfiguration</code>"
+                  ],
+                  [
+                    "Policy",
+                    "<code>?policy</code>",
+                    "No",
+                    "<code>BucketPolicy</code>"
+                  ],
+                  [
+                    "Encryption",
+                    "<code>?encryption</code>",
+                    "No",
+                    "<code>BucketEncryptionConfiguration</code>"
+                  ],
+                  [
+                    "Logging",
+                    "<code>?logging</code>",
+                    "No",
+                    "<code>BucketLoggingConfiguration</code>"
+                  ],
+                  [
+                    "Website",
+                    "<code>?website</code>",
+                    "No",
+                    "<code>BucketWebsiteConfiguration</code>"
+                  ],
+                  [
+                    "Notification",
+                    "<code>?notification</code>",
+                    "No",
+                    "<code>BucketNotificationConfiguration</code>"
+                  ],
+                  [
+                    "Replication",
+                    "<code>?replication</code>",
+                    "No",
+                    "<code>BucketReplicationConfiguration</code>"
+                  ],
+                  [
+                    "Request Payment",
+                    "<code>?requestPayment</code>",
+                    "No",
+                    "<code>BucketRequestPaymentConfiguration</code>"
+                  ],
+                  [
+                    "Ownership Controls",
+                    "<code>?ownershipControls</code>",
+                    "No",
+                    "<code>BucketOwnershipControls</code>"
+                  ],
+                  [
+                    "Public Access Block",
+                    "<code>?publicAccessBlock</code>",
+                    "No",
+                    "<code>PublicAccessBlockConfiguration</code>"
+                  ],
+                  [
+                    "Accelerate",
+                    "<code>?accelerate</code>",
+                    "No",
+                    "<code>BucketAccelerateConfiguration</code>"
+                  ],
+                  [
+                    "Analytics",
+                    "<code>?analytics</code>",
+                    "Yes (<code>list-type</code>)",
+                    "<code>BucketAnalyticsConfiguration</code>"
+                  ],
+                  [
+                    "Inventory",
+                    "<code>?inventory</code>",
+                    "Yes (<code>list-type</code>)",
+                    "<code>BucketInventoryConfiguration</code>"
+                  ],
+                  [
+                    "Metrics",
+                    "<code>?metrics</code>",
+                    "No",
+                    "<code>BucketMetricsConfiguration</code>"
+                  ],
+                  [
+                    "Intelligent-Tiering",
+                    "<code>?intelligent-tiering</code>",
+                    "No",
+                    "<code>BucketIntelligentTieringConfiguration</code>"
+                  ],
+                  [
+                    "ABAC",
+                    "<code>?abac</code>",
+                    "No",
+                    "ABAC command/query DTOs"
+                  ],
+                  [
+                    "Object Lock",
+                    "<code>?object-lock</code>",
+                    "No",
+                    "<code>ObjectLockConfiguration</code> command/query DTOs"
+                  ],
+                  [
+                    "Bucket Metadata Configuration",
+                    "<code>?metadata-config</code>",
+                    "No",
+                    "<code>MetadataConfiguration</code> command/query DTOs"
+                  ],
+                  [
+                    "Bucket Metadata Table Configuration",
+                    "<code>?metadata-table-config</code>",
+                    "No",
+                    "<code>MetadataTableConfiguration</code> command/query DTOs"
+                  ],
+                  [
+                    "Inventory Table Configuration",
+                    "<code>?inventory-table-config</code>",
+                    "No",
+                    "metadata table command/query DTOs"
+                  ],
+                  [
+                    "Journal Table Configuration",
+                    "<code>?journal-table-config</code>",
+                    "No",
+                    "metadata table command/query DTOs"
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_scenario_6_phase_f_advanced_object_operations",
+            "title": "Scenario 6 — Phase F Advanced Object Operations",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "<strong>Description:</strong> Phase F adds advanced/specialized operations from <a href=\"/docs/adr/0012\">ADR 0012</a> while reusing existing RouterFunction and handler patterns."
+              },
+              {
+                "type": "paragraph",
+                "html": "<strong>Flow:</strong>\n1. User → s3-reactive-api-adapter: sends an advanced S3 request such as RenameObject, RestoreObject, SelectObjectContent, WriteGetObjectResponse, legal hold, retention, torrent, or encryption update.\n2. <code>S3PathRouter</code> dispatches by HTTP method, path, query parameter, and headers.\n3. <code>S3ObjectOperationsHandler</code> handles advanced object behavior such as rename, torrent, restore, select, and Object Lambda response.\n4. <code>S3ObjectMetadataHandler</code> handles metadata-oriented Phase F operations such as legal hold, retention, and encryption update.\n5. Reactive services/repositories are used where object or bucket state must be read or updated."
+              },
+              {
+                "type": "paragraph",
+                "html": "<strong>Verification:</strong> Phase F is Cucumber-tested; <code>mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false</code> completed with 216 tests, 0 failures, and 0 errors."
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_scenario_7_reactive_chain_pattern",
+            "title": "Scenario 7 — Reactive Chain Pattern",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "<strong>Description:</strong> The reactive chain pattern used throughout the application layer. No blocking <code>.join()</code>, no <code>Mono.fromCallable</code>, no <code>.subscribeOn(Schedulers.boundedElastic())</code>."
+              },
+              {
+                "type": "paragraph",
+                "html": "<strong>Flow:</strong>\n1. Handler receives <code>ServerRequest</code>\n2. Handler calls reactive service method — returns <code>Mono&lt;T&gt;</code> or <code>Flux&lt;T&gt;</code>\n3. Service method composes repository operations using <code>Mono.defer</code>, <code>Mono.just</code>, <code>Mono.justOrEmpty</code>, <code>Flux.defer</code>, <code>Flux.fromIterable</code>\n4. Repository operations use native <code>ConcurrentHashMap</code> lookups wrapped in <code>Mono.just</code>/<code>Mono.justOrEmpty</code>\n5. Handler chains operators: <code>.flatMap(service::method)</code>, <code>.flatMap(service::method2)</code>, <code>.map(domain::toDto)</code>\n6. Handler returns <code>ServerResponse.ok().body(&#8230;&#8203;)</code> or <code>ServerResponse.status(code).body(&#8230;&#8203;)</code>"
+              },
+              {
+                "type": "paragraph",
+                "html": "<strong>Example:</strong>"
+              },
+              {
+                "type": "code",
+                "html": "<pre><code>// Handler — no blocking, no thread pool offload\npublic Mono&lt;ServerResponse&gt; handleGet(ServerRequest request) {\n    return bucketService.findBucket(bucketName)\n        .flatMap(bucket -&gt; {\n            CorsConfiguration config = bucket.corsConfiguration();\n            return Mono.justOrEmpty(config)\n                .map(GetBucketCorsQuery::from);\n        })\n        .flatMap(query -&gt; ok().body(BodyInserters.fromValue(query)))\n        .switchIfEmpty(Mono.defer(() -&gt; errorResponse(404, \"NoSuchBucket\")));\n}</code></pre>"
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_scenario_8_runtime_effects",
+            "title": "Scenario 8 — Runtime Effects",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "<strong>Description:</strong> Runtime effects that execute during request processing to enforce S3 semantics."
+              },
+              {
+                "type": "section",
+                "id": "_cors_validation",
+                "title": "CORS Validation",
+                "level": 3,
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "html": "<strong>Trigger:</strong> Any request with <code>Origin</code> header.\n<strong>Behavior:</strong> <code>S3BucketConfigHandler</code> checks bucket CORS configuration. If the origin is not allowed, returns <code>403 Forbidden</code> with <code>AccessForbidden</code> error. If CORS preflight (<code>OPTIONS</code>), validates method, headers, and origin."
+                  }
+                ]
+              },
+              {
+                "type": "section",
+                "id": "_website_routing",
+                "title": "Website Routing",
+                "level": 3,
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "html": "<strong>Trigger:</strong> Request to a bucket configured as a website (<code>?website</code>).\n<strong>Behavior:</strong> <code>S3BucketOperationsHandler</code> redirects <code>GET /{bucket}</code> to the configured website endpoint if the bucket has website configuration."
+                  }
+                ]
+              },
+              {
+                "type": "section",
+                "id": "_ownershipcontrols_enforcement",
+                "title": "OwnershipControls Enforcement",
+                "level": 3,
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "html": "<strong>Trigger:</strong> <code>PutObject</code>, <code>PutObjectAcl</code> requests.\n<strong>Behavior:</strong> If bucket has <code>OwnershipControls</code> with <code>ObjectOwnerRequired</code>, the request must include <code>x-amz-object-ownership</code> header."
+                  }
+                ]
+              },
+              {
+                "type": "section",
+                "id": "_publicaccessblock_evaluation",
+                "title": "PublicAccessBlock Evaluation",
+                "level": 3,
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "html": "<strong>Trigger:</strong> ACL or policy modification requests.\n<strong>Behavior:</strong> If <code>PublicAccessBlock</code> is enabled, blocks public ACLs or public bucket policies."
+                  }
+                ]
+              },
+              {
+                "type": "section",
+                "id": "_accelerate_header_injection",
+                "title": "Accelerate Header Injection",
+                "level": 3,
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "html": "<strong>Trigger:</strong> Response to <code>GetObject</code>, <code>HeadObject</code>, <code>GetBucketAccelerateConfiguration</code>.\n<strong>Behavior:</strong> If bucket has accelerate configuration, response includes <code>x-amz-accelerate-result</code> header."
+                  }
+                ]
+              },
+              {
+                "type": "section",
+                "id": "_requestpayment_enforcement",
+                "title": "RequestPayment Enforcement",
+                "level": 3,
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "html": "<strong>Trigger:</strong> Requests to buckets with <code>RequestPayment</code> configured.\n<strong>Behavior:</strong> If bucket has <code>RequesterPays</code> enabled, requests must include <code>x-amz-request-payer</code> header or return <code>403 AccessDenied</code>."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_scenario_9_error_handling",
+            "title": "Scenario 9 — Error Handling",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "<strong>Description:</strong> System behavior for error conditions."
+              },
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "<strong>NoSuchBucket:</strong> Handler returns <code>404 Not Found</code> with S3 XML <code>&lt;Error&gt;&lt;Code&gt;NoSuchBucket&lt;/Code&gt;&#8230;&#8203;</code>",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>NoSuchKey:</strong> Handler returns <code>404 Not Found</code> with S3 XML <code>&lt;Error&gt;&lt;Code&gt;NoSuchKey&lt;/Code&gt;&#8230;&#8203;</code>",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>BucketAlreadyExists:</strong> Handler returns <code>409 Conflict</code> with S3 XML <code>&lt;Error&gt;&lt;Code&gt;BucketAlreadyExists&lt;/Code&gt;&#8230;&#8203;</code>",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>InvalidArgument:</strong> Handler returns <code>400 Bad Request</code> with S3 XML <code>&lt;Error&gt;&lt;Code&gt;InvalidArgument&lt;/Code&gt;&#8230;&#8203;</code>",
+                    "blocks": []
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "html": "All error responses use <code>S3WebSupport.errorResponse()</code> which creates a Jackson 3 XML annotated <code>S3Error</code> record and serializes it via the registered <code>JacksonXmlEncoder</code>. Reactive error handling uses <code>Mono.error()</code> and <code>Flux.error()</code> with custom exception classes, caught at the handler level and mapped to S3 XML error responses."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "section",
+        "id": "section-deployment-view",
+        "title": "Deployment View",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "section",
+            "id": "_development_environment",
+            "title": "Development Environment",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "<strong>Single node, running locally.</strong>"
+              },
+              {
+                "type": "table",
+                "headers": [
+                  "Element",
+                  "Description"
+                ],
+                "rows": [
+                  [
+                    "S3 Server",
+                    "JAR <code>bootstrap-application-1.0.0-SNAPSHOT.jar</code> running on <code>localhost:8080</code>"
+                  ],
+                  [
+                    "File Store",
+                    "In-memory (ConcurrentHashMap), allocated in the same JVM heap as the server"
+                  ],
+                  [
+                    "Java Runtime",
+                    "JDK 21"
+                  ],
+                  [
+                    "Build Tool",
+                    "Apache Maven 3.9+"
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_docker_deployment",
+            "title": "Docker Deployment",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "A <code>Dockerfile</code> and <code>docker-compose.yml</code> are present at the project root for containerized execution:"
+              },
+              {
+                "type": "paragraph",
+                "html": "<strong>Dockerfile:</strong>\n- Base: <code>eclipse-temurin:21-jdk</code>\n- Copy <code>bootstrap-application/target/*.jar</code>\n- Expose port 8080\n- Entrypoint: <code>java -jar bootstrap-application-1.0.0-SNAPSHOT.jar</code>"
+              },
+              {
+                "type": "paragraph",
+                "html": "<strong>docker-compose.yml:</strong>\n- Single service <code>magrathea-s3</code> on port <code>8080:8080</code>\n- Environment variables for configuration"
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_production_deployment_future",
+            "title": "Production Deployment (Future)",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "The two-container architecture (<code>s3-server</code> + <code>file-store</code>) is intentionally monolithic for single-node operation. In the future:"
+              },
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "<code>file-store</code> can be replaced by R2DBC + PostgreSQL for relational persistence",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>file-store</code> can become a separate container for horizontal scaling",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>s3-server</code> can be clustered with session affinity",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>storage-engine-*</code> placeholder modules for future storage-engine persistence design",
+                    "blocks": []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "section",
+        "id": "section-concepts",
+        "title": "Cross-cutting Concepts",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "section",
+            "id": "_hexagonal_architecture_ports_and_adapters",
+            "title": "Hexagonal Architecture (Ports and Adapters)",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "The system follows the hexagonal architecture pattern with three layers:"
+              },
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "<strong>Domain (core):</strong> pure business logic, zero framework dependencies",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>Application:</strong> orchestration, reactive bridge via Mono/Flux",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>Infrastructure:</strong> HTTP adapter (RouterFunction), persistence adapter (in-memory)",
+                    "blocks": []
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "html": "Dependencies flow only inward: infrastructure → application → domain."
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_reactive_non_blocking_io",
+            "title": "Reactive Non-blocking I/O",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "All HTTP request handling is reactive:"
+              },
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "RouterFunction instead of @Controller",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Flux&lt;DataBuffer&gt; for binary upload/download (never byte[] in handlers)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Mono/Flux throughout the reactive application and infrastructure layers",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Schedulers.boundedElastic() only for operations that consume the stream in memory",
+                    "blocks": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_domain_purity",
+            "title": "Domain Purity",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "The <code>object-store-domain</code> module is strictly pure:"
+              },
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "NO Spring imports",
+                    "blocks": []
+                  },
+                  {
+                    "text": "NO JPA, NO jakarta.validation",
+                    "blocks": []
+                  },
+                  {
+                    "text": "NO reactive types (Mono, Flux, DataBuffer)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Repository interfaces with CompletableFuture (standard Java async)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "S3ObjectWrite/S3ObjectContent without framework types",
+                    "blocks": []
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "html": "Advanced configuration value objects (BucketAnalyticsConfiguration, BucketInventoryConfiguration, BucketMetricsConfiguration, BucketIntelligentTieringConfiguration) follow the same pattern: immutable records, zero framework dependencies, validation with Objects.requireNonNull."
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_s3_api_compatibility",
+            "title": "S3 API Compatibility",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "The system exposes ONLY AWS S3-compatible endpoints:"
+              },
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "Same HTTP signature (methods, headers, query parameters)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Same XML format (ListAllMyBucketsResult, ListBucketResult, Error, etc.)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Same error encoding (NoSuchBucket, NoSuchKey, BucketAlreadyExists)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Pluggable via Spring Boot auto-configuration (s3-reactive-api-adapter attaches as an optional module)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Toggle with <code>s3.api.enabled=false</code>",
+                    "blocks": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_pluggable_s3_api_module",
+            "title": "Pluggable S3 API Module",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "<code>s3-reactive-api-adapter</code> is an auto-configuring module that plugs into the Spring Boot context:"
+              },
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "<code>META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports</code>",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>S3ApiConfig</code> guarded by <code>@ConditionalOnClass({ ReactiveBucketService.class, ReactiveObjectService.class })</code>",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>s3.api.enabled=true</code> by default",
+                    "blocks": []
+                  },
+                  {
+                    "text": "If <code>s3-reactive-api-adapter</code> is not in the classpath, S3 routes are not loaded",
+                    "blocks": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_commandquery_dto_pattern_for_xml_serialization",
+            "title": "Command/Query DTO Pattern for XML Serialization",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "The system exposes an XML S3-compatible API where each operation has a structured XML body. Instead of using custom parsers (regex, explicit XmlMapper) or generic \"request\"/\"response\" DTOs, the system follows the DDD CQS (Command-Query Separation) pattern:"
+              },
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "<strong>Commands</strong>: represent the intention to change state (PUT, POST, DELETE). They are Jackson XML-annotated DTOs that the framework deserializes directly from the HTTP body. Examples: <code>CorsConfigurationCommand</code>, <code>LifecycleConfigurationCommand</code>, <code>DeleteObjectsCommand</code>",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>Queries</strong>: represent the response to a read request (GET). They are Jackson XML-annotated DTOs that the framework serializes directly into the HTTP body. Examples: <code>ListBucketsQuery</code>, <code>GetBucketCorsQuery</code>, <code>ErrorResponse</code>",
+                    "blocks": []
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "html": "Benefits:\n- Zero custom parsing: Spring Boot 4 WebFlux deserializes/serializes with registered codecs\n- Separate DTOs per operation: each Command/Query lives in its own file, organized by domain\n- DDD alignment: Commands express intent, Queries express reads — semantically clear\n- Maintainability: modifying an XML tag means modifying a single DTO, not a regex parser and a separate mapping"
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_xml_codec_infrastructure",
+            "title": "XML Codec Infrastructure",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "Spring Boot 4 WebFlux handles XML serialization via codecs registered in <code>JacksonXmlCodecConfig</code>:"
+              },
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "<strong>JacksonXmlEncoder</strong>: serializes response DTOs into XML",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>JacksonXmlDecoder</strong>: deserializes request body into Command DTOs (added with <a href=\"/docs/adr/0008\">ADR 0008</a>)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Both use <code>tools.jackson.dataformat:jackson-dataformat-xml</code> (Jackson 3, not Jackson 2)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "DTOs use <code>tools.jackson.dataformat.xml.annotation.*</code> annotations (<code>@JacksonXmlRootElement</code>, <code>@JacksonXmlProperty</code>, <code>@JacksonXmlElementWrapper</code>, <code>@JacksonXmlText</code>)",
+                    "blocks": []
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "html": "The decoder allows <code>request.bodyToMono(CorsConfigurationCommand.class)</code> to work for XML — the framework reads the body, passes it to the XML decoder, and produces the annotated record. No explicit call to <code>XmlMapper</code>."
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_command_query_separation_cqs_repository_pattern",
+            "title": "Command-Query Separation (CQS) Repository Pattern",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "The application layer separates write and read concerns at the repository level:"
+              },
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "<strong>Command repositories</strong>: <code>BucketCommandRepository</code>, <code>S3ObjectCommandRepository</code>, <code>MultipartUploadCommandRepository</code> — accept Mono&lt;Void&gt; return types for write operations",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>Query repositories</strong>: <code>BucketQueryRepository</code>, <code>S3ObjectQueryRepository</code>, <code>MultipartUploadQueryRepository</code> — return Mono&lt;T&gt; or Flux&lt;T&gt; for read operations",
+                    "blocks": []
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "html": "This enables independent optimization of read and write paths, and aligns with CQS principles at the persistence boundary."
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_handler_minimal_pattern_2",
+            "title": "Handler Minimal Pattern",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "All handlers (except <code>S3BucketConfigHandler</code>) follow the <strong>extract → delegate → response</strong> pattern:"
+              },
+              {
+                "type": "code",
+                "html": "<pre><code>public Mono&lt;ServerResponse&gt; putObject(ServerRequest request) {\n    return objectService.saveObjectWithContent(\n            S3RequestExtractor.extractObjectKey(request),\n            S3RequestExtractor.extractStorageClass(request),\n            S3RequestExtractor.extractChecksum(request),\n            S3RequestExtractor.extractEncryption(request),\n            S3RequestExtractor.extractContentType(request),\n            S3RequestExtractor.extractContentLength(request),\n            S3RequestExtractor.extractUserMetadata(request),\n            request.bodyToFlux(DataBuffer.class))\n        .flatMap(result -&gt; S3ResponseBuilder.ok(result.aggregate()))\n        .onErrorResume(BucketNotFoundException.class,\n            e -&gt; S3WebSupport.xmlError(HttpStatus.NOT_FOUND, \"NoSuchBucket\", \"Bucket not found\"))\n        .onErrorResume(Throwable.class,\n            e -&gt; S3WebSupport.xmlError(HttpStatus.INTERNAL_SERVER_ERROR, \"InternalError\", e.getMessage()));\n}</code></pre>"
+              },
+              {
+                "type": "paragraph",
+                "html": "Key constraints:\n- <strong>NO</strong> validation — postponed to repository preconditions\n- <strong>NO</strong> bucket existence checks — postponed to repository preconditions\n- <strong>NO</strong> ETag computation — postponed to repository on store\n- <strong>NO</strong> handler-local state — postponed to repository\n- <strong>NO</strong> CORS/website logic — postponed to repository/service"
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_postponed_items",
+            "title": "Postponed Items",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "The following cross-cutting concerns are intentionally absent from handlers and will be implemented in the repository layer:"
+              },
+              {
+                "type": "table",
+                "headers": [
+                  "Concern",
+                  "Target"
+                ],
+                "rows": [
+                  [
+                    "Validation (Spring Reactive Validator)",
+                    "Repository preconditions"
+                  ],
+                  [
+                    "Bucket existence checks",
+                    "Repository preconditions"
+                  ],
+                  [
+                    "Bucket name validation",
+                    "Repository preconditions"
+                  ],
+                  [
+                    "ETag computation",
+                    "Repository (generated on store)"
+                  ],
+                  [
+                    "Handler-local ACL/grants/tagging",
+                    "Repository"
+                  ],
+                  [
+                    "CORS validation",
+                    "Repository/Service"
+                  ],
+                  [
+                    "Website routing",
+                    "Repository/Service"
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_reactive_error_handling",
+            "title": "Reactive Error Handling",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "Error handling follows the reactive pattern with typed exceptions and S3 XML error serialization:"
+              },
+              {
+                "type": "section",
+                "id": "_exception_hierarchy",
+                "title": "Exception Hierarchy",
+                "level": 3,
+                "blocks": [
+                  {
+                    "type": "code",
+                    "html": "<pre><code>S3Exception (abstract)\n├── NoSuchBucketException     → 404 NoSuchBucket\n├── NoSuchKeyException        → 404 NoSuchKey\n├── BucketAlreadyExistsException → 409 BucketAlreadyExists\n├── InvalidArgumentException  → 400 InvalidArgument\n├── AccessDeniedException     → 403 AccessDenied\n└── InternalServerException   → 500 InternalServerError</code></pre>"
+                  }
+                ]
+              },
+              {
+                "type": "section",
+                "id": "_handler_error_chain",
+                "title": "Handler Error Chain",
+                "level": 3,
+                "blocks": [
+                  {
+                    "type": "code",
+                    "html": "<pre><code>// Handler-level error handling\npublic Mono&lt;ServerResponse&gt; handleGet(ServerRequest request) {\n    return service.findBucket(name)\n        .flatMap(bucket -&gt; service.getObject(bucket, key))\n        .map(object -&gt; buildResponse(object))\n        .onErrorResume(NoSuchBucketException.class, e -&gt; errorResponse(404, \"NoSuchBucket\"))\n        .onErrorResume(NoSuchKeyException.class, e -&gt; errorResponse(404, \"NoSuchKey\"))\n        .onErrorResume(InvalidArgumentException.class, e -&gt; errorResponse(400, \"InvalidArgument\"))\n        .onErrorResume(throwable -&gt; errorResponse(500, \"InternalError\"));\n}</code></pre>"
+                  },
+                  {
+                    "type": "paragraph",
+                    "html": "All error responses use <code>S3WebSupport.errorResponse()</code> which creates a Jackson 3 XML annotated <code>S3Error</code> record."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_domain_events_and_state_transitions",
+            "title": "Domain Events and State Transitions",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "section",
+                "id": "_aggregate_root_pattern",
+                "title": "Aggregate Root Pattern",
+                "level": 3,
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "html": "All three aggregates (Bucket, S3Object, MultipartUpload) follow the same pattern:"
+                  },
+                  {
+                    "type": "list",
+                    "style": "arabic",
+                    "items": [
+                      {
+                        "text": "State transitions return NEW immutable instances — no mutation",
+                        "blocks": []
+                      },
+                      {
+                        "text": "Each transition records a domain event in an accumulated list",
+                        "blocks": []
+                      },
+                      {
+                        "text": "<code>domainEvents()</code> retrieves pending events",
+                        "blocks": []
+                      },
+                      {
+                        "text": "<code>clearEvents()</code> returns a clean instance ready for persistence",
+                        "blocks": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "section",
+                "id": "_state_transition_rules",
+                "title": "State Transition Rules",
+                "level": 3,
+                "blocks": [
+                  {
+                    "type": "list",
+                    "style": "ulist",
+                    "items": [
+                      {
+                        "text": "State transitions return NEW immutable instances with accumulated events",
+                        "blocks": []
+                      },
+                      {
+                        "text": "<code>domainEvents()</code> retrieves pending events; <code>clearEvents()</code> returns a clean instance for persistence",
+                        "blocks": []
+                      }
+                    ]
+                  },
+                  {
+                    "type": "paragraph",
+                    "html": "Each event carries the specific value object type (e.g., <code>BucketLifecycleConfiguration</code>, <code>BucketNotificationConfiguration</code>) so consumers can react to precise changes."
+                  }
+                ]
+              },
+              {
+                "type": "section",
+                "id": "_bucket_events",
+                "title": "Bucket Events",
+                "level": 3,
+                "blocks": [
+                  {
+                    "type": "code",
+                    "html": "<pre><code>ObjectStoreEvent (sealed interface)\n├── BucketCreated\n├── BucketDeleted\n├── BucketVersioningEnabled\n├── BucketVersioningSuspended\n├── BucketEncryptionEnabled\n├── BucketCorsConfigurationChanged      (carries CorsConfiguration)\n├── BucketLifecycleConfigurationChanged (carries BucketLifecycleConfiguration)\n├── BucketEncryptionConfigurationChanged (carries BucketEncryptionConfiguration)\n├── BucketLoggingConfigurationChanged    (carries BucketLoggingConfiguration)\n├── BucketWebsiteConfigurationChanged    (carries BucketWebsiteConfiguration)\n├── BucketNotificationConfigurationChanged (carries BucketNotificationConfiguration)\n├── BucketReplicationConfigurationChanged (carries BucketReplicationConfiguration)\n├── BucketPolicyChanged                 (carries BucketPolicy)\n├── BucketPublicAccessBlockChanged      (carries PublicAccessBlockConfiguration)\n├── BucketOwnershipControlsChanged      (carries BucketOwnershipControls)\n├── BucketRequestPaymentChanged         (carries BucketRequestPaymentConfiguration)\n├── BucketAccelerateConfigurationChanged (carries BucketAccelerateConfiguration)\n├── BucketAnalyticsConfigurationAdded   (carries BucketAnalyticsConfiguration)\n├── BucketAnalyticsConfigurationRemoved\n├── BucketInventoryConfigurationAdded   (carries BucketInventoryConfiguration)\n├── BucketInventoryConfigurationRemoved\n├── BucketMetricsConfigurationAdded     (carries BucketMetricsConfiguration)\n├── BucketMetricsConfigurationRemoved\n├── BucketIntelligentTieringConfigurationAdded (carries BucketIntelligentTieringConfiguration)\n├── BucketIntelligentTieringConfigurationRemoved</code></pre>"
+                  }
+                ]
+              },
+              {
+                "type": "section",
+                "id": "_s3object_events",
+                "title": "S3Object Events",
+                "level": 3,
+                "blocks": [
+                  {
+                    "type": "code",
+                    "html": "<pre><code>ObjectStoreEvent (sealed interface)\n├── ObjectCreated                      (carries S3Object)\n├── ObjectDeleted\n├── ObjectEtagUpdated                  (carries String etag)\n├── ObjectStorageClassChanged          (carries StorageClass)\n├── ObjectAclChanged                   (carries AccessControlPolicy)\n├── ObjectTaggingChanged               (carries Map&lt;String,String&gt;)\n├── ObjectLegalHoldChanged             (carries LegalHold)\n├── ObjectLegalHoldRemoved\n├── ObjectRetentionChanged             (carries RetentionPeriod)\n├── ObjectRetentionRemoved\n├── ObjectEncryptionChanged            (carries EncryptionConfiguration)\n├── ObjectEncryptionRemoved</code></pre>"
+                  }
+                ]
+              },
+              {
+                "type": "section",
+                "id": "_multipartupload_events",
+                "title": "MultipartUpload Events",
+                "level": 3,
+                "blocks": [
+                  {
+                    "type": "code",
+                    "html": "<pre><code>ObjectStoreEvent (sealed interface)\n├── ContentDescriptorCreated           (carries MultipartUpload)\n├── PartUploaded                       (carries UploadPart)\n├── MultipartUploadCreated\n├── MultipartUploadCompleted\n├── MultipartUploadAborted</code></pre>"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_aws_cli_header_compatibility",
+            "title": "AWS CLI Header Compatibility",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "The system must handle headers that the AWS CLI v2 sends by default on every <code>aws s3api put-object</code> request. These headers are critical for AWS CLI compatibility but are currently ignored by the handler."
+              },
+              {
+                "type": "section",
+                "id": "_default_headers_sent_by_aws_cli_v2",
+                "title": "Default Headers Sent by AWS CLI v2",
+                "level": 3,
+                "blocks": [
+                  {
+                    "type": "table",
+                    "headers": [
+                      "Header",
+                      "Value",
+                      "Purpose",
+                      "Handler Status"
+                    ],
+                    "rows": [
+                      [
+                        "<code>x-amz-sdk-checksum-algorithm</code>",
+                        "<code>crc64nvme</code> (default)",
+                        "Identifies the checksum algorithm used",
+                        "<span class=\"red\">Not read</span>"
+                      ],
+                      [
+                        "<code>x-amz-checksum-crc64nvme</code>",
+                        "BASE64 CRC64-NVME hash",
+                        "Payload integrity hash computed automatically by AWS CLI",
+                        "<span class=\"red\">Not validated</span>"
+                      ],
+                      [
+                        "<code>X-Amz-Date</code>",
+                        "ISO 8601 timestamp",
+                        "SigV4 signing timestamp",
+                        "<span class=\"red\">Not validated</span>"
+                      ],
+                      [
+                        "<code>X-Amz-Content-SHA256</code>",
+                        "SHA256 hex string",
+                        "SigV4 payload hash",
+                        "<span class=\"red\">Not validated</span>"
+                      ],
+                      [
+                        "<code>Authorization</code>",
+                        "SigV4 signature string",
+                        "SigV4 signature",
+                        "<span class=\"red\">Not validated</span>"
+                      ],
+                      [
+                        "<code>User-Agent</code>",
+                        "SDK identifier string",
+                        "Client identification",
+                        "<span class=\"red\">Not read</span>"
+                      ],
+                      [
+                        "<code>Expect</code>",
+                        "<code>100-continue</code>",
+                        "Hop-by-hop header for large payloads",
+                        "<span class=\"red\">Not read</span>"
+                      ]
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "section",
+                "id": "_checksum_algorithm_mapping",
+                "title": "Checksum Algorithm Mapping",
+                "level": 3,
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "html": "When <code>--checksum-algorithm &lt;alg&gt;</code> is specified, AWS CLI v2 <strong>automatically computes</strong> the hash and sends it in the corresponding header:"
+                  },
+                  {
+                    "type": "table",
+                    "headers": [
+                      "CLI <code>--checksum-algorithm</code>",
+                      "Header Sent",
+                      "Automatic Computation"
+                    ],
+                    "rows": [
+                      [
+                        "<code>crc64nvme</code> (default)",
+                        "<code>x-amz-checksum-crc64nvme</code>",
+                        "<span class=\"green\">Yes</span> — AWS CLI computes CRC64-NVME"
+                      ],
+                      [
+                        "<code>crc32</code>",
+                        "<code>x-amz-checksum-crc32</code>",
+                        "<span class=\"green\">Yes</span>"
+                      ],
+                      [
+                        "<code>crc32c</code>",
+                        "<code>x-amz-checksum-crc32c</code>",
+                        "<span class=\"green\">Yes</span>"
+                      ],
+                      [
+                        "<code>sha1</code>",
+                        "<code>x-amz-checksum-sha1</code>",
+                        "<span class=\"green\">Yes</span>"
+                      ],
+                      [
+                        "<code>sha256</code>",
+                        "<code>x-amz-checksum-sha256</code>",
+                        "<span class=\"green\">Yes</span>"
+                      ],
+                      [
+                        "<code>sha512</code>",
+                        "<code>x-amz-checksum-sha512</code>",
+                        "<span class=\"green\">Yes</span>"
+                      ],
+                      [
+                        "<code>xxhash64</code>",
+                        "<code>x-amz-checksum-xxhash64</code>",
+                        "<span class=\"green\">Yes</span>"
+                      ],
+                      [
+                        "<code>xxhash3</code>",
+                        "<code>x-amz-checksum-xxhash3</code>",
+                        "<span class=\"green\">Yes</span>"
+                      ],
+                      [
+                        "<code>xxhash128</code>",
+                        "<code>x-amz-checksum-xxhash128</code>",
+                        "<span class=\"green\">Yes</span>"
+                      ]
+                    ]
+                  },
+                  {
+                    "type": "paragraph",
+                    "html": "The server must read <code>x-amz-sdk-checksum-algorithm</code>, re-compute the hash of the received body with that algorithm, and compare against the corresponding <code>x-amz-checksum-&lt;alg&gt;</code> header. A mismatch must return <code>400 InvalidArgument (ChecksumMismatch)</code>."
+                  }
+                ]
+              },
+              {
+                "type": "section",
+                "id": "_content_type_handling",
+                "title": "Content-Type Handling",
+                "level": 3,
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "html": "AWS CLI v2 does NOT send <code>Content-Type</code> by default unless <code>--content-type</code> is explicitly passed. The handler currently falls back to <code>application/octet-stream</code>. When AWS CLI is used, the stored content-type is incorrect — the object will be served with <code>application/octet-stream</code> instead of the actual content type."
+                  }
+                ]
+              },
+              {
+                "type": "section",
+                "id": "_current_gap_summary",
+                "title": "Current Gap Summary",
+                "level": 3,
+                "blocks": [
+                  {
+                    "type": "table",
+                    "headers": [
+                      "Gap",
+                      "Impact",
+                      "Severity"
+                    ],
+                    "rows": [
+                      [
+                        "Checksum headers ignored",
+                        "No data integrity validation — corrupted payloads accepted silently",
+                        "<span class=\"red\">High</span>"
+                      ],
+                      [
+                        "SigV4 headers ignored",
+                        "No authentication — anyone can write/read objects",
+                        "<span class=\"red\">High</span>"
+                      ],
+                      [
+                        "Content-Type not sent by AWS CLI",
+                        "Wrong content-type stored when using AWS CLI",
+                        "<span class=\"yellow\">Medium</span>"
+                      ],
+                      [
+                        "User-Agent ignored",
+                        "No client identification for analytics",
+                        "<span class=\"green\">Low</span>"
+                      ],
+                      [
+                        "Expect ignored",
+                        "No 100-continue optimization",
+                        "<span class=\"green\">Low</span>"
+                      ]
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_testing_strategy",
+            "title": "Testing Strategy",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "Three levels of testing:"
+              },
+              {
+                "type": "list",
+                "style": "arabic",
+                "items": [
+                  {
+                    "text": "<strong>Domain:</strong> Pure JUnit, zero Spring — test invariants and business rules (213 tests)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>Application:</strong> Reactive application service tests (18 tests)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>S3 Integration:</strong> Cucumber BDD with WebTestClient — verify HTTP endpoints (227 tests)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<strong>AWS CLI Compatibility:</strong> <code>test-aws-cli.sh</code> bash script + <code>mvn verify -Paws-cli-tests</code>",
+                    "blocks": []
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "html": "Total: <strong>479 tests</strong> (213 domain + 18 application + 227 S3 integration + 21 AWS CLI), 12 failures (12 anomaly tests documenting known bugs in put_object handler — see PLAN.md Phase 0 for details)."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "section",
+        "id": "section-design-decisions",
+        "title": "Architecture Decisions",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "All architectural decisions are documented as Architecture Decision Records (ADRs) in <code>docs/adr/</code>."
+          },
+          {
+            "type": "table",
+            "headers": [
+              "ADR",
+              "Title",
+              "Status"
+            ],
+            "rows": [
+              [
+                "[0001](adr/0001-multi-module-per-bounded-context.md)",
+                "Multi-Module per Bounded Context",
+                "✅ Accepted"
+              ],
+              [
+                "[0002](adr/0002-zero-dependency-domain-purity.md)",
+                "Zero-dependency domain purity",
+                "✅ Accepted"
+              ],
+              [
+                "[0003](adr/0003-binarycontent-vs-databuffer-boundary.md)",
+                "BinaryContent vs DataBuffer boundary",
+                "✅ Accepted"
+              ],
+              [
+                "[0004](adr/0004-reactive-boundary-completablefuture-to-mono-flux.md)",
+                "Reactive boundary CompletableFuture to Mono/Flux",
+                "✅ Accepted"
+              ],
+              [
+                "[0005](adr/0005-routerfunction-functional-webflux-pattern.md)",
+                "RouterFunction functional WebFlux pattern",
+                "✅ Accepted"
+              ],
+              [
+                "[0006](adr/0006-s3-api-protocol-endpoint-mapping.md)",
+                "S3 reactive API protocol endpoint mapping",
+                "✅ Accepted"
+              ],
+              [
+                "[0007](adr/0007-pluggable-s3-api-autoconfiguration.md)",
+                "Pluggable S3 reactive API via Spring Boot Auto-Configuration",
+                "✅ Accepted"
+              ],
+              [
+                "[0008](adr/0008-remove-xml-parsing-use-spring-codec.md)",
+                "Remove all custom XML parsing, use Spring Boot 4 codec infrastructure",
+                "✅ Accepted"
+              ],
+              [
+                "[0009](adr/0009-reactive-repository-domain-separation.md)",
+                "Reactive repository and domain separation",
+                "✅ Accepted"
+              ],
+              [
+                "[0010](adr/0010-course-correction-reactive-quality.md)",
+                "Course correction: reactive migration quality issues",
+                "✅ Accepted"
+              ],
+              [
+                "[0011](adr/0011-course-correction-bucket-configuration-redesign.md)",
+                "Course correction: Bucket.Configuration redesign",
+                "✅ Accepted"
+              ],
+              [
+                "[0012](adr/0012-phase-f-advanced-s3-operations.md)",
+                "Phase F: Advanced and Specialized S3 Operations",
+                "✅ Accepted"
+              ],
+              [
+                "[0013](adr/0013-course-correction-phase-f-domain-application-ownership-and-aws-cli-verification-gate.md)",
+                "Course correction: Phase F domain/application ownership and AWS CLI verification gate",
+                "✅ Accepted"
+              ],
+              [
+                "[0014](adr/0014-storage-engine-bounded-context.md)",
+                "Storage Engine bounded context",
+                "✅ Accepted"
+              ],
+              [
+                "[0015](adr/0015-handler-minimal-pattern-and-postponed-repository-responsibilities.md)",
+                "Handler minimal pattern and postponed repository responsibilities",
+                "✅ Accepted"
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "type": "section",
+        "id": "section-quality-scenarios",
+        "title": "Quality Requirements",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "section",
+            "id": "_quality_goals_from_section_1",
+            "title": "Quality Goals (from Section 1)",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "table",
+                "headers": [
+                  "Category",
+                  "Goal",
+                  "Description",
+                  "Metric"
+                ],
+                "rows": [
+                  [
+                    "Functional",
+                    "S3 API Compatibility",
+                    "Implement the in-scope AWS S3 REST API operation set",
+                    "111/111 operations implemented"
+                  ],
+                  [
+                    "Performance",
+                    "Reactive non-blocking I/O",
+                    "Upload/download without thread blocking",
+                    "DataBuffer streaming, no byte[] in handlers"
+                  ],
+                  [
+                    "Testability",
+                    "3-layer testing",
+                    "Domain JUnit + Cucumber BDD + AWS CLI",
+                    "Total: 479 tests (213 domain + 18 application + 227 S3 integration + 21 AWS CLI), 12 failures (12 anomaly tests)"
+                  ],
+                  [
+                    "Maintainability",
+                    "Domain-Driven Design",
+                    "Pure domain, zero framework dependencies",
+                    "12 ADRs document decisions"
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_quality_scenarios",
+            "title": "Quality Scenarios",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "section",
+                "id": "_scenario_1_object_upload_performance",
+                "title": "Scenario 1 — Object Upload Performance",
+                "level": 3,
+                "blocks": [
+                  {
+                    "type": "list",
+                    "style": "ulist",
+                    "items": [
+                      {
+                        "text": "<strong>Context:</strong> User uploads large files (100+ MB)",
+                        "blocks": []
+                      },
+                      {
+                        "text": "<strong>Stimulus:</strong> PUT /{bucket}/{key} with binary body",
+                        "blocks": []
+                      },
+                      {
+                        "text": "<strong>Response:</strong> Upload completes without OutOfMemoryError",
+                        "blocks": []
+                      },
+                      {
+                        "text": "<strong>Metric:</strong> Throughput &gt; 50 MB/s, peak memory &lt; 256 MB",
+                        "blocks": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "section",
+                "id": "_scenario_2_s3_api_compatibility",
+                "title": "Scenario 2 — S3 API Compatibility",
+                "level": 3,
+                "blocks": [
+                  {
+                    "type": "list",
+                    "style": "ulist",
+                    "items": [
+                      {
+                        "text": "<strong>Context:</strong> AWS CLI interacts with the system",
+                        "blocks": []
+                      },
+                      {
+                        "text": "<strong>Stimulus:</strong> AWS CLI command for each implemented operation",
+                        "blocks": []
+                      },
+                      {
+                        "text": "<strong>Response:</strong> Output identical to real AWS S3 (same XML, same error codes)",
+                        "blocks": []
+                      },
+                      {
+                        "text": "<strong>Metric:</strong> 111/111 in-scope operations implemented; AWS CLI checks pass for operations exposed by <code>aws s3api</code>",
+                        "blocks": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "section",
+                "id": "_scenario_3_test_coverage",
+                "title": "Scenario 3 — Test Coverage",
+                "level": 3,
+                "blocks": [
+                  {
+                    "type": "list",
+                    "style": "ulist",
+                    "items": [
+                      {
+                        "text": "<strong>Context:</strong> A new S3 operation is implemented",
+                        "blocks": []
+                      },
+                      {
+                        "text": "<strong>Stimulus:</strong> Code commit",
+                        "blocks": []
+                      },
+                      {
+                        "text": "<strong>Response:</strong> Pre-commit hook generates Clover coverage",
+                        "blocks": []
+                      },
+                      {
+                        "text": "<strong>Metric:</strong> Coverage &gt; 80% (83.45% current)",
+                        "blocks": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "section",
+        "id": "section-technical-risks",
+        "title": "Risks and Technical Debts",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "table",
+            "headers": [
+              "#",
+              "Risk",
+              "Impact",
+              "Mitigation"
+            ],
+            "rows": [
+              [
+                "1",
+                "<strong>Single-node in-memory only</strong> — reactive in-memory repositories do not persist to disk",
+                "Data loss on restart",
+                "Introduce file persistence or R2DBC; <code>storage-engine-*</code> placeholder modules are reserved for this work"
+              ],
+              [
+                "2",
+                "<strong>S3 semantic depth</strong> — 111/111 operations are routed and Cucumber-tested, but some advanced operations use simplified compatibility behavior",
+                "AWS SDK features may expect deeper semantics than the in-memory implementation provides",
+                "Track semantic gaps in PLAN.md and ADR follow-ups; prioritize AWS CLI/SDK compatibility cases"
+              ],
+              [
+                "3",
+                "<strong>In-memory content store</strong> — large objects stored in ConcurrentHashMap",
+                "OutOfMemoryError for files &gt; 1GB",
+                "Flush to file system, chunked streaming, content store with file persistence"
+              ],
+              [
+                "4",
+                "<strong>No authentication/authorization</strong> — AWS SigV4 not implemented",
+                "Usable only in trusted environments",
+                "Implement SigV4 verification middleware"
+              ],
+              [
+                "5",
+                "<strong>No storage-engine integration</strong> — placeholder modules are empty",
+                "Alternative persistence untestable",
+                "Not a v1 priority — planned as future storage-engine architecture work"
+              ],
+              [
+                "6",
+                "<strong>Missing checksum validation</strong> — <code>x-amz-checksum-crc64nvme</code> and <code>x-amz-sdk-checksum-algorithm</code> headers are not read by the PutObject handler. AWS CLI v2 sends these by default and computes the hash automatically. The server should re-compute and verify.",
+                "Corrupted payloads accepted silently — data integrity not verified",
+                "Read <code>x-amz-sdk-checksum-algorithm</code>, re-compute hash with that algorithm, compare with <code>x-amz-checksum-crc64nvme</code>; return <code>400 InvalidArgument</code> on mismatch"
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "type": "section",
+        "id": "section-glossary",
+        "title": "Glossary",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "table",
+            "headers": [
+              "Term",
+              "Definition"
+            ],
+            "rows": [
+              [
+                "Bucket",
+                "S3 object container. Identified by a unique DNS-compliant name (3-63 characters, lowercase)"
+              ],
+              [
+                "S3Object",
+                "S3 object: key, metadata, version, ACL, tagging, attributes, binary content"
+              ],
+              [
+                "ObjectKey",
+                "Unique key of an object within a bucket"
+              ],
+              [
+                "Region",
+                "AWS S3 region (e.g., <code>us-east-1</code>, <code>eu-west-1</code>)"
+              ],
+              [
+                "StorageClass",
+                "S3 storage class: <code>STANDARD</code>, <code>INTELLIGENT_TIERING</code>, <code>PARANOIC_MODE</code>"
+              ],
+              [
+                "ETag",
+                "Entity tag for optimistic concurrency and content verification"
+              ],
+              [
+                "VersionId",
+                "Version identifier for versioned objects"
+              ],
+              [
+                "ACL",
+                "Access Control List: <code>private</code>, <code>public-read</code>, <code>public-read-write</code>, <code>authenticated-read</code>"
+              ],
+              [
+                "Tagging",
+                "Key-value pairs for object/bucket categorization"
+              ],
+              [
+                "CORS",
+                "Cross-Origin Resource Sharing: allowed origins, methods, headers"
+              ],
+              [
+                "Multipart Upload",
+                "Upload of large objects in parts (Phase C)"
+              ],
+              [
+                "RouterFunction",
+                "Functional WebFlux pattern for defining HTTP routes programmatically"
+              ],
+              [
+                "CompletableFuture",
+                "Standard Java async — bridge between pure domain and reactive infrastructure"
+              ],
+              [
+                "Flux&lt;DataBuffer&gt;",
+                "Reactive type for binary streaming in WebFlux"
+              ],
+              [
+                "S3ObjectWrite",
+                "Domain interface: object save contract without reactive types"
+              ],
+              [
+                "S3ObjectContent",
+                "Domain interface: object read contract without reactive types"
+              ],
+              [
+                "ARC42",
+                "Architecture documentation template in 12 sections"
+              ],
+              [
+                "ADR",
+                "Architecture Decision Record (Michael Nygard format)"
+              ],
+              [
+                "C4 Model",
+                "Architecture description method with 4 levels (Context, Container, Component, Code)"
+              ],
+              [
+                "Structurizr DSL",
+                "Domain-specific language for modeling C4 diagrams"
+              ]
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

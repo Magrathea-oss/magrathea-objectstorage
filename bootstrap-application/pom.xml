@@ -25,43 +25,43 @@
             <artifactId>admin-api-adapter</artifactId>
         </dependency>
         <!-- Dependencies below ensure all module class files are available
-             for JaCoCo aggregate coverage report. They use provided scope
-             so they are not duplicated in the Spring Boot fat JAR.
-             (Transitive dependencies already include these modules.) -->
+             at runtime. They use compile scope so the Spring Boot fat JAR
+             includes them. (provided scope would override transitive
+             compile scope and exclude them from the fat JAR.) -->
         <dependency>
             <groupId>com.example</groupId>
             <artifactId>object-store-domain</artifactId>
-            <scope>provided</scope>
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.example</groupId>
             <artifactId>object-store-reactive-application</artifactId>
-            <scope>provided</scope>
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.example</groupId>
             <artifactId>object-store-reactive-repository-application</artifactId>
-            <scope>provided</scope>
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.example</groupId>
             <artifactId>storage-engine-domain</artifactId>
-            <scope>provided</scope>
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.example</groupId>
             <artifactId>storage-engine-application</artifactId>
-            <scope>provided</scope>
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.example</groupId>
             <artifactId>storage-engine-infrastructure</artifactId>
-            <scope>provided</scope>
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.example</groupId>
             <artifactId>object-store-reactive-repository-storage-engine-infrastructure</artifactId>
-            <scope>provided</scope>
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -218,6 +218,8 @@
                                     cp -r target/site/apidocs/* bootstrap-application/target/classes/static/docs/apidocs/ 2&gt;/dev/null || true;
                                     mkdir -p bootstrap-application/target/classes/static/docs/jacoco &amp;&amp;
                                     cp -r */target/site/jacoco/*.html bootstrap-application/target/classes/static/docs/jacoco/ 2&gt;/dev/null || true;
+                                    mkdir -p bootstrap-application/target/classes/static/docs/jacoco-resources &amp;&amp;
+                                    cp -r */target/site/jacoco/jacoco-resources/* bootstrap-application/target/classes/static/docs/jacoco-resources/ 2&gt;/dev/null || true;
                                     mkdir -p bootstrap-application/target/classes/static/docs/cucumber &amp;&amp;
                                     cp -r */target/cucumber/*.html bootstrap-application/target/classes/static/docs/cucumber/ 2&gt;/dev/null || true
                                 </argument>

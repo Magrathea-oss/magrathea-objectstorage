@@ -1,0 +1,185 @@
+{
+  "adr": 11,
+  "title": "ADR 0011 — Course correction: Bucket.Configuration redesign",
+  "status": "Accepted",
+  "lang": "en",
+  "document": {
+    "type": "document",
+    "title": "ADR 0011 — Course correction: Bucket.Configuration redesign",
+    "sections": [
+      {
+        "id": "_adr_0011_course_correction_bucket_configuration_redesign",
+        "title": "ADR 0011 — Course correction: Bucket.Configuration redesign",
+        "level": 1,
+        "blocks": []
+      },
+      {
+        "id": "_context",
+        "title": "Context",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "What was being done: The Bucket aggregate&#039;s Configuration record was extended with 15 nullable fields for all S3 bucket configuration types (Accelerate, Analytics, Encryption, Lifecycle, Logging, Website, Notification, Replication, Policy, PublicAccessBlock, OwnershipControls, RequestPayment, Metrics, IntelligentTiering, Inventory) as a flat record. The handler code (S3BucketConfigHandler) creates these value objects but stores them via <code>new Bucket.Configuration(null)</code> — effectively throwing them away."
+          }
+        ]
+      },
+      {
+        "id": "_derailment",
+        "title": "Derailment",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Specific symptoms:"
+          },
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "Bucket.Configuration became a flat \"dump\" of 15+ nullable fields — no domain semantics, no invariants, no relationships between config types",
+                "blocks": []
+              },
+              {
+                "text": "Domain events (BucketConfigurationChanged) became too generic — a single event type for ALL config changes loses the specific meaning of each change",
+                "blocks": []
+              },
+              {
+                "text": "The value objects exist in the domain but were never properly integrated with the aggregate root — they float as disconnected concepts",
+                "blocks": []
+              },
+              {
+                "text": "Handler code is copypasta: creates value objects, stores null config, GET handlers always return Optional.empty()",
+                "blocks": []
+              },
+              {
+                "text": "The AWS S3 API has specific semantics for each config type (lifecycle rules have transitions, replication has source/destination, etc.) that are lost in a flat Configuration record",
+                "blocks": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "_required_change",
+        "title": "Required Change",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Instead of a flat Configuration record:"
+          },
+          {
+            "type": "list",
+            "style": "olist",
+            "items": [
+              {
+                "text": "Revert Bucket.Configuration to only hold CORS (its original design)",
+                "blocks": []
+              },
+              {
+                "text": "Each S3 bucket configuration feature should be modeled as a separate aggregate or value object attached to Bucket via dedicated methods (withAccelerateConfig(), withLifecycleConfig(), etc.) and specific domain events per type",
+                "blocks": []
+              },
+              {
+                "text": "Study the official AWS S3 API documentation for each config type to understand:",
+                "blocks": []
+              },
+              {
+                "text": "What constraints exist between config types?",
+                "blocks": []
+              },
+              {
+                "text": "What lifecycle/state transitions exist?",
+                "blocks": []
+              },
+              {
+                "text": "What are the proper domain events?",
+                "blocks": []
+              },
+              {
+                "text": "Re-implement each config feature properly with:",
+                "blocks": []
+              },
+              {
+                "text": "Dedicated with* methods on Bucket (e.g., withLifecycleConfiguration, withEncryptionConfiguration)",
+                "blocks": []
+              },
+              {
+                "text": "Specific domain events per config type",
+                "blocks": []
+              },
+              {
+                "text": "Handler code that actually stores and retrieves config data properly",
+                "blocks": []
+              },
+              {
+                "text": "Refactor S3BucketConfigHandler to eliminate copypasta once the domain model is correct",
+                "blocks": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "_consequences",
+        "title": "Consequences",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "Impact: The naive Configuration extension must be reverted, which means the handler integration work done so far needs to be re-done with the correct domain model",
+                "blocks": []
+              },
+              {
+                "text": "Benefit: Proper domain model will support real S3 API semantics, correct domain events, and maintainable handler code",
+                "blocks": []
+              },
+              {
+                "text": "Timing: ADR created BEFORE any correction code or plan update — this is the non-negotiable rule",
+                "blocks": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "_status",
+        "title": "Status",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Accepted"
+          }
+        ]
+      },
+      {
+        "id": "_date",
+        "title": "Date",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "2026-05-25"
+          }
+        ]
+      },
+      {
+        "id": "_implementation_note",
+        "title": "Implementation Note",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Bucket.Configuration was replaced by BucketConfig with dedicated with* methods per config type. Each config feature now has a specific value object (CorsConfiguration, BucketLifecycleConfiguration, etc.). Domain events use BucketConfigChanged with the full BucketConfig payload. Handler code properly stores and retrieves config data through the aggregate root. C4 diagrams and ARC42 have been aligned."
+          }
+        ]
+      }
+    ]
+  }
+}

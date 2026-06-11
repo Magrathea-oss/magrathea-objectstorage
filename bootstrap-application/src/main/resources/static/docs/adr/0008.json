@@ -1,0 +1,224 @@
+{
+  "adr": 8,
+  "title": "ADR 0008 — Remove All Custom XML Parsing, Use Spring Boot 4 Codec Infrastructure",
+  "status": "Implemented",
+  "lang": "en",
+  "document": {
+    "type": "document",
+    "title": "ADR 0008 — Remove All Custom XML Parsing, Use Spring Boot 4 Codec Infrastructure",
+    "sections": [
+      {
+        "id": "_adr_0008_remove_all_custom_xml_parsing_use_spring_boot_4_codec_infrastructure",
+        "title": "ADR 0008 — Remove All Custom XML Parsing, Use Spring Boot 4 Codec Infrastructure",
+        "level": 1,
+        "blocks": []
+      },
+      {
+        "id": "_status",
+        "title": "Status",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Implemented"
+          }
+        ]
+      },
+      {
+        "id": "_context",
+        "title": "Context",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "The <code>s3-api</code> module implements an AWS S3-compatible HTTP API that sends and receives XML for bucket configurations, object metadata, tagging, ACLs, multipart uploads, and error responses."
+          },
+          {
+            "type": "paragraph",
+            "html": "The project has <code>tools.jackson.dataformat:jackson-dataformat-xml</code> as a dependency (Jackson 3 XML), and <code>JacksonXmlCodecConfig</code> registers a <code>JacksonXmlEncoder</code> for XML response serialization. However, request body deserialization was handled via:"
+          },
+          {
+            "type": "list",
+            "style": "olist",
+            "items": [
+              {
+                "text": "<strong>Regex-based XML parsing</strong> in <code>S3BucketConfigHandler</code>, <code>S3BucketMetadataHandler</code>, <code>S3ObjectMetadataHandler</code>, <code>S3ObjectOperationsHandler</code>, <code>S3BucketOperationsHandler</code>, and <code>S3BucketConfigListHandler</code> — using <code>java.util.regex.Pattern</code>, <code>extractXmlValue()</code>, <code>extractXmlList()</code>, and string <code>contains()</code> checks.",
+                "blocks": []
+              },
+              {
+                "text": "<strong>A custom <code>S3XmlParser</code> class</strong> wrapping <code>XmlMapper</code> directly, never imported by any handler.",
+                "blocks": []
+              },
+              {
+                "text": "<strong>A monolithic <code>S3XmlResponses</code> file</strong> with all XML response records and static <code>from()</code> factory methods, creating a parallel DTO hierarchy.",
+                "blocks": []
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "html": "This violated the <code>java-infra-coder</code> agent constraint: <strong>\"FORBIDDEN: Regex XML Parsing\"</strong>."
+          },
+          {
+            "type": "section",
+            "id": "_root_cause",
+            "title": "Root Cause",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "paragraph",
+            "html": "The <code>java-infra-coder</code> agent generated <code>S3XmlParser</code> (Jackson-based) in one pass and the handler classes in a later pass without cross-referencing. The handler pass opted for regex parsing because it appeared \"faster\" to implement inline extraction than to integrate the existing Jackson records. The agent did not enforce its own constraint during generation — no delegation check caught the violation because the agent treated regex parsing as \"handler implementation detail\" rather than recognizing it as an XML-parsing task that Jackson should handle."
+          }
+        ]
+      },
+      {
+        "id": "_decision",
+        "title": "Decision",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Remove ALL custom XML parsing and rely exclusively on Spring Boot 4&#039;s WebFlux codec infrastructure:"
+          },
+          {
+            "type": "list",
+            "style": "olist",
+            "items": [
+              {
+                "text": "<strong>Request deserialization</strong>: Register <code>JacksonXmlDecoder</code> in <code>JacksonXmlCodecConfig</code> so that <code>request.bodyToMono(Dto.class)</code> deserializes XML request bodies directly into annotated records.",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Request DTOs</strong>: Define in <code>S3Request.java</code> — annotated records only, no logic, no XmlMapper.",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Response DTOs</strong>: Define in separate files per domain concept — <code>BucketListResponse.java</code>, <code>BucketConfigResponse.java</code>, <code>ErrorResponse.java</code>, <code>MultipartResponse.java</code>, <code>ObjectMetadataResponse.java</code>, <code>ObjectOperationResponse.java</code>.",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Remove</strong>: <code>S3XmlParser.java</code>, <code>S3XmlResponses.java</code>, the <code>xml/</code> package directory, and ALL regex-based parsing methods from handlers.",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Handler refactor</strong>: Every PUT/POST handler that receives XML body uses <code>request.bodyToMono(RequestDto.class)</code> directly.",
+                "blocks": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "_consequences",
+        "title": "Consequences",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "<strong>Positive</strong>: No fragile regex XML parsing. Single source of truth for XML binding (Jackson annotations on DTOs). Spring Boot 4 manages content negotiation — handlers declare <code>MediaType.APPLICATION_XML</code> and the codec handles serialization.",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Positive</strong>: Request DTOs are pure annotated records — no parsing logic leak. Response DTOs are separate files organized by domain concept.",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Positive</strong>: The codec decoder handles edge cases (whitespace, encoding, malformed XML) that regex cannot.",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Negative</strong>: Handler files change significantly — all PUT/POST handlers that previously read <code>String</code> body now read typed DTOs.",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Negative</strong>: The <code>xml/</code> package directory is removed; DTOs move to <code>dto/</code>.",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Negative</strong>: <code>S3BucketConfigListHandler</code> also loses its dependency on <code>S3BucketConfigHandler.extractXmlValue()</code> — must define its own DTOs or use <code>S3Request</code>.",
+                "blocks": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "_compliance",
+        "title": "Compliance",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "The <code>java-infra-coder</code> agent definition is updated to:"
+          },
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "Strengthen the FORBIDDEN rule with explicit \"BLOCK — do not generate\" language",
+                "blocks": []
+              },
+              {
+                "text": "Add a self-audit step: before writing any handler, check if XML body handling is needed and verify Jackson DTOs exist",
+                "blocks": []
+              },
+              {
+                "text": "Add a cross-reference requirement: handlers MUST use <code>S3Request.*</code> DTOs, not regex",
+                "blocks": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "_resolution",
+        "title": "Resolution",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "All 14 correction phases were implemented and verified:"
+          },
+          {
+            "type": "list",
+            "style": "olist",
+            "items": [
+              {
+                "text": "<strong>Phase 1–12</strong>: <code>JacksonXmlDecoder</code> registered, 14 Command DTOs created in <code>dto/command/</code>, 29 Query DTOs created in <code>dto/query/</code>, all handlers refactored to use <code>request.bodyToMono(Dto.class)</code> — no regex XML parsing remains.",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Phase 13</strong>: 141 Cucumber tests pass, 3 CORS scenarios pass, 10 pre-existing unrelated failures remain unchanged.",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Phase 14</strong>: ADR 0008 updated and ARC42 documentation aligned.",
+                "blocks": []
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "html": "<strong>Result</strong>: The <code>xml/</code> package is deleted, <code>S3XmlParser.java</code> and <code>S3XmlResponses.java</code> are removed, and ALL XML parsing now goes through the Spring Boot 4 Jackson XML codec."
+          }
+        ]
+      },
+      {
+        "id": "_status_panel_note",
+        "title": "Status Panel Note",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "The multi-agent TUI status panel highlights <code>java-infra-coder</code> as the agent responsible for handler generation. This ADR documents why the generated code was incorrect and what corrective action was taken."
+          }
+        ]
+      }
+    ]
+  }
+}

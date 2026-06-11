@@ -1,0 +1,27 @@
+{
+  "title": "SelectResponse.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "SelectResponse.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_selectresponse_java",
+        "title": "SelectResponse.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.objectstore.domain.valueobject;\n\nimport java.util.Objects;\n\n/**\n * SelectResponse — a value object representing the result metadata of a SELECT query.\n * <p>\n * Domain-level representation of a {@code SelectObjectContent} response.\n * Actual result records are streamed by infrastructure — domain only holds\n * result metadata (payload length, status).\n * </p>\n * Pure domain — NO framework dependencies.\n */\npublic record SelectResponse(\n    long payloadLength,\n    String status,\n    String requestId\n) {\n\n<span class=\"nc\" id=\"L20\">    public SelectResponse {</span>\n<span class=\"nc bnc\" id=\"L21\" title=\"All 2 branches missed.\">        if (payloadLength < 0) throw new IllegalArgumentException(\"payloadLength must be non-negative\");</span>\n<span class=\"nc\" id=\"L22\">        Objects.requireNonNull(status);</span>\n<span class=\"nc\" id=\"L23\">        Objects.requireNonNull(requestId);</span>\n<span class=\"nc\" id=\"L24\">    }</span>\n\n    /**\n     * Factory method.\n     */\n    public static SelectResponse of(long payloadLength, String status, String requestId) {\n<span class=\"nc\" id=\"L30\">        return new SelectResponse(payloadLength, status, requestId);</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

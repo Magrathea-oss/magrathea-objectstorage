@@ -1,0 +1,99 @@
+{
+  "adr": 5,
+  "title": "5. RouterFunction functional WebFlux pattern",
+  "status": "Accepted",
+  "lang": "en",
+  "document": {
+    "type": "document",
+    "title": "5. RouterFunction functional WebFlux pattern",
+    "sections": [
+      {
+        "id": "_5_routerfunction_functional_webflux_pattern",
+        "title": "5. RouterFunction functional WebFlux pattern",
+        "level": 1,
+        "blocks": []
+      },
+      {
+        "id": "",
+        "title": "",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Date: 2026-05-21"
+          }
+        ],
+        "level": 0
+      },
+      {
+        "id": "_status",
+        "title": "Status",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Accepted"
+          }
+        ]
+      },
+      {
+        "id": "_context",
+        "title": "Context",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Spring WebFlux supports both <code>@Controller</code> annotation-based and <code>RouterFunction</code> functional programming styles. The S3 API requires precise content-negotiation routing (XML vs JSON for the same path) and fine-grained endpoint mapping."
+          }
+        ]
+      },
+      {
+        "id": "_decision",
+        "title": "Decision",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "ALL HTTP endpoints use <code>RouterFunction<ServerResponse></code>:"
+          },
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "NO @Controller, NO @RequestMapping, NO @GetMapping/@PostMapping",
+                "blocks": []
+              },
+              {
+                "text": "<code>RouterFunctions.route()</code> builder for precise path/headers/accept matching",
+                "blocks": []
+              },
+              {
+                "text": "Content-negotiation via predicate functions (<code>acceptXml(req)</code>, <code>acceptJson(req)</code>)",
+                "blocks": []
+              },
+              {
+                "text": "S3-compatible error responses as XML records",
+                "blocks": []
+              },
+              {
+                "text": "Bean wiring in <code>InfrastructureConfig</code> exposing <code>RouterFunction<ServerResponse></code>",
+                "blocks": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "_consequences",
+        "title": "Consequences",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "<strong>Positive</strong>: precise routing control, functional style matches S3 API complexity, better testability\n<strong>Negative</strong>: more verbose than annotation-based, requires explicit bean configuration"
+          }
+        ]
+      }
+    ]
+  }
+}

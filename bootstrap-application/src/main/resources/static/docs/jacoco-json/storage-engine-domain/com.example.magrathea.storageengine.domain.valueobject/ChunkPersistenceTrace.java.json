@@ -1,0 +1,27 @@
+{
+  "title": "ChunkPersistenceTrace.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "ChunkPersistenceTrace.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_chunkpersistencetrace_java",
+        "title": "ChunkPersistenceTrace.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.storageengine.domain.valueobject;\n\nimport java.util.List;\n\npublic record ChunkPersistenceTrace(\n        ChunkId chunkId,\n        Fingerprint fingerprint,\n        long originalSize,\n        List<StepExecutionRecord> steps) {\n\n<span class=\"nc\" id=\"L11\">    public ChunkPersistenceTrace {</span>\n<span class=\"nc\" id=\"L12\">        java.util.Objects.requireNonNull(chunkId, \"chunkId must not be null\");</span>\n<span class=\"nc\" id=\"L13\">        java.util.Objects.requireNonNull(fingerprint, \"fingerprint must not be null\");</span>\n<span class=\"nc bnc\" id=\"L14\" title=\"All 2 branches missed.\">        if (originalSize < 0) {</span>\n<span class=\"nc\" id=\"L15\">            throw new IllegalArgumentException(\"originalSize must be >= 0: \" + originalSize);</span>\n        }\n<span class=\"nc\" id=\"L17\">        java.util.Objects.requireNonNull(steps, \"steps must not be null\");</span>\n<span class=\"nc bnc\" id=\"L18\" title=\"All 2 branches missed.\">        if (steps.size() != 6) {</span>\n<span class=\"nc\" id=\"L19\">            throw new IllegalArgumentException(\"steps must have exactly 6 entries: \" + steps.size());</span>\n        }\n<span class=\"nc\" id=\"L21\">    }</span>\n\n    public ContentHash finalChecksum() {\n        // The final checksum is the output checksum of the last step (STORE)\n<span class=\"nc bnc\" id=\"L25\" title=\"All 2 branches missed.\">        if (steps.isEmpty()) {</span>\n<span class=\"nc\" id=\"L26\">            throw new IllegalStateException(\"No steps available\");</span>\n        }\n<span class=\"nc\" id=\"L28\">        StepExecutionRecord lastStep = steps.get(steps.size() - 1);</span>\n<span class=\"nc\" id=\"L29\">        return lastStep.outputChecksum()</span>\n<span class=\"nc\" id=\"L30\">                .orElseThrow(() -> new IllegalStateException(\"Last step missing output checksum\"));</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

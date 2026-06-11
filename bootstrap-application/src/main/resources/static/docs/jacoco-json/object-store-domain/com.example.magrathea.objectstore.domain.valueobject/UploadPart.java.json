@@ -1,0 +1,27 @@
+{
+  "title": "UploadPart.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "UploadPart.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_uploadpart_java",
+        "title": "UploadPart.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.objectstore.domain.valueobject;\n\nimport java.time.Instant;\nimport java.util.Objects;\n\n/**\n * AWS S3 Upload Part — value object.\n * Represents a single part uploaded during a multipart upload session.\n * Immutable, zero framework dependencies.\n */\npublic record UploadPart(\n    PartNumber partNumber,\n    String etag,\n    long size,\n    Instant lastModified\n) {\n\n<span class=\"fc\" id=\"L18\">    public UploadPart {</span>\n<span class=\"fc\" id=\"L19\">        Objects.requireNonNull(partNumber);</span>\n<span class=\"fc\" id=\"L20\">        Objects.requireNonNull(etag);</span>\n<span class=\"fc\" id=\"L21\">        Objects.requireNonNull(lastModified);</span>\n<span class=\"pc bpc\" id=\"L22\" title=\"1 of 2 branches missed.\">        if (size < 0) throw new IllegalArgumentException(\"size must be non-negative\");</span>\n<span class=\"fc\" id=\"L23\">    }</span>\n\n    public static UploadPart create(PartNumber partNumber, String etag, long size) {\n<span class=\"fc\" id=\"L26\">        Objects.requireNonNull(partNumber);</span>\n<span class=\"fc\" id=\"L27\">        Objects.requireNonNull(etag);</span>\n<span class=\"fc bfc\" id=\"L28\" title=\"All 2 branches covered.\">        if (size < 0) throw new IllegalArgumentException(\"size must be non-negative\");</span>\n<span class=\"fc\" id=\"L29\">        return new UploadPart(partNumber, etag, size, Instant.now());</span>\n    }\n\n    public static UploadPart of(PartNumber partNumber, String etag, long size, Instant lastModified) {\n<span class=\"nc\" id=\"L33\">        Objects.requireNonNull(partNumber);</span>\n<span class=\"nc\" id=\"L34\">        Objects.requireNonNull(etag);</span>\n<span class=\"nc\" id=\"L35\">        Objects.requireNonNull(lastModified);</span>\n<span class=\"nc bnc\" id=\"L36\" title=\"All 2 branches missed.\">        if (size < 0) throw new IllegalArgumentException(\"size must be non-negative\");</span>\n<span class=\"nc\" id=\"L37\">        return new UploadPart(partNumber, etag, size, lastModified);</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

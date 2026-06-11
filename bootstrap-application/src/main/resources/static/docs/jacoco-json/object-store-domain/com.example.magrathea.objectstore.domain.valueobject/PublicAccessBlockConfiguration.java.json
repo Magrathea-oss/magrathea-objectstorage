@@ -1,0 +1,27 @@
+{
+  "title": "PublicAccessBlockConfiguration.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "PublicAccessBlockConfiguration.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_publicaccessblockconfiguration_java",
+        "title": "PublicAccessBlockConfiguration.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.objectstore.domain.valueobject;\n\nimport java.util.Objects;\n\n/**\n * AWS S3 public access block configuration — value object.\n * Pure domain — NO framework dependencies.\n */\npublic record PublicAccessBlockConfiguration(\n    String bucketName,\n    boolean blockPublicAcls,\n    boolean ignorePublicAcls,\n    boolean blockPublicPolicy,\n    boolean restrictPublicBuckets\n) {\n<span class=\"fc\" id=\"L16\">    public PublicAccessBlockConfiguration {</span>\n<span class=\"fc\" id=\"L17\">        Objects.requireNonNull(bucketName);</span>\n<span class=\"fc\" id=\"L18\">    }</span>\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

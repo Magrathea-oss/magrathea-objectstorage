@@ -1,0 +1,27 @@
+{
+  "title": "StepExecutionStatus.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "StepExecutionStatus.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_stepexecutionstatus_java",
+        "title": "StepExecutionStatus.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.storageengine.domain.valueobject;\n\n<span class=\"nc\" id=\"L3\">public enum StepExecutionStatus {</span>\n<span class=\"nc\" id=\"L4\">    EXECUTED,</span>\n<span class=\"nc\" id=\"L5\">    SKIPPED,</span>\n<span class=\"nc\" id=\"L6\">    BYPASSED</span>\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "title": "IllegalStateTransitionException.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "IllegalStateTransitionException.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_illegalstatetransitionexception_java",
+        "title": "IllegalStateTransitionException.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.objectstore.domain;\n\n/**\n * Thrown when a state transition is attempted with invalid preconditions.\n * Pure domain exception — NO framework dependencies.\n */\npublic class IllegalStateTransitionException extends RuntimeException {\n\n    public IllegalStateTransitionException(String message) {\n<span class=\"fc\" id=\"L10\">        super(message);</span>\n<span class=\"fc\" id=\"L11\">    }</span>\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "title": "BucketReplicationQuery.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "BucketReplicationQuery.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_bucketreplicationquery_java",
+        "title": "BucketReplicationQuery.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.s3api.dto.query;\n\nimport com.example.magrathea.objectstore.domain.aggregate.Bucket;\nimport com.example.magrathea.objectstore.domain.valueobject.BucketReplicationConfiguration;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;\n\nimport java.util.List;\nimport java.util.Optional;\n\n/**\n * Response for GET /{bucket}?replication (GetBucketReplication).\n */\n@JacksonXmlRootElement(localName = \"ReplicationConfiguration\")\n<span class=\"fc\" id=\"L15\">public record BucketReplicationQuery(</span>\n    @JacksonXmlProperty(localName = \"Role\")\n    String role,\n    @JacksonXmlProperty(localName = \"Rule\")\n    List<RuleEntry> rules\n) {\n    public static BucketReplicationQuery from(Optional<BucketReplicationConfiguration> config) {\n<span class=\"pc\" id=\"L22\">        var c = config.orElseThrow(() -> new IllegalArgumentException(\"No replication configuration\"));</span>\n<span class=\"fc\" id=\"L23\">        return new BucketReplicationQuery(c.role(), c.rules().stream()</span>\n<span class=\"fc\" id=\"L24\">            .map(r -> new RuleEntry(r.id(), r.status(), r.prefix(), r.destinationBucket(), r.destinationStorageClass()))</span>\n<span class=\"fc\" id=\"L25\">            .toList());</span>\n    }\n\n\n<span class=\"fc\" id=\"L29\">    public record RuleEntry(</span>\n        @JacksonXmlProperty(localName = \"ID\")\n        String id,\n        @JacksonXmlProperty(localName = \"Status\")\n        String status,\n        @JacksonXmlProperty(localName = \"Prefix\")\n        String prefix,\n        @JacksonXmlProperty(localName = \"DestinationBucket\")\n        String destinationBucket,\n        @JacksonXmlProperty(localName = \"DestinationStorageClass\")\n        String destinationStorageClass\n    ) {}\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

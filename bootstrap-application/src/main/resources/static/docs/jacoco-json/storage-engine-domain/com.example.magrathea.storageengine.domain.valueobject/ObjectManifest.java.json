@@ -1,0 +1,27 @@
+{
+  "title": "ObjectManifest.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "ObjectManifest.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_objectmanifest_java",
+        "title": "ObjectManifest.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.storageengine.domain.valueobject;\n\nimport java.util.List;\n\npublic record ObjectManifest(\n        ManifestId manifestId,\n        ObjectId objectId,\n        VersionId versionId,\n        StorageClassId storageClassId,\n        VirtualDevice targetDevice,\n        DeviceConfigurationHash deviceHash,\n        UploadCompletionTrace uploadTrace,\n        List<PolicyDecision> policyDecisions,\n        int chunkCount,\n        long totalOriginalSize,\n        long totalStoredSize,\n        List<ChunkReferenceDescriptor> chunks) {\n\n<span class=\"nc\" id=\"L19\">    public ObjectManifest {</span>\n<span class=\"nc\" id=\"L20\">        java.util.Objects.requireNonNull(manifestId, \"manifestId must not be null\");</span>\n<span class=\"nc\" id=\"L21\">        java.util.Objects.requireNonNull(objectId, \"objectId must not be null\");</span>\n<span class=\"nc\" id=\"L22\">        java.util.Objects.requireNonNull(versionId, \"versionId must not be null\");</span>\n<span class=\"nc\" id=\"L23\">        java.util.Objects.requireNonNull(storageClassId, \"storageClassId must not be null\");</span>\n<span class=\"nc\" id=\"L24\">        java.util.Objects.requireNonNull(targetDevice, \"targetDevice must not be null\");</span>\n<span class=\"nc\" id=\"L25\">        java.util.Objects.requireNonNull(deviceHash, \"deviceHash must not be null\");</span>\n<span class=\"nc\" id=\"L26\">        java.util.Objects.requireNonNull(uploadTrace, \"uploadTrace must not be null\");</span>\n<span class=\"nc\" id=\"L27\">        java.util.Objects.requireNonNull(policyDecisions, \"policyDecisions must not be null\");</span>\n<span class=\"nc bnc\" id=\"L28\" title=\"All 2 branches missed.\">        if (chunkCount < 0) {</span>\n<span class=\"nc\" id=\"L29\">            throw new IllegalArgumentException(\"chunkCount must be >= 0: \" + chunkCount);</span>\n        }\n<span class=\"nc bnc\" id=\"L31\" title=\"All 2 branches missed.\">        if (totalOriginalSize < 0) {</span>\n<span class=\"nc\" id=\"L32\">            throw new IllegalArgumentException(\"totalOriginalSize must be >= 0: \" + totalOriginalSize);</span>\n        }\n<span class=\"nc bnc\" id=\"L34\" title=\"All 2 branches missed.\">        if (totalStoredSize < 0) {</span>\n<span class=\"nc\" id=\"L35\">            throw new IllegalArgumentException(\"totalStoredSize must be >= 0: \" + totalStoredSize);</span>\n        }\n<span class=\"nc\" id=\"L37\">        java.util.Objects.requireNonNull(chunks, \"chunks must not be null\");</span>\n<span class=\"nc\" id=\"L38\">    }</span>\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

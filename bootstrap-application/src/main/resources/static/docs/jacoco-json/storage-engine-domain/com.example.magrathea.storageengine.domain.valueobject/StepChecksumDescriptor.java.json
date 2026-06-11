@@ -1,0 +1,27 @@
+{
+  "title": "StepChecksumDescriptor.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "StepChecksumDescriptor.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_stepchecksumdescriptor_java",
+        "title": "StepChecksumDescriptor.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.storageengine.domain.valueobject;\n\npublic record StepChecksumDescriptor(StepId stepId, ContentHash inputChecksum, ContentHash outputChecksum) {\n<span class=\"nc\" id=\"L4\">    public StepChecksumDescriptor {</span>\n<span class=\"nc\" id=\"L5\">        java.util.Objects.requireNonNull(stepId, \"stepId must not be null\");</span>\n<span class=\"nc\" id=\"L6\">        java.util.Objects.requireNonNull(inputChecksum, \"inputChecksum must not be null\");</span>\n<span class=\"nc\" id=\"L7\">        java.util.Objects.requireNonNull(outputChecksum, \"outputChecksum must not be null\");</span>\n<span class=\"nc\" id=\"L8\">    }</span>\n\n    public static StepChecksumDescriptor of(StepId stepId, ContentHash inputChecksum, ContentHash outputChecksum) {\n<span class=\"nc\" id=\"L11\">        return new StepChecksumDescriptor(stepId, inputChecksum, outputChecksum);</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

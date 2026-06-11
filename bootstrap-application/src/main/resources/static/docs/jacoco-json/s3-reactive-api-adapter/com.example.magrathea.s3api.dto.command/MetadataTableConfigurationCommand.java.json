@@ -1,0 +1,27 @@
+{
+  "title": "MetadataTableConfigurationCommand.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "MetadataTableConfigurationCommand.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_metadatatableconfigurationcommand_java",
+        "title": "MetadataTableConfigurationCommand.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.s3api.dto.command;\n\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;\n\nimport java.util.List;\n\n/**\n * Command DTO for PUT/POST /{bucket}?metadata-table-config — MetadataTableConfiguration XML body.\n */\n@JacksonXmlRootElement(localName = \"MetadataTableConfiguration\")\n<span class=\"fc\" id=\"L13\">public record MetadataTableConfigurationCommand(</span>\n    @JacksonXmlElementWrapper(localName = \"MetadataTableRule\", useWrapping = false)\n    @JacksonXmlProperty(localName = \"MetadataTableRule\")\n    List<MetadataTableRuleDto> rules\n) {\n<span class=\"fc\" id=\"L18\">    public record MetadataTableRuleDto(</span>\n        @JacksonXmlProperty(localName = \"Id\")\n        String id,\n        @JacksonXmlProperty(localName = \"Status\")\n        String status,\n        @JacksonXmlProperty(localName = \"MetadataTableName\")\n        String metadataTableName,\n        @JacksonXmlProperty(localName = \"MetadataTableDatabase\")\n        String metadataTableDatabase\n    ) {}\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

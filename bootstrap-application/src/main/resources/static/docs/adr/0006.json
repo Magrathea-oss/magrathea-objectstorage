@@ -1,0 +1,427 @@
+{
+  "adr": 6,
+  "title": "6. S3 API protocol endpoint mapping",
+  "status": "Accepted",
+  "lang": "en",
+  "document": {
+    "type": "document",
+    "title": "6. S3 API protocol endpoint mapping",
+    "sections": [
+      {
+        "id": "_6_s3_api_protocol_endpoint_mapping",
+        "title": "6. S3 API protocol endpoint mapping",
+        "level": 1,
+        "blocks": []
+      },
+      {
+        "id": "",
+        "title": "",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Date: 2026-05-21"
+          }
+        ],
+        "level": 0
+      },
+      {
+        "id": "_status",
+        "title": "Status",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Accepted"
+          }
+        ]
+      },
+      {
+        "id": "_context",
+        "title": "Context",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "AWS S3 provides 111 REST API operations. The implementation is split into phases covering core CRUD, CLI-baseline compatibility, object metadata/tagging/ACL, bucket configuration APIs, multipart upload, analytics, and advanced operations."
+          }
+        ]
+      },
+      {
+        "id": "_decision",
+        "title": "Decision",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "section",
+            "id": "_phase_a_cli_baseline_compatibility_completed",
+            "title": "Phase A — CLI-Baseline Compatibility (completed)",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "table",
+            "headers": [
+              "Operation",
+              "Endpoint",
+              "Status"
+            ],
+            "rows": [
+              [
+                "ListObjectsV2",
+                "GET /{bucket}?list-type=2",
+                "✅ Implemented"
+              ],
+              [
+                "CopyObject",
+                "PUT /{bucket}/{key} x-amz-copy-source",
+                "✅ Implemented"
+              ],
+              [
+                "DeleteObjects",
+                "POST /{bucket}?delete",
+                "✅ Implemented"
+              ],
+              [
+                "GetBucketLocation",
+                "GET /{bucket}?location",
+                "✅ Implemented"
+              ],
+              [
+                "GetBucketVersioning",
+                "GET /{bucket}?versioning",
+                "✅ Implemented"
+              ],
+              [
+                "PutBucketVersioning",
+                "PUT /{bucket}?versioning",
+                "✅ Implemented"
+              ],
+              [
+                "ListObjectVersions",
+                "GET /{bucket}?versions",
+                "✅ Implemented"
+              ]
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_phase_b_object_metadata_tagging_and_acl_completed",
+            "title": "Phase B — Object Metadata, Tagging, and ACL (completed)",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "table",
+            "headers": [
+              "Operation",
+              "Endpoint",
+              "Status"
+            ],
+            "rows": [
+              [
+                "GetObjectAcl",
+                "GET /{bucket}/{key}?acl",
+                "✅ Implemented"
+              ],
+              [
+                "PutObjectAcl",
+                "PUT /{bucket}/{key}?acl",
+                "✅ Implemented"
+              ],
+              [
+                "GetObjectTagging",
+                "GET /{bucket}/{key}?tagging",
+                "✅ Implemented"
+              ],
+              [
+                "PutObjectTagging",
+                "PUT /{bucket}/{key}?tagging",
+                "✅ Implemented"
+              ],
+              [
+                "DeleteObjectTagging",
+                "DELETE /{bucket}/{key}?tagging",
+                "✅ Implemented"
+              ],
+              [
+                "GetObjectAttributes",
+                "GET /{bucket}/{key}?attributes",
+                "✅ Implemented"
+              ],
+              [
+                "GetBucketAcl",
+                "GET /{bucket}?acl",
+                "✅ Implemented"
+              ],
+              [
+                "PutBucketAcl",
+                "PUT /{bucket}?acl",
+                "✅ Implemented"
+              ],
+              [
+                "GetBucketTagging",
+                "GET /{bucket}?tagging",
+                "✅ Implemented"
+              ],
+              [
+                "PutBucketTagging",
+                "PUT /{bucket}?tagging",
+                "✅ Implemented"
+              ],
+              [
+                "DeleteBucketTagging",
+                "DELETE /{bucket}?tagging",
+                "✅ Implemented"
+              ]
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_phase_c_multipart_upload_completed",
+            "title": "Phase C — Multipart Upload (completed)",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "table",
+            "headers": [
+              "Operation",
+              "Endpoint",
+              "Status"
+            ],
+            "rows": [
+              [
+                "CreateMultipartUpload",
+                "POST /{bucket}/{key}?uploads",
+                "✅ Implemented"
+              ],
+              [
+                "UploadPart",
+                "PUT /{bucket}/{key}?uploadId=...&partNumber=...",
+                "✅ Implemented"
+              ],
+              [
+                "UploadPartCopy",
+                "PUT /{bucket}/{key}?uploadId=...&partNumber=... + x-amz-copy-source",
+                "✅ Implemented"
+              ],
+              [
+                "CompleteMultipartUpload",
+                "POST /{bucket}/{key}?uploadId=...",
+                "✅ Implemented"
+              ],
+              [
+                "AbortMultipartUpload",
+                "DELETE /{bucket}/{key}?uploadId=...",
+                "✅ Implemented"
+              ],
+              [
+                "ListMultipartUploads",
+                "GET /{bucket}?uploads",
+                "✅ Implemented"
+              ],
+              [
+                "ListParts",
+                "GET /{bucket}/{key}?uploadId=...",
+                "✅ Implemented"
+              ]
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_phase_d_bucket_configuration_apis_completed",
+            "title": "Phase D — Bucket Configuration APIs (completed)",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "table",
+            "headers": [
+              "Area",
+              "Status"
+            ],
+            "rows": [
+              [
+                "CORS",
+                "✅ GetBucketCors, PutBucketCors, DeleteBucketCors"
+              ],
+              [
+                "Lifecycle",
+                "✅ GetBucketLifecycle, PutBucketLifecycle, DeleteBucketLifecycle"
+              ],
+              [
+                "Policy",
+                "✅ GetBucketPolicy, PutBucketPolicy, DeleteBucketPolicy"
+              ],
+              [
+                "Encryption",
+                "✅ GetBucketEncryption, PutBucketEncryption, DeleteBucketEncryption"
+              ],
+              [
+                "Logging",
+                "✅ GetBucketLogging, PutBucketLogging, DeleteBucketLogging"
+              ],
+              [
+                "Website",
+                "✅ GetBucketWebsite, PutBucketWebsite, DeleteBucketWebsite"
+              ],
+              [
+                "Notification",
+                "✅ GetBucketNotification, PutBucketNotification, DeleteBucketNotification"
+              ],
+              [
+                "Replication",
+                "✅ GetBucketReplication, PutBucketReplication, DeleteBucketReplication"
+              ],
+              [
+                "Ownership Controls",
+                "✅ GetBucketOwnershipControls, PutBucketOwnershipControls, DeleteBucketOwnershipControls"
+              ],
+              [
+                "Public Access Block",
+                "✅ GetPublicAccessBlock, PutPublicAccessBlock, DeletePublicAccessBlock"
+              ],
+              [
+                "Accelerate",
+                "✅ GetBucketAccelerateConfiguration, PutBucketAccelerateConfiguration, DeleteBucketAccelerateConfiguration"
+              ],
+              [
+                "Request Payment",
+                "✅ GetBucketRequestPayment, PutBucketRequestPayment, DeleteBucketRequestPayment"
+              ]
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_phase_e_analytics_inventory_metrics_intelligent_tiering_completed",
+            "title": "Phase E — Analytics, Inventory, Metrics, Intelligent-Tiering (completed)",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "table",
+            "headers": [
+              "Area",
+              "Operations",
+              "Status"
+            ],
+            "rows": [
+              [
+                "Analytics",
+                "GetBucketAnalyticsConfiguration, PutBucketAnalyticsConfiguration, DeleteBucketAnalyticsConfiguration, ListBucketAnalyticsConfigurations",
+                "✅ Implemented"
+              ],
+              [
+                "Inventory",
+                "GetBucketInventoryConfiguration, PutBucketInventoryConfiguration, DeleteBucketInventoryConfiguration, ListBucketInventoryConfigurations",
+                "✅ Implemented"
+              ],
+              [
+                "Metrics",
+                "GetBucketMetricsConfiguration, PutBucketMetricsConfiguration, DeleteBucketMetricsConfiguration",
+                "✅ Implemented"
+              ],
+              [
+                "Intelligent-Tiering",
+                "GetBucketIntelligentTieringConfiguration, PutBucketIntelligentTieringConfiguration, DeleteBucketIntelligentTieringConfiguration",
+                "✅ Implemented"
+              ]
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_phase_f_advanced_specialized_operations_not_started",
+            "title": "Phase F — Advanced / Specialized Operations (not started)",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "section",
+            "id": "_implementation_rule",
+            "title": "Implementation Rule",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "paragraph",
+            "html": "Per ogni nuova operazione:"
+          },
+          {
+            "type": "list",
+            "style": "olist",
+            "items": [
+              {
+                "text": "RouterFunction route in s3-api",
+                "blocks": []
+              },
+              {
+                "text": "AWS S3 terminology in domain/application DTOs",
+                "blocks": []
+              },
+              {
+                "text": "Jackson 3 XML annotations per XML response/request records",
+                "blocks": []
+              },
+              {
+                "text": "Cucumber feature scenarios (success + failure)",
+                "blocks": []
+              },
+              {
+                "text": "AWS CLI coverage in test-aws-cli.sh",
+                "blocks": []
+              },
+              {
+                "text": "Update PLAN.md coverage table",
+                "blocks": []
+              },
+              {
+                "text": "Update ARC42 and ADRs se introduce nuove decisioni architetturali",
+                "blocks": []
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_domain_application_test_requirement",
+            "title": "Domain / Application / Test Requirement",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "Domain: value objects / aggregates per nuovi concetti di dati",
+                "blocks": []
+              },
+              {
+                "text": "Application: service methods in BucketService/ObjectService, DTO records",
+                "blocks": []
+              },
+              {
+                "text": "Tests: almeno 1 success + 1 failure scenario per operazione",
+                "blocks": []
+              },
+              {
+                "text": "AWS CLI failure tests per ogni errore documentato",
+                "blocks": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "_consequences",
+        "title": "Consequences",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "<strong>Positive</strong>: phased approach delivers working S3 API quickly, priorities based on AWS CLI common usage\n<strong>Negative</strong>: phase 2/3 operations not available until implemented"
+          }
+        ]
+      }
+    ]
+  }
+}

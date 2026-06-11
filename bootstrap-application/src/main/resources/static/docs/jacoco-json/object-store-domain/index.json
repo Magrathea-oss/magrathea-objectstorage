@@ -1,0 +1,497 @@
+{
+  "title": "object-store-domain",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "object-store-domain",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_object_store_domain",
+        "title": "object-store-domain",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "table",
+            "headers": [
+              {
+                "text": "Element",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed Instructions",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Cov.",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed Branches",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Cov.",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Cxty",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Lines",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Methods",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Missed",
+                "colspan": 1,
+                "rowspan": 1
+              },
+              {
+                "text": "Classes",
+                "colspan": 1,
+                "rowspan": 1
+              }
+            ],
+            "rows": [
+              [
+                {
+                  "text": "Element",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed Instructions",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Cov.",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed Branches",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Cov.",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Cxty",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Lines",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Methods",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Missed",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "Classes",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "Total",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1.289 of 7.302",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "82%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "72 of 201",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "64%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "137",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "465",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "201",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "963",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "87",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "357",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "25",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "130",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"com.example.magrathea.objectstore.domain.valueobject/index.json\" class=\"el_package\">com.example.magrathea.objectstore.domain.valueobject</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"28\" height=\"10\" title=\"917\" alt=\"917\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"59\" height=\"10\" title=\"1.901\" alt=\"1.901\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "67%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"62\" height=\"10\" title=\"58\" alt=\"58\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"57\" height=\"10\" title=\"54\" alt=\"54\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "48%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "102",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "223",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "156",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "396",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "65",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "167",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "18",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "58",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"com.example.magrathea.objectstore.domain.aggregate/index.json\" class=\"el_package\">com.example.magrathea.objectstore.domain.aggregate</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"9\" height=\"10\" title=\"294\" alt=\"294\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"110\" height=\"10\" title=\"3.550\" alt=\"3.550\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "92%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"15\" height=\"10\" title=\"14\" alt=\"14\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"80\" height=\"10\" title=\"75\" alt=\"75\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "84%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "28",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "183",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "38",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "507",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "15",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "131",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "13",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"com.example.magrathea.objectstore.domain.event/index.json\" class=\"el_package\">com.example.magrathea.objectstore.domain.event</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "<img src=\"/docs/jacoco-resources/redbar.gif\" width=\"2\" height=\"10\" title=\"78\" alt=\"78\"><img src=\"/docs/jacoco-resources/greenbar.gif\" width=\"17\" height=\"10\" title=\"558\" alt=\"558\">",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "87%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "58",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "58",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "58",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "7",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "58",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ],
+              [
+                {
+                  "text": "<a href=\"com.example.magrathea.objectstore.domain/index.json\" class=\"el_package\">com.example.magrathea.objectstore.domain</a>",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "100%",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "n/a",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "2",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "0",
+                  "colspan": 1,
+                  "rowspan": 1
+                },
+                {
+                  "text": "1",
+                  "colspan": 1,
+                  "rowspan": 1
+                }
+              ]
+            ]
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

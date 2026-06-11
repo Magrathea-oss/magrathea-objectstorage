@@ -1,0 +1,27 @@
+{
+  "title": "ArchivedS3Object.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "ArchivedS3Object.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_archiveds3object_java",
+        "title": "ArchivedS3Object.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.objectstore.domain.aggregate;\n\nimport com.example.magrathea.objectstore.domain.event.ObjectStoreEvent;\nimport com.example.magrathea.objectstore.domain.valueobject.EncryptionConfiguration;\nimport com.example.magrathea.objectstore.domain.valueobject.ObjectChecksum;\nimport com.example.magrathea.objectstore.domain.valueobject.ObjectKey;\n\nimport java.time.ZonedDateTime;\nimport java.util.List;\nimport java.util.Map;\nimport java.util.Objects;\n\n/**\n * Archived state — object has been archived to Glacier/Deep Archive.\n * Valid transitions:\n * <ul>\n *   <li>{@link #delete()} → {@code DeletedS3Object}</li>\n * </ul>\n * NO restore() — restore is handled via event sourcing rebuild.\n */\npublic final class ArchivedS3Object extends S3Object {\n\n    private final boolean restored;\n    private final ZonedDateTime restoreExpiry;\n\n    ArchivedS3Object(ObjectKey key, String storageClass,\n                     Map<String, String> userMetadata, EncryptionConfiguration encryption,\n                     ObjectChecksum checksum, long size, ZonedDateTime createdAt,\n                     boolean restored, ZonedDateTime restoreExpiry,\n                     WriteState writeState, List<ObjectStoreEvent> events) {\n<span class=\"fc\" id=\"L31\">        super(key, storageClass, userMetadata, encryption, checksum, size, createdAt, writeState, events);</span>\n<span class=\"fc\" id=\"L32\">        this.restored = restored;</span>\n<span class=\"fc\" id=\"L33\">        this.restoreExpiry = restoreExpiry;</span>\n<span class=\"fc\" id=\"L34\">    }</span>\n\n    /** Returns {@code true} if this archived object has been temporarily restored. */\n<span class=\"fc\" id=\"L37\">    public boolean restored() { return restored; }</span>\n\n    /** Returns the restore expiry timestamp, or {@code null} if not restored. */\n<span class=\"fc\" id=\"L40\">    public ZonedDateTime restoreExpiry() { return restoreExpiry; }</span>\n\n    /**\n     * Delete this archived object, transitioning to terminal {@code DeletedS3Object}.\n     *\n     * @return a new {@code DeletedS3Object} with an {@code ObjectDeleted} event\n     */\n    public DeletedS3Object delete() {\n<span class=\"fc\" id=\"L48\">        validateWriteStateForDelete();</span>\n<span class=\"fc\" id=\"L49\">        var newEvents = appendEvent(domainEvents(),</span>\n<span class=\"fc\" id=\"L50\">            new ObjectStoreEvent.ObjectDeleted(key(), ZonedDateTime.now()));</span>\n<span class=\"fc\" id=\"L51\">        return new DeletedS3Object(key(), storageClass(), userMetadata(),</span>\n<span class=\"fc\" id=\"L52\">            createdAt(), WriteState.DELETED, newEvents);</span>\n    }\n\n    @Override\n    public S3Object clearEvents() {\n<span class=\"fc\" id=\"L57\">        return new ArchivedS3Object(key(), storageClass(), userMetadata(),</span>\n<span class=\"fc\" id=\"L58\">            encryption(), checksum(), size(), createdAt(),</span>\n<span class=\"fc\" id=\"L59\">            restored, restoreExpiry, writeState(), List.of());</span>\n    }\n\n    @Override\n    protected S3Object withWriteState(WriteState newState) {\n<span class=\"nc\" id=\"L64\">        return new ArchivedS3Object(key(), storageClass(), userMetadata(),</span>\n<span class=\"nc\" id=\"L65\">            encryption(), checksum(), size(), createdAt(),</span>\n<span class=\"nc\" id=\"L66\">            restored, restoreExpiry, newState, domainEvents());</span>\n    }\n\n    @Override\n    public String toString() {\n<span class=\"nc\" id=\"L71\">        return \"ArchivedS3Object[key=\" + key() + \",writeState=\" + writeState() + \"]\";</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "title": "BucketMetadataConfiguration.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "BucketMetadataConfiguration.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_bucketmetadataconfiguration_java",
+        "title": "BucketMetadataConfiguration.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.objectstore.domain.valueobject;\n\nimport java.util.Collections;\nimport java.util.List;\nimport java.util.Objects;\n\n/**\n * BucketMetadataConfiguration — a value object for bucket metadata key definitions.\n * <p>\n * Defines metadata keys and their types (e.g., dimension, timestamp) for S3 object metadata.\n * Used by CreateBucketMetadataConfiguration, GetBucketMetadataConfiguration, etc.\n * </p>\n * Pure domain — NO framework dependencies.\n */\npublic record BucketMetadataConfiguration(\n    List<MetadataKeyDefinition> keys\n) {\n\n<span class=\"nc\" id=\"L19\">    public BucketMetadataConfiguration {</span>\n<span class=\"nc\" id=\"L20\">        Objects.requireNonNull(keys);</span>\n<span class=\"nc\" id=\"L21\">        keys = List.copyOf(keys);</span>\n<span class=\"nc\" id=\"L22\">    }</span>\n\n    /**\n     * Factory method — create from a list of key definitions.\n     */\n    public static BucketMetadataConfiguration of(List<MetadataKeyDefinition> keys) {\n<span class=\"nc\" id=\"L28\">        return new BucketMetadataConfiguration(keys);</span>\n    }\n\n    /**\n     * Factory method — empty configuration.\n     */\n    public static BucketMetadataConfiguration empty() {\n<span class=\"nc\" id=\"L35\">        return new BucketMetadataConfiguration(List.of());</span>\n    }\n\n    public List<MetadataKeyDefinition> keys() {\n<span class=\"nc\" id=\"L39\">        return Collections.unmodifiableList(keys);</span>\n    }\n\n    /**\n     * A single metadata key definition.\n     */\n    public record MetadataKeyDefinition(\n        String key,\n        String type\n    ) {\n\n<span class=\"nc\" id=\"L50\">        public MetadataKeyDefinition {</span>\n<span class=\"nc\" id=\"L51\">            Objects.requireNonNull(key);</span>\n<span class=\"nc\" id=\"L52\">            Objects.requireNonNull(type);</span>\n<span class=\"nc bnc\" id=\"L53\" title=\"All 2 branches missed.\">            if (key.isBlank()) throw new IllegalArgumentException(\"key must not be blank\");</span>\n<span class=\"nc bnc\" id=\"L54\" title=\"All 2 branches missed.\">            if (type.isBlank()) throw new IllegalArgumentException(\"type must not be blank\");</span>\n<span class=\"nc\" id=\"L55\">        }</span>\n\n        /**\n         * Factory method.\n         */\n        public static MetadataKeyDefinition of(String key, String type) {\n<span class=\"nc\" id=\"L61\">            return new MetadataKeyDefinition(key, type);</span>\n        }\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

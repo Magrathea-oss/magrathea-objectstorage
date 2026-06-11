@@ -1,0 +1,27 @@
+{
+  "title": "ListDirectoryBucketsQuery.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "ListDirectoryBucketsQuery.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_listdirectorybucketsquery_java",
+        "title": "ListDirectoryBucketsQuery.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.s3api.dto.query;\n\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;\n\nimport java.util.List;\n\n/**\n * Response for GET /?directory-buckets (ListDirectoryBuckets).\n *\n * <pre>{@code\n * <ListDirectoryBucketsResult>\n *   <Buckets>\n *     <Bucket>\n *       <BucketName>my-directory-bucket</BucketName>\n *       <BucketId>abc123</BucketId>\n *       <CreationDate>2025-01-01T00:00:00Z</CreationDate>\n *     </Bucket>\n *   </Buckets>\n * </ListDirectoryBucketsResult>\n * }</pre>\n */\n@JacksonXmlRootElement(localName = \"ListDirectoryBucketsResult\")\n<span class=\"nc\" id=\"L25\">public record ListDirectoryBucketsQuery(</span>\n    @JacksonXmlElementWrapper(localName = \"Buckets\")\n    @JacksonXmlProperty(localName = \"Bucket\")\n    List<BucketEntry> buckets\n) {\n<span class=\"nc\" id=\"L30\">    public record BucketEntry(</span>\n        @JacksonXmlProperty(localName = \"BucketName\")\n        String bucketName,\n        @JacksonXmlProperty(localName = \"BucketId\")\n        String bucketId,\n        @JacksonXmlProperty(localName = \"CreationDate\")\n        String creationDate\n    ) {}\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

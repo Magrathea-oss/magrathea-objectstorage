@@ -1,0 +1,27 @@
+{
+  "title": "LoggingConfigurationCommand.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "LoggingConfigurationCommand.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_loggingconfigurationcommand_java",
+        "title": "LoggingConfigurationCommand.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.s3api.dto.command;\n\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;\n\n/**\n * Command DTO for PutBucketLogging XML body.\n */\n@JacksonXmlRootElement(localName = \"BucketLoggingStatus\")\n<span class=\"fc\" id=\"L10\">public record LoggingConfigurationCommand(</span>\n    @JacksonXmlProperty(localName = \"TargetBucket\")\n    String targetBucket,\n    @JacksonXmlProperty(localName = \"TargetPrefix\")\n    String targetPrefix\n) {}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

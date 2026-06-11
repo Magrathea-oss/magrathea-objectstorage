@@ -1,0 +1,27 @@
+{
+  "title": "ChunkId.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "ChunkId.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_chunkid_java",
+        "title": "ChunkId.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.storageengine.domain.valueobject;\n\nimport java.util.UUID;\n\npublic record ChunkId(UUID value) {\n<span class=\"nc\" id=\"L6\">    public ChunkId {</span>\n<span class=\"nc\" id=\"L7\">        java.util.Objects.requireNonNull(value, \"ChunkId value must not be null\");</span>\n<span class=\"nc\" id=\"L8\">    }</span>\n\n    public static ChunkId generate() {\n<span class=\"nc\" id=\"L11\">        return new ChunkId(UUID.randomUUID());</span>\n    }\n\n    public static ChunkId of(UUID value) {\n<span class=\"nc\" id=\"L15\">        return new ChunkId(value);</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

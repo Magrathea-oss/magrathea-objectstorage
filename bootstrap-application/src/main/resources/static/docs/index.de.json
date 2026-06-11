@@ -1,0 +1,212 @@
+{
+  "title": "Magrathea ObjectStore — Benutzerhandbuch",
+  "lang": "de",
+  "document": {
+    "type": "document",
+    "title": "Magrathea ObjectStore — Benutzerhandbuch",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_frontend_übersicht",
+        "title": "Frontend-Übersicht",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Magrathea ObjectStore enthält ein Vue.js-basiertes Verwaltungs-Frontend, das auf Port 8081 bereitgestellt wird."
+          },
+          {
+            "type": "section",
+            "id": "_zugriff_auf_das_frontend",
+            "title": "Zugriff auf das Frontend",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "Öffnen Sie Ihren Browser unter:"
+              },
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "<code><a href=\"http://localhost:8081/\" class=\"bare\">http://localhost:8081/</a></code> — Standard",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code><a href=\"http://&lt;host&gt;:8081/\" class=\"bare\">http://&lt;host&gt;:8081/</a></code> — von einem anderen Rechner im LAN",
+                    "blocks": []
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "html": "Das Frontend wird vom Admin-Server (separater eingebetteter Netty auf Port 8081) bereitgestellt, unabhängig von der S3-API auf Port 8080."
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_seiten",
+            "title": "Seiten",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "table",
+                "headers": [
+                  "Seite",
+                  "URL",
+                  "Beschreibung"
+                ],
+                "rows": [
+                  [
+                    "Dashboard",
+                    "<code>/</code>",
+                    "Übersicht mit Glassmorphism-Design"
+                  ],
+                  [
+                    "Buckets",
+                    "<code>/buckets</code>",
+                    "S3-Bucket-Verwaltung"
+                  ],
+                  [
+                    "Storage Policies",
+                    "<code>/storage-policies</code>",
+                    "Speicherrichtlinien-Konfiguration (Admin-API)"
+                  ],
+                  [
+                    "Dokumentation",
+                    "<code>/docs</code>",
+                    "Dieses Benutzerhandbuch"
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_sprachunterstützung",
+            "title": "Sprachunterstützung",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "Das Frontend unterstützt 5 Sprachen über vue-i18n:"
+              },
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "English (en)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Italiano (it)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Español (es)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Deutsch (de)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "中文 (cn)",
+                    "blocks": []
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "html": "Die Sprache kann über den Sprachselektor oben rechts umgeschaltet werden."
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_thema",
+            "title": "Thema",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "Die UI verwendet ein Glassmorphism-Design mit:"
+              },
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "Milchglashintergründen (<code>backdrop-filter: blur</code>)",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Farbverlaufs-Overlays",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Sanften Übergängen",
+                    "blocks": []
+                  },
+                  {
+                    "text": "Dunklem Thema mit Akzentfarben",
+                    "blocks": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_admin_api",
+            "title": "Admin-API",
+            "level": 2,
+            "blocks": [
+              {
+                "type": "paragraph",
+                "html": "Die Admin-API ist REST mit HATEOAS, verfügbar auf Port 8081:"
+              },
+              {
+                "type": "list",
+                "style": "ulist",
+                "items": [
+                  {
+                    "text": "<code>GET /admin/health</code> — Gesundheitsprüfung",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>GET /admin/storage-policies</code> — alle Speicherrichtlinien auflisten",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>GET /admin/storage-policies/{id}</code> — eine einzelne Richtlinie abrufen",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>POST /admin/storage-policies</code> — eine Richtlinie erstellen",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>PUT /admin/storage-policies/{id}</code> — eine Richtlinie aktualisieren",
+                    "blocks": []
+                  },
+                  {
+                    "text": "<code>DELETE /admin/storage-policies/{id}</code> — eine Richtlinie löschen",
+                    "blocks": []
+                  }
+                ]
+              },
+              {
+                "type": "paragraph",
+                "html": "Alle Antworten enthalten <code>_links</code> für HATEOAS-Navigation."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

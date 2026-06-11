@@ -1,0 +1,27 @@
+{
+  "title": "ReplicationConfig.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "ReplicationConfig.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_replicationconfig_java",
+        "title": "ReplicationConfig.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.storageengine.domain.valueobject;\n\npublic record ReplicationConfig(int factor) {\n<span class=\"nc\" id=\"L4\">    public ReplicationConfig {</span>\n<span class=\"nc bnc\" id=\"L5\" title=\"All 2 branches missed.\">        if (factor < 1) {</span>\n<span class=\"nc\" id=\"L6\">            throw new IllegalArgumentException(\"factor must be >= 1: \" + factor);</span>\n        }\n<span class=\"nc\" id=\"L8\">    }</span>\n\n    public static ReplicationConfig of(int factor) {\n<span class=\"nc\" id=\"L11\">        return new ReplicationConfig(factor);</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

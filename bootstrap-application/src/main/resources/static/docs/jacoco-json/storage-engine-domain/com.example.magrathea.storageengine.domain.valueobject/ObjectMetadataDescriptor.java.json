@@ -1,0 +1,27 @@
+{
+  "title": "ObjectMetadataDescriptor.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "ObjectMetadataDescriptor.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_objectmetadatadescriptor_java",
+        "title": "ObjectMetadataDescriptor.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.storageengine.domain.valueobject;\n\nimport java.util.Map;\nimport java.util.Collections;\n\npublic record ObjectMetadataDescriptor(Map<String, String> entries) {\n<span class=\"nc\" id=\"L7\">    public ObjectMetadataDescriptor {</span>\n<span class=\"nc\" id=\"L8\">        java.util.Objects.requireNonNull(entries, \"entries must not be null\");</span>\n<span class=\"nc\" id=\"L9\">    }</span>\n\n    // Accessor returning an unmodifiable view\n    public static ObjectMetadataDescriptor of(Map<String, String> entries) {\n<span class=\"nc\" id=\"L13\">        return new ObjectMetadataDescriptor(entries);</span>\n    }\n\n    public static ObjectMetadataDescriptor empty() {\n<span class=\"nc\" id=\"L17\">        return new ObjectMetadataDescriptor(Collections.emptyMap());</span>\n    }\n\n    @Override\n    public Map<String, String> entries() {\n<span class=\"nc\" id=\"L22\">        return Collections.unmodifiableMap(entries);</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

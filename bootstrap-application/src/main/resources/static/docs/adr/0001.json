@@ -1,0 +1,274 @@
+{
+  "adr": 1,
+  "title": "1. Multi-Module per Bounded Context con DDD + Spring Reactive",
+  "status": "Accepted",
+  "lang": "en",
+  "document": {
+    "type": "document",
+    "title": "1. Multi-Module per Bounded Context con DDD + Spring Reactive",
+    "sections": [
+      {
+        "id": "_1_multi_module_per_bounded_context_con_ddd_spring_reactive",
+        "title": "1. Multi-Module per Bounded Context con DDD + Spring Reactive",
+        "level": 1,
+        "blocks": []
+      },
+      {
+        "id": "",
+        "title": "",
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Date: 2026-05-20"
+          }
+        ],
+        "level": 0
+      },
+      {
+        "id": "_status",
+        "title": "Status",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Accepted"
+          }
+        ]
+      },
+      {
+        "id": "_context",
+        "title": "Context",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Il progetto Magrathea ObjectStore implementa un AWS S3-compatible object storage con Spring Boot 4 WebFlux. La struttura modulare deve separare rigorosamente il dominio puro (DDD) dall&#039;infrastruttura reattiva, seguendo i pattern definiti dagli agenti <code>domain-coder</code> e <code>app-infra-coder</code>."
+          }
+        ]
+      },
+      {
+        "id": "_decision",
+        "title": "Decision",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Ogni bounded context e&#039; suddiviso in tre moduli Maven flat sibling:"
+          },
+          {
+            "type": "section",
+            "id": "_1_boundedn_domain_dominio_puro_ddd",
+            "title": "1. `<boundedN>-domain` — Dominio puro (DDD)",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "Java 17+ records per aggregate root (Bucket, S3Object)",
+                "blocks": []
+              },
+              {
+                "text": "Value objects come record immutabili (ObjectKey, Region, StorageClass)",
+                "blocks": []
+              },
+              {
+                "text": "Domain events con sealed interface",
+                "blocks": []
+              },
+              {
+                "text": "Repository interfaces con <code>CompletableFuture</code> (standard Java async)",
+                "blocks": []
+              },
+              {
+                "text": "Domain services con logica business pura",
+                "blocks": []
+              },
+              {
+                "text": "<code>BinaryContent</code> value object: SOLO metadati (content-type, filename, size, compression, checksum)",
+                "blocks": []
+              },
+              {
+                "text": "<strong>NO byte[]</strong>, NO DataBuffer, NO Spring imports, NO JPA, NO reactive types",
+                "blocks": []
+              },
+              {
+                "text": "Test: JUnit puro, zero Spring context",
+                "blocks": []
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_2_boundedn_application_orchestrazione_applicativa",
+            "title": "2. `<boundedN>-application` — Orchestrazione applicativa",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "Application services con <code>@Service</code>",
+                "blocks": []
+              },
+              {
+                "text": "DTO come Java records (CreateBucketCommand, PutObjectCommand, BucketResponse, ObjectResponse)",
+                "blocks": []
+              },
+              {
+                "text": "Bridge tra CompletableFuture (dominio) e Mono/Flux (infrastruttura)",
+                "blocks": []
+              },
+              {
+                "text": "CAN dipendere da Spring",
+                "blocks": []
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_3_boundedn_infrastructure_adapter_reattivi",
+            "title": "3. `<boundedN>-infrastructure` — Adapter reattivi",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "<strong>RouterFunction<ServerResponse></strong> per tutti gli endpoint HTTP (NO @Controller, NO @RequestMapping)",
+                "blocks": []
+              },
+              {
+                "text": "XML serializzato con <code>@JacksonXmlRootElement</code> record (NO StringBuilder)",
+                "blocks": []
+              },
+              {
+                "text": "<code>BinaryContentAdapter</code>: BinaryContent (metadati) ↔ DataBuffer/Flux<DataBuffer> (bytes)",
+                "blocks": []
+              },
+              {
+                "text": "Content store per binary data (ConcurrentHashMap + file persistence)",
+                "blocks": []
+              },
+              {
+                "text": "Persistenza su file single-node con DataBuffer (NO R2DBC)",
+                "blocks": []
+              },
+              {
+                "text": "Test: Cucumber BDD con WebTestClient + AWS CLI verification",
+                "blocks": []
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_4_moduli_aggiuntivi",
+            "title": "4. Moduli aggiuntivi",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "<code>shared-domain</code>: BinaryContent (cross-cutting)",
+                "blocks": []
+              },
+              {
+                "text": "<code>bootstrap-application</code>: Spring Boot entry point, compone i moduli attivi",
+                "blocks": []
+              },
+              {
+                "text": "<code>persistence-context-*</code>: placeholder vuoti (non implementati in v1)",
+                "blocks": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "_conseguenze",
+        "title": "Conseguenze",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "<strong>Positive</strong>:"
+          },
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "Dominio puramente business, testabile senza Spring",
+                "blocks": []
+              },
+              {
+                "text": "Framework e reactive types confinati all&#039;infrastruttura",
+                "blocks": []
+              },
+              {
+                "text": "RouterFunction permette routing S3-compatible preciso (XML vs JSON content negotiation)",
+                "blocks": []
+              },
+              {
+                "text": "DDD garantisce che il modello riflette le specifiche AWS S3 reali",
+                "blocks": []
+              },
+              {
+                "text": "Spring Reactive (WebFlux, DataBuffer, Flux/Mono) e&#039; gestito interamente in infrastruttura",
+                "blocks": []
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "html": "<strong>Negative</strong>:"
+          },
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "9 moduli da gestire (6 attivi + 3 placeholder)",
+                "blocks": []
+              },
+              {
+                "text": "Mapping layer tra dominio e persistence",
+                "blocks": []
+              },
+              {
+                "text": "No Spring DI nel dominio",
+                "blocks": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "_related_adrs",
+        "title": "Related ADRs",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "(Additional ADRs dopo la prima build funzionante: zero-dependency domain, BinaryContent vs DataBuffer, reactive boundary, RouterFunction pattern)",
+                "blocks": []
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

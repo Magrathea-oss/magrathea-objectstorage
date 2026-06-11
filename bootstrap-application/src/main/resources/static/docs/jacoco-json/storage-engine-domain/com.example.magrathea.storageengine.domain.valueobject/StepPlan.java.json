@@ -1,0 +1,27 @@
+{
+  "title": "StepPlan.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "StepPlan.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_stepplan_java",
+        "title": "StepPlan.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.storageengine.domain.valueobject;\n\nimport java.util.Optional;\n\npublic record StepPlan(\n        StepId stepId,\n        StepExecutionStatus expectedStatus,\n        Optional<StepConfig> config,\n        boolean requiresOperation,\n        boolean requiresInputChecksumVerification,\n        boolean allowsAlteration,\n        boolean requiresOutputChecksumCalculation) {\n\n<span class=\"nc\" id=\"L14\">    public StepPlan {</span>\n<span class=\"nc\" id=\"L15\">        java.util.Objects.requireNonNull(stepId, \"stepId must not be null\");</span>\n<span class=\"nc\" id=\"L16\">        java.util.Objects.requireNonNull(expectedStatus, \"expectedStatus must not be null\");</span>\n<span class=\"nc\" id=\"L17\">        java.util.Objects.requireNonNull(config, \"config must not be null\");</span>\n<span class=\"nc\" id=\"L18\">    }</span>\n\n    public static StepPlan of(\n            StepId stepId,\n            StepExecutionStatus expectedStatus,\n            Optional<StepConfig> config,\n            boolean requiresOperation,\n            boolean requiresInputChecksumVerification,\n            boolean allowsAlteration,\n            boolean requiresOutputChecksumCalculation) {\n<span class=\"nc\" id=\"L28\">        return new StepPlan(stepId, expectedStatus, config,</span>\n                requiresOperation, requiresInputChecksumVerification,\n                allowsAlteration, requiresOutputChecksumCalculation);\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

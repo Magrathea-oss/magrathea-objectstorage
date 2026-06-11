@@ -1,0 +1,456 @@
+{
+  "adr": 12,
+  "title": "ADR 0012 — Phase F: Advanced and Specialized S3 Operations",
+  "status": "Accepted",
+  "lang": "en",
+  "document": {
+    "type": "document",
+    "title": "ADR 0012 — Phase F: Advanced and Specialized S3 Operations",
+    "sections": [
+      {
+        "id": "_adr_0012_phase_f_advanced_and_specialized_s3_operations",
+        "title": "ADR 0012 — Phase F: Advanced and Specialized S3 Operations",
+        "level": 1,
+        "blocks": []
+      },
+      {
+        "id": "_context",
+        "title": "Context",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Phase F implements the remaining 27 S3 API operations that are advanced or specialized. These operations were deferred from earlier phases because they introduce new S3 concepts (legal hold, object lock, retention, directory buckets, ABAC, torrent, restore, select, rename, encryption update, Object Lambda, and bucket metadata configurations) or require complex request/response handling (SelectObjectContent, WriteGetObjectResponse)."
+          },
+          {
+            "type": "paragraph",
+            "html": "The 27 operations are:"
+          },
+          {
+            "type": "table",
+            "headers": [
+              "Category",
+              "Operations"
+            ],
+            "rows": [
+              [
+                "Session management",
+                "CreateSession, ListDirectoryBuckets"
+              ],
+              [
+                "ABAC",
+                "GetBucketAbac, PutBucketAbac"
+              ],
+              [
+                "Legal hold / lock",
+                "GetObjectLegalHold, PutObjectLegalHold, GetObjectLockConfiguration, PutObjectLockConfiguration, GetObjectRetention, PutObjectRetention"
+              ],
+              [
+                "Torrent",
+                "GetObjectTorrent"
+              ],
+              [
+                "Restore",
+                "RestoreObject"
+              ],
+              [
+                "Select content",
+                "SelectObjectContent"
+              ],
+              [
+                "Rename",
+                "RenameObject"
+              ],
+              [
+                "Encryption update",
+                "UpdateObjectEncryption"
+              ],
+              [
+                "Object Lambda",
+                "WriteGetObjectResponse"
+              ],
+              [
+                "Bucket metadata configs",
+                "CreateBucketMetadataConfiguration, DeleteBucketMetadataConfiguration, GetBucketMetadataConfiguration, CreateBucketMetadataTableConfiguration, DeleteBucketMetadataTableConfiguration, GetBucketMetadataTableConfiguration, UpdateBucketMetadataInventoryTableConfiguration, UpdateBucketMetadataJournalTableConfiguration"
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "id": "_decision",
+        "title": "Decision",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "section",
+            "id": "_1_implementation_order_batched_by_complexity",
+            "title": "1. Implementation Order — Batched by Complexity",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "paragraph",
+            "html": "Operations were implemented in five batches, ordered from simplest (reusing existing patterns with minimal new domain types) to most complex (requiring new request/response streaming or new S3 concepts):"
+          },
+          {
+            "type": "paragraph",
+            "html": "<strong>Batch 1 — Simple, existing patterns</strong> (reuse existing DTO patterns, no new domain types):"
+          },
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "RenameObject — rename key, maps to existing copy+delete pattern",
+                "blocks": []
+              },
+              {
+                "text": "UpdateObjectEncryption — update encryption metadata, maps to existing metadata update pattern",
+                "blocks": []
+              },
+              {
+                "text": "GetObjectTorrent — returns torrent file, maps to existing GetObject response pattern",
+                "blocks": []
+              },
+              {
+                "text": "RestoreObject — restore from Glacier, maps to existing PUT pattern",
+                "blocks": []
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "html": "<strong>Batch 2 — Configuration-like</strong> (follow existing bucket config handler pattern):"
+          },
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "CreateSession — session management, maps to existing POST pattern",
+                "blocks": []
+              },
+              {
+                "text": "ListDirectoryBuckets — directory bucket listing, maps to existing ListBuckets pattern",
+                "blocks": []
+              },
+              {
+                "text": "GetBucketAbac — attribute-based access control config, maps to existing GET config pattern",
+                "blocks": []
+              },
+              {
+                "text": "PutBucketAbac — attribute-based access control config, maps to existing PUT config pattern",
+                "blocks": []
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "html": "<strong>Batch 3 — Legal/Lock/Retention</strong> (introduce new domain types):"
+          },
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "GetObjectLegalHold — new LegalHold domain type",
+                "blocks": []
+              },
+              {
+                "text": "PutObjectLegalHold — new LegalHold domain type",
+                "blocks": []
+              },
+              {
+                "text": "GetObjectLockConfiguration — new ObjectLockConfiguration domain type",
+                "blocks": []
+              },
+              {
+                "text": "PutObjectLockConfiguration — new ObjectLockConfiguration domain type",
+                "blocks": []
+              },
+              {
+                "text": "GetObjectRetention — new RetentionPeriod domain type",
+                "blocks": []
+              },
+              {
+                "text": "PutObjectRetention — new RetentionPeriod domain type",
+                "blocks": []
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "html": "<strong>Batch 4 — Complex request/response handling</strong>:"
+          },
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "SelectObjectContent — streaming SQL-like SELECT on object content",
+                "blocks": []
+              },
+              {
+                "text": "WriteGetObjectResponse — Object Lambda response writing",
+                "blocks": []
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "html": "<strong>Batch 5 — Bucket metadata configurations</strong> (eight operations, new domain types for metadata configuration):"
+          },
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "CreateBucketMetadataConfiguration",
+                "blocks": []
+              },
+              {
+                "text": "DeleteBucketMetadataConfiguration",
+                "blocks": []
+              },
+              {
+                "text": "GetBucketMetadataConfiguration",
+                "blocks": []
+              },
+              {
+                "text": "CreateBucketMetadataTableConfiguration",
+                "blocks": []
+              },
+              {
+                "text": "DeleteBucketMetadataTableConfiguration",
+                "blocks": []
+              },
+              {
+                "text": "GetBucketMetadataTableConfiguration",
+                "blocks": []
+              },
+              {
+                "text": "UpdateBucketMetadataInventoryTableConfiguration",
+                "blocks": []
+              },
+              {
+                "text": "UpdateBucketMetadataJournalTableConfiguration",
+                "blocks": []
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_2_pattern_reuse",
+            "title": "2. Pattern Reuse",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "paragraph",
+            "html": "All operations follow the established pattern from ADR 0005 (RouterFunction functional WebFlux pattern) and ADR 0006 (S3 API protocol endpoint mapping):"
+          },
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "<strong>RouterFunction route</strong> — registered in <code>S3PathRouter</code> with appropriate HTTP method, path, and query parameters",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Handler method</strong> — implemented in the appropriate handler class (<code>S3SessionHandler</code>, <code>S3BucketOperationsHandler</code>, <code>S3ObjectOperationsHandler</code>, <code>S3ObjectMetadataHandler</code>, or <code>S3BucketConfigHandler</code>)",
+                "blocks": []
+              },
+              {
+                "text": "<strong>DTOs</strong> — command DTOs in <code>dto/command/</code> for request bodies, query DTOs in <code>dto/query/</code> for response bodies",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Cucumber feature scenarios</strong> — at least one success scenario and one failure scenario per operation, covering all error cases documented in the AWS S3 API spec",
+                "blocks": []
+              },
+              {
+                "text": "<strong>AWS CLI tests</strong> — where AWS CLI exposes the operation, add CLI test variants in <code>test-aws-cli.sh</code>",
+                "blocks": []
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_3_domain_modeling",
+            "title": "3. Domain Modeling",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "paragraph",
+            "html": "New domain types should only be created when the operation introduces genuinely new S3 concepts. Specifically:"
+          },
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "<strong>LegalHold</strong> — new value object in <code>object-store-domain</code> for legal hold status (On/Off)",
+                "blocks": []
+              },
+              {
+                "text": "<strong>ObjectLockConfiguration</strong> — new value object for lock configuration (enforcement mode, retention period)",
+                "blocks": []
+              },
+              {
+                "text": "<strong>RetentionPeriod</strong> — new value object for retention period (duration, unit)",
+                "blocks": []
+              },
+              {
+                "text": "<strong>BucketMetadataConfiguration</strong> — new value object for bucket metadata configuration (metadata key, type)",
+                "blocks": []
+              },
+              {
+                "text": "<strong>BucketMetadataTableConfiguration</strong> — new value object for metadata table configuration (table name, keys, inventory/journal settings)",
+                "blocks": []
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "html": "Operations that reuse existing concepts (RenameObject = copy+delete, UpdateObjectEncryption = metadata update) should not introduce new domain types."
+          },
+          {
+            "type": "section",
+            "id": "_4_handler_organization",
+            "title": "4. Handler Organization",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "table",
+            "headers": [
+              "Handler Class",
+              "Operations"
+            ],
+            "rows": [
+              [
+                "`S3SessionHandler`",
+                "CreateSession"
+              ],
+              [
+                "`S3BucketOperationsHandler`",
+                "ListDirectoryBuckets"
+              ],
+              [
+                "`S3ObjectOperationsHandler`",
+                "RenameObject, GetObjectTorrent, RestoreObject, SelectObjectContent, WriteGetObjectResponse"
+              ],
+              [
+                "`S3ObjectMetadataHandler`",
+                "UpdateObjectEncryption, GetObjectLegalHold, PutObjectLegalHold, GetObjectRetention, PutObjectRetention"
+              ],
+              [
+                "`S3BucketConfigHandler`",
+                "GetBucketAbac, PutBucketAbac, GetObjectLockConfiguration, PutObjectLockConfiguration, CreateBucketMetadataConfiguration, DeleteBucketMetadataConfiguration, GetBucketMetadataConfiguration, CreateBucketMetadataTableConfiguration, DeleteBucketMetadataTableConfiguration, GetBucketMetadataTableConfiguration, UpdateBucketMetadataInventoryTableConfiguration, UpdateBucketMetadataJournalTableConfiguration"
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "id": "_consequences",
+        "title": "Consequences",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "<strong>Positive</strong>: Batched approach allowed incremental implementation and testing. Each batch was verified with Cucumber before Phase F closure.",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Positive</strong>: Reusing established patterns minimized architectural drift. New domain types remained limited to genuinely new S3 concepts.",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Positive</strong>: Handler organization stayed within existing responsibilities: session creation in <code>S3SessionHandler</code>, object operations/metadata split between <code>S3ObjectOperationsHandler</code> and <code>S3ObjectMetadataHandler</code>, and bucket metadata configuration in <code>S3BucketConfigHandler</code>.",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Negative</strong>: Some operations (SelectObjectContent, WriteGetObjectResponse) require simplified compatibility behavior rather than full AWS feature parity.",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Risk</strong>: Bucket metadata configuration operations are available through the S3 adapter; deeper storage-engine integration remains future architecture work.",
+                "blocks": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "_implementation_note",
+        "title": "Implementation Note",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Phase F is implemented and Cucumber-tested across all five batches:"
+          },
+          {
+            "type": "list",
+            "style": "olist",
+            "items": [
+              {
+                "text": "Batch 1 added simple advanced object operations: RenameObject, UpdateObjectEncryption, GetObjectTorrent, and RestoreObject.",
+                "blocks": []
+              },
+              {
+                "text": "Batch 2 added session/configuration-like operations: CreateSession, ListDirectoryBuckets, GetBucketAbac, and PutBucketAbac.",
+                "blocks": []
+              },
+              {
+                "text": "Batch 3 added legal hold, object lock, and retention operations.",
+                "blocks": []
+              },
+              {
+                "text": "Batch 4 added SelectObjectContent and WriteGetObjectResponse using existing object operation handler infrastructure.",
+                "blocks": []
+              },
+              {
+                "text": "Batch 5 added bucket metadata and metadata table configuration operations in <code>S3BucketConfigHandler</code>.",
+                "blocks": []
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "html": "Verification result: <code>mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false</code> => 227 tests, 0 failures, 0 errors."
+          }
+        ]
+      },
+      {
+        "id": "_status",
+        "title": "Status",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Accepted"
+          }
+        ]
+      },
+      {
+        "id": "_date",
+        "title": "Date",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "2026-05-26"
+          }
+        ]
+      }
+    ]
+  }
+}

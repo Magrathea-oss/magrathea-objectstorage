@@ -24,6 +24,7 @@ import com.example.magrathea.storageengine.domain.valueobject.ChunkReferenceDesc
 import com.example.magrathea.storageengine.domain.valueobject.CompleteUploadCommand;
 import com.example.magrathea.storageengine.domain.valueobject.ChecksumAlgorithm;
 import com.example.magrathea.storageengine.domain.valueobject.ContentHash;
+import com.example.magrathea.storageengine.domain.valueobject.DedupConfig;
 import com.example.magrathea.storageengine.domain.valueobject.Fingerprint;
 import com.example.magrathea.storageengine.domain.valueobject.FingerprintAlgorithm;
 import com.example.magrathea.storageengine.domain.valueobject.ManifestId;
@@ -74,7 +75,6 @@ public class ReactiveStorageOrchestrator {
     private final ChunkStorePort chunkStorePort;
     private final StoredObjectRepository storedObjectRepository;
     private final ObjectManifestRepository objectManifestRepository;
-    private final Chunker chunker;
 
     public ReactiveStorageOrchestrator(
             CompleteUploadService completeUploadService,
@@ -88,8 +88,7 @@ public class ReactiveStorageOrchestrator {
             AlterationPort alterationPort,
             ChunkStorePort chunkStorePort,
             StoredObjectRepository storedObjectRepository,
-            ObjectManifestRepository objectManifestRepository,
-            Chunker chunker) {
+            ObjectManifestRepository objectManifestRepository) {
         this.completeUploadService = completeUploadService;
         this.storagePolicyCatalog = storagePolicyCatalog;
         this.effectivePolicyResolver = effectivePolicyResolver;
@@ -102,7 +101,6 @@ public class ReactiveStorageOrchestrator {
         this.chunkStorePort = chunkStorePort;
         this.storedObjectRepository = storedObjectRepository;
         this.objectManifestRepository = objectManifestRepository;
-        this.chunker = chunker;
     }
 
     /**
@@ -130,9 +128,40 @@ public class ReactiveStorageOrchestrator {
                     // Step 5: Create persistence plan
                     PersistencePlan plan = persistencePlanner.createPlan(effectivePolicy, device);
 
-                    // Step 6: Chunk the data and run pipeline per chunk
-                    return chunker.chunk(data)
-                            .concatMap(chunkPayload -> processChunk(chunkPayload, plan))
+                    // Step 6: Accumulate full data, then decide if chunking is needed
+                    return data.reduceWith(() -> new byte[0], (acc, buf) -> {
+                                byte[] bytes = new byte[acc.length + buf.readableByteCount()];
+                                System.arraycopy(acc, 0, bytes, 0, acc.length);
+                                buf.read(bytes, acc.length, buf.readableByteCount());
+                                org.springframework.core.io.buffer.DataBufferUtils.release(buf);
+                                return bytes;
+                            })
+                            .flatMapMany(fullData -> {
+                                // Check if dedup is enabled — only then chunk
+                                boolean dedupEnabled = plan.effectivePolicy().dedup()
+                                        .filter(d -> plan.steps().get(0).expectedStatus() == StepExecutionStatus.EXECUTED)
+                                        .isPresent();
+
+                                if (dedupEnabled) {
+                                    // Chunk using dedup config chunk size
+                                    long chunkSize = plan.effectivePolicy().dedup()
+                                            .map(DedupConfig::chunkSize)
+                                            .orElse(65536L);
+                                    Chunker chunker = new Chunker((int) chunkSize);
+                                    return chunker.chunk(Flux.just(
+                                            new org.springframework.core.io.buffer.DefaultDataBufferFactory().wrap(fullData)))
+                                            .concatMap(chunkPayload -> processChunk(chunkPayload, plan))
+                                            .collectList()
+                                            .flatMapMany(Flux::just);
+                                } else {
+                                    // No dedup: process full data as a single chunk
+                                    ChunkId singleChunkId = ChunkId.generate();
+                                    ApplicationChunkPayload singlePayload =
+                                            new ApplicationChunkPayload(singleChunkId, fullData);
+                                    return processChunk(singlePayload, plan)
+                                            .flatMapMany(trace -> Flux.just(trace));
+                                }
+                            })
                             .collectList()
                             .flatMap(chunkTraces -> {
                                 // Step 9: Build ChunkReferenceDescriptor list

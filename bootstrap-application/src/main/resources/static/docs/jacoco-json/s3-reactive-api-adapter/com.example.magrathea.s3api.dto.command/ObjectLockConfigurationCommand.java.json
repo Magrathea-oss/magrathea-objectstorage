@@ -1,0 +1,27 @@
+{
+  "title": "ObjectLockConfigurationCommand.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "ObjectLockConfigurationCommand.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_objectlockconfigurationcommand_java",
+        "title": "ObjectLockConfigurationCommand.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.s3api.dto.command;\n\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;\n\n/**\n * Command DTO for PUT /{bucket}?object-lock — PutObjectLockConfiguration XML body.\n */\n@JacksonXmlRootElement(localName = \"ObjectLockConfiguration\")\n<span class=\"fc\" id=\"L10\">public record ObjectLockConfigurationCommand(</span>\n    @JacksonXmlProperty(localName = \"ObjectLockEnabled\")\n    String objectLockEnabled,\n    @JacksonXmlProperty(localName = \"Rule\")\n    Rule rule\n) {\n<span class=\"fc\" id=\"L16\">    public record Rule(</span>\n        @JacksonXmlProperty(localName = \"DefaultRetention\")\n        DefaultRetention defaultRetention\n    ) {}\n\n<span class=\"fc\" id=\"L21\">    public record DefaultRetention(</span>\n        @JacksonXmlProperty(localName = \"Mode\")\n        String mode,\n        @JacksonXmlProperty(localName = \"Days\")\n        Integer days,\n        @JacksonXmlProperty(localName = \"Years\")\n        Integer years\n    ) {}\n\n    public boolean isEnabled() {\n<span class=\"fc\" id=\"L31\">        return \"true\".equals(objectLockEnabled);</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "title": "CompleteUploadCommand.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "CompleteUploadCommand.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_completeuploadcommand_java",
+        "title": "CompleteUploadCommand.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.storageengine.domain.valueobject;\n\nimport java.util.Optional;\nimport java.util.List;\n\npublic record CompleteUploadCommand(\n        UploadRequestContext context,\n        UploadMode uploadMode,\n        Optional<List<PartDescriptor>> parts) {\n\n<span class=\"nc\" id=\"L11\">    public CompleteUploadCommand {</span>\n<span class=\"nc\" id=\"L12\">        java.util.Objects.requireNonNull(context, \"context must not be null\");</span>\n<span class=\"nc\" id=\"L13\">        java.util.Objects.requireNonNull(uploadMode, \"uploadMode must not be null\");</span>\n<span class=\"nc\" id=\"L14\">        java.util.Objects.requireNonNull(parts, \"parts must not be null\");</span>\n<span class=\"nc\" id=\"L15\">    }</span>\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

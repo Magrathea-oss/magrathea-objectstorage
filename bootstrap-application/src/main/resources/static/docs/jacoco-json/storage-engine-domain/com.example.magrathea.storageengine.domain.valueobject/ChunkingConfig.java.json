@@ -1,0 +1,27 @@
+{
+  "title": "ChunkingConfig.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "ChunkingConfig.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_chunkingconfig_java",
+        "title": "ChunkingConfig.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.storageengine.domain.valueobject;\n\npublic record ChunkingConfig(int chunkSize, ChunkAlignment alignment) {\n<span class=\"nc\" id=\"L4\">    public ChunkingConfig {</span>\n<span class=\"nc\" id=\"L5\">        java.util.Objects.requireNonNull(alignment, \"alignment must not be null\");</span>\n<span class=\"nc bnc\" id=\"L6\" title=\"All 2 branches missed.\">        if (chunkSize <= 0) {</span>\n<span class=\"nc\" id=\"L7\">            throw new IllegalArgumentException(\"chunkSize must be positive: \" + chunkSize);</span>\n        }\n<span class=\"nc\" id=\"L9\">    }</span>\n\n    public static ChunkingConfig of(int chunkSize, ChunkAlignment alignment) {\n<span class=\"nc\" id=\"L12\">        return new ChunkingConfig(chunkSize, alignment);</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

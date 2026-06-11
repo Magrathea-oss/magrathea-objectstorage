@@ -1,0 +1,27 @@
+{
+  "title": "FileSystemStorageNode.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "FileSystemStorageNode.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_filesystemstoragenode_java",
+        "title": "FileSystemStorageNode.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.storageengine.infrastructure.filesystem;\n\nimport com.example.magrathea.storageengine.domain.valueobject.ChunkId;\nimport com.example.magrathea.storageengine.domain.valueobject.NodeId;\nimport reactor.core.publisher.Mono;\n\nimport java.io.IOException;\nimport java.io.UncheckedIOException;\nimport java.nio.file.Files;\nimport java.nio.file.Path;\nimport java.nio.file.StandardOpenOption;\n\n/**\n * A storage node backed by a single directory on the filesystem.\n * Each node writes chunk data to nodePath/chunks/{chunkId}.\n */\npublic class FileSystemStorageNode {\n\n    private final Path nodePath;\n    private final NodeId nodeId;\n    private final Path chunksDir;\n\n<span class=\"nc\" id=\"L23\">    public FileSystemStorageNode(Path nodePath, NodeId nodeId) {</span>\n<span class=\"nc\" id=\"L24\">        this.nodePath = java.util.Objects.requireNonNull(nodePath, \"nodePath must not be null\");</span>\n<span class=\"nc\" id=\"L25\">        this.nodeId = java.util.Objects.requireNonNull(nodeId, \"nodeId must not be null\");</span>\n<span class=\"nc\" id=\"L26\">        this.chunksDir = nodePath.resolve(\"chunks\");</span>\n        try {\n<span class=\"nc\" id=\"L28\">            Files.createDirectories(chunksDir);</span>\n<span class=\"nc\" id=\"L29\">        } catch (IOException e) {</span>\n<span class=\"nc\" id=\"L30\">            throw new UncheckedIOException(\"Failed to create chunks directory: \" + chunksDir, e);</span>\n<span class=\"nc\" id=\"L31\">        }</span>\n<span class=\"nc\" id=\"L32\">    }</span>\n\n    public NodeId nodeId() {\n<span class=\"nc\" id=\"L35\">        return nodeId;</span>\n    }\n\n    public Path nodePath() {\n<span class=\"nc\" id=\"L39\">        return nodePath;</span>\n    }\n\n    /**\n     * Writes chunk data to nodePath/chunks/{chunkId}.\n     */\n    public Mono<WriteResult> write(ChunkId chunkId, byte[] data) {\n<span class=\"nc\" id=\"L46\">        return Mono.fromCallable(() -> {</span>\n<span class=\"nc\" id=\"L47\">            Path chunkFile = chunksDir.resolve(chunkId.value().toString());</span>\n<span class=\"nc\" id=\"L48\">            Files.write(chunkFile, data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);</span>\n<span class=\"nc\" id=\"L49\">            return new WriteResult(nodeId, chunkId, data.length);</span>\n        });\n    }\n\n    /**\n     * Reads chunk data from nodePath/chunks/{chunkId}.\n     */\n    public Mono<byte[]> read(ChunkId chunkId) {\n<span class=\"nc\" id=\"L57\">        return Mono.fromCallable(() -> {</span>\n<span class=\"nc\" id=\"L58\">            Path chunkFile = chunksDir.resolve(chunkId.value().toString());</span>\n<span class=\"nc\" id=\"L59\">            return Files.readAllBytes(chunkFile);</span>\n        });\n    }\n\n    /**\n     * Result of a write operation.\n     */\n    public record WriteResult(NodeId nodeId, ChunkId chunkId, long bytesWritten) {\n<span class=\"nc\" id=\"L67\">        public WriteResult {</span>\n<span class=\"nc\" id=\"L68\">            java.util.Objects.requireNonNull(nodeId, \"nodeId must not be null\");</span>\n<span class=\"nc\" id=\"L69\">            java.util.Objects.requireNonNull(chunkId, \"chunkId must not be null\");</span>\n<span class=\"nc bnc\" id=\"L70\" title=\"All 2 branches missed.\">            if (bytesWritten < 0) {</span>\n<span class=\"nc\" id=\"L71\">                throw new IllegalArgumentException(\"bytesWritten must be >= 0: \" + bytesWritten);</span>\n            }\n<span class=\"nc\" id=\"L73\">        }</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "title": "S3ApiConfig.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "S3ApiConfig.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_s3apiconfig_java",
+        "title": "S3ApiConfig.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.s3api.config;\n\nimport com.example.magrathea.reactive.application.service.ReactiveBucketService;\nimport com.example.magrathea.reactive.application.service.ReactiveMultipartUploadService;\nimport com.example.magrathea.reactive.application.service.ReactiveObjectService;\nimport com.example.magrathea.s3api.adapter.web.S3BucketConfigHandler;\nimport com.example.magrathea.s3api.adapter.web.S3BucketMetadataHandler;\nimport com.example.magrathea.s3api.adapter.web.S3BucketOperationsHandler;\nimport com.example.magrathea.s3api.adapter.web.S3MultipartHandler;\nimport com.example.magrathea.s3api.adapter.web.S3ObjectMetadataHandler;\nimport com.example.magrathea.s3api.adapter.web.S3ObjectOperationsHandler;\nimport com.example.magrathea.s3api.adapter.web.S3PathRouter;\nimport com.example.magrathea.s3api.adapter.web.S3SessionHandler;\nimport org.springframework.boot.autoconfigure.AutoConfiguration;\nimport org.springframework.boot.autoconfigure.condition.ConditionalOnClass;\nimport org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;\nimport org.springframework.context.annotation.Bean;\nimport org.springframework.web.reactive.function.server.RouterFunction;\nimport org.springframework.web.reactive.function.server.ServerResponse;\n\n/**\n * Auto-configuration for S3 Reactive API Adapter module.\n * Activates when:\n *  - object-store-reactive-application is on the classpath (ReactiveBucketService, ReactiveObjectService available)\n *  - s3.api.enabled property is not false\n *\n * When s3-reactive-api-adapter module is excluded from the build, this config is not loaded.\n * When included but disabled via property, beans are not created.\n */\n@AutoConfiguration\n@ConditionalOnClass({ ReactiveBucketService.class, ReactiveObjectService.class })\n@ConditionalOnProperty(name = \"s3.api.enabled\", havingValue = \"true\", matchIfMissing = true)\n<span class=\"fc\" id=\"L33\">public class S3ApiConfig {</span>\n\n    @Bean\n    public S3BucketOperationsHandler s3BucketOperationsHandler(ReactiveBucketService bucketService,\n                                                               ReactiveObjectService objectService) {\n<span class=\"fc\" id=\"L38\">        return new S3BucketOperationsHandler(bucketService, objectService);</span>\n    }\n\n    @Bean\n    public S3BucketMetadataHandler s3BucketMetadataHandler(ReactiveBucketService bucketService) {\n<span class=\"fc\" id=\"L43\">        return new S3BucketMetadataHandler(bucketService);</span>\n    }\n\n    @Bean\n    public S3ObjectOperationsHandler s3ObjectOperationsHandler(ReactiveObjectService objectService) {\n<span class=\"fc\" id=\"L48\">        return new S3ObjectOperationsHandler(objectService);</span>\n    }\n\n    @Bean\n    public S3ObjectMetadataHandler s3ObjectMetadataHandler(ReactiveObjectService objectService) {\n<span class=\"fc\" id=\"L53\">        return new S3ObjectMetadataHandler(objectService);</span>\n    }\n\n    @Bean\n    public S3BucketConfigHandler s3BucketConfigHandler(ReactiveBucketService bucketService) {\n<span class=\"fc\" id=\"L58\">        return new S3BucketConfigHandler(bucketService);</span>\n    }\n\n    @Bean\n    public S3MultipartHandler s3MultipartHandler(ReactiveMultipartUploadService multipartUploadService) {\n<span class=\"fc\" id=\"L63\">        return new S3MultipartHandler(multipartUploadService);</span>\n    }\n\n    @Bean\n    public S3SessionHandler s3SessionHandler(ReactiveBucketService bucketService) {\n<span class=\"fc\" id=\"L68\">        return new S3SessionHandler(bucketService);</span>\n    }\n\n    @Bean\n    public S3PathRouter s3PathRouter(S3BucketOperationsHandler bucketOperations,\n                                        S3BucketMetadataHandler bucketMetadata,\n                                        S3ObjectOperationsHandler objectOperations,\n                                        S3ObjectMetadataHandler objectMetadata,\n                                        S3BucketConfigHandler bucketConfig,\n                                        S3MultipartHandler multipartHandler,\n                                        S3SessionHandler sessionHandler) {\n<span class=\"fc\" id=\"L79\">        return new S3PathRouter(bucketOperations, bucketMetadata, objectOperations, objectMetadata, bucketConfig, multipartHandler, sessionHandler);</span>\n    }\n\n    @Bean\n    public RouterFunction<ServerResponse> s3Routes(S3PathRouter router) {\n<span class=\"fc\" id=\"L84\">        return router.s3Routes();</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

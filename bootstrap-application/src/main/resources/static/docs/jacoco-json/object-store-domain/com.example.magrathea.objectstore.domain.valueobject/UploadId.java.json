@@ -1,0 +1,27 @@
+{
+  "title": "UploadId.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "UploadId.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_uploadid_java",
+        "title": "UploadId.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.objectstore.domain.valueobject;\n\nimport java.util.Objects;\nimport java.util.UUID;\n\n/**\n * AWS S3 UploadId — value object.\n * Identifies a multipart upload session.\n * Immutable, zero framework dependencies.\n */\npublic record UploadId(String value) {\n\n<span class=\"fc\" id=\"L13\">    public UploadId {</span>\n<span class=\"fc\" id=\"L14\">        Objects.requireNonNull(value);</span>\n<span class=\"fc bfc\" id=\"L15\" title=\"All 2 branches covered.\">        if (value.isBlank()) throw new IllegalArgumentException(\"UploadId must not be blank\");</span>\n<span class=\"fc bfc\" id=\"L16\" title=\"All 2 branches covered.\">        if (!value.matches(\"^[a-zA-Z0-9]+$\"))</span>\n<span class=\"fc\" id=\"L17\">            throw new IllegalArgumentException(\"UploadId must be alphanumeric\");</span>\n<span class=\"fc\" id=\"L18\">    }</span>\n\n    public static UploadId generate() {\n<span class=\"fc\" id=\"L21\">        return new UploadId(UUID.randomUUID().toString().replace(\"-\", \"\"));</span>\n    }\n\n    public static UploadId of(String value) {\n<span class=\"fc\" id=\"L25\">        return new UploadId(value);</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

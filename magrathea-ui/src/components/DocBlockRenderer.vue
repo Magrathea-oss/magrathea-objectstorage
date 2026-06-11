@@ -2,6 +2,8 @@
   <template v-for="(block, bi) in blocks" :key="bi">
     <p v-if="block.type === 'paragraph'" class="docs-paragraph" v-html="block.html"></p>
 
+    <div v-else-if="block.type === 'code'" class="docs-code" v-html="block.html"></div>
+
     <div v-else-if="block.type === 'section'" class="docs-subsection">
       <h3 v-if="block.title" :id="block.id" class="docs-subsection-title">{{ block.title }}</h3>
       <DocBlockRenderer :blocks="block.blocks || []" />
@@ -119,6 +121,18 @@ function extractSrc(html) {
 .docs-list li {
   margin: 0.3em 0;
   color: var(--text-secondary);
+}
+
+.docs-code {
+  margin: 1em 0;
+  overflow-x: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: 8px;
+  padding: 1rem;
+  font-family: 'Fira Code', 'Consolas', monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
 }
 
 .docs-image {

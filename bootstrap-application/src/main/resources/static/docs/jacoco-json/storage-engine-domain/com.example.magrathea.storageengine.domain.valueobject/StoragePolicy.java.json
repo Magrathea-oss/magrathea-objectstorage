@@ -1,0 +1,27 @@
+{
+  "title": "StoragePolicy.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "StoragePolicy.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_storagepolicy_java",
+        "title": "StoragePolicy.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.storageengine.domain.valueobject;\n\nimport java.util.Optional;\n\npublic record StoragePolicy(\n        StorageClassId id,\n        Optional<DedupConfig> dedup,\n        Optional<CompressionConfig> compression,\n        Optional<EncryptionPolicy> encryption,\n        Optional<ErasureCodingConfig> erasureCoding,\n        ReplicationConfig replication) {\n\n<span class=\"nc\" id=\"L13\">    public StoragePolicy {</span>\n<span class=\"nc\" id=\"L14\">        java.util.Objects.requireNonNull(id, \"id must not be null\");</span>\n<span class=\"nc\" id=\"L15\">        java.util.Objects.requireNonNull(dedup, \"dedup must not be null\");</span>\n<span class=\"nc\" id=\"L16\">        java.util.Objects.requireNonNull(compression, \"compression must not be null\");</span>\n<span class=\"nc\" id=\"L17\">        java.util.Objects.requireNonNull(encryption, \"encryption must not be null\");</span>\n<span class=\"nc\" id=\"L18\">        java.util.Objects.requireNonNull(erasureCoding, \"erasureCoding must not be null\");</span>\n<span class=\"nc\" id=\"L19\">        java.util.Objects.requireNonNull(replication, \"replication must not be null\");</span>\n<span class=\"nc\" id=\"L20\">    }</span>\n\n    public static StoragePolicy of(\n            StorageClassId id,\n            Optional<DedupConfig> dedup,\n            Optional<CompressionConfig> compression,\n            Optional<EncryptionPolicy> encryption,\n            Optional<ErasureCodingConfig> erasureCoding,\n            ReplicationConfig replication) {\n<span class=\"nc\" id=\"L29\">        return new StoragePolicy(id, dedup, compression, encryption, erasureCoding, replication);</span>\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

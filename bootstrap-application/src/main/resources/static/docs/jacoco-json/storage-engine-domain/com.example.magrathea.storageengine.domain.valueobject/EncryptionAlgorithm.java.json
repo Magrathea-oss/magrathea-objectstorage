@@ -1,0 +1,27 @@
+{
+  "title": "EncryptionAlgorithm.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "EncryptionAlgorithm.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_encryptionalgorithm_java",
+        "title": "EncryptionAlgorithm.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.storageengine.domain.valueobject;\n\n<span class=\"nc\" id=\"L3\">public enum EncryptionAlgorithm {</span>\n<span class=\"nc\" id=\"L4\">    SSE_S3,</span>\n<span class=\"nc\" id=\"L5\">    SSE_KMS</span>\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

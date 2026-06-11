@@ -1,0 +1,27 @@
+{
+  "title": "ListPartsQuery.java",
+  "lang": "it",
+  "document": {
+    "type": "document",
+    "title": "ListPartsQuery.java",
+    "sections": [
+      {
+        "type": "section",
+        "id": "_listpartsquery_java",
+        "title": "ListPartsQuery.java",
+        "level": 1,
+        "blocks": [
+          {
+            "type": "code",
+            "html": "<pre>package com.example.magrathea.s3api.dto.query;\n\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;\nimport tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;\nimport reactor.core.publisher.Flux;\nimport reactor.core.publisher.Mono;\n\nimport java.util.List;\n\n/**\n * Response for GET /{bucket}/{key}?uploadId (ListParts).\n * Uses Jackson XML annotations for serialization via Jackson XML codec.\n */\n@JacksonXmlRootElement(localName = \"ListPartsResult\")\n<span class=\"fc\" id=\"L16\">public record ListPartsQuery(</span>\n    @JacksonXmlProperty(localName = \"Bucket\")\n    String bucket,\n    @JacksonXmlProperty(localName = \"Key\")\n    String key,\n    @JacksonXmlProperty(localName = \"UploadId\")\n    String uploadId,\n    @JacksonXmlElementWrapper(localName = \"Part\", useWrapping = false)\n    @JacksonXmlProperty(localName = \"Part\")\n    List<PartEntry> parts\n) {\n    /**\n     * Builds the ListPartsResult reactively by collecting PartEntry flux into a list.\n     */\n    public static Mono<ListPartsQuery> from(String bucket, String key, String uploadId, Flux<PartEntry> parts) {\n<span class=\"fc\" id=\"L31\">        return parts.collectList()</span>\n<span class=\"fc\" id=\"L32\">            .map(list -> new ListPartsQuery(bucket, key, uploadId, list));</span>\n    }\n\n    /**\n     * Inner record for each part entry in the result.\n     */\n<span class=\"fc\" id=\"L38\">    public record PartEntry(</span>\n        @JacksonXmlProperty(localName = \"PartNumber\")\n        int partNumber,\n        @JacksonXmlProperty(localName = \"ETag\")\n        String etag\n    ) {\n        public static PartEntry from(int partNumber, String etag) {\n<span class=\"fc\" id=\"L45\">            return new PartEntry(partNumber, etag);</span>\n        }\n    }\n}\n</pre>"
+          },
+          {
+            "type": "paragraph",
+            "html": "<div class=\"footer\"><span class=\"right\">Created with <a href=\"http://www.jacoco.org/jacoco\">JaCoCo</a> 0.8.12.202403310830</span></div>"
+          }
+        ]
+      }
+    ],
+    "lang": "it"
+  }
+}

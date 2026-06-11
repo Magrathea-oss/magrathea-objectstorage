@@ -1,0 +1,251 @@
+{
+  "adr": 15,
+  "title": "ADR 0015 — Handler minimal pattern and postponed repository responsibilities",
+  "status": "Accepted",
+  "lang": "en",
+  "document": {
+    "type": "document",
+    "title": "ADR 0015 — Handler minimal pattern and postponed repository responsibilities",
+    "sections": [
+      {
+        "id": "_adr_0015_handler_minimal_pattern_and_postponed_repository_responsibilities",
+        "title": "ADR 0015 — Handler minimal pattern and postponed repository responsibilities",
+        "level": 1,
+        "blocks": []
+      },
+      {
+        "id": "_context",
+        "title": "Context",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Phase 1 of the Handler Correction Plan required cleaning up all S3 API handlers to follow a strict minimal pattern. Originally, handlers contained validation logic, bucket existence checks, ETag computation, CORS validation, website routing, and handler-local state (ConcurrentHashMap for ACL/tagging, ABAC, ObjectLock, etc.). This made handlers complex, coupled to cross-cutting concerns, and difficult to test in isolation."
+          },
+          {
+            "type": "paragraph",
+            "html": "The project uses hexagonal architecture with DDD: handlers are HTTP adapters, application services orchestrate domain calls, repositories handle persistence. Cross-cutting concerns belong in the repository layer where preconditions can be checked before state mutations."
+          }
+        ]
+      },
+      {
+        "id": "_decision",
+        "title": "Decision",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "We will enforce the <strong>extract → delegate → response</strong> pattern for all handlers in <code>s3-reactive-api-adapter</code>:"
+          },
+          {
+            "type": "list",
+            "style": "olist",
+            "items": [
+              {
+                "text": "<strong>Extract</strong>: <code>S3RequestExtractor</code> parses HTTP headers, path variables, and query parameters into typed primitives and DTOs",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Delegate</strong>: The handler calls a single reactive service method — no validation, no bucket checks, no ETag computation, no CORS/website logic, no handler-local state",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Response</strong>: <code>S3ResponseBuilder</code> or direct XML serialization converts the service result into an HTTP response",
+                "blocks": []
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "html": "All cross-cutting concerns are <strong>postponed to the repository layer</strong>:"
+          },
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "Validation (Spring Reactive Validator) → repository preconditions",
+                "blocks": []
+              },
+              {
+                "text": "Bucket existence checks → repository preconditions",
+                "blocks": []
+              },
+              {
+                "text": "Bucket name validation → repository preconditions",
+                "blocks": []
+              },
+              {
+                "text": "ETag computation → repository (generated on store)",
+                "blocks": []
+              },
+              {
+                "text": "Handler-local ACL/grants/tagging → repository",
+                "blocks": []
+              },
+              {
+                "text": "CORS validation → repository/service",
+                "blocks": []
+              },
+              {
+                "text": "Website routing → repository/service",
+                "blocks": []
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "html": "The <code>S3BucketConfigHandler</code> is <strong>excluded</strong> from this cleanup because it uses a complex registry/strategy pattern with <code>ConcurrentHashMap</code> for ABAC, ObjectLock, Metadata, InventoryTable, and JournalTable configurations. Its cleanup is postponed to a separate phase."
+          },
+          {
+            "type": "section",
+            "id": "_handlers_cleaned_up",
+            "title": "Handlers cleaned up",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "table",
+            "headers": [
+              "Handler",
+              "Before",
+              "After"
+            ],
+            "rows": [
+              [
+                "`S3ObjectOperationsHandler`",
+                "Bucket checks, validation, ETag",
+                "Delegates to `ReactiveObjectService`"
+              ],
+              [
+                "`S3ObjectMetadataHandler`",
+                "`bucketService.findByName()`, `ConcurrentHashMap` for ACL/tag, CORS",
+                "Delegates to `ReactiveObjectService`"
+              ],
+              [
+                "`S3MultipartHandler`",
+                "`bucketService.findByName()`, `DigestUtils.md5DigestAsHex()` for ETag",
+                "Delegates to `ReactiveMultipartUploadService`"
+              ],
+              [
+                "`S3BucketOperationsHandler`",
+                "Bucket name validation, `validateRuntimeRequest`, `applyRuntimeHeaders`, `websiteRouting`",
+                "Delegates to `ReactiveBucketService`"
+              ],
+              [
+                "`S3BucketMetadataHandler`",
+                "`ConcurrentHashMap` for ACL/tag, `visibleAcl`, `validatePublicAclMutation`, CORS",
+                "Delegates to `ReactiveBucketService`"
+              ],
+              [
+                "`S3SessionHandler`",
+                "Session state management",
+                "Delegates to `ReactiveBucketService.createSession()`"
+              ],
+              [
+                "`S3BucketConfigHandler`",
+                "Complex registry + `ConcurrentHashMap` for ABAC/ObjectLock/Metadata",
+                "⏳ Excluded"
+              ]
+            ]
+          },
+          {
+            "type": "section",
+            "id": "_new_domain_files",
+            "title": "New domain files",
+            "level": 3,
+            "blocks": []
+          },
+          {
+            "type": "table",
+            "headers": [
+              "File",
+              "Description"
+            ],
+            "rows": [
+              [
+                "`WriteState.java`",
+                "Enum: `CREATED` → `WRITING` → `WRITTEN` → `DELETED` — write lifecycle state machine"
+              ],
+              [
+                "`ContentDescriptor.java`",
+                "Record: size, checksum, content type, disposition, encoding, language"
+              ],
+              [
+                "`EncryptionConfiguration.java` (aggregate)",
+                "Record: encryption type, KMS key ID, KMS context, algorithm"
+              ],
+              [
+                "`EncryptionType.java`",
+                "Enum: `NONE`, `SSE_S3`, `SSE_KMS`, `SSE_C`"
+              ]
+            ]
+          },
+          {
+            "type": "paragraph",
+            "html": "These files support the S3Object sealed state machine hierarchy (<code>ActiveS3Object</code>, <code>ArchivedS3Object</code>, <code>LockedS3Object</code>, <code>DeletedS3Object</code>) and write lifecycle tracking."
+          }
+        ]
+      },
+      {
+        "id": "_consequences",
+        "title": "Consequences",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "list",
+            "style": "ulist",
+            "items": [
+              {
+                "text": "<strong>Handlers are simpler</strong>: each handler is a thin HTTP adapter — easy to test, easy to review, easy to maintain",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Repository layer gains responsibility</strong>: preconditions, ETag computation, CORS, website routing, and state management move to the infrastructure layer where they belong",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Postponed tests removed</strong>: tests for validation, bucket checks, ETag, CORS, website routing are removed until those features are implemented in repositories",
+                "blocks": []
+              },
+              {
+                "text": "<strong>S3BucketConfigHandler remains complex</strong>: its cleanup is deferred to a separate phase",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Risk</strong>: postponed features may be forgotten. Tracked in PLAN.md \"Postponed Items\" table",
+                "blocks": []
+              },
+              {
+                "text": "<strong>Verification</strong>: <code>mvn test</code> passes with 0 failures",
+                "blocks": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "_status",
+        "title": "Status",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "Accepted"
+          }
+        ]
+      },
+      {
+        "id": "_date",
+        "title": "Date",
+        "level": 2,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "html": "2026-06-05"
+          }
+        ]
+      }
+    ]
+  }
+}
