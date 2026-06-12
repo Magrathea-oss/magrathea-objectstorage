@@ -104,6 +104,7 @@ public class S3MultipartHandler {
                 var updated = upload.withPart(part);
                 return multipartUploadService.saveUpload(updated)
                     .then(ServerResponse.ok()
+                        .header("ETag", etag)
                         .contentType(MediaType.APPLICATION_XML)
                         .bodyValue(UploadPartResultQuery.from(etag)));
             })

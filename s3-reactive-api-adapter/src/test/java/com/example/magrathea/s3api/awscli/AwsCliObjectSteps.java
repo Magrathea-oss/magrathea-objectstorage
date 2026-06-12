@@ -13,6 +13,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 
 import java.nio.file.*;
 import java.util.*;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -40,6 +41,8 @@ public class AwsCliObjectSteps {
     private int exitCode;
     private String stdout;
     private String stderr;
+    private String currentUploadId;
+    private String currentPartETag;
 
     private String getEndpoint() {
         return "http://localhost:" + port;
@@ -89,9 +92,16 @@ public class AwsCliObjectSteps {
         exitCode = 0;
         stdout = "";
         stderr = "";
+        currentUploadId = null;
+        currentPartETag = null;
     }
 
     // ── Given steps ──
+
+    @Given("an object key {string}")
+    public void anObjectKey(String key) {
+        currentKey = key;
+    }
 
     @Given("a bucket name {string}")
     public void aBucketName(String bucketName) {
@@ -377,6 +387,146 @@ public class AwsCliObjectSteps {
         assertTrue(stdout.contains("\"StorageClass\": \"" + storageClass + "\"")
                 || (stdout.contains("StorageClass") && stdout.contains(storageClass)),
             "Object attributes should include storage class '" + storageClass + "': " + stdout);
+    }
+
+    // ── Metadata / ACL / Tagging steps ──
+
+    @When("bucket ACL {string} is applied via AWS CLI to {string}")
+    public void bucketAclAppliedViaAwsCli(String acl, String bucket) throws Exception {
+        currentBucket = bucket;
+        runAws("put-bucket-acl", "--bucket", bucket, "--acl", acl);
+    }
+
+    @When("bucket ACL is requested via AWS CLI for {string}")
+    public void bucketAclRequestedViaAwsCli(String bucket) throws Exception {
+        currentBucket = bucket;
+        runAws("get-bucket-acl", "--bucket", bucket);
+    }
+
+    @When("object ACL {string} is applied via AWS CLI to {string}")
+    public void objectAclAppliedViaAwsCli(String acl, String key) throws Exception {
+        currentKey = key;
+        runAws("put-object-acl", "--bucket", currentBucket, "--key", key, "--acl", acl);
+    }
+
+    @When("object ACL is requested via AWS CLI for {string}")
+    public void objectAclRequestedViaAwsCli(String key) throws Exception {
+        currentKey = key;
+        runAws("get-object-acl", "--bucket", currentBucket, "--key", key);
+    }
+
+    @When("bucket tag {string} = {string} is applied via AWS CLI to {string}")
+    public void bucketTagAppliedViaAwsCli(String k, String v, String bucket) throws Exception {
+        currentBucket = bucket;
+        runAws("put-bucket-tagging", "--bucket", bucket, "--tagging",
+            "TagSet=[{Key=" + k + ",Value=" + v + "}]");
+    }
+
+    @When("bucket tags are requested via AWS CLI for {string}")
+    public void bucketTagsRequestedViaAwsCli(String bucket) throws Exception {
+        currentBucket = bucket;
+        runAws("get-bucket-tagging", "--bucket", bucket);
+    }
+
+    @When("bucket tags are deleted via AWS CLI for {string}")
+    public void bucketTagsDeletedViaAwsCli(String bucket) throws Exception {
+        currentBucket = bucket;
+        runAws("delete-bucket-tagging", "--bucket", bucket);
+    }
+
+    @When("object tag {string} = {string} is applied via AWS CLI to {string}")
+    public void objectTagAppliedViaAwsCli(String k, String v, String key) throws Exception {
+        currentKey = key;
+        runAws("put-object-tagging", "--bucket", currentBucket, "--key", key,
+            "--tagging", "TagSet=[{Key=" + k + ",Value=" + v + "}]");
+    }
+
+    @When("object tags are requested via AWS CLI for {string}")
+    public void objectTagsRequestedViaAwsCli(String key) throws Exception {
+        currentKey = key;
+        runAws("get-object-tagging", "--bucket", currentBucket, "--key", key);
+    }
+
+    @When("object tags are deleted via AWS CLI for {string}")
+    public void objectTagsDeletedViaAwsCli(String key) throws Exception {
+        currentKey = key;
+        runAws("delete-object-tagging", "--bucket", currentBucket, "--key", key);
+    }
+
+    @When("object attributes are requested via AWS CLI for {string} including ETag and ObjectSize")
+    public void objectAttributesWithEtagAndSizeRequestedViaAwsCli(String key) throws Exception {
+        currentKey = key;
+        runAws("get-object-attributes", "--bucket", currentBucket, "--key", key,
+            "--object-attributes", "ETag", "ObjectSize");
+    }
+
+    // ── Multipart upload steps ──
+
+    @When("a multipart upload is initiated via AWS CLI for {string}")
+    public void multipartUploadInitiatedViaAwsCli(String key) throws Exception {
+        currentKey = key;
+        runAws("create-multipart-upload", "--bucket", currentBucket, "--key", key);
+        var m = Pattern.compile("\"UploadId\"\\s*:\\s*\"([^\"]+)\"").matcher(stdout);
+        if (m.find()) {
+            currentUploadId = m.group(1);
+        }
+    }
+
+    @When("part {int} is uploaded via AWS CLI with content {string}")
+    public void partUploadedViaAwsCli(int partNumber, String content) throws Exception {
+        var tmpFile = writeTempFile(content);
+        runAws("upload-part", "--bucket", currentBucket, "--key", currentKey,
+            "--part-number", String.valueOf(partNumber),
+            "--upload-id", currentUploadId,
+            "--body", tmpFile.toString());
+        Files.deleteIfExists(tmpFile);
+        // Extract ETag from JSON response — handles JSON-escaped values like \"placeholder-etag\"
+        var m = Pattern.compile("\"ETag\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"")
+            .matcher(stdout);
+        if (m.find()) {
+            currentPartETag = m.group(1);
+        } else {
+            currentPartETag = "placeholder";
+        }
+    }
+
+    @When("the parts are listed via AWS CLI")
+    public void partsListedViaAwsCli() throws Exception {
+        runAws("list-parts", "--bucket", currentBucket, "--key", currentKey,
+            "--upload-id", currentUploadId);
+    }
+
+    @When("the multipart upload is completed via AWS CLI")
+    public void multipartUploadCompletedViaAwsCli() throws Exception {
+        // Build parts JSON; server does not validate ETag so any valid JSON payload succeeds.
+        var etag = currentPartETag != null ? currentPartETag : "placeholder";
+        runAws("complete-multipart-upload", "--bucket", currentBucket, "--key", currentKey,
+            "--upload-id", currentUploadId,
+            "--multipart-upload",
+            "{\"Parts\":[{\"PartNumber\":1,\"ETag\":\"" + etag + "\"}]}");
+    }
+
+    @When("the multipart upload is aborted via AWS CLI")
+    public void multipartUploadAbortedViaAwsCli() throws Exception {
+        runAws("abort-multipart-upload", "--bucket", currentBucket, "--key", currentKey,
+            "--upload-id", currentUploadId);
+    }
+
+    @When("the multipart uploads are listed via AWS CLI")
+    public void multipartUploadsListedViaAwsCli() throws Exception {
+        runAws("list-multipart-uploads", "--bucket", currentBucket);
+    }
+
+    @Then("the AWS CLI output contains an upload ID")
+    public void awsCliOutputContainsUploadId() {
+        assertTrue(stdout.contains("UploadId"),
+            "AWS CLI output should contain UploadId. Output: " + stdout);
+    }
+
+    @Then("the AWS CLI output contains an ETag")
+    public void awsCliOutputContainsETag() {
+        assertTrue(stdout.contains("ETag"),
+            "AWS CLI output should contain ETag. Output: " + stdout);
     }
 
     // ── Checksum header step definitions ──

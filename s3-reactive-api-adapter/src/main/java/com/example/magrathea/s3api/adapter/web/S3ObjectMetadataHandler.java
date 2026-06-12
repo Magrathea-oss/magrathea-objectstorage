@@ -5,7 +5,6 @@ import com.example.magrathea.reactive.application.service.ReactiveObjectService;
 import com.example.magrathea.s3api.adapter.web.headers.S3RequestExtractor;
 import com.example.magrathea.s3api.dto.command.LegalHoldCommand;
 import com.example.magrathea.s3api.dto.command.RetentionCommand;
-import com.example.magrathea.s3api.dto.command.TaggingCommand;
 import com.example.magrathea.s3api.dto.query.AccessControlPolicyQuery;
 import com.example.magrathea.s3api.dto.query.ErrorQuery;
 import com.example.magrathea.s3api.dto.query.GetObjectAttributesQuery;
@@ -84,11 +83,14 @@ public class S3ObjectMetadataHandler {
         var bucketName = request.pathVariable("bucket");
         var key = S3RequestExtractor.extractObjectKeyValue(request);
         return objectService.getObject(ObjectKey.of(bucketName, key))
-            .flatMap(obj -> request.bodyToMono(TaggingCommand.class)
-                .flatMap(cmd -> {
-                    // TODO: tagging persistence postponed → repository
-                    return ServerResponse.ok().build();
-                }))
+            .flatMap(obj -> {
+                // TODO: tagging persistence postponed → repository
+                // Consume the request body without type-specific decoding to avoid
+                // content-type negotiation issues with various AWS CLI versions.
+                return request.bodyToMono(String.class)
+                    .defaultIfEmpty("")
+                    .then(ServerResponse.ok().build());
+            })
             .switchIfEmpty(ServerResponse.status(HttpStatus.NOT_FOUND)
                 .contentType(MediaType.APPLICATION_XML)
                 .bodyValue(ErrorQuery.from("NoSuchKey", "Object not found")));

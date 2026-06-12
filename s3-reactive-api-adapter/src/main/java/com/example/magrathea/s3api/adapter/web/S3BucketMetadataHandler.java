@@ -1,7 +1,6 @@
 package com.example.magrathea.s3api.adapter.web;
 
 import com.example.magrathea.reactive.application.service.ReactiveBucketService;
-import com.example.magrathea.s3api.dto.command.TaggingCommand;
 import com.example.magrathea.s3api.dto.query.AccessControlPolicyQuery;
 import com.example.magrathea.s3api.dto.query.ErrorQuery;
 import com.example.magrathea.s3api.dto.query.TaggingQuery;
@@ -72,11 +71,14 @@ public class S3BucketMetadataHandler {
     public Mono<ServerResponse> putBucketTagging(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
         return bucketService.findByName(bucket)
-            .flatMap(b -> request.bodyToMono(TaggingCommand.class)
-                .flatMap(cmd -> {
-                    // TODO: tagging persistence postponed → repository
-                    return ServerResponse.ok().build();
-                }))
+            .flatMap(b -> {
+                // TODO: tagging persistence postponed → repository
+                // Consume the request body without type-specific decoding to avoid
+                // content-type negotiation issues with various AWS CLI versions.
+                return request.bodyToMono(String.class)
+                    .defaultIfEmpty("")
+                    .then(ServerResponse.ok().build());
+            })
             .switchIfEmpty(ServerResponse.status(HttpStatus.NOT_FOUND)
                 .contentType(MediaType.APPLICATION_XML)
                 .bodyValue(ErrorQuery.from("NoSuchBucket", "Bucket not found")));
