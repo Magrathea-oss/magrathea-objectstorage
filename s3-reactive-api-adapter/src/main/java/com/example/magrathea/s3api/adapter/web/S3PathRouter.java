@@ -15,6 +15,8 @@ import static org.springframework.web.reactive.function.server.RequestPredicates
  */
 public class S3PathRouter {
 
+    private static final String OBJECT_PATH = "/{bucket}/{*key}";
+
     private final S3BucketOperationsHandler bucketOperations;
     private final S3BucketMetadataHandler bucketMetadata;
     private final S3ObjectOperationsHandler objectOperations;
@@ -128,33 +130,33 @@ public class S3PathRouter {
 
             .POST("/{bucket}", queryParam("delete", v -> true), objectOperations::deleteObjects)
             .POST("/{bucket}", queryParam("session", v -> true), sessionHandler::createSession)
-            .POST("/{bucket}/{key}", queryParam("uploads", v -> true), multipartHandler::initiateMultipartUpload)
-            .POST("/{bucket}/{key}", queryParam("uploadId", v -> true), multipartHandler::completeMultipartUpload)
-            .GET("/{bucket}/{key}", queryParam("acl", v -> true), objectMetadata::getObjectAcl)
-            .GET("/{bucket}/{key}", queryParam("tagging", v -> true), objectMetadata::getObjectTagging)
-            .GET("/{bucket}/{key}", queryParam("attributes", v -> true), objectMetadata::getObjectAttributes)
-            .GET("/{bucket}/{key}", queryParam("legal-hold", v -> true), objectMetadata::getObjectLegalHold)
-            .GET("/{bucket}/{key}", queryParam("retention", v -> true), objectMetadata::getObjectRetention)
-            .GET("/{bucket}/{key}", queryParam("uploadId", v -> true), multipartHandler::listParts)
-            .PUT("/{bucket}/{key}", queryParam("acl", v -> true), objectMetadata::putObjectAcl)
-            .PUT("/{bucket}/{key}", queryParam("tagging", v -> true), objectMetadata::putObjectTagging)
-            .PUT("/{bucket}/{key}", queryParam("legal-hold", v -> true), objectMetadata::putObjectLegalHold)
-            .PUT("/{bucket}/{key}", queryParam("retention", v -> true), objectMetadata::putObjectRetention)
-            .PUT("/{bucket}/{key}", queryParam("uploadId", v -> true).and(headers(h -> h.firstHeader("x-amz-copy-source") != null)), multipartHandler::uploadPartCopy)
-            .PUT("/{bucket}/{key}", queryParam("uploadId", v -> true), multipartHandler::uploadPart)
-            .PUT("/{bucket}/{key}", request -> request.headers().firstHeader("x-amz-copy-source") != null, objectOperations::copyObject)
-            .PUT("/{bucket}/{key}", queryParam("rename", v -> true), objectOperations::renameObject)
-            .PUT("/{bucket}/{key}", queryParam("encryption", v -> true), objectMetadata::updateObjectEncryption)
-            .PUT("/{bucket}/{key}", request -> "WriteGetObjectResponse".equals(request.queryParam("x-id").orElse("")), objectOperations::writeGetObjectResponse)
-            .PUT("/{bucket}/{key}", objectOperations::putObject)
-            .GET("/{bucket}/{key}", queryParam("torrent", v -> true), objectOperations::getObjectTorrent)
-            .GET("/{bucket}/{key}", objectOperations::getObject)
-            .HEAD("/{bucket}/{key}", objectOperations::headObject)
-            .DELETE("/{bucket}/{key}", queryParam("tagging", v -> true), objectMetadata::deleteObjectTagging)
-            .DELETE("/{bucket}/{key}", queryParam("uploadId", v -> true), multipartHandler::abortMultipartUpload)
-            .DELETE("/{bucket}/{key}", objectOperations::deleteObject)
-            .POST("/{bucket}/{key}", queryParam("restore", v -> true), objectOperations::restoreObject)
-            .POST("/{bucket}/{key}", queryParam("select", v -> true), objectOperations::selectObjectContent)
+            .POST(OBJECT_PATH, queryParam("uploads", v -> true), multipartHandler::initiateMultipartUpload)
+            .POST(OBJECT_PATH, queryParam("uploadId", v -> true), multipartHandler::completeMultipartUpload)
+            .GET(OBJECT_PATH, queryParam("acl", v -> true), objectMetadata::getObjectAcl)
+            .GET(OBJECT_PATH, queryParam("tagging", v -> true), objectMetadata::getObjectTagging)
+            .GET(OBJECT_PATH, queryParam("attributes", v -> true), objectMetadata::getObjectAttributes)
+            .GET(OBJECT_PATH, queryParam("legal-hold", v -> true), objectMetadata::getObjectLegalHold)
+            .GET(OBJECT_PATH, queryParam("retention", v -> true), objectMetadata::getObjectRetention)
+            .GET(OBJECT_PATH, queryParam("uploadId", v -> true), multipartHandler::listParts)
+            .PUT(OBJECT_PATH, queryParam("acl", v -> true), objectMetadata::putObjectAcl)
+            .PUT(OBJECT_PATH, queryParam("tagging", v -> true), objectMetadata::putObjectTagging)
+            .PUT(OBJECT_PATH, queryParam("legal-hold", v -> true), objectMetadata::putObjectLegalHold)
+            .PUT(OBJECT_PATH, queryParam("retention", v -> true), objectMetadata::putObjectRetention)
+            .PUT(OBJECT_PATH, queryParam("uploadId", v -> true).and(headers(h -> h.firstHeader("x-amz-copy-source") != null)), multipartHandler::uploadPartCopy)
+            .PUT(OBJECT_PATH, queryParam("uploadId", v -> true), multipartHandler::uploadPart)
+            .PUT(OBJECT_PATH, request -> request.headers().firstHeader("x-amz-copy-source") != null, objectOperations::copyObject)
+            .PUT(OBJECT_PATH, queryParam("rename", v -> true), objectOperations::renameObject)
+            .PUT(OBJECT_PATH, queryParam("encryption", v -> true), objectMetadata::updateObjectEncryption)
+            .PUT(OBJECT_PATH, request -> "WriteGetObjectResponse".equals(request.queryParam("x-id").orElse("")), objectOperations::writeGetObjectResponse)
+            .PUT(OBJECT_PATH, objectOperations::putObject)
+            .GET(OBJECT_PATH, queryParam("torrent", v -> true), objectOperations::getObjectTorrent)
+            .GET(OBJECT_PATH, objectOperations::getObject)
+            .HEAD(OBJECT_PATH, objectOperations::headObject)
+            .DELETE(OBJECT_PATH, queryParam("tagging", v -> true), objectMetadata::deleteObjectTagging)
+            .DELETE(OBJECT_PATH, queryParam("uploadId", v -> true), multipartHandler::abortMultipartUpload)
+            .DELETE(OBJECT_PATH, objectOperations::deleteObject)
+            .POST(OBJECT_PATH, queryParam("restore", v -> true), objectOperations::restoreObject)
+            .POST(OBJECT_PATH, queryParam("select", v -> true), objectOperations::selectObjectContent)
             .build();
     }
 }

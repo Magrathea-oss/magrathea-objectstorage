@@ -54,14 +54,34 @@ public final class S3RequestExtractor {
      */
     public static ObjectKey extractObjectKey(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
-        var key = request.pathVariable("key");
+        var key = extractObjectKeyValue(request);
         if (bucket == null || bucket.isBlank()) {
             throw new IllegalArgumentException("Bucket name must not be empty");
+        }
+        return ObjectKey.of(bucket, key);
+    }
+
+    /**
+     * Extracts the raw object key value from the {@code {key}} path variable.
+     * <p>
+     * Catch-all object routes use {@code {*key}} so Spring may include the
+     * separator slash in the captured value. S3 object keys are stored without
+     * that route separator, while keys containing slashes are preserved.
+     * </p>
+     *
+     * @param request the HTTP request with a {@code {key}} path variable
+     * @return normalized object key value without the route separator slash
+     * @throws IllegalArgumentException if key is missing or blank
+     */
+    public static String extractObjectKeyValue(ServerRequest request) {
+        var key = request.pathVariable("key");
+        if (key != null && key.startsWith("/")) {
+            key = key.substring(1);
         }
         if (key == null || key.isBlank()) {
             throw new IllegalArgumentException("Object key must not be empty");
         }
-        return ObjectKey.of(bucket, key);
+        return key;
     }
 
     // ─────────────────────────────────────────────────────

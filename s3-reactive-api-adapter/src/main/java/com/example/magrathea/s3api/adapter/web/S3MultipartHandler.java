@@ -6,6 +6,7 @@ import com.example.magrathea.objectstore.domain.valueobject.ObjectKey;
 import com.example.magrathea.objectstore.domain.valueobject.PartNumber;
 import com.example.magrathea.objectstore.domain.valueobject.UploadId;
 import com.example.magrathea.reactive.application.service.ReactiveMultipartUploadService;
+import com.example.magrathea.s3api.adapter.web.headers.S3RequestExtractor;
 import com.example.magrathea.s3api.dto.query.ErrorQuery;
 import com.example.magrathea.s3api.dto.query.InitiateMultipartUploadQuery;
 import com.example.magrathea.s3api.dto.query.UploadPartResultQuery;
@@ -42,7 +43,7 @@ public class S3MultipartHandler {
     /** POST /{bucket}/{key}?uploads — Initiate multipart upload */
     public Mono<ServerResponse> initiateMultipartUpload(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
-        var key = request.pathVariable("key");
+        var key = S3RequestExtractor.extractObjectKeyValue(request);
         var uploadId = UploadId.generate();
         // TODO: bucket check postponed — service/repository handles bucket resolution
         var upload = MultipartUpload.create(
@@ -114,7 +115,7 @@ public class S3MultipartHandler {
     /** POST /{bucket}/{key}?uploadId=... — Complete multipart upload */
     public Mono<ServerResponse> completeMultipartUpload(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
-        var key = request.pathVariable("key");
+        var key = S3RequestExtractor.extractObjectKeyValue(request);
         var uploadIdStr = request.queryParam("uploadId").orElse("");
         var uploadId = UploadId.of(uploadIdStr);
 
@@ -169,7 +170,7 @@ public class S3MultipartHandler {
     /** GET /{bucket}/{key}?uploadId=... — List parts */
     public Mono<ServerResponse> listParts(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
-        var key = request.pathVariable("key");
+        var key = S3RequestExtractor.extractObjectKeyValue(request);
         var uploadIdStr = request.queryParam("uploadId").orElse("");
         var uploadId = UploadId.of(uploadIdStr);
 

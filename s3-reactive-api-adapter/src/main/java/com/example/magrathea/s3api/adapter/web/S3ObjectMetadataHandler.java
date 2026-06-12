@@ -2,6 +2,7 @@ package com.example.magrathea.s3api.adapter.web;
 
 import com.example.magrathea.objectstore.domain.valueobject.ObjectKey;
 import com.example.magrathea.reactive.application.service.ReactiveObjectService;
+import com.example.magrathea.s3api.adapter.web.headers.S3RequestExtractor;
 import com.example.magrathea.s3api.dto.command.LegalHoldCommand;
 import com.example.magrathea.s3api.dto.command.RetentionCommand;
 import com.example.magrathea.s3api.dto.command.TaggingCommand;
@@ -37,7 +38,7 @@ public class S3ObjectMetadataHandler {
     /** GET /{bucket}/{key}?acl — GetObjectAcl */
     public Mono<ServerResponse> getObjectAcl(ServerRequest request) {
         var bucketName = request.pathVariable("bucket");
-        var key = request.pathVariable("key");
+        var key = S3RequestExtractor.extractObjectKeyValue(request);
         return objectService.getObject(ObjectKey.of(bucketName, key))
             .flatMap(obj -> ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_XML)
@@ -50,7 +51,7 @@ public class S3ObjectMetadataHandler {
     /** PUT /{bucket}/{key}?acl — PutObjectAcl */
     public Mono<ServerResponse> putObjectAcl(ServerRequest request) {
         var bucketName = request.pathVariable("bucket");
-        var key = request.pathVariable("key");
+        var key = S3RequestExtractor.extractObjectKeyValue(request);
         return objectService.getObject(ObjectKey.of(bucketName, key))
             .flatMap(obj -> {
                 // TODO: ACL persistence postponed → repository
@@ -65,7 +66,7 @@ public class S3ObjectMetadataHandler {
     /** GET /{bucket}/{key}?tagging — GetObjectTagging */
     public Mono<ServerResponse> getObjectTagging(ServerRequest request) {
         var bucketName = request.pathVariable("bucket");
-        var key = request.pathVariable("key");
+        var key = S3RequestExtractor.extractObjectKeyValue(request);
         return objectService.getObject(ObjectKey.of(bucketName, key))
             .flatMap(obj -> {
                 // TODO: tagging persistence postponed → repository
@@ -81,7 +82,7 @@ public class S3ObjectMetadataHandler {
     /** PUT /{bucket}/{key}?tagging — PutObjectTagging */
     public Mono<ServerResponse> putObjectTagging(ServerRequest request) {
         var bucketName = request.pathVariable("bucket");
-        var key = request.pathVariable("key");
+        var key = S3RequestExtractor.extractObjectKeyValue(request);
         return objectService.getObject(ObjectKey.of(bucketName, key))
             .flatMap(obj -> request.bodyToMono(TaggingCommand.class)
                 .flatMap(cmd -> {
@@ -96,7 +97,7 @@ public class S3ObjectMetadataHandler {
     /** DELETE /{bucket}/{key}?tagging — DeleteObjectTagging */
     public Mono<ServerResponse> deleteObjectTagging(ServerRequest request) {
         var bucketName = request.pathVariable("bucket");
-        var key = request.pathVariable("key");
+        var key = S3RequestExtractor.extractObjectKeyValue(request);
         return objectService.getObject(ObjectKey.of(bucketName, key))
             .flatMap(obj -> {
                 // TODO: tagging persistence postponed → repository
@@ -110,7 +111,7 @@ public class S3ObjectMetadataHandler {
     /** GET /{bucket}/{key}?attributes — GetObjectAttributes */
     public Mono<ServerResponse> getObjectAttributes(ServerRequest request) {
         var bucketName = request.pathVariable("bucket");
-        var key = request.pathVariable("key");
+        var key = S3RequestExtractor.extractObjectKeyValue(request);
         return objectService.getObject(ObjectKey.of(bucketName, key))
             .flatMap(obj -> ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_XML)
@@ -123,7 +124,7 @@ public class S3ObjectMetadataHandler {
     /** PUT /{bucket}/{key}?encryption — UpdateObjectEncryption */
     public Mono<ServerResponse> updateObjectEncryption(ServerRequest request) {
         var bucketName = request.pathVariable("bucket");
-        var key = request.pathVariable("key");
+        var key = S3RequestExtractor.extractObjectKeyValue(request);
         return objectService.getObject(ObjectKey.of(bucketName, key))
             .flatMap(obj -> {
                 var sse = request.headers().firstHeader("x-amz-server-side-encryption");
@@ -165,7 +166,7 @@ public class S3ObjectMetadataHandler {
     /** GET /{bucket}/{key}?legal-hold — GetObjectLegalHold */
     public Mono<ServerResponse> getObjectLegalHold(ServerRequest request) {
         var bucketName = request.pathVariable("bucket");
-        var key = request.pathVariable("key");
+        var key = S3RequestExtractor.extractObjectKeyValue(request);
         return objectService.getObjectLegalHold(bucketName, ObjectKey.of(bucketName, key))
             .flatMap(hold -> ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_XML)
@@ -178,7 +179,7 @@ public class S3ObjectMetadataHandler {
     /** PUT /{bucket}/{key}?legal-hold — PutObjectLegalHold */
     public Mono<ServerResponse> putObjectLegalHold(ServerRequest request) {
         var bucketName = request.pathVariable("bucket");
-        var key = request.pathVariable("key");
+        var key = S3RequestExtractor.extractObjectKeyValue(request);
         return request.bodyToMono(LegalHoldCommand.class)
             .flatMap(cmd -> objectService.putObjectLegalHold(bucketName, ObjectKey.of(bucketName, key),
                 cmd.isActive()
@@ -194,7 +195,7 @@ public class S3ObjectMetadataHandler {
     /** GET /{bucket}/{key}?retention — GetObjectRetention */
     public Mono<ServerResponse> getObjectRetention(ServerRequest request) {
         var bucketName = request.pathVariable("bucket");
-        var key = request.pathVariable("key");
+        var key = S3RequestExtractor.extractObjectKeyValue(request);
         return objectService.getObjectLockConfiguration(bucketName, ObjectKey.of(bucketName, key))
             .flatMap(lockConfig -> {
                 var mode = lockConfig.mode().name();
@@ -213,7 +214,7 @@ public class S3ObjectMetadataHandler {
     /** PUT /{bucket}/{key}?retention — PutObjectRetention */
     public Mono<ServerResponse> putObjectRetention(ServerRequest request) {
         var bucketName = request.pathVariable("bucket");
-        var key = request.pathVariable("key");
+        var key = S3RequestExtractor.extractObjectKeyValue(request);
         return request.bodyToMono(RetentionCommand.class)
             .flatMap(cmd -> {
                 var mode = "COMPLIANCE".equals(cmd.mode())
