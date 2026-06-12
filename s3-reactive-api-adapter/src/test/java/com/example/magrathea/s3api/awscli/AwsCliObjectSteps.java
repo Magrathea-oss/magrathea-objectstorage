@@ -1,13 +1,16 @@
 package com.example.magrathea.s3api.awscli;
 
+import com.example.magrathea.reactive.infrastructure.adapter.persistence.InMemoryReactiveBucketRepository;
+import com.example.magrathea.reactive.infrastructure.adapter.persistence.InMemoryReactiveMultipartUploadRepository;
+import com.example.magrathea.reactive.infrastructure.adapter.persistence.InMemoryReactiveS3ObjectRepository;
+import com.example.magrathea.s3api.adapter.web.S3BucketConfigHandler;
+import io.cucumber.java.Before;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.When;
 import io.cucumber.java.en.Then;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.web.server.LocalServerPort;
 
-import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 
@@ -18,10 +21,22 @@ public class AwsCliObjectSteps {
     @LocalServerPort
     private int port;
 
-    private String endpointUrl;
+    @Autowired
+    private InMemoryReactiveBucketRepository bucketRepository;
+
+    @Autowired
+    private InMemoryReactiveS3ObjectRepository objectRepository;
+
+    @Autowired
+    private InMemoryReactiveMultipartUploadRepository multipartUploadRepository;
+
+    @Autowired
+    private S3BucketConfigHandler bucketConfigHandler;
+
     private String currentBucket;
     private String currentKey;
     private String currentContent;
+    private String retrievedContent;
     private int exitCode;
     private String stdout;
     private String stderr;
@@ -43,6 +58,11 @@ public class AwsCliObjectSteps {
     private int runAws(String... args) throws Exception {
         var pb = new ProcessBuilder(awsCommand(args));
         pb.redirectErrorStream(true);
+        var env = pb.environment();
+        env.putIfAbsent("AWS_ACCESS_KEY_ID", "test");
+        env.putIfAbsent("AWS_SECRET_ACCESS_KEY", "test");
+        env.putIfAbsent("AWS_DEFAULT_REGION", "us-east-1");
+        env.putIfAbsent("AWS_EC2_METADATA_DISABLED", "true");
         var proc = pb.start();
         stdout = new String(proc.getInputStream().readAllBytes());
         stderr = "";
@@ -56,14 +76,29 @@ public class AwsCliObjectSteps {
         return path;
     }
 
+    @Before
+    public void resetRepositories() {
+        bucketRepository.reset();
+        objectRepository.reset();
+        multipartUploadRepository.reset();
+        bucketConfigHandler.resetInMemoryConfigurations();
+        currentBucket = null;
+        currentKey = null;
+        currentContent = null;
+        retrievedContent = null;
+        exitCode = 0;
+        stdout = "";
+        stderr = "";
+    }
+
     // ── Given steps ──
 
     @Given("bucket {string} exists")
     public void bucketExists(String bucketName) throws Exception {
         currentBucket = bucketName;
-        // Create bucket via AWS CLI
+        // Create bucket via AWS CLI after the scenario hook clears in-memory state.
         runAws("create-bucket", "--bucket", bucketName);
-        assertEquals(0, exitCode, "Bucket should be created via CLI");
+        assertEquals(0, exitCode, "Bucket should be created via CLI. Output: " + stdout);
     }
 
     @Given("an object with key {string} and content {string}")
@@ -78,7 +113,7 @@ public class AwsCliObjectSteps {
         currentContent = content;
         var body = writeTempFile(content);
         runAws("put-object", "--bucket", currentBucket, "--key", key, "--body", body.toString());
-        assertEquals(0, exitCode, "Object should exist after put-object");
+        assertEquals(0, exitCode, "Object should exist after put-object. Output: " + stdout);
         Files.deleteIfExists(body);
     }
 
@@ -117,7 +152,7 @@ public class AwsCliObjectSteps {
     @Then("the AWS CLI exit code is {int}")
     public void awsCliExitCodeIs(int expectedCode) {
         assertEquals(expectedCode, exitCode,
-            "AWS CLI should exit with code " + expectedCode);
+            "AWS CLI should exit with code " + expectedCode + ". Output: " + stdout);
     }
 
     @Then("the AWS CLI exit code is non-zero")
@@ -152,10 +187,9 @@ public class AwsCliObjectSteps {
     @When("the object is retrieved via S3 API")
     public void objectRetrieved() throws Exception {
         var outFile = Files.createTempFile("magrathea-out-", ".txt");
-        runAws("get-object", "--bucket", currentBucket, "--key", currentKey,
-            "--output", outFile.toString());
+        runAws("get-object", "--bucket", currentBucket, "--key", currentKey, outFile.toString());
         if (exitCode == 0) {
-            stdout = Files.readString(outFile);
+            retrievedContent = Files.readString(outFile);
         }
         Files.deleteIfExists(outFile);
     }
@@ -168,7 +202,36 @@ public class AwsCliObjectSteps {
 
     @When("HEAD request is sent for object {string}")
     public void headObject(String key) throws Exception {
+        currentKey = key;
         runAws("head-object", "--bucket", currentBucket, "--key", key);
+    }
+
+    @When("the objects are listed via AWS CLI")
+    public void objectsListedViaAwsCli() throws Exception {
+        runAws("list-objects", "--bucket", currentBucket);
+    }
+
+    @When("the objects are listed via AWS CLI V2")
+    public void objectsListedViaAwsCliV2() throws Exception {
+        runAws("list-objects-v2", "--bucket", currentBucket);
+    }
+
+    @When("the object is deleted via AWS CLI")
+    public void objectDeletedViaAwsCli() throws Exception {
+        runAws("delete-object", "--bucket", currentBucket, "--key", currentKey);
+    }
+
+    @When("the object with key {string} is deleted via AWS CLI")
+    public void objectWithKeyDeletedViaAwsCli(String key) throws Exception {
+        currentKey = key;
+        objectDeletedViaAwsCli();
+    }
+
+    @When("object attributes are requested via AWS CLI for {string}")
+    public void objectAttributesRequestedViaAwsCli(String key) throws Exception {
+        currentKey = key;
+        runAws("get-object-attributes", "--bucket", currentBucket, "--key", key,
+            "--object-attributes", "StorageClass");
     }
 
     // ── Then steps ──
@@ -177,7 +240,7 @@ public class AwsCliObjectSteps {
     public void responseStatusIs(int expectedStatus) {
         // AWS CLI returns 0 for success (200/204), non-zero for failure
         if (expectedStatus == 200 || expectedStatus == 204) {
-            assertEquals(0, exitCode, "Expected AWS CLI success (exit 0)");
+            assertEquals(0, exitCode, "Expected AWS CLI success (exit 0). Output: " + stdout);
         } else {
             assertNotEquals(0, exitCode, "Expected AWS CLI failure (exit non-zero)");
         }
@@ -185,20 +248,46 @@ public class AwsCliObjectSteps {
 
     @Then("the content is {string}")
     public void contentIs(String expectedContent) {
-        assertEquals(expectedContent, stdout.trim());
+        assertEquals(expectedContent, retrievedContent);
     }
 
     @Then("the object appears in the object list")
     public void objectAppearsInList() throws Exception {
         runAws("list-objects", "--bucket", currentBucket);
-        assertEquals(0, exitCode);
-        assertTrue(stdout.contains(currentKey), "Object key should appear in list-objects output");
+        assertEquals(0, exitCode, "list-objects should succeed. Output: " + stdout);
+        assertTrue(stdout.contains(currentKey), "Object key should appear in list-objects output: " + stdout);
     }
 
     @Then("the object no longer appears in the object list")
     public void objectNoLongerAppears() throws Exception {
         runAws("list-objects", "--bucket", currentBucket);
-        assertFalse(stdout.contains(currentKey), "Object key should not appear in list-objects output");
+        assertEquals(0, exitCode, "list-objects should succeed. Output: " + stdout);
+        assertFalse(stdout.contains(currentKey), "Object key should not appear in list-objects output: " + stdout);
+    }
+
+    @Then("the AWS CLI output contains object {string}")
+    public void awsCliOutputContainsObject(String key) {
+        assertTrue(stdout.contains(key), "AWS CLI output should contain object key '" + key + "': " + stdout);
+    }
+
+    @Then("the AWS CLI output does not contain object {string}")
+    public void awsCliOutputDoesNotContainObject(String key) {
+        assertFalse(stdout.contains(key), "AWS CLI output should not contain object key '" + key + "': " + stdout);
+    }
+
+    @Then("object {string} does not appear in the object list")
+    public void objectDoesNotAppearInObjectList(String key) throws Exception {
+        runAws("list-objects", "--bucket", currentBucket);
+        assertEquals(0, exitCode, "list-objects should succeed. Output: " + stdout);
+        assertFalse(stdout.contains(key), "Object key should not appear in list-objects output: " + stdout);
+    }
+
+    @Then("the AWS CLI object attributes include storage class {string}")
+    public void awsCliObjectAttributesIncludeStorageClass(String storageClass) {
+        assertEquals(0, exitCode, "get-object-attributes should succeed. Output: " + stdout);
+        assertTrue(stdout.contains("\"StorageClass\": \"" + storageClass + "\"")
+                || (stdout.contains("StorageClass") && stdout.contains(storageClass)),
+            "Object attributes should include storage class '" + storageClass + "': " + stdout);
     }
 
     // ── Checksum header step definitions ──
