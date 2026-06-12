@@ -62,7 +62,7 @@ This section implements [ADR 0017](docs/adr/0017-course-correction-broaden-proje
 |---|---|
 | Owner agent(s) | `java-tester` primary; `documenter` for report integration; implementation agents own fixes for failures in their modules |
 | Affected modules/files | Surefire reports under `*/target/surefire-reports/**`; root and module test suites; `s3-reactive-api-adapter/src/test/features/**`; AWS CLI Cucumber features/steps; `test-aws-cli.sh`; JaCoCo configuration and reports; `docs/test-report.md`; CI scripts if present |
-| Concrete findings | Existing Surefire reports show 544 passing tests, but many modules have no tests. The AWS CLI report is stale/failing and separate from Cucumber parity. AWS CLI Cucumber has 1 scenario while WebTestClient Cucumber has 238. Target design is the same canonical scenarios executed with WebTestClient and AWS CLI drivers where possible. JaCoCo is the coverage baseline; Clover is optional/legacy. `docs/test-report.md` is stale and inconsistent. |
+| Concrete findings | Existing Surefire reports showed broad passing coverage, but many modules still have no tests. The standalone AWS CLI report is stale/failing and separate from Cucumber parity. AWS CLI Cucumber now has a first object CRUD increment (9 scenarios total: 8 run, 1 `@unsupported-awscli` skipped) while WebTestClient Cucumber has 238 scenarios. Target design remains the same canonical scenarios executed with WebTestClient and AWS CLI drivers where possible. JaCoCo is the coverage baseline; Clover is optional/legacy. `docs/test-report.md` must stay evidence-based. |
 | Expected correction outputs | Current test inventory by module; tests added for untested modules, especially `storage-engine-domain`; canonical Cucumber scenario model with WebTestClient and AWS CLI drivers/tags; fresh AWS CLI compatibility status; JaCoCo baseline documented; stale Clover-primary wording removed; updated test report that separates verified results from planned gates. |
 | Acceptance gates | `mvn test` and targeted module gates pass; untested critical modules have meaningful tests or explicit risk entries; WebTestClient/AWS CLI scenario parity matrix exists; AWS CLI failures are reproducible or explicitly skipped with reasons; `docs/test-report.md` matches current command results and report paths. |
 
@@ -93,7 +93,7 @@ This section implements [ADR 0017](docs/adr/0017-course-correction-broaden-proje
 | P0 — Stop compounding false signals ✅ (documentation + build hygiene done 2026-06-12) | Clean generated/tracked artifact boundaries; fix Maven/POM/profile hygiene; correct documentation overclaims; establish current test/report baseline; record package/layering risks. **Done 2026-06-12:** (1) README.md and docs/test-report.md documentation overclaims corrected; JaCoCo documented as primary baseline. (2) 789 generated/compiled artifacts untracked from Git (Vue bundles, JaCoCo JSON exports, .class files, META-INF); .gitignore extended. (3) `admin-api-adapter/pom.xml` schema URL fixed (maven-1.0.0.xsd → maven-4.0.0.xsd). (4) `docker-compose.yml` healthcheck changed from `curl` (missing in JRE image) to `wget --spider`. (5) `.dockerignore` excludes generated bootstrap static resources, and the `Dockerfile` regenerates documentation/frontend static assets inside the Maven/Node builder stage from source docs and UI sources instead of copying host-pre-generated resources. Remaining P0 gate: `mvn validate` from clean checkout. | `mvn validate` from a clean checkout; no generated source-tree mutations; README/PLAN/test report stop claiming unverified runtime/API status; JaCoCo baseline is clear. |
 | P1 — Restore architectural and runtime correctness ⚠️ (layering/scanning done 2026-06-12; runtime correctness pending) | Fix application-to-infrastructure dependency inversion; make backend selection explicit; wire storage-engine backend end to end; repair critical read/write, manifest, chunk, dedup, route, multipart, ETag, and admin catalog behavior. **Done 2026-06-12:** (1) 4 exception classes moved from `object-store-reactive-infrastructure` to `object-store-reactive-repository-application` port module; all imports updated; old classes deprecated; infra dependency removed from application POM. (2) `@ComponentScan` extended with `com.example.magrathea.objectstorage` and `com.example.magrathea.storageengine`. (3) `@Profile("single-node")` added to 3 in-memory repository beans; `@Profile("storage-engine")` added to storage-engine adapter beans and ACL translator. (4) `application.properties` sets `spring.profiles.default=single-node`. (5) Pre-existing compile error in `ReactiveStorageOrchestrator` fixed (duplicate variable, type mismatch). Full project `mvn compile` → BUILD SUCCESS. Remaining: runtime correctness (read path, manifest/chunk/dedup, multipart, ETag, admin catalog) — tracked under P2/P5. | Context tests for both backends; S3 read-after-write through selected backend; storage-engine integration tests; route/multipart/admin tests pass. |
 | P2 — Harden domain and configuration model | Add storage-engine domain tests; enforce invariants and immutability; implement YAML-backed policy/device/topology catalogs; define and test `MINIO_STANDARD`; model physical placement/topology for placement and EC. | Domain and catalog tests pass; malformed config fails clearly; `MINIO_STANDARD` is loaded from YAML and produces deterministic persistence plans. |
-| P3 — Parity, documentation, and UI maturation ⚠️ (Phase 8 backend Admin API partial done) | Bring AWS CLI Cucumber toward canonical WebTestClient parity; update C4/ARC42/API coverage; plan and hand off frontend admin UI. **Done for Phase 8 backend/API:** read-only configuration-as-code Admin API catalog endpoints and non-persistent policy validation are documented and tested. Remaining: selected backend/status contract beyond `/admin/health`, UI implementation handoff, ADR freshness, and remaining docs links. | Scenario parity matrix exists; docs match code and tests; C4 includes admin API/current routers; frontend workflow ownership is established before UI implementation. |
+| P3 — Parity, documentation, and UI maturation ⚠️ (Phase 8 backend Admin API partial done; Phase 9 first increment done) | Bring AWS CLI Cucumber toward canonical WebTestClient parity; update C4/ARC42/API coverage; plan and hand off frontend admin UI. **Done for Phase 8 backend/API:** read-only configuration-as-code Admin API catalog endpoints and non-persistent policy validation are documented and tested. **Done for Phase 9 first increment:** targeted AWS CLI Cucumber object CRUD parity covers put default headers, get content, head, list v1/v2, delete, idempotent delete, and `STANDARD` storage class via object attributes. Remaining: full AWS CLI parity beyond canonical object CRUD, slash-containing object keys, selected backend/status contract beyond `/admin/health`, UI implementation handoff, ADR freshness, and remaining docs links. | Scenario parity matrix exists; docs match code and tests; C4 includes admin API/current routers; frontend workflow ownership is established before UI implementation. |
 
 ## S3 API Semantic Completion Plan
 
@@ -142,7 +142,7 @@ Every API coverage report must include this table shape or an equivalent machine
 | Priority | Correction focus | Must happen before claiming completion |
 |---|---|---|
 | S3-P0 ✅ (documentation truth reset done; full inventory pending) | Replace any `111/111` completion claim with a semantic matrix and inventory all routes, handlers, services, repositories, tests, and AWS CLI scenarios. Documentation truth reset completed 2026-06-12: README.md downgraded `111/111` to route-inventory-only; docs/test-report.md adds semantic matrix and stale-report warning; JaCoCo documented as primary coverage baseline; admin API surface acknowledged. Full per-operation semantic inventory requires a dedicated java-tester inventory pass (previous attempt interrupted by usage limit). | API coverage report uses the required matrix; every operation has an initial classification; stubs and unsupported operations are explicitly labeled. |
-| S3-P1 | Finish Object CRUD and Bucket baseline against both the in-memory backend and the storage-engine backend. | Read-after-write, slash keys, metadata/checksum/ETag/storage-class/delete/copy semantics, bucket state, object indexes, list prefixes/delimiters/continuation tokens, and storage-engine scenarios pass. |
+| S3-P1 ⚠️ (first AWS CLI object CRUD increment complete) | Finish Object CRUD and Bucket baseline against both the in-memory backend and the storage-engine backend. AWS CLI first increment now verifies canonical object CRUD basics: put default headers, get content, head, list v1/v2, delete, idempotent delete, and `STANDARD` storage class via object attributes. | Remaining before S3-P1 completion: slash keys, metadata/checksum/ETag/copy semantics, fuller bucket state/list prefixes/delimiters/continuation tokens, and storage-engine scenarios pass. Slash-containing keys remain `@unsupported-awscli` because current route matching does not support slash-containing keys. |
 | S3-P2 | Finish multipart and object metadata/tagging/ACL persistence. | Multipart part persistence, assembly, ETag, abort cleanup, part-copy behavior, and object metadata/tagging/ACL round-trip tests pass; unsupported enforcement is documented. |
 | S3-P3 | Finish bucket configuration statefulness and versioning/delete markers. | Bucket config APIs are classified as config-only/enforced/unsupported/stub; version IDs, latest resolution, delete markers, and versioned list/get/head/delete are tested. |
 | S3-P4 | Finish authorization/enforcement/background jobs/advanced APIs. | Authorization, public controls, retention/object-lock enforcement, encryption-at-rest behavior, lifecycle/replication/notification jobs, analytics/inventory/metrics/tiering jobs, and advanced APIs are either implemented with tests or explicitly out of scope/unsupported. |
@@ -178,7 +178,7 @@ This section supersedes earlier planning statements where they conflict with [AD
   - `object-store-reactive-repository-storage-engine-infrastructure`
 - `admin-api-adapter` exists; therefore documentation that says the project is strictly "S3-only" is stale. The S3 API remains the public object API, but admin/configuration APIs must be documented separately.
 - **JaCoCo is the current coverage baseline**. Clover/OpenClover is optional/legacy and must not be documented as the primary coverage gate.
-- AWS CLI Cucumber currently is **not scenario-parallel** to the WebTestClient Cucumber suite. The AWS CLI path must be brought into parity where the AWS CLI can express the same behavior.
+- AWS CLI Cucumber is **not yet scenario-parallel** to the WebTestClient Cucumber suite. The first AWS CLI object CRUD increment is complete (9 scenarios total: 8 run, 1 `@unsupported-awscli` skipped), but the AWS CLI path must continue toward parity where the AWS CLI can express the same behavior.
 - Storage-engine policy/device configuration is partially implemented: YAML-backed policy/device/disk-set catalogs and the Admin API now treat these entities as configuration-as-code/read-only at runtime; the concrete `MINIO_STANDARD` policy path is test-backed, while selected-backend runtime read/write evidence remains pending.
 
 ### Architecture Correction Goals
@@ -360,21 +360,32 @@ Tasks:
 - [ ] Plan Vue screens: policy list, policy detail, policy validation/report; device list, device detail; disk-set/topology overview/detail; backend/status dashboard.
 - [ ] Request an appropriate frontend workflow/agent before changing `magrathea-ui`; do not implement Vue screens in the Java workflow.
 
-#### Phase 9 — Cucumber Parity
+#### Phase 9 — Cucumber Parity ⚠️ (first AWS CLI object CRUD increment complete)
 
-| Field | Plan |
+| Field | Plan / Result |
 |---|---|
 | Owner agent | `java-tester` |
 | Affected files/modules | `s3-reactive-api-adapter/src/test/features/object-store/**`, `s3-reactive-api-adapter/src/test/features/awscli/**`, `s3-reactive-api-adapter/src/test/java/com/example/magrathea/s3api/cucumber/**`, `s3-reactive-api-adapter/src/test/java/com/example/magrathea/s3api/awscli/**`, `test-aws-cli.sh`, `docs/test-report.md` |
-| Expected outputs | Canonical shared scenarios with WebTestClient and AWS CLI drivers; unsupported/CLI-only cases tagged; shell script checks migrated into Cucumber or retained as a compatibility report with clear scope |
-| Acceptance criteria | Every canonical S3 scenario has either both `@webclient` and `@awscli` coverage or an explicit skip/unsupported reason; `MINIO_STANDARD` storage-engine scenarios can run through WebTestClient and AWS CLI where possible; AWS CLI environment requirements are documented |
-| Test gates | `mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false`; AWS CLI Cucumber profile; optional `bash test-aws-cli.sh` compatibility report |
+| Expected outputs | Canonical shared scenarios with WebTestClient and AWS CLI drivers; unsupported/CLI-only cases tagged; shell script checks migrated into Cucumber or retained as a compatibility report with clear scope. First increment delivered targeted AWS CLI object CRUD parity for canonical basics, but not full S3 parity. |
+| Acceptance criteria | Partial: AWS CLI Cucumber now covers the first canonical object CRUD increment. Full Phase 9 remains open until every canonical S3 scenario has either both `@webclient` and `@awscli` coverage or an explicit skip/unsupported reason; `MINIO_STANDARD` storage-engine scenarios can run through WebTestClient and AWS CLI where possible; AWS CLI environment requirements are documented. |
+| Test gates | ✅ `mvn -B -pl s3-reactive-api-adapter -am test -Dsurefire.failIfNoSpecifiedTests=false` — 247 tests, 0 failures, 0 errors, 1 skipped; AWS CLI Cucumber: 9 scenarios total, 8 run, 1 skipped as `@unsupported-awscli`; optional `bash test-aws-cli.sh` compatibility report remains separate/stale. |
+| Completion evidence | Phase 9 first increment tests commit `2d7b1a4`. |
+
+Completed first-increment scope:
+- AWS CLI `put-object` succeeds with default AWS CLI headers.
+- AWS CLI `get-object` reads stored content.
+- AWS CLI `head-object` finds an existing object.
+- AWS CLI `list-objects` and `list-objects-v2` show a stored object.
+- AWS CLI `delete-object` removes an existing object.
+- AWS CLI `delete-object` is idempotent for an already deleted object.
+- AWS CLI `put-object` stores `STANDARD` storage class, verified through object attributes.
+- AWS CLI key-with-slashes scenario remains documented as `@unsupported-awscli` because current route matching does not support slash-containing keys.
 
 Tasks:
-- Extract canonical scenario definitions from WebTestClient-only features where possible.
-- Add AWS CLI step definitions that execute equivalent behavior instead of maintaining an unrelated one-scenario suite.
-- Use tags such as `@webclient`, `@awscli`, `@unsupported-awscli`, and `@cli-only`.
-- Decide whether `test-aws-cli.sh` becomes generated/legacy, or remains a separate broad compatibility smoke report.
+- [ ] Extract canonical scenario definitions from WebTestClient-only features where possible.
+- [x] Add first-increment AWS CLI step definitions that execute equivalent canonical object CRUD behavior instead of maintaining an unrelated one-scenario suite.
+- [x] Use tags such as `@webclient`, `@awscli`, and `@unsupported-awscli` for the first increment; continue applying `@cli-only` where future scenarios require it.
+- [ ] Decide whether `test-aws-cli.sh` becomes generated/legacy, or remains a separate broad compatibility smoke report.
 
 #### Phase 10 — Quality Gates
 
@@ -398,7 +409,7 @@ mvn test -pl object-store-reactive-repository-storage-engine-infrastructure -am
 mvn test -pl bootstrap-application -am
 mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false
 mvn -Pcoverage test jacoco:report
-# AWS CLI Cucumber/profile command to be finalized in Phase 9.
+# Phase 9 first AWS CLI Cucumber increment currently runs through the s3-reactive-api-adapter command above.
 ```
 
 ### Cross-Phase Acceptance Checklist
@@ -415,7 +426,7 @@ mvn -Pcoverage test jacoco:report
 - [ ] S3 write/read path works end to end with the selected storage-engine backend.
 - [x] Backend Admin API exposes read-only policy/device/disk-set catalogs and non-persistent validation as configuration-as-code.
 - [ ] Admin UI plan covers policy/device/disk-set/backend-status screens and awaits frontend workflow ownership.
-- [ ] AWS CLI Cucumber parity exists for canonical scenarios where possible.
+- [ ] AWS CLI Cucumber parity exists for canonical scenarios where possible. First object CRUD increment is complete: 9 AWS CLI scenarios total, 8 run, 1 `@unsupported-awscli` skipped for slash-containing keys.
 - [ ] Documentation reports planned vs completed work accurately.
 
 ### Risk Table
@@ -512,7 +523,7 @@ Activation modes:
 | 1 | Pure JUnit | `mvn test -pl object-store-domain` and `mvn test -pl storage-engine-domain -am` | Domain only, no Spring |
 | 2 | Module tests | `mvn test -pl <module> -am` | Run affected modules during each phase |
 | 3 | WebTestClient Cucumber | `mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false` | Canonical S3 behavior through in-process WebFlux driver |
-| 4 | AWS CLI Cucumber | To be finalized in Phase 9 | Must share canonical scenarios where possible |
+| 4 | AWS CLI Cucumber | `mvn -B -pl s3-reactive-api-adapter -am test -Dsurefire.failIfNoSpecifiedTests=false` | First object CRUD increment runs in the S3 adapter suite; must continue sharing canonical scenarios where possible |
 | 5 | AWS CLI compatibility script | `bash test-aws-cli.sh` | May remain as separate compatibility report if not fully migrated |
 | 6 | JaCoCo coverage | `mvn -Pcoverage test jacoco:report` or project-finalized equivalent | Current coverage baseline |
 | 7 | Clover/OpenClover | Optional/legacy only | Do not use as primary gate unless a future ADR revives it |

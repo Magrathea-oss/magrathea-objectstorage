@@ -45,6 +45,6 @@ The `S3BucketConfigHandler` uses a registry/strategy pattern to dispatch configu
 
 === Quality Strategy
 
-- **Testability**: domain tested with pure JUnit (no Spring), integration tested with Cucumber BDD, S3 compatibility verified with AWS CLI
+- **Testability**: domain tested with pure JUnit (no Spring), integration tested with Cucumber BDD, targeted S3 compatibility verified with AWS CLI; the first AWS CLI object CRUD increment passes, but full S3 scenario parity remains open
 - **Simplicity and explicit backend selection**: single-node in-memory stores remain the default backend; Storage Engine is selected explicitly and must be verified separately
 - **Traceability**: ADRs document every architectural decision, ARC42 provides full architecture documentation

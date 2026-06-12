@@ -104,7 +104,7 @@ image::../../c4/images/BucketConfigurationRuntime.png[Bucket Configuration Runti
 4. `S3ObjectMetadataHandler` handles metadata-oriented Phase F operations such as legal hold, retention, and encryption update.
 5. Reactive services/repositories are used where object or bucket state must be read or updated.
 
-**Verification:** Phase F is Cucumber-tested; `mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false` completed with 216 tests, 0 failures, and 0 errors.
+**Verification:** S3 adapter Cucumber remains evidence-gated. The latest targeted command, `mvn -B -pl s3-reactive-api-adapter -am test -Dsurefire.failIfNoSpecifiedTests=false`, completed with 247 tests, 0 failures, 0 errors, and 1 skipped `@unsupported-awscli` scenario. AWS CLI parity is improved for canonical object CRUD basics, but not complete for all S3 scenarios.
 
 === Scenario 6b — Admin Static Asset and Documentation UI
 

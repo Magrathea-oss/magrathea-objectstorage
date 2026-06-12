@@ -255,19 +255,19 @@ ObjectStoreEvent (sealed interface)
 
 === AWS CLI Header Compatibility
 
-The system must handle headers that the AWS CLI v2 sends by default on every `aws s3api put-object` request. These headers are critical for AWS CLI compatibility but are currently ignored by the handler.
+The system must handle headers that the AWS CLI v2 sends by default on every `aws s3api put-object` request. Phase 9 first-increment AWS CLI Cucumber now verifies that `put-object` succeeds with the default AWS CLI headers. Compatibility is still partial: checksum and SigV4 headers are accepted/ignored for this scope, but not validated.
 
 ==== Default Headers Sent by AWS CLI v2
 
 | Header | Value | Purpose | Handler Status |
 |--------|-------|---------|----------------|
-| `x-amz-sdk-checksum-algorithm` | `crc64nvme` (default) | Identifies the checksum algorithm used | [red]#Not read# |
-| `x-amz-checksum-crc64nvme` | BASE64 CRC64-NVME hash | Payload integrity hash computed automatically by AWS CLI | [red]#Not validated# |
-| `X-Amz-Date` | ISO 8601 timestamp | SigV4 signing timestamp | [red]#Not validated# |
-| `X-Amz-Content-SHA256` | SHA256 hex string | SigV4 payload hash | [red]#Not validated# |
-| `Authorization` | SigV4 signature string | SigV4 signature | [red]#Not validated# |
-| `User-Agent` | SDK identifier string | Client identification | [red]#Not read# |
-| `Expect` | `100-continue` | Hop-by-hop header for large payloads | [red]#Not read# |
+| `x-amz-sdk-checksum-algorithm` | `crc64nvme` (default) | Identifies the checksum algorithm used | [yellow]#Accepted by first AWS CLI increment; not validated# |
+| `x-amz-checksum-crc64nvme` | BASE64 CRC64-NVME hash | Payload integrity hash computed automatically by AWS CLI | [yellow]#Accepted by first AWS CLI increment; not validated# |
+| `X-Amz-Date` | ISO 8601 timestamp | SigV4 signing timestamp | [yellow]#Accepted by first AWS CLI increment; not validated# |
+| `X-Amz-Content-SHA256` | SHA256 hex string | SigV4 payload hash | [yellow]#Accepted by first AWS CLI increment; not validated# |
+| `Authorization` | SigV4 signature string | SigV4 signature | [yellow]#Accepted by first AWS CLI increment; not validated# |
+| `User-Agent` | SDK identifier string | Client identification | [yellow]#Accepted by first AWS CLI increment; not used# |
+| `Expect` | `100-continue` | Hop-by-hop header for large payloads | [yellow]#Accepted by first AWS CLI increment; not optimized# |
 
 ==== Checksum Algorithm Mapping
 
@@ -295,19 +295,19 @@ AWS CLI v2 does NOT send `Content-Type` by default unless `--content-type` is ex
 
 | Gap | Impact | Severity |
 |-----|--------|---------|
-| Checksum headers ignored | No data integrity validation — corrupted payloads accepted silently | [red]#High# |
-| SigV4 headers ignored | No authentication — anyone can write/read objects | [red]#High# |
-| Content-Type not sent by AWS CLI | Wrong content-type stored when using AWS CLI | [yellow]#Medium# |
-| User-Agent ignored | No client identification for analytics | [green]#Low# |
-| Expect ignored | No 100-continue optimization | [green]#Low# |
+| Checksum headers accepted but not validated | First AWS CLI object CRUD increment can pass, but data integrity validation is still absent — corrupted payloads may be accepted silently | [red]#High# |
+| SigV4 headers accepted but not validated | First AWS CLI object CRUD increment can pass, but authentication is still absent — anyone can write/read objects in trusted deployments | [red]#High# |
+| Content-Type not sent by AWS CLI | Wrong content-type may be stored when using AWS CLI unless explicitly provided | [yellow]#Medium# |
+| User-Agent accepted but ignored | No client identification for analytics | [green]#Low# |
+| Expect accepted but not optimized | No explicit 100-continue optimization | [green]#Low# |
 
 === Testing Strategy
 
 Three levels of testing:
 
-1. **Domain:** Pure JUnit, zero Spring — test invariants and business rules (213 tests)
-2. **Application:** Reactive application service tests (18 tests)
-3. **S3 Integration:** Cucumber BDD with WebTestClient — verify HTTP endpoints (227 tests)
-4. **AWS CLI Compatibility:** `test-aws-cli.sh` bash script + `mvn verify -Paws-cli-tests`
+1. **Domain:** Pure JUnit, zero Spring — test invariants and business rules.
+2. **Application:** Reactive application service tests.
+3. **S3 Integration:** Cucumber BDD with WebTestClient — verify HTTP endpoints.
+4. **AWS CLI Compatibility:** targeted AWS CLI Cucumber plus the separate/stale `test-aws-cli.sh` compatibility script.
 
-Total: **479 tests** (213 domain + 18 application + 227 S3 integration + 21 AWS CLI), 12 failures (12 anomaly tests documenting known bugs in put_object handler — see PLAN.md Phase 0 for details).
+Latest Phase 9 first-increment evidence: `mvn -B -pl s3-reactive-api-adapter -am test -Dsurefire.failIfNoSpecifiedTests=false` passed with **247 tests**, **0 failures**, **0 errors**, and **1 skipped** `@unsupported-awscli` scenario. The AWS CLI subset covers canonical object CRUD basics: put default headers, get content, head, list v1/v2, delete, idempotent delete, and `STANDARD` storage class via object attributes. Key-with-slashes remains skipped because current route matching does not support slash-containing keys.

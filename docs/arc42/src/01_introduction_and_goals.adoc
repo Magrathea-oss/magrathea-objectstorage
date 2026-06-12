@@ -3,16 +3,16 @@ ifndef::imagesdir[:imagesdir: ../images]
 [[section-introduction-and-goals]]
 == Introduction and Goals
 
-The Magrathea ObjectStore project implements an **AWS S3-compatible object storage** built with Spring Boot 4 WebFlux and Java 21.
+The Magrathea ObjectStore project implements an **AWS S3-compatible object storage** route surface built with Spring Boot 4 WebFlux and Java 21.
 
-It provides a lightweight implementation of the AWS S3 REST API route surface for development, testing, and small-scale deployments, plus separate internal/admin endpoints for operational configuration.
+It provides a lightweight implementation of the AWS S3 REST API route surface for development, testing, and small-scale deployments, plus separate internal/admin endpoints for operational configuration. AWS CLI parity has improved for canonical object CRUD basics, but full S3 scenario parity is not complete.
 
 === Goals
 
 - **S3 API compatibility**: map the in-scope AWS S3 REST API route surface and classify semantic implementation separately from route count
 - **Reactive by design**: full WebFlux non-blocking I/O, DataBuffer streaming for binary content
 - **Domain-Driven Design**: pure domain with zero framework dependencies, hexagonal architecture
-- **Testability**: domain/unit tests, WebTestClient Cucumber, targeted AWS CLI compatibility, and JaCoCo coverage reporting
+- **Testability**: domain/unit tests, WebTestClient Cucumber, targeted AWS CLI object CRUD compatibility, explicit unsupported AWS CLI tags, and JaCoCo coverage reporting
 
 === Stakeholders
 
@@ -24,4 +24,4 @@ It provides a lightweight implementation of the AWS S3 REST API route surface fo
 
 === Motivation
 
-The project serves as both a production-quality S3-compatible storage and a reference implementation of Java DDD + Spring Boot 4 reactive patterns with hexagonal architecture.
+The project serves as a reference implementation of Java DDD + Spring Boot 4 reactive patterns with hexagonal architecture and is evolving toward production-quality S3-compatible storage through evidence-based semantic coverage.

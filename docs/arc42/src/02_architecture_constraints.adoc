@@ -45,5 +45,5 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 - Domain tests: pure JUnit, NO Spring context
 - Integration tests: Cucumber BDD with WebTestClient in `s3-reactive-api-adapter`
-- AWS CLI compatibility tests: `test-aws-cli.sh`, also runnable via Maven profile `aws-cli-tests`
+- AWS CLI compatibility tests: targeted AWS CLI Cucumber in `s3-reactive-api-adapter`; `test-aws-cli.sh` / Maven profile `aws-cli-tests` remains a separate broad compatibility script
 - Coverage verification: JaCoCo via the standard Maven lifecycle is the current baseline; OpenClover remains optional/legacy.

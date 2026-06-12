@@ -27,7 +27,7 @@
 - **Jackson 3 XML** — `tools.jackson.dataformat:jackson-dataformat-xml` with custom WebFlux encoder
 - **Pure domain** — no Spring, no JPA, no reactive types in `object-store-domain`
 - **In-memory infrastructure** — reactive in-memory bucket, object, and multipart repositories
-- **Testing** — JUnit, Cucumber, AWS CLI compatibility; **JaCoCo is the current coverage baseline** (Clover/OpenClover is optional/legacy)
+- **Testing** — JUnit, Cucumber, targeted AWS CLI compatibility; the first AWS CLI object CRUD increment passes, but full S3 scenario parity is not complete; **JaCoCo is the current coverage baseline** (Clover/OpenClover is optional/legacy)
 
 ---
 
@@ -154,7 +154,7 @@ aws --endpoint-url http://localhost:8080 s3api get-object --bucket test-bucket -
 |---|---|---|
 | 1 | All unit + integration tests | `mvn test` |
 | 2 | Domain JUnit only | `mvn test -pl object-store-domain` |
-| 3 | S3 API Cucumber only | `mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false` |
+| 3 | S3 API Cucumber only | `mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false` (latest evidence: 247 tests, 0 failures/errors, 1 `@unsupported-awscli` skip) |
 | 3b | Admin API adapter tests | `mvn -B -pl admin-api-adapter -am test` |
 | 4 | JaCoCo coverage (current baseline) | `mvn verify` (JaCoCo runs automatically with the default lifecycle) |
 | 4b | Clover coverage (optional/legacy) | `mvn -Pcoverage clover:setup test clover:aggregate clover:clover` |
@@ -221,6 +221,7 @@ The implementation plan tracks all Amazon S3 actions from:
 > ⚠️ **Coverage reporting has been reclassified.** The `111/111` figure reflects a route/surface inventory only — it means 111 S3 API action routes are mapped. It does **not** mean 111 operations are semantically implemented, stateful, or AWS CLI compatible.
 >
 > API coverage must now be reported by semantic status: **Mapped / Stubbed / Stateful / AWS CLI compatible / Storage-engine compatible / Semantically S3-compatible**.
+> AWS CLI parity has improved for the canonical object CRUD subset (put default headers, get content, head, list v1/v2, delete/idempotent delete, and `STANDARD` storage class via object attributes), but it is **not complete** for all S3 scenarios; slash-containing keys remain `@unsupported-awscli` because current route matching does not support them.
 > See [`docs/test-report.md`](docs/test-report.md) for the classification matrix and [`PLAN.md`](PLAN.md) → *S3 API Semantic Completion Plan* for the phased roadmap.
 
 Phases A–F route mapping is recorded in [ADR 0012](docs/adr/0012-phase-f-advanced-s3-operations.md). Semantic implementation completion is tracked separately in the correction plan.
