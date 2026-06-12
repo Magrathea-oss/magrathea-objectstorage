@@ -39,15 +39,16 @@ COPY s3-reactive-api-adapter/pom.xml ./s3-reactive-api-adapter/
 COPY admin-api-adapter/pom.xml ./admin-api-adapter/
 COPY bootstrap-application/pom.xml ./bootstrap-application/
 
-# Frontend POM (just package.json for npm)
+# Frontend and documentation script manifests for dependency caching
 COPY magrathea-ui/package.json magrathea-ui/package-lock.json magrathea-ui/vite.config.js ./magrathea-ui/
 COPY magrathea-ui/index.html ./magrathea-ui/
 COPY magrathea-ui/public ./magrathea-ui/public/
 COPY magrathea-ui/src ./magrathea-ui/src/
+COPY bootstrap-application/src/main/scripts/package.json bootstrap-application/src/main/scripts/package-lock.json ./bootstrap-application/src/main/scripts/
 
-# Install npm dependencies (required for asciidoc-to-html and vite build)
-RUN npm install --prefix magrathea-ui && \
-    npm install -g @asciidoctor/core
+# Install npm dependencies for the frontend and bootstrap documentation scripts
+RUN npm ci --prefix magrathea-ui && \
+    npm ci --prefix bootstrap-application/src/main/scripts
 
 # Download Maven dependencies (skip unavailable plugins)
 RUN mvn -B dependency:go-offline -DskipTests -Dmaven.plugin.skip=true -fn 2>/dev/null || echo 'Warning: some plugins unavailable, continuing'
@@ -67,12 +68,56 @@ COPY object-store-reactive-repository-storage-engine-infrastructure/src ./object
 COPY s3-reactive-api-adapter/src ./s3-reactive-api-adapter/src/
 COPY bootstrap-application/src ./bootstrap-application/src/
 
-# TODO (P0 build hygiene): Javadoc is pre-generated on the host and copied here.
-# This is an anti-pattern — Javadoc should be generated inside the builder stage.
-# Tracked in PLAN.md under P0 build hygiene.
-COPY bootstrap-application/src/main/resources/static/docs/apidocs ./bootstrap-application/src/main/resources/static/docs/apidocs/
+# Regenerate web documentation assets from source docs inside the builder.
+# This intentionally does not copy generated bootstrap static resources from the host context.
+RUN set -eux; \
+    for required in \
+      docs/usermanual/en/index.adoc \
+      docs/usermanual/it/index.adoc \
+      docs/usermanual/es/index.adoc \
+      docs/usermanual/de/index.adoc \
+      docs/usermanual/cn/index.adoc \
+      docs/arc42/arc42-template.adoc \
+      docs/arc42/images \
+      docs/c4/images \
+      docs/test-report.md \
+      docs/adr \
+      magrathea-ui/public/favicon.svg \
+      magrathea-ui/public/icons.svg; \
+    do \
+      test -e "$required"; \
+    done; \
+    for script in \
+      bootstrap-application/src/main/scripts/asciidoc-to-json.mjs \
+      bootstrap-application/src/main/scripts/asciidoc-to-arc42-json.mjs \
+      bootstrap-application/src/main/scripts/markdown-to-json.mjs \
+      bootstrap-application/src/main/scripts/adr-to-json.mjs; \
+    do \
+      test -f "$script"; \
+    done; \
+    find docs/c4/images -maxdepth 1 -type f -name '*.png' -print -quit | grep -q .; \
+    find docs/arc42/images -maxdepth 1 -type f -print -quit | grep -q .; \
+    mkdir -p bootstrap-application/src/main/resources/static/docs/c4/images \
+             bootstrap-application/src/main/resources/static/docs/arc42/images; \
+    cp docs/c4/images/*.png bootstrap-application/src/main/resources/static/docs/c4/images/; \
+    cp -R docs/arc42/images/. bootstrap-application/src/main/resources/static/docs/arc42/images/; \
+    node bootstrap-application/src/main/scripts/asciidoc-to-json.mjs; \
+    node bootstrap-application/src/main/scripts/asciidoc-to-arc42-json.mjs; \
+    node bootstrap-application/src/main/scripts/markdown-to-json.mjs; \
+    node bootstrap-application/src/main/scripts/adr-to-json.mjs; \
+    npm run build --prefix magrathea-ui; \
+    cp -R magrathea-ui/dist/. bootstrap-application/src/main/resources/static/; \
+    test -f bootstrap-application/src/main/resources/static/index.html; \
+    test -f bootstrap-application/src/main/resources/static/favicon.svg; \
+    test -f bootstrap-application/src/main/resources/static/icons.svg; \
+    test -f bootstrap-application/src/main/resources/static/docs/index.en.json; \
+    test -f bootstrap-application/src/main/resources/static/docs/arc42.json; \
+    test -f bootstrap-application/src/main/resources/static/docs/test-report.json; \
+    test -f bootstrap-application/src/main/resources/static/docs/adr/0001.json; \
+    find bootstrap-application/src/main/resources/static/docs/c4/images -maxdepth 1 -type f -name '*.png' -print -quit | grep -q .; \
+    find bootstrap-application/src/main/resources/static/docs/arc42/images -maxdepth 1 -type f -print -quit | grep -q .
 
-# Build (Maven will call npm via exec-maven-plugin during generate-resources)
+# Build final JAR packaging with Maven.
 ENV NODE_PATH=/build/magrathea-ui/node_modules
 RUN mvn -B clean package -DskipTests -fn && \
     cp bootstrap-application/target/*.jar /app.jar
