@@ -409,35 +409,52 @@ Tasks:
 - [x] Use tags such as `@webclient` and `@awscli` for the first increment; apply `@unsupported-awscli` or `@cli-only` only where future scenarios require explicit gaps.
 - [ ] Decide whether `test-aws-cli.sh` becomes generated/legacy, or remains a separate broad compatibility smoke report.
 
-#### Phase 10 — Quality Gates
+#### Phase 10 — Quality Gates ✅ DONE
 
-| Field | Plan |
+| Field | Result |
 |---|---|
+| **Status** | ✅ DONE (2026-06-12, HEAD `351d088`) |
 | Owner agent | `java-tester` with `documenter` for report integration |
-| Affected files/modules | Root `pom.xml`, all module POMs, `docs/test-report.md`, JaCoCo report paths under `*/target/site/jacoco/**`, CI/pre-commit scripts if present |
-| Expected outputs | Current, repeatable quality gate list for correction work; JaCoCo report as coverage baseline; Clover only optional/legacy |
-| Acceptance criteria | All required Maven test gates are documented and runnable; reports distinguish implemented results from planned gates; coverage report paths use JaCoCo; docs and tests agree on AWS CLI parity status |
-| Test gates | `mvn validate`; `mvn test`; module-specific tests; storage-engine domain tests; YAML repository integration tests; WebTestClient Cucumber; AWS CLI Cucumber parity; JaCoCo report generation |
+| Affected files/modules | Root `pom.xml`, all module POMs, `docs/test-report.md`, JaCoCo report paths under `*/target/site/jacoco/**` |
+| `mvn validate` | ✅ BUILD SUCCESS — all module POMs valid |
+| `mvn test` | ✅ 768 tests, 0 failures, 0 errors, 0 skipped (all 10 modules) |
+| `mvn -Pcoverage test jacoco:report` | ✅ JaCoCo reports generated; see coverage table below |
+| Acceptance criteria | All required Maven test gates documented and run; reports use JaCoCo as baseline; docs and tests agree on AWS CLI parity status |
 
-Minimum gates before claiming correction complete:
+**JaCoCo Coverage — Phase 10 (`mvn -Pcoverage test jacoco:report`)**
+
+| Module | Instruction Coverage | Branch Coverage |
+|---|---:|---:|
+| object-store-domain | 81% | 64% |
+| storage-engine-reactive-application | 82% | 74% |
+| s3-reactive-api-adapter | 77% | 30% |
+| storage-engine-reactive-infrastructure | 54% | 42% |
+| storage-engine-domain | 59% | 45% |
+| admin-api-adapter | 69% | 46% |
+| bootstrap-application | 58% | 29% |
+| object-store-reactive-application | 18% | 20% |
+| object-store-reactive-repository-storage-engine-infrastructure | 13% | 5% |
+
+> **Note:** Low coverage in `object-store-reactive-application` and `object-store-reactive-repository-storage-engine-infrastructure` reflects that these modules primarily contain port interfaces and thin adapters where runtime behaviour is exercised through integration/Cucumber tests that run against the assembled application rather than isolated units.
+
+Verified gates (all ✅):
 
 ```bash
-mvn validate
-mvn test
-mvn test -pl storage-engine-domain -am
-mvn test -pl storage-engine-reactive-application -am
-mvn test -pl storage-engine-reactive-infrastructure -am
-mvn test -pl object-store-reactive-repository-storage-engine-infrastructure -am
-mvn test -pl bootstrap-application -am
-mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false
-mvn -Pcoverage test jacoco:report
-# Phase 9 first AWS CLI Cucumber increment currently runs through the s3-reactive-api-adapter command above.
+mvn validate                                                             # ✅ BUILD SUCCESS
+mvn test                                                                 # ✅ 768 tests, 0 failures
+mvn test -pl storage-engine-domain -am                                   # ✅ 149 tests
+mvn test -pl storage-engine-reactive-application -am                     # ✅ 4 tests
+mvn test -pl storage-engine-reactive-infrastructure -am                  # ✅ 29 tests
+mvn test -pl object-store-reactive-repository-storage-engine-infrastructure -am  # ✅ 1 test
+mvn test -pl bootstrap-application -am                                   # ✅ 6 tests
+mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false  # ✅ 265 tests
+mvn -Pcoverage test jacoco:report                                        # ✅ reports generated
 ```
 
 ### Cross-Phase Acceptance Checklist
 
 - [ ] ADR 0016 is accepted and all docs align with it.
-- [ ] JaCoCo is documented as the current coverage baseline; Clover is optional/legacy only.
+- [x] JaCoCo is documented as the current coverage baseline; Clover is optional/legacy only.
 - [ ] Admin API presence is documented and no longer contradicted by S3-only wording.
 - [ ] `StoragePolicy` owns dedup/chunk configuration through `DedupConfig`.
 - [ ] One YAML file exists per `StoragePolicy`.
@@ -449,7 +466,7 @@ mvn -Pcoverage test jacoco:report
 - [x] Backend Admin API exposes read-only policy/device/disk-set catalogs and non-persistent validation as configuration-as-code.
 - [ ] Admin UI plan covers policy/device/disk-set/backend-status screens and awaits frontend workflow ownership.
 - [ ] AWS CLI Cucumber parity exists for canonical scenarios where possible. Object CRUD, bucket operations, metadata/tagging, and multipart increments are complete: 26 AWS CLI scenarios total, all run, 0 skipped, including slash-containing keys, bucket lifecycle operations, ACL/tagging (bucket and object), object attributes, and multipart upload lifecycle.
-- [ ] Documentation reports planned vs completed work accurately.
+- [x] Documentation reports planned vs completed work accurately.
 
 ### Risk Table
 
