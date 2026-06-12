@@ -108,14 +108,15 @@ image::../../c4/images/BucketConfigurationRuntime.png[Bucket Configuration Runti
 
 === Scenario 6b — Admin Static Asset and Documentation UI
 
-**Description:** The staged static asset handoff packages the generated admin UI and documentation artifacts into `bootstrap-application` classpath resources.
+**Description:** Container packaging regenerates the admin UI and documentation artifacts inside the Docker builder stage and packages them into `bootstrap-application` classpath resources. Host-generated bootstrap static resources are excluded from the Docker build context by `.dockerignore`.
 
 **Flow:**
-1. Browser/Admin UI → bootstrap-application: request `/`, `/assets/*`, or `/docs/*`.
-2. bootstrap-application → classpath `static/**`: serves generated Vue assets, ARC42 JSON, ADR JSON, JaCoCo JSON exports, C4 PNG images, and ARC42 image resources.
-3. Browser/Admin UI renders documentation and links to `/admin/**` JSON endpoints for operational data.
+1. Docker builder stage → source docs/UI: regenerate ARC42 JSON, ADR JSON, test-report JSON, copied documentation images, and Vue admin UI assets.
+2. Browser/Admin UI → bootstrap-application: request `/`, `/assets/*`, or `/docs/*`.
+3. bootstrap-application → classpath `static/**`: serves generated Vue assets, ARC42 JSON, ADR JSON, JaCoCo JSON exports, C4 PNG images, and ARC42 image resources.
+4. Browser/Admin UI renders documentation and links to `/admin/**` JSON endpoints for operational data.
 
-**Verification boundary:** The static resource handoff verifies files are present and JSON is parseable. It does not change S3 API semantics or storage-engine runtime behavior.
+**Verification boundary:** The container build verifies required generated files are present and JSON/image inputs exist. The static asset packaging path does not change S3 API semantics or storage-engine runtime behavior.
 
 === Scenario 6c — Admin Configuration-as-Code Catalog API
 

@@ -20,10 +20,12 @@ ifndef::imagesdir[:imagesdir: ../images]
 A `Dockerfile` and `docker-compose.yml` are present at the project root for containerized execution:
 
 **Dockerfile:**
-- Base: `eclipse-temurin:21-jdk`
-- Copy `bootstrap-application/target/*.jar`
-- Expose port 8080
-- Entrypoint: `java -jar bootstrap-application-1.0.0-SNAPSHOT.jar`
+- Builder stage: Maven 3.9 + Eclipse Temurin 21 with Node.js installed for documentation/frontend generation
+- Regenerates web documentation and admin UI static assets inside the builder stage from source-controlled docs and `magrathea-ui` sources
+- Does not copy host-generated `bootstrap-application/src/main/resources/static/**` assets; `.dockerignore` excludes those generated resources from the build context
+- Runtime stage: Eclipse Temurin 21 JRE, copies the packaged Spring Boot JAR from the builder
+- Exposes ports 8080 and 8081
+- Entrypoint: `java -jar /app.jar`
 
 **docker-compose.yml:**
 - Single service `magrathea-s3` on port `8080:8080`

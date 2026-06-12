@@ -106,6 +106,10 @@ Current runtime mutability decision: storage policies, storage devices, and disk
 
 Planned Vue screens are policy list/detail/validation report, device list/detail, disk-set/topology overview/detail, and backend/status dashboard. Frontend implementation requires an appropriate frontend workflow/agent before changing `magrathea-ui`; the current Java workflow only documents the plan and backend contracts.
 
+### Container build and generated static assets
+
+Generated bootstrap static resources are not expected to be committed or copied from the host into the image. `.dockerignore` excludes generated `bootstrap-application/src/main/resources/static/**` docs, assets, and entry files. The `Dockerfile` installs the frontend/documentation toolchains in the builder stage, regenerates ARC42/ADR/test-report JSON, copies source-controlled documentation images, builds `magrathea-ui`, and packages those regenerated static assets into the Spring Boot JAR.
+
 ### S3 API activation
 
 ```properties
