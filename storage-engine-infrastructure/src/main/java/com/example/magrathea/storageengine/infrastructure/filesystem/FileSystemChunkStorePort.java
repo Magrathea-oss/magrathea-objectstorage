@@ -4,16 +4,16 @@ import com.example.magrathea.storageengine.application.port.ChunkStorePort;
 import com.example.magrathea.storageengine.domain.valueobject.ChunkId;
 import com.example.magrathea.storageengine.domain.valueobject.NodeId;
 import com.example.magrathea.storageengine.domain.valueobject.PersistencePlan;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-import java.util.ArrayList;
+import java.nio.file.NoSuchFileException;
 import java.util.List;
 
 /**
  * Filesystem-backed chunk store port.
- * Persists chunk data to storage nodes according to the persistence plan.
- * Uses FileSystemStorageCluster nodes for actual storage.
+ * Persists chunk data under the exact ChunkId chosen by the application pipeline.
  */
 public class FileSystemChunkStorePort implements ChunkStorePort {
 
@@ -24,27 +24,25 @@ public class FileSystemChunkStorePort implements ChunkStorePort {
     }
 
     @Override
-    public Mono<List<NodeId>> store(byte[] data, PersistencePlan plan) {
-        // Generate a chunk ID for this data
-        ChunkId chunkId = ChunkId.generate();
-
-        // Distribute data across cluster nodes based on plan
-        // Simple strategy: round-robin across available nodes
+    public Mono<List<NodeId>> store(ChunkId chunkId, byte[] data, PersistencePlan plan) {
         List<FileSystemStorageNode> nodes = cluster.nodes();
         int replicationFactor = plan.effectivePolicy().replication().factor();
         int nodesToUse = Math.min(replicationFactor, nodes.size());
 
-        List<NodeId> storedNodeIds = new ArrayList<>();
+        return Flux.fromIterable(nodes.subList(0, nodesToUse))
+                .concatMap(node -> node.write(chunkId, data)
+                        .subscribeOn(Schedulers.boundedElastic()))
+                .map(FileSystemStorageNode.WriteResult::nodeId)
+                .collectList();
+    }
 
-        // Use boundedElastic scheduler for blocking I/O
-        return Mono.fromCallable(() -> {
-                    for (int i = 0; i < nodesToUse; i++) {
-                        FileSystemStorageNode node = nodes.get(i);
-                        node.write(chunkId, data).block(); // block is acceptable here (I/O scheduler)
-                        storedNodeIds.add(node.nodeId());
-                    }
-                    return storedNodeIds;
-                })
-                .subscribeOn(Schedulers.boundedElastic());
+    @Override
+    public Mono<byte[]> read(ChunkId chunkId) {
+        return Flux.fromIterable(cluster.nodes())
+                .concatMap(node -> node.read(chunkId)
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .onErrorResume(NoSuchFileException.class, ignored -> Mono.empty()))
+                .next()
+                .switchIfEmpty(Mono.error(new NoSuchFileException("Chunk not found: " + chunkId.value())));
     }
 }

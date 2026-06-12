@@ -21,6 +21,7 @@ import com.example.magrathea.storageengine.domain.aggregate.StoredObject;
 import com.example.magrathea.storageengine.domain.valueobject.BucketId;
 import com.example.magrathea.storageengine.domain.valueobject.BucketRef;
 import com.example.magrathea.storageengine.domain.valueobject.CompleteUploadCommand;
+import com.example.magrathea.storageengine.domain.valueobject.ManifestId;
 import com.example.magrathea.storageengine.domain.valueobject.ObjectId;
 import com.example.magrathea.storageengine.domain.valueobject.ObjectManifest;
 import com.example.magrathea.storageengine.domain.valueobject.VersionId;
@@ -54,6 +55,7 @@ public class StorageEngineReactiveS3ObjectRepository
     private final ObjectStoreToStorageEngineTranslator translator;
     private final ReactiveStorageOrchestrator orchestrator;
     private final Map<String, S3Object> storeByKey = new ConcurrentHashMap<>();
+    private final Map<String, ManifestId> manifestByKey = new ConcurrentHashMap<>();
     private final AtomicLong versionCounter = new AtomicLong(1);
     private static final DefaultDataBufferFactory DATA_BUFFER_FACTORY =
         new DefaultDataBufferFactory();
@@ -94,6 +96,7 @@ public class StorageEngineReactiveS3ObjectRepository
         return Mono.defer(() -> {
             var storeKey = storeKey(object.key().bucket(), object.key().key());
             S3Object removed = storeByKey.remove(storeKey);
+            manifestByKey.remove(storeKey);
             if (removed == null) {
                 return Mono.error(new RuntimeException(
                     "S3Object not found: " + object.key().bucket() + "/" + object.key().key()));
@@ -154,6 +157,7 @@ public class StorageEngineReactiveS3ObjectRepository
                 var storeKey = storeKey(object.key().bucket(), object.key().key());
                 S3Object clean = object.clearEvents();
                 storeByKey.put(storeKey, clean);
+                manifestByKey.put(storeKey, storedObject.manifestId());
                 long version = versionCounter.getAndIncrement();
                 CommandResult<S3Object> result =
                     new CommandResult.Created<>(clean, object.domainEvents(), version);
@@ -182,6 +186,7 @@ public class StorageEngineReactiveS3ObjectRepository
                 var storeKey = storeKey(
                     activeObject.key().bucket(), activeObject.key().key());
                 storeByKey.put(storeKey, activeObject);
+                manifestByKey.put(storeKey, storedObject.manifestId());
                 long version = versionCounter.getAndIncrement();
                 CommandResult<S3Object> result =
                     new CommandResult.Created<>(
@@ -193,9 +198,14 @@ public class StorageEngineReactiveS3ObjectRepository
     @Override
     public Flux<DataBuffer> getContent(
             com.example.magrathea.objectstore.domain.valueobject.ObjectKey key) {
-        // Read content from Storage Engine via orchestrator
-        // For now, return empty — content is stored in Storage Engine chunks
-        return Flux.empty();
+        return Flux.defer(() -> {
+            ManifestId manifestId = manifestByKey.get(storeKey(key.bucket(), key.key()));
+            if (manifestId == null) {
+                return Flux.empty();
+            }
+            return orchestrator.read(manifestId)
+                    .map(DATA_BUFFER_FACTORY::wrap);
+        });
     }
 
     // ── Phase F object config queries ──
@@ -298,6 +308,10 @@ public class StorageEngineReactiveS3ObjectRepository
                 var newStoreKey = storeKey(bucketName, newKey);
                 storeByKey.remove(oldStoreKey);
                 storeByKey.put(newStoreKey, clean);
+                ManifestId manifestId = manifestByKey.remove(oldStoreKey);
+                if (manifestId != null) {
+                    manifestByKey.put(newStoreKey, manifestId);
+                }
                 return Mono.<Void>empty();
             })
             .switchIfEmpty(Mono.<Void>error(
@@ -367,6 +381,7 @@ public class StorageEngineReactiveS3ObjectRepository
      */
     public void reset() {
         storeByKey.clear();
+        manifestByKey.clear();
         versionCounter.set(1);
         legalHoldByKey.clear();
         encryptionByKey.clear();
