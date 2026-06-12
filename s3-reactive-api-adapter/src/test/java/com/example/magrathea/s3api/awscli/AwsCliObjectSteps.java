@@ -93,12 +93,24 @@ public class AwsCliObjectSteps {
 
     // ── Given steps ──
 
+    @Given("a bucket name {string}")
+    public void aBucketName(String bucketName) {
+        currentBucket = bucketName;
+    }
+
     @Given("bucket {string} exists")
     public void bucketExists(String bucketName) throws Exception {
         currentBucket = bucketName;
         // Create bucket via AWS CLI after the scenario hook clears in-memory state.
         runAws("create-bucket", "--bucket", bucketName);
         assertEquals(0, exitCode, "Bucket should be created via CLI. Output: " + stdout);
+    }
+
+    @Given("bucket {string} does not exist")
+    public void bucketDoesNotExist(String bucketName) throws Exception {
+        currentBucket = bucketName;
+        runAws("head-bucket", "--bucket", bucketName);
+        assertNotEquals(0, exitCode, "Bucket should not exist: " + stdout);
     }
 
     @Given("an object with key {string} and content {string}")
@@ -206,6 +218,47 @@ public class AwsCliObjectSteps {
         runAws("head-object", "--bucket", currentBucket, "--key", key);
     }
 
+    @When("the bucket is created via AWS CLI")
+    public void bucketCreatedViaAwsCli() throws Exception {
+        runAws("create-bucket", "--bucket", currentBucket);
+    }
+
+    @When("the buckets are listed via AWS CLI")
+    public void bucketsListedViaAwsCli() throws Exception {
+        runAws("list-buckets");
+    }
+
+    @When("HEAD request is sent for bucket {string}")
+    public void headBucket(String bucket) throws Exception {
+        currentBucket = bucket;
+        runAws("head-bucket", "--bucket", bucket);
+    }
+
+    @When("bucket location is requested via AWS CLI for {string}")
+    public void bucketLocationRequestedViaAwsCli(String bucket) throws Exception {
+        currentBucket = bucket;
+        runAws("get-bucket-location", "--bucket", bucket);
+    }
+
+    @When("bucket versioning is requested via AWS CLI for {string}")
+    public void bucketVersioningRequestedViaAwsCli(String bucket) throws Exception {
+        currentBucket = bucket;
+        runAws("get-bucket-versioning", "--bucket", bucket);
+    }
+
+    @When("bucket versioning is set via AWS CLI for {string} to {string}")
+    public void bucketVersioningSetViaAwsCli(String bucket, String status) throws Exception {
+        currentBucket = bucket;
+        runAws("put-bucket-versioning", "--bucket", bucket,
+            "--versioning-configuration", "Status=" + status);
+    }
+
+    @When("the bucket {string} is deleted via AWS CLI")
+    public void bucketDeletedViaAwsCli(String bucket) throws Exception {
+        currentBucket = bucket;
+        runAws("delete-bucket", "--bucket", bucket);
+    }
+
     @When("the objects are listed via AWS CLI")
     public void objectsListedViaAwsCli() throws Exception {
         runAws("list-objects", "--bucket", currentBucket);
@@ -268,6 +321,42 @@ public class AwsCliObjectSteps {
     @Then("the AWS CLI output contains object {string}")
     public void awsCliOutputContainsObject(String key) {
         assertTrue(stdout.contains(key), "AWS CLI output should contain object key '" + key + "': " + stdout);
+    }
+
+    @Then("the AWS CLI output contains bucket {string}")
+    public void awsCliOutputContainsBucket(String bucket) {
+        assertTrue(stdout.contains(bucket), "AWS CLI output should contain bucket '" + bucket + "': " + stdout);
+    }
+
+    @Then("the AWS CLI output does not contain bucket {string}")
+    public void awsCliOutputDoesNotContainBucket(String bucket) {
+        assertFalse(stdout.contains(bucket), "AWS CLI output should not contain bucket '" + bucket + "': " + stdout);
+    }
+
+    @Then("the AWS CLI output contains {string}")
+    public void awsCliOutputContains(String expected) {
+        assertTrue(stdout.contains(expected), "AWS CLI output should contain '" + expected + "': " + stdout);
+    }
+
+    @Then("the AWS CLI bucket location contains {string}")
+    public void awsCliBucketLocationContains(String expected) {
+        assertEquals(0, exitCode, "get-bucket-location should succeed. Output: " + stdout);
+        assertTrue(stdout.contains(expected), "Bucket location should contain '" + expected + "': " + stdout);
+    }
+
+    @Then("the AWS CLI bucket versioning contains status {string}")
+    public void awsCliBucketVersioningContainsStatus(String status) {
+        assertEquals(0, exitCode, "get-bucket-versioning should succeed. Output: " + stdout);
+        assertTrue(stdout.contains("\"Status\": \"" + status + "\"")
+                || (stdout.contains("Status") && stdout.contains(status)),
+            "Bucket versioning should contain status '" + status + "': " + stdout);
+    }
+
+    @Then("bucket {string} does not appear in the bucket list")
+    public void bucketDoesNotAppearInBucketList(String bucket) throws Exception {
+        runAws("list-buckets");
+        assertEquals(0, exitCode, "list-buckets should succeed. Output: " + stdout);
+        assertFalse(stdout.contains(bucket), "Bucket should not appear in list-buckets output: " + stdout);
     }
 
     @Then("the AWS CLI output does not contain object {string}")
