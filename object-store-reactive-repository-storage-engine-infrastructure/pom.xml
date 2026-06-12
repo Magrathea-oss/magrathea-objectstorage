@@ -21,7 +21,7 @@
         <!-- Internal: Storage Engine application layer -->
         <dependency>
             <groupId>com.example</groupId>
-            <artifactId>storage-engine-application</artifactId>
+            <artifactId>storage-engine-reactive-application</artifactId>
             <version>${project.version}</version>
         </dependency>
 

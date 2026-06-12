@@ -14,8 +14,9 @@
 
         <module>object-store-domain</module>
         <module>storage-engine-domain</module>
-        <module>storage-engine-application</module>
-        <module>storage-engine-infrastructure</module>
+        <module>storage-engine-reactive-repository-application</module>
+        <module>storage-engine-reactive-application</module>
+        <module>storage-engine-reactive-infrastructure</module>
         <module>bootstrap-application</module>
 
         <module>object-store-reactive-repository-application</module>
@@ -98,17 +99,22 @@
             </dependency>
             <dependency>
                 <groupId>com.example</groupId>
-                <artifactId>storage-engine-application</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.example</groupId>
                 <artifactId>storage-engine-domain</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.example</groupId>
-                <artifactId>storage-engine-infrastructure</artifactId>
+                <artifactId>storage-engine-reactive-repository-application</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.example</groupId>
+                <artifactId>storage-engine-reactive-application</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.example</groupId>
+                <artifactId>storage-engine-reactive-infrastructure</artifactId>
                 <version>${project.version}</version>
             </dependency>
 

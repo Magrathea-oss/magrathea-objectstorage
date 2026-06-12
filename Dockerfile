@@ -28,8 +28,9 @@ COPY pom.xml .
 # All module POMs
 COPY object-store-domain/pom.xml ./object-store-domain/
 COPY storage-engine-domain/pom.xml ./storage-engine-domain/
-COPY storage-engine-application/pom.xml ./storage-engine-application/
-COPY storage-engine-infrastructure/pom.xml ./storage-engine-infrastructure/
+COPY storage-engine-reactive-repository-application/pom.xml ./storage-engine-reactive-repository-application/
+COPY storage-engine-reactive-application/pom.xml ./storage-engine-reactive-application/
+COPY storage-engine-reactive-infrastructure/pom.xml ./storage-engine-reactive-infrastructure/
 COPY object-store-reactive-repository-application/pom.xml ./object-store-reactive-repository-application/
 COPY object-store-reactive-application/pom.xml ./object-store-reactive-application/
 COPY object-store-reactive-infrastructure/pom.xml ./object-store-reactive-infrastructure/
@@ -56,8 +57,9 @@ COPY docs ./docs/
 COPY admin-api-adapter/src ./admin-api-adapter/src/
 COPY object-store-domain/src ./object-store-domain/src/
 COPY storage-engine-domain/src ./storage-engine-domain/src/
-COPY storage-engine-application/src ./storage-engine-application/src/
-COPY storage-engine-infrastructure/src ./storage-engine-infrastructure/src/
+COPY storage-engine-reactive-repository-application/src ./storage-engine-reactive-repository-application/src/
+COPY storage-engine-reactive-application/src ./storage-engine-reactive-application/src/
+COPY storage-engine-reactive-infrastructure/src ./storage-engine-reactive-infrastructure/src/
 COPY object-store-reactive-repository-application/src ./object-store-reactive-repository-application/src/
 COPY object-store-reactive-application/src ./object-store-reactive-application/src/
 COPY object-store-reactive-infrastructure/src ./object-store-reactive-infrastructure/src/

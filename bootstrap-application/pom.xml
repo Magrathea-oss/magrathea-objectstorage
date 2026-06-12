@@ -50,12 +50,17 @@
         </dependency>
         <dependency>
             <groupId>com.example</groupId>
-            <artifactId>storage-engine-application</artifactId>
+            <artifactId>storage-engine-reactive-repository-application</artifactId>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.example</groupId>
-            <artifactId>storage-engine-infrastructure</artifactId>
+            <artifactId>storage-engine-reactive-application</artifactId>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>storage-engine-reactive-infrastructure</artifactId>
             <scope>compile</scope>
         </dependency>
         <dependency>

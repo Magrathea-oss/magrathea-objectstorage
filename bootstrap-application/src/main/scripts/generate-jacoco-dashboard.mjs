@@ -33,7 +33,8 @@ if (!staticDir || !outputPath) {
 // Known module index files (actual module names from JaCoCo HTML conversion)
 const MODULE_INDEX_FILES = [
   { name: 'storage-engine-domain', file: 'storage-engine-domain/index.json' },
-  { name: 'storage-engine-application', file: 'storage-engine-application/index.json' },
+  { name: 'storage-engine-reactive-repository-application', file: 'storage-engine-reactive-repository-application/index.json' },
+  { name: 'storage-engine-reactive-application', file: 'storage-engine-reactive-application/index.json' },
   { name: 'object-store-reactive-repository-application', file: 'object-store-reactive-repository-application/index.json' },
 ];
 
