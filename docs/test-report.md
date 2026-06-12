@@ -7,7 +7,7 @@ Updated: 2026-06-12
 > This report reflects a point-in-time snapshot and **must not be read as implementation completeness**.
 > - The `111/111` route count (referenced elsewhere) is a mapped-surface inventory only, not semantic completion.
 > - AWS CLI standalone results (46 passed / 82 failed) are from a run where the server was not started; most failures are connection errors (exit code 254), not logic failures.
-> - AWS CLI Cucumber: **10 scenarios total** for the first object CRUD increment including slash-containing keys; **10 run** and **0 are skipped**. WebTestClient Cucumber: **238 scenarios** implemented. These are not equivalent and full AWS CLI parity is not complete.
+> - AWS CLI Cucumber: **18 scenarios total** covering object CRUD (including slash-containing keys) and bucket operations parity; **18 run** and **0 are skipped**. WebTestClient Cucumber: **239 scenarios** implemented. These are not equivalent and full AWS CLI parity is not complete.
 > - Storage-engine backend scenarios: **absent**. The storage-engine modules are not yet verified end-to-end.
 > - **JaCoCo is the current coverage baseline.** Clover/OpenClover is optional/legacy.
 >
@@ -18,7 +18,7 @@ Updated: 2026-06-12
 | Suite | Passed | Failed | Total | Notes |
 |---|---:|---:|---:|---|
 | AWS CLI S3 compatibility script | 46 | 82 | 128 | Stale standalone `test-aws-cli.sh` result; endpoint: `http://localhost:8080` |
-| S3 API adapter Cucumber/Surefire | 248 | 0 | 248 | `mvn -B -pl s3-reactive-api-adapter -am test -Dsurefire.failIfNoSpecifiedTests=false` — build success; 0 skipped scenarios |
+| S3 API adapter Cucumber/Surefire | 257 | 0 | 257 | `mvn -B -pl s3-reactive-api-adapter -am test -Dsurefire.failIfNoSpecifiedTests=false` — build success; 0 skipped scenarios |
 | Maven Surefire | See section | See section | See section | Latest reports under `*/target/surefire-reports` |
 | Admin API adapter | 9 | 0 | 9 | `mvn -B -pl admin-api-adapter -am test` — build success |
 | JaCoCo coverage | See section | - | - | Current baseline; latest reports under `target/site/jacoco` when generated |
@@ -30,14 +30,14 @@ Updated: 2026-06-12
 | Phase 5 domain planning (`storage-engine-domain`) | Commit `b0a5f74`; `PersistencePlannerMinioStandardTest` | 152 tests passing, 0 failures | Verifies deterministic `MINIO_STANDARD` persistence planning in the domain model. |
 | Phase 5 YAML catalogs and MINIO_STANDARD integration (`storage-engine-reactive-infrastructure`) | Commit `0ec84cf`; `MinioStandardIntegrationTest` | 26 tests passing, 0 failures | Verifies YAML catalog/device integration and `MINIO_STANDARD` selection with S3 storage class `STANDARD`, dedup disabled, EC planning `4 data / 2 parity`, replication factor `1`, compression disabled, and encryption disabled by default; storage-engine runtime read/write wiring and physical EC shard placement remain pending for Phase 6/7. |
 | Phase 8 backend Admin API (`admin-api-adapter`) | `mvn -B -pl admin-api-adapter -am test`; `AdminRouterTest` | 9 tests passing, 0 failures, build success | Verifies configuration-as-code/read-only admin catalog behavior for policies/devices/disk sets, structured validation responses for `POST /admin/storage-policies/validate`, non-persistence of validation, and runtime rejection of policy mutations. |
-| Phase 9 slash-key AWS CLI object CRUD increment (`s3-reactive-api-adapter`) | Production commit `9ff5a08`; test commit `94f3e47`; `mvn -B -pl s3-reactive-api-adapter -am test -Dsurefire.failIfNoSpecifiedTests=false`; `AwsCliCucumberTest` + `ObjectStoreCucumberTest` | 248 tests, 0 failures, 0 errors, 0 skipped | Targeted AWS CLI Cucumber has 10 scenarios total: all run, 0 skipped. Covered AWS CLI scenarios: put default headers, get content, head, list v1/v2, delete, idempotent delete, `STANDARD` storage class via object attributes, and slash-containing object keys through catch-all object routes/key normalization. |
+| Phase 9 AWS CLI object CRUD + bucket operations increment (`s3-reactive-api-adapter`) | Production commits `9ff5a08`, `b2c333c`; test commits `94f3e47`, `cdbcc9d`; `mvn -B -pl s3-reactive-api-adapter -am test -Dsurefire.failIfNoSpecifiedTests=false`; `AwsCliCucumberTest` + `ObjectStoreCucumberTest` | 257 tests, 0 failures, 0 errors, 0 skipped | Targeted AWS CLI Cucumber has 18 scenarios total: all run, 0 skipped. Object scenarios: put default headers, get content, head, list v1/v2, delete, idempotent delete, `STANDARD` storage class via object attributes, and slash-containing object keys. Bucket scenarios: create-bucket + list-buckets, head-bucket found, get-bucket-location, get-bucket-versioning default, put-bucket-versioning enable, delete-bucket, head-bucket 404, delete-bucket 404, create duplicate bucket 409. |
 
 ### AWS CLI Test Status
 
 | Feature | Status | Note |
 |---|---|---|
-| WebTestClient scenarios (238) | ✅ Passing | Standard Cucumber via Java WebTestClient (`@webclient` tag) |
-| AWS CLI Cucumber scenarios | ⚠️ First increment: 10 total, all run, 0 skipped | Canonical object CRUD basics, including slash-containing object keys, now have targeted AWS CLI coverage, but full parity with WebTestClient canonical scenarios is not complete. |
+| WebTestClient scenarios (239) | ✅ Passing | Standard Cucumber via Java WebTestClient (`@webclient` tag) |
+| AWS CLI Cucumber scenarios | ⚠️ 18 total, all run, 0 skipped | Object CRUD basics (including slash-containing keys) and bucket operations (create, list, head, location, versioning, delete, and failure cases) now have targeted AWS CLI coverage, but full parity with WebTestClient canonical scenarios is not complete. |
 | `test-aws-cli.sh` standalone | ⚠️ 46/82 passed | Standalone script; most failures are connection errors (server not running at test time), not logic failures |
 
 ## AWS CLI S3 Compatibility
@@ -211,10 +211,10 @@ Bucket: `magrathea-cli-test-1780641560-106784`
 | object-store-domain | com.example.magrathea.objectstore.domain.UploadIdTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
 | object-store-domain | com.example.magrathea.objectstore.domain.UploadPartTest.txt | 4 | 0 | 0 | 0 | ✅ Passed |
 | object-store-reactive-application | com.example.magrathea.reactive.application.service.CucumberTest.txt | 18 | 0 | 0 | 0 | ✅ Passed |
-| s3-reactive-api-adapter | com.example.magrathea.s3api.awscli.AwsCliCucumberTest.txt | 10 | 0 | 0 | 0 | ✅ Passed |
-| s3-reactive-api-adapter | com.example.magrathea.s3api.cucumber.ObjectStoreCucumberTest.txt | 238 | 0 | 0 | 0 | ✅ Passed |
+| s3-reactive-api-adapter | com.example.magrathea.s3api.awscli.AwsCliCucumberTest.txt | 18 | 0 | 0 | 0 | ✅ Passed |
+| s3-reactive-api-adapter | com.example.magrathea.s3api.cucumber.ObjectStoreCucumberTest.txt | 239 | 0 | 0 | 0 | ✅ Passed |
 | admin-api-adapter | com.example.magrathea.admin.web.AdminRouterTest.txt | 9 | 0 | 0 | 0 | ✅ Passed |
-| **Total including latest Admin API and S3 adapter evidence** |  | **562** | **0** | **0** | **0** | **✅ Passed** |
+| **Total including latest Admin API and S3 adapter evidence** |  | **571** | **0** | **0** | **0** | **✅ Passed** |
 
 ## Coverage
 
@@ -239,7 +239,7 @@ Bucket: `magrathea-cli-test-1780641560-106784`
 | Family | Operation (examples) | Route mapped | Stateful behavior | AWS CLI scenario | Storage-engine scenario | Semantic status | Notes |
 |---|---|---|---|---|---|---|---|
 | Object CRUD | PutObject, GetObject, HeadObject, DeleteObject, CopyObject | Yes | Partial — in-memory only | Partial pass: first AWS CLI increment covers put default headers, get content, head, delete, idempotent delete, `STANDARD` storage class via object attributes, and slash-containing object keys | Absent | AWS CLI compatible for first CRUD subset / Partial overall | Read-after-write verified for targeted AWS CLI object CRUD subset; slash-containing keys are supported by catch-all object routes/key normalization; storage-engine read path remains unverified here; copy and ETag semantics remain incomplete |
-| Bucket baseline | CreateBucket, HeadBucket, DeleteBucket, ListBuckets, ListObjects, ListObjectsV2 | Yes | Partial — in-memory only | Partial pass: first AWS CLI increment covers list-objects and list-objects-v2 for a stored object, including a slash-containing key | Absent | Stubbed / Partial | List V1/V2 basic object visibility is covered by targeted AWS CLI Cucumber; prefix/delimiter edge cases, continuation tokens, bucket delete guards, and storage-engine indexes remain unverified |
+| Bucket baseline | CreateBucket, HeadBucket, DeleteBucket, ListBuckets, ListObjects, ListObjectsV2 | Yes | Partial — in-memory only | Partial pass: AWS CLI bucket operations increment covers create-bucket, list-buckets, head-bucket, get-bucket-location, get-bucket-versioning, put-bucket-versioning, delete-bucket, duplicate-bucket 409, head-bucket 404, delete-bucket 404, list-objects, and list-objects-v2 | Absent | Stubbed / Partial | Bucket create/head/location/versioning/delete and failure cases now have targeted AWS CLI Cucumber coverage; prefix/delimiter edge cases, continuation tokens, and storage-engine indexes remain unverified |
 | Multipart upload | CreateMultipartUpload, UploadPart, CompleteMultipartUpload, AbortMultipartUpload, ListParts, ListMultipartUploads | Yes | Shallow/Partial — part bodies not persisted | Missing | Absent | Stubbed | Part persistence and assembly not implemented in storage-engine backend; ETag semantics incomplete |
 | Bucket configuration | CORS, Lifecycle, Website, Logging, Notification, Replication, Encryption, Versioning, Tagging, etc. | Yes | Partial — config storage only | Failing (server not running at test time) | Absent | Config-only / Stubbed | No background job execution (lifecycle/replication/notification); enforcement not implemented |
 | Object metadata/tagging/ACL | PutObjectTagging, GetObjectTagging, GetObjectAttributes, PutObjectAcl, GetObjectAcl | Yes | Partial — in-memory only | Partial pass: first AWS CLI increment verifies `STANDARD` storage class through object attributes | Absent | Stubbed / Partial | Object-attributes coverage is limited to storage class evidence; metadata/tagging/ACL persistence in storage-engine backend remains unverified |
@@ -253,10 +253,10 @@ Bucket: `magrathea-cli-test-1780641560-106784`
 
 | Dimension | WebTestClient Cucumber | AWS CLI Cucumber |
 |---|---|---|
-| Scenarios | 238 | 10 total (all run, 0 skipped) |
+| Scenarios | 239 | 18 total (all run, 0 skipped) |
 | Tag | `@webclient` | `@awscli` |
 | Driver | Spring WebTestClient | `aws s3api` CLI |
-| Status | Passing | First canonical object CRUD increment passing; full parity incomplete |
+| Status | Passing | Object CRUD and bucket operations increments passing; full parity incomplete |
 | Parity goal | Canonical suite | Must continue toward parity (roadmap item P3/S3-P1+) |
 
 ---
@@ -398,8 +398,8 @@ Bucket: `magrathea-cli-test-1780641560-106784`
 
 | Category | Status | Note |
 |---|---|---|
-| `@webclient` scenarios (238) | ✅ Passing | Standard Cucumber via Java WebTestClient |
-| `@awscli` scenarios | ⚠️ 10 total, all run, 0 skipped | First canonical object CRUD increment passes, including slash-containing keys; full parity with `@webclient` canonical suite remains open (roadmap item P3/S3-P1+). |
+| `@webclient` scenarios (239) | ✅ Passing | Standard Cucumber via Java WebTestClient |
+| `@awscli` scenarios | ⚠️ 18 total, all run, 0 skipped | Object CRUD basics (including slash-containing keys) and bucket operations parity (create, list, head, location, versioning, delete, and failure cases) pass; full parity with `@webclient` canonical suite remains open (roadmap item P3/S3-P1+). |
 | `test-aws-cli.sh` standalone | ⚠️ 46/82 passed | Independent script; most failures are connection errors (server not started at test time) |
 
 ## Roadmap
