@@ -1,13 +1,11 @@
 policyId: minio-standard
 version: "1.0"
-storageClassId: MINIO_STANDARD
+storageClassId: STANDARD
 
-# Single-node MinIO-compatible behaviour:
-#   - Deduplication enabled with SHA256 fingerprinting and 1 MiB chunk size
-#   - No compression (MinIO does not compress by default)
-#   - No encryption at rest by default
-#   - No erasure coding (single-node topology; EC requires multiple drives/nodes)
-#   - Replication factor 1 (single replica)
+# First executable scope: single-node MinIO-compatible behavior.
+# Deduplication is enabled with SHA256 fingerprints and 1 MiB chunks.
+# No erasure coding, no multi-replica behavior, and no encryption by default.
+# Compression is also disabled to match MinIO's default object-storage path.
 
 dedup:
   enabled: true
