@@ -17,6 +17,16 @@ public record StoragePolicy(
         java.util.Objects.requireNonNull(encryption, "encryption must not be null");
         java.util.Objects.requireNonNull(erasureCoding, "erasureCoding must not be null");
         java.util.Objects.requireNonNull(replication, "replication must not be null");
+        // Combination invariant: EC already provides redundancy through parity blocks.
+        // Using both EC and replication factor > 1 simultaneously is an invalid combination
+        // because it stacks two independent redundancy mechanisms without deterministic
+        // placement semantics. Use either EC or replication > 1, not both.
+        if (erasureCoding.isPresent() && replication.factor() > 1) {
+            throw new IllegalArgumentException(
+                    "Invalid policy combination: erasure coding and replication factor > 1 ("
+                    + replication.factor() + ") cannot both be active. "
+                    + "Use either erasure coding OR replication factor > 1, not both.");
+        }
     }
 
     /**

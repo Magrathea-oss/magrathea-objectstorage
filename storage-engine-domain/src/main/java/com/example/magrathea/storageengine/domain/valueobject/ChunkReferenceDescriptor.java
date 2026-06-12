@@ -23,5 +23,8 @@ public record ChunkReferenceDescriptor(
         java.util.Objects.requireNonNull(stepChecksums, "stepChecksums must not be null");
         java.util.Objects.requireNonNull(finalChecksum, "finalChecksum must not be null");
         java.util.Objects.requireNonNull(locations, "locations must not be null");
+        // Defensive copies — public API must never expose mutable collections.
+        stepChecksums = List.copyOf(stepChecksums);
+        locations = List.copyOf(locations);
     }
 }

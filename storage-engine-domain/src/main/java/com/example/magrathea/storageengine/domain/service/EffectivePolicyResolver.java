@@ -47,8 +47,15 @@ public class EffectivePolicyResolver {
     );
 
     /**
-     * Minimum chunk size for dedup to be effective (64KB).
+     * Fallback minimum object size for dedup bypass when the policy's DedupConfig
+     * does not provide an explicit chunk size. Prefer using {@code dedupConfig.chunkSize()}
+     * when the DedupConfig is present.
+     *
+     * @deprecated Use the DedupConfig chunk size from the StoragePolicy instead.
+     *             This constant is retained only for backward compatibility with tests
+     *             that reference it directly.
      */
+    @Deprecated
     public static final long DEDUP_CHUNK_SIZE = 64 * 1024;
 
     /**
@@ -60,12 +67,15 @@ public class EffectivePolicyResolver {
      * @return resolved effective storage policy
      */
     public EffectiveStoragePolicy resolve(StoragePolicy policy, UploadRequestContext context) {
-        // 1. Dedup bypass: skip dedup for small objects (< DEDUP_CHUNK_SIZE)
+        // 1. Dedup bypass: skip dedup for objects smaller than one chunk.
+        // The threshold is driven by the policy's DedupConfig.chunkSize(), so the
+        // bypass decision is policy-driven, not hard-coded.
         Optional<DedupConfig> dedup = policy.dedup();
         if (dedup.isPresent()) {
             long objectSize = context.contentDescriptor().objectSize();
-            if (objectSize < DEDUP_CHUNK_SIZE) {
-                dedup = Optional.empty(); // bypass dedup for small objects
+            long chunkSizeThreshold = dedup.get().chunkSize();
+            if (objectSize < chunkSizeThreshold) {
+                dedup = Optional.empty(); // bypass dedup: object smaller than one chunk
             }
         }
 

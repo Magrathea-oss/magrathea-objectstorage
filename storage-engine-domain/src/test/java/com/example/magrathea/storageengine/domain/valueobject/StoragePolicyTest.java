@@ -80,4 +80,57 @@ class StoragePolicyTest {
         assertNotNull(dedup.alignment(),
                 "alignment must be a non-null field inside DedupConfig");
     }
+
+    // -------------------------------------------------------------------------
+    // Combination invariants
+    // -------------------------------------------------------------------------
+
+    @Test
+    void erasureCodingWithReplicationFactor1_isAllowed() {
+        // EC + replication factor=1 (single copy, EC handles redundancy) is valid.
+        assertDoesNotThrow(() -> StoragePolicy.of(
+                StorageClassId.STANDARD,
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(TestFixtures.anErasureCodingConfig()),
+                ReplicationConfig.of(1)));
+    }
+
+    @Test
+    void erasureCodingWithReplicationFactorGreaterThan1_throwsIllegalArgumentException() {
+        // EC + replication factor > 1 stacks two redundancy mechanisms and is rejected.
+        assertThrows(IllegalArgumentException.class, () -> StoragePolicy.of(
+                StorageClassId.STANDARD,
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(TestFixtures.anErasureCodingConfig()),
+                ReplicationConfig.of(3)),
+                "EC + replication factor > 1 must throw IllegalArgumentException");
+    }
+
+    @Test
+    void dedupWithEC_andReplication1_isAllowed() {
+        // Dedup + EC + replication=1 is valid: dedup and EC are independent concerns.
+        assertDoesNotThrow(() -> StoragePolicy.of(
+                StorageClassId.STANDARD,
+                Optional.of(TestFixtures.aBucketDedupConfig()),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(TestFixtures.anErasureCodingConfig()),
+                ReplicationConfig.of(1)));
+    }
+
+    @Test
+    void noEC_withHighReplicationFactor_isAllowed() {
+        // No EC + replication factor=5 is valid: replication handles redundancy.
+        assertDoesNotThrow(() -> StoragePolicy.of(
+                StorageClassId.STANDARD,
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                ReplicationConfig.of(5)));
+    }
 }

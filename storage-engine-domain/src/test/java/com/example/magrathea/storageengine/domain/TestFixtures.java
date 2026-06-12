@@ -7,12 +7,15 @@ import com.example.magrathea.storageengine.domain.valueobject.CompressionAlgorit
 import com.example.magrathea.storageengine.domain.valueobject.CompressionConfig;
 import com.example.magrathea.storageengine.domain.valueobject.DedupConfig;
 import com.example.magrathea.storageengine.domain.valueobject.DedupScope;
+import com.example.magrathea.storageengine.domain.valueobject.DeviceHealth;
+import com.example.magrathea.storageengine.domain.valueobject.DiskSet;
 import com.example.magrathea.storageengine.domain.valueobject.EffectiveStoragePolicy;
 import com.example.magrathea.storageengine.domain.valueobject.EncryptionAlgorithm;
 import com.example.magrathea.storageengine.domain.valueobject.EncryptionMode;
 import com.example.magrathea.storageengine.domain.valueobject.EncryptionPolicy;
 import com.example.magrathea.storageengine.domain.valueobject.EncryptionRequest;
 import com.example.magrathea.storageengine.domain.valueobject.ErasureCodingConfig;
+import com.example.magrathea.storageengine.domain.valueobject.FailureDomain;
 import com.example.magrathea.storageengine.domain.valueobject.FingerprintAlgorithm;
 import com.example.magrathea.storageengine.domain.valueobject.ManifestId;
 import com.example.magrathea.storageengine.domain.valueobject.ObjectContentDescriptor;
@@ -21,6 +24,8 @@ import com.example.magrathea.storageengine.domain.valueobject.ObjectKey;
 import com.example.magrathea.storageengine.domain.valueobject.ObjectMetadataDescriptor;
 import com.example.magrathea.storageengine.domain.valueobject.ReplicationConfig;
 import com.example.magrathea.storageengine.domain.valueobject.StorageClassId;
+import com.example.magrathea.storageengine.domain.valueobject.StorageDevice;
+import com.example.magrathea.storageengine.domain.valueobject.StorageDeviceId;
 import com.example.magrathea.storageengine.domain.valueobject.StoragePolicy;
 import com.example.magrathea.storageengine.domain.valueobject.UploadRequestContext;
 import com.example.magrathea.storageengine.domain.valueobject.VersionId;
@@ -119,7 +124,11 @@ public final class TestFixtures {
     // StoragePolicy
     // -------------------------------------------------------------------------
 
-    /** Full policy with dedup, compression, encryption, EC and replication=3. */
+    /**
+     * Full policy with dedup, compression, encryption, EC and replication=1.
+     * Replication is 1 (single copy) because EC already provides redundancy;
+     * EC + replication > 1 is an invalid combination rejected by StoragePolicy.
+     */
     public static StoragePolicy aStoragePolicy() {
         return StoragePolicy.of(
                 aStorageClassId(),
@@ -127,10 +136,13 @@ public final class TestFixtures {
                 Optional.of(aCompressionConfig()),
                 Optional.of(anEncryptionPolicy()),
                 Optional.of(anErasureCodingConfig()),
-                aReplicationConfig());
+                ReplicationConfig.of(1));
     }
 
-    /** Full policy with global-scope dedup, compression, encryption, EC and replication=3. */
+    /**
+     * Full policy with global-scope dedup, compression, encryption, EC and replication=1.
+     * Replication is 1 because EC already provides redundancy.
+     */
     public static StoragePolicy aStoragePolicyWithGlobalDedup() {
         return StoragePolicy.of(
                 aStorageClassId(),
@@ -138,7 +150,7 @@ public final class TestFixtures {
                 Optional.of(aCompressionConfig()),
                 Optional.of(anEncryptionPolicy()),
                 Optional.of(anErasureCodingConfig()),
-                aReplicationConfig());
+                ReplicationConfig.of(1));
     }
 
     /** Policy with dedup only, no compression/encryption/EC. */
@@ -298,5 +310,70 @@ public final class TestFixtures {
     /** Upload context with application/octet-stream and NONE encryption. */
     public static UploadRequestContext aDefaultUploadRequestContext(BucketRef bucketRef, long objectSize) {
         return anUploadRequestContext(bucketRef, objectSize, "application/octet-stream", EncryptionMode.NONE);
+    }
+
+    // -------------------------------------------------------------------------
+    // Phase 3 — StorageDevice and topology fixtures
+    // -------------------------------------------------------------------------
+
+    /** Creates a healthy StorageDeviceId with a deterministic value. */
+    public static StorageDeviceId aStorageDeviceId() {
+        return StorageDeviceId.of("disk-rack1-host1-sda");
+    }
+
+    public static StorageDeviceId aStorageDeviceId(String suffix) {
+        return StorageDeviceId.of("disk-" + suffix);
+    }
+
+    /**
+     * Creates a healthy StorageDevice with 1 TB total capacity and full availability.
+     */
+    public static StorageDevice aHealthyStorageDevice() {
+        return StorageDevice.create(
+                aStorageDeviceId(),
+                "/data/disk0",
+                1_000_000_000_000L); // 1 TB
+    }
+
+    public static StorageDevice aHealthyStorageDevice(String idSuffix, String path, long totalBytes) {
+        return StorageDevice.create(aStorageDeviceId(idSuffix), path, totalBytes);
+    }
+
+    /**
+     * Creates a degraded StorageDevice (simulating partial failure).
+     */
+    public static StorageDevice aDegradedStorageDevice() {
+        StorageDevice healthy = StorageDevice.create(
+                StorageDeviceId.of("disk-degraded-01"),
+                "/data/disk-degraded",
+                500_000_000_000L); // 500 GB
+        return healthy.withHealth(DeviceHealth.DEGRADED);
+    }
+
+    /**
+     * Creates an unavailable StorageDevice (simulating catastrophic failure).
+     */
+    public static StorageDevice anUnavailableStorageDevice() {
+        StorageDevice healthy = StorageDevice.create(
+                StorageDeviceId.of("disk-unavailable-01"),
+                "/data/disk-unavailable",
+                500_000_000_000L);
+        return healthy.withHealth(DeviceHealth.UNAVAILABLE);
+    }
+
+    /**
+     * Creates a DiskSet containing two healthy device IDs under a HOST failure domain.
+     */
+    public static DiskSet aDiskSet() {
+        return DiskSet.of(
+                "host1-disk-set",
+                FailureDomain.HOST,
+                java.util.List.of(
+                        aStorageDeviceId("host1-sda"),
+                        aStorageDeviceId("host1-sdb")));
+    }
+
+    public static DiskSet aDiskSet(String name, FailureDomain domain, java.util.List<StorageDeviceId> devices) {
+        return DiskSet.of(name, domain, devices);
     }
 }

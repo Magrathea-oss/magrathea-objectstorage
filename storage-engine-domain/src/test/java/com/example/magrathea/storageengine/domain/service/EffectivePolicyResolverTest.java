@@ -2,12 +2,20 @@ package com.example.magrathea.storageengine.domain.service;
 
 import com.example.magrathea.storageengine.domain.TestFixtures;
 import com.example.magrathea.storageengine.domain.valueobject.BucketRef;
+import com.example.magrathea.storageengine.domain.valueobject.ChunkAlignment;
+import com.example.magrathea.storageengine.domain.valueobject.DedupConfig;
+import com.example.magrathea.storageengine.domain.valueobject.DedupScope;
 import com.example.magrathea.storageengine.domain.valueobject.EffectiveStoragePolicy;
 import com.example.magrathea.storageengine.domain.valueobject.EncryptionMode;
+import com.example.magrathea.storageengine.domain.valueobject.FingerprintAlgorithm;
+import com.example.magrathea.storageengine.domain.valueobject.ReplicationConfig;
+import com.example.magrathea.storageengine.domain.valueobject.StorageClassId;
 import com.example.magrathea.storageengine.domain.valueobject.StoragePolicy;
 import com.example.magrathea.storageengine.domain.valueobject.UploadRequestContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -44,17 +52,48 @@ class EffectivePolicyResolverTest {
     }
 
     @Test
-    void resolve_objectAtChunkThreshold_keepsDedup() {
-        // Object size = exactly 64 KB = the dedup threshold: dedup must be kept
-        long threshold = EffectivePolicyResolver.DEDUP_CHUNK_SIZE; // 64 * 1024 = 65536
+    void resolve_objectAtChunkSize_keepsDedup() {
+        // Object size = exactly the policy DedupConfig chunk size (1 MB by default).
+        // The resolver uses dedupConfig.chunkSize() as the threshold, so an object of
+        // exactly that size must NOT have dedup bypassed.
+        long chunkSize = DedupConfig.DEFAULT_CHUNK_SIZE; // 1 MB = 1_048_576
         StoragePolicy policy = TestFixtures.aPolicyWithDedupOnly();
         UploadRequestContext context = TestFixtures.anUploadRequestContext(
-                bucket, threshold, "application/octet-stream", EncryptionMode.NONE);
+                bucket, chunkSize, "application/octet-stream", EncryptionMode.NONE);
 
         EffectiveStoragePolicy effective = resolver.resolve(policy, context);
 
         assertTrue(effective.dedup().isPresent(),
-                "Dedup must NOT be bypassed for objects at or above the " + threshold + "-byte threshold");
+                "Dedup must NOT be bypassed for objects at or above the policy chunk size (" + chunkSize + " bytes)");
+    }
+
+    @Test
+    void resolve_usesChunkSizeFromPolicy_notHardCodedConstant() {
+        // Use a small custom chunk size (32 KB) in the policy DedupConfig.
+        // An object of 40 KB (> 32 KB chunk) must keep dedup.
+        // An object of 16 KB (< 32 KB chunk) must bypass dedup.
+        // This proves the resolver reads from the policy, not a hard-coded constant.
+        long smallChunkSize = 32 * 1024L; // 32 KB
+        DedupConfig smallChunkDedup = DedupConfig.of(
+                DedupScope.BUCKET_LEVEL, FingerprintAlgorithm.SHA256, smallChunkSize, ChunkAlignment.NONE);
+        StoragePolicy policyWithSmallChunk = StoragePolicy.of(
+                StorageClassId.STANDARD,
+                Optional.of(smallChunkDedup),
+                Optional.empty(), Optional.empty(), Optional.empty(),
+                ReplicationConfig.of(1));
+
+        UploadRequestContext contextAbove = TestFixtures.anUploadRequestContext(
+                bucket, 40 * 1024L, "application/octet-stream", EncryptionMode.NONE);
+        UploadRequestContext contextBelow = TestFixtures.anUploadRequestContext(
+                bucket, 16 * 1024L, "application/octet-stream", EncryptionMode.NONE);
+
+        EffectiveStoragePolicy aboveThreshold = resolver.resolve(policyWithSmallChunk, contextAbove);
+        EffectiveStoragePolicy belowThreshold = resolver.resolve(policyWithSmallChunk, contextBelow);
+
+        assertTrue(aboveThreshold.dedup().isPresent(),
+                "Object (40 KB) >= small chunk size (32 KB): dedup must be kept");
+        assertTrue(belowThreshold.dedup().isEmpty(),
+                "Object (16 KB) < small chunk size (32 KB): dedup must be bypassed");
     }
 
     // -------------------------------------------------------------------------
