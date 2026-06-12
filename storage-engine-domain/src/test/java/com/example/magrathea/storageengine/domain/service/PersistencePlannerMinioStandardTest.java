@@ -2,12 +2,9 @@ package com.example.magrathea.storageengine.domain.service;
 
 import com.example.magrathea.storageengine.domain.TestFixtures;
 import com.example.magrathea.storageengine.domain.valueobject.BucketRef;
-import com.example.magrathea.storageengine.domain.valueobject.ChunkAlignment;
-import com.example.magrathea.storageengine.domain.valueobject.DedupConfig;
-import com.example.magrathea.storageengine.domain.valueobject.DedupScope;
 import com.example.magrathea.storageengine.domain.valueobject.EffectiveStoragePolicy;
 import com.example.magrathea.storageengine.domain.valueobject.EncryptionMode;
-import com.example.magrathea.storageengine.domain.valueobject.FingerprintAlgorithm;
+import com.example.magrathea.storageengine.domain.valueobject.ErasureCodingConfig;
 import com.example.magrathea.storageengine.domain.valueobject.PersistencePlan;
 import com.example.magrathea.storageengine.domain.valueobject.ReplicationConfig;
 import com.example.magrathea.storageengine.domain.valueobject.StorageClassId;
@@ -24,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -41,23 +39,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *     → PersistencePlan
  * </pre>
  *
- * <p>The MINIO_STANDARD policy is:
+ * <p>The MINIO_STANDARD-equivalent policy is:
  * <ul>
- *   <li>Dedup enabled — BUCKET scope, SHA-256 fingerprint, 1 MiB chunk size, NONE alignment</li>
- *   <li>Compression disabled</li>
- *   <li>Encryption disabled</li>
- *   <li>Erasure coding disabled</li>
- *   <li>Replication factor 1 (single-node, single replica)</li>
  *   <li>Storage class: {@code STANDARD}</li>
+ *   <li>Dedup disabled</li>
+ *   <li>Erasure coding enabled — 4 data blocks, 2 parity blocks</li>
+ *   <li>Replication factor 1 (single logical replica; EC provides redundancy)</li>
+ *   <li>Compression disabled</li>
+ *   <li>Encryption disabled by default</li>
  * </ul>
  *
- * <p>These domain parameters define the domain MINIO_STANDARD-equivalent plan shape.
- * Pure JUnit 5 — no Spring, no Mockito, no reactive imports.
+ * <p>Pure JUnit 5 — no Spring, no Mockito, no reactive imports.
  */
 class PersistencePlannerMinioStandardTest {
 
-    /** 1 MiB — the policy-driven chunk size for the MINIO_STANDARD-equivalent plan. */
-    private static final long MINIO_STANDARD_CHUNK_SIZE = 1_048_576L;
+    private static final int MINIO_STANDARD_EC_DATA_BLOCKS = 4;
+    private static final int MINIO_STANDARD_EC_PARITY_BLOCKS = 2;
+    private static final long OBJECT_SIZE = 1_048_576L;
 
     private EffectivePolicyResolver resolver;
     private PersistencePlanner planner;
@@ -72,294 +70,178 @@ class PersistencePlannerMinioStandardTest {
         bucket = TestFixtures.aBucketRef();
     }
 
-    // -------------------------------------------------------------------------
-    // Helper: constructs a StoragePolicy with MINIO_STANDARD parameters.
-    // Expected MINIO_STANDARD-equivalent domain parameters:
-    //   - storageClassId: STANDARD
-    //   - dedup.enabled: true, scope: BUCKET, algorithm: SHA256, chunkSizeBytes: 1048576
-    //   - compression.enabled: false
-    //   - encryption.enabled: false
-    //   - erasureCoding.enabled: false
-    //   - replication.factor: 1
-    // -------------------------------------------------------------------------
-
     private StoragePolicy minioStandardPolicy() {
         return StoragePolicy.of(
                 StorageClassId.STANDARD,
-                Optional.of(DedupConfig.of(
-                        DedupScope.BUCKET_LEVEL,
-                        FingerprintAlgorithm.SHA256,
-                        MINIO_STANDARD_CHUNK_SIZE,
-                        ChunkAlignment.NONE)),
-                Optional.empty(),          // no compression
-                Optional.empty(),          // no encryption
-                Optional.empty(),          // no EC
-                ReplicationConfig.of(1));  // single replica
+                Optional.empty(),          // dedup disabled for MINIO_STANDARD
+                Optional.empty(),          // compression disabled
+                Optional.empty(),          // encryption disabled by default
+                Optional.of(ErasureCodingConfig.of(
+                        MINIO_STANDARD_EC_DATA_BLOCKS,
+                        MINIO_STANDARD_EC_PARITY_BLOCKS)),
+                ReplicationConfig.of(1));  // no multi-replica behavior
     }
 
-    // -------------------------------------------------------------------------
-    // 5a — Verify EffectivePolicyResolver uses policy-driven chunk size
-    // -------------------------------------------------------------------------
-
-    @Test
-    void resolve_minioStandard_effectivePolicyHasDedupWith1MiBChunkSize() {
-        // Object size = exactly 1 MiB: dedup must NOT be bypassed (object >= chunk size).
-        // This verifies the resolver reads chunkSize from the policy, not a hard-coded constant.
-        StoragePolicy policy = minioStandardPolicy();
+    private EffectiveStoragePolicy resolveMinioStandardPolicy() {
         UploadRequestContext context = TestFixtures.anUploadRequestContext(
-                bucket, MINIO_STANDARD_CHUNK_SIZE, "application/octet-stream", EncryptionMode.NONE);
+                bucket, OBJECT_SIZE, "application/octet-stream", EncryptionMode.NONE);
+        return resolver.resolve(minioStandardPolicy(), context);
+    }
 
-        EffectiveStoragePolicy effective = resolver.resolve(policy, context);
-
-        assertTrue(effective.dedup().isPresent(),
-                "MINIO_STANDARD: dedup must be present for object >= 1 MiB");
-        assertEquals(MINIO_STANDARD_CHUNK_SIZE, effective.dedup().get().chunkSize(),
-                "MINIO_STANDARD: effective chunk size must be exactly 1 MiB (1048576 bytes)");
-        assertEquals(FingerprintAlgorithm.SHA256, effective.dedup().get().algorithm(),
-                "MINIO_STANDARD: fingerprint algorithm must be SHA-256");
-        assertEquals(DedupScope.BUCKET_LEVEL, effective.dedup().get().scope(),
-                "MINIO_STANDARD: dedup scope must be BUCKET_LEVEL");
+    private PersistencePlan createMinioStandardPlan() {
+        EffectiveStoragePolicy effective = resolveMinioStandardPolicy();
+        VirtualDevice device = deviceResolver.resolve(effective, bucket);
+        return planner.createPlan(effective, device);
     }
 
     @Test
-    void resolve_minioStandard_effectivePolicyHasNoCompressionEncryptionOrEC() {
-        StoragePolicy policy = minioStandardPolicy();
-        UploadRequestContext context = TestFixtures.aDefaultUploadRequestContext(
-                bucket, MINIO_STANDARD_CHUNK_SIZE);
+    void resolve_minioStandard_effectivePolicyHasStandardClassAndNoDedup() {
+        EffectiveStoragePolicy effective = resolveMinioStandardPolicy();
 
-        EffectiveStoragePolicy effective = resolver.resolve(policy, context);
+        assertEquals(StorageClassId.STANDARD, effective.storageClassId(),
+                "MINIO_STANDARD-equivalent policy must resolve to STANDARD storage class");
+        assertTrue(effective.dedup().isEmpty(),
+                "MINIO_STANDARD must not enable dedup as its primary behavior");
+    }
+
+    @Test
+    void resolve_minioStandard_effectivePolicyHasEC4Data2ParityAndReplicationFactor1() {
+        EffectiveStoragePolicy effective = resolveMinioStandardPolicy();
+
+        assertTrue(effective.erasureCoding().isPresent(),
+                "MINIO_STANDARD must enable erasure coding");
+        ErasureCodingConfig ec = effective.erasureCoding().get();
+        assertEquals(MINIO_STANDARD_EC_DATA_BLOCKS, ec.dataBlocks(),
+                "MINIO_STANDARD EC config must use 4 data blocks");
+        assertEquals(MINIO_STANDARD_EC_PARITY_BLOCKS, ec.parityBlocks(),
+                "MINIO_STANDARD EC config must use 2 parity blocks");
+        assertEquals(1, effective.replication().factor(),
+                "MINIO_STANDARD must keep replication factor 1; EC provides redundancy");
+    }
+
+    @Test
+    void resolve_minioStandard_effectivePolicyHasNoCompressionOrEncryptionByDefault() {
+        EffectiveStoragePolicy effective = resolveMinioStandardPolicy();
 
         assertTrue(effective.compression().isEmpty(),
-                "MINIO_STANDARD: compression must be disabled");
+                "MINIO_STANDARD compression must be disabled");
         assertTrue(effective.encryption().isEmpty(),
-                "MINIO_STANDARD: encryption must be disabled");
-        assertTrue(effective.erasureCoding().isEmpty(),
-                "MINIO_STANDARD: erasure coding must be disabled");
-        assertEquals(1, effective.replication().factor(),
-                "MINIO_STANDARD: replication factor must be 1");
-        assertEquals(StorageClassId.STANDARD, effective.storageClassId(),
-                "MINIO_STANDARD-equivalent plan: storage class must be STANDARD");
+                "MINIO_STANDARD encryption must be disabled by default");
     }
 
     @Test
-    void resolve_minioStandard_chunkSizeIsFromPolicy_notHardCodedConstant() {
-        // Proof that the resolver uses the policy's DedupConfig.chunkSize() as the bypass threshold,
-        // not the deprecated EffectivePolicyResolver.DEDUP_CHUNK_SIZE constant (64 KB).
-        // An object of 65 KB is > 64 KB (old constant) but < 1 MiB (policy chunk size).
-        // With the policy-driven threshold it must be bypassed; with the old constant it would not.
-        StoragePolicy policy = minioStandardPolicy();
-        long objectSizeBetweenOldAndNew = 65 * 1024L; // 65 KiB: > 64 KB old constant, < 1 MiB policy chunk
-
-        UploadRequestContext context = TestFixtures.anUploadRequestContext(
-                bucket, objectSizeBetweenOldAndNew, "application/octet-stream", EncryptionMode.NONE);
-
-        EffectiveStoragePolicy effective = resolver.resolve(policy, context);
-
-        assertTrue(effective.dedup().isEmpty(),
-                "MINIO_STANDARD: dedup must be bypassed for 65 KiB object "
-                + "(policy chunk = 1 MiB; resolver must use policy-driven threshold, not 64 KB constant)");
-    }
-
-    // -------------------------------------------------------------------------
-    // 5a — Verify dedup bypass for small objects
-    // -------------------------------------------------------------------------
-
-    @Test
-    void resolve_minioStandard_smallObject_bypassesDedup() {
-        StoragePolicy policy = minioStandardPolicy();
-        long smallObjectSize = 512 * 1024L; // 512 KiB — less than 1 MiB chunk
-
-        UploadRequestContext context = TestFixtures.anUploadRequestContext(
-                bucket, smallObjectSize, "application/octet-stream", EncryptionMode.NONE);
-
-        EffectiveStoragePolicy effective = resolver.resolve(policy, context);
-
-        assertTrue(effective.dedup().isEmpty(),
-                "MINIO_STANDARD: dedup must be bypassed for objects smaller than 1 MiB chunk size");
-    }
-
-    // -------------------------------------------------------------------------
-    // 5a — Verify VirtualDevice selection
-    // -------------------------------------------------------------------------
-
-    @Test
-    void resolve_minioStandard_largeObject_virtualDeviceIsDedupDevice() {
-        StoragePolicy policy = minioStandardPolicy();
-        UploadRequestContext context = TestFixtures.aDefaultUploadRequestContext(
-                bucket, MINIO_STANDARD_CHUNK_SIZE);
-        EffectiveStoragePolicy effective = resolver.resolve(policy, context);
-
-        VirtualDevice device = deviceResolver.resolve(effective, bucket);
-
-        assertInstanceOf(VirtualDevice.DedupDevice.class, device,
-                "MINIO_STANDARD: VirtualDevice must be a DedupDevice when dedup is enabled");
-    }
-
-    @Test
-    void resolve_minioStandard_smallObject_virtualDeviceIsBucketDevice() {
-        // Small objects bypass dedup → resolver must return BucketDevice
-        StoragePolicy policy = minioStandardPolicy();
-        long smallSize = 512 * 1024L;
-        UploadRequestContext context = TestFixtures.aDefaultUploadRequestContext(bucket, smallSize);
-        EffectiveStoragePolicy effective = resolver.resolve(policy, context);
+    void resolve_minioStandard_virtualDeviceIsBucketDeviceBecauseDedupIsDisabled() {
+        EffectiveStoragePolicy effective = resolveMinioStandardPolicy();
 
         VirtualDevice device = deviceResolver.resolve(effective, bucket);
 
         assertInstanceOf(VirtualDevice.BucketDevice.class, device,
-                "MINIO_STANDARD: VirtualDevice must be a BucketDevice when dedup is bypassed");
+                "MINIO_STANDARD must not resolve to a DedupDevice when dedup is disabled");
     }
 
-    // -------------------------------------------------------------------------
-    // 5c — Verify PersistencePlanner produces correct plan for MINIO_STANDARD
-    // -------------------------------------------------------------------------
-
     @Test
-    void plan_minioStandard_dedupStepIsExecutedWithCorrectConfig() {
-        StoragePolicy policy = minioStandardPolicy();
-        UploadRequestContext context = TestFixtures.aDefaultUploadRequestContext(
-                bucket, MINIO_STANDARD_CHUNK_SIZE);
-        EffectiveStoragePolicy effective = resolver.resolve(policy, context);
-        VirtualDevice device = deviceResolver.resolve(effective, bucket);
-
-        PersistencePlan plan = planner.createPlan(effective, device);
+    void plan_minioStandard_dedupStepIsSkippedAndHasNoConfig() {
+        PersistencePlan plan = createMinioStandardPlan();
 
         StepPlan dedupStep = plan.steps().get(0);
         assertEquals(StepId.DEDUP, dedupStep.stepId(),
                 "Step 0 must be DEDUP");
-        assertEquals(StepExecutionStatus.EXECUTED, dedupStep.expectedStatus(),
-                "MINIO_STANDARD: DEDUP step must be EXECUTED when dedup is enabled");
-        assertTrue(dedupStep.config().isPresent(),
-                "MINIO_STANDARD: DEDUP step must carry a DedupStepConfig");
-        assertInstanceOf(StepConfig.DedupStepConfig.class, dedupStep.config().get(),
-                "MINIO_STANDARD: DEDUP step config must be a DedupStepConfig");
-
-        StepConfig.DedupStepConfig dedupConfig = (StepConfig.DedupStepConfig) dedupStep.config().get();
-        assertEquals(MINIO_STANDARD_CHUNK_SIZE, dedupConfig.config().chunkSize(),
-                "MINIO_STANDARD: DEDUP step chunk size must be 1 MiB (1048576 bytes)");
-        assertEquals(FingerprintAlgorithm.SHA256, dedupConfig.config().algorithm(),
-                "MINIO_STANDARD: DEDUP step algorithm must be SHA-256");
+        assertEquals(StepExecutionStatus.SKIPPED, dedupStep.expectedStatus(),
+                "MINIO_STANDARD DEDUP step must be SKIPPED because dedup is disabled");
+        assertTrue(dedupStep.config().isEmpty(),
+                "MINIO_STANDARD DEDUP step must not carry DedupStepConfig");
+        assertFalse(plan.steps().stream()
+                        .flatMap(step -> step.config().stream())
+                        .anyMatch(StepConfig.DedupStepConfig.class::isInstance),
+                "MINIO_STANDARD plan must not include any DedupStepConfig");
     }
 
     @Test
-    void plan_minioStandard_ecStepIsSkipped() {
-        StoragePolicy policy = minioStandardPolicy();
-        UploadRequestContext context = TestFixtures.aDefaultUploadRequestContext(
-                bucket, MINIO_STANDARD_CHUNK_SIZE);
-        EffectiveStoragePolicy effective = resolver.resolve(policy, context);
-        VirtualDevice device = deviceResolver.resolve(effective, bucket);
-
-        PersistencePlan plan = planner.createPlan(effective, device);
+    void plan_minioStandard_ecStepIsExecutedWith4Data2ParityConfig() {
+        PersistencePlan plan = createMinioStandardPlan();
 
         StepPlan ecStep = plan.steps().get(3);
         assertEquals(StepId.ERASURE_CODING, ecStep.stepId(),
                 "Step 3 must be ERASURE_CODING");
-        assertEquals(StepExecutionStatus.SKIPPED, ecStep.expectedStatus(),
-                "MINIO_STANDARD: ERASURE_CODING step must be SKIPPED (EC is disabled)");
-        assertTrue(ecStep.config().isEmpty(),
-                "MINIO_STANDARD: ERASURE_CODING step must have no config when EC is disabled");
+        assertEquals(StepExecutionStatus.EXECUTED, ecStep.expectedStatus(),
+                "MINIO_STANDARD ERASURE_CODING step must be EXECUTED");
+        assertTrue(ecStep.config().isPresent(),
+                "MINIO_STANDARD ERASURE_CODING step must carry an ECStepConfig");
+        assertInstanceOf(StepConfig.ECStepConfig.class, ecStep.config().get(),
+                "MINIO_STANDARD ERASURE_CODING step config must be ECStepConfig");
+
+        StepConfig.ECStepConfig ecConfig = (StepConfig.ECStepConfig) ecStep.config().get();
+        assertEquals(MINIO_STANDARD_EC_DATA_BLOCKS, ecConfig.config().dataBlocks(),
+                "MINIO_STANDARD EC step must use 4 data blocks");
+        assertEquals(MINIO_STANDARD_EC_PARITY_BLOCKS, ecConfig.config().parityBlocks(),
+                "MINIO_STANDARD EC step must use 2 parity blocks");
     }
 
     @Test
-    void plan_minioStandard_compressionStepIsSkipped() {
-        StoragePolicy policy = minioStandardPolicy();
-        UploadRequestContext context = TestFixtures.aDefaultUploadRequestContext(
-                bucket, MINIO_STANDARD_CHUNK_SIZE);
-        EffectiveStoragePolicy effective = resolver.resolve(policy, context);
-        VirtualDevice device = deviceResolver.resolve(effective, bucket);
-
-        PersistencePlan plan = planner.createPlan(effective, device);
+    void plan_minioStandard_compressionAndCryptStepsAreSkipped() {
+        PersistencePlan plan = createMinioStandardPlan();
 
         StepPlan compressStep = plan.steps().get(1);
+        StepPlan cryptStep = plan.steps().get(2);
+
         assertEquals(StepId.COMPRESS, compressStep.stepId(),
                 "Step 1 must be COMPRESS");
         assertEquals(StepExecutionStatus.SKIPPED, compressStep.expectedStatus(),
-                "MINIO_STANDARD: COMPRESS step must be SKIPPED (compression is disabled)");
-    }
+                "MINIO_STANDARD COMPRESS step must be SKIPPED");
+        assertTrue(compressStep.config().isEmpty(),
+                "MINIO_STANDARD COMPRESS step must have no config");
 
-    @Test
-    void plan_minioStandard_cryptStepIsSkipped() {
-        StoragePolicy policy = minioStandardPolicy();
-        UploadRequestContext context = TestFixtures.aDefaultUploadRequestContext(
-                bucket, MINIO_STANDARD_CHUNK_SIZE);
-        EffectiveStoragePolicy effective = resolver.resolve(policy, context);
-        VirtualDevice device = deviceResolver.resolve(effective, bucket);
-
-        PersistencePlan plan = planner.createPlan(effective, device);
-
-        StepPlan cryptStep = plan.steps().get(2);
         assertEquals(StepId.CRYPT, cryptStep.stepId(),
                 "Step 2 must be CRYPT");
         assertEquals(StepExecutionStatus.SKIPPED, cryptStep.expectedStatus(),
-                "MINIO_STANDARD: CRYPT step must be SKIPPED (encryption is disabled)");
+                "MINIO_STANDARD CRYPT step must be SKIPPED");
+        assertTrue(cryptStep.config().isEmpty(),
+                "MINIO_STANDARD CRYPT step must have no config");
     }
 
     @Test
-    void plan_minioStandard_replicationFactorIs1() {
-        StoragePolicy policy = minioStandardPolicy();
-        UploadRequestContext context = TestFixtures.aDefaultUploadRequestContext(
-                bucket, MINIO_STANDARD_CHUNK_SIZE);
-        EffectiveStoragePolicy effective = resolver.resolve(policy, context);
-        VirtualDevice device = deviceResolver.resolve(effective, bucket);
-
-        PersistencePlan plan = planner.createPlan(effective, device);
+    void plan_minioStandard_replicationFactorIs1WithNoMultiReplicaBehavior() {
+        PersistencePlan plan = createMinioStandardPlan();
 
         StepPlan replStep = plan.steps().get(4);
         assertEquals(StepId.REPLICATION, replStep.stepId(),
                 "Step 4 must be REPLICATION");
         assertEquals(StepExecutionStatus.EXECUTED, replStep.expectedStatus(),
-                "MINIO_STANDARD: REPLICATION step must be EXECUTED (always active)");
+                "REPLICATION step remains present but configured with factor 1");
         assertTrue(replStep.config().isPresent(),
-                "MINIO_STANDARD: REPLICATION step must carry a ReplicationStepConfig");
+                "REPLICATION step must carry ReplicationStepConfig");
         assertInstanceOf(StepConfig.ReplicationStepConfig.class, replStep.config().get());
 
         StepConfig.ReplicationStepConfig replConfig =
                 (StepConfig.ReplicationStepConfig) replStep.config().get();
         assertEquals(1, replConfig.config().factor(),
-                "MINIO_STANDARD: replication factor must be 1 (single-node, no redundant copies)");
+                "MINIO_STANDARD replication config must be factor 1, not additional replicas");
     }
 
     @Test
     void plan_minioStandard_storageClassIsSTANDARD() {
-        StoragePolicy policy = minioStandardPolicy();
-        UploadRequestContext context = TestFixtures.aDefaultUploadRequestContext(
-                bucket, MINIO_STANDARD_CHUNK_SIZE);
-        EffectiveStoragePolicy effective = resolver.resolve(policy, context);
-        VirtualDevice device = deviceResolver.resolve(effective, bucket);
-
-        PersistencePlan plan = planner.createPlan(effective, device);
+        PersistencePlan plan = createMinioStandardPlan();
 
         assertEquals(StorageClassId.STANDARD, plan.effectivePolicy().storageClassId(),
-                "MINIO_STANDARD-equivalent plan: storage class must be STANDARD");
+                "MINIO_STANDARD-equivalent plan must retain STANDARD storage class");
     }
 
     @Test
     void plan_minioStandard_planHasExactly6Steps() {
-        StoragePolicy policy = minioStandardPolicy();
-        UploadRequestContext context = TestFixtures.aDefaultUploadRequestContext(
-                bucket, MINIO_STANDARD_CHUNK_SIZE);
-        EffectiveStoragePolicy effective = resolver.resolve(policy, context);
-        VirtualDevice device = deviceResolver.resolve(effective, bucket);
-
-        PersistencePlan plan = planner.createPlan(effective, device);
+        PersistencePlan plan = createMinioStandardPlan();
 
         assertEquals(6, plan.steps().size(),
-                "MINIO_STANDARD: plan must always have exactly 6 steps");
+                "MINIO_STANDARD plan must always have exactly 6 steps");
     }
 
     @Test
     void plan_minioStandard_storeStepIsAlwaysExecuted() {
-        StoragePolicy policy = minioStandardPolicy();
-        UploadRequestContext context = TestFixtures.aDefaultUploadRequestContext(
-                bucket, MINIO_STANDARD_CHUNK_SIZE);
-        EffectiveStoragePolicy effective = resolver.resolve(policy, context);
-        VirtualDevice device = deviceResolver.resolve(effective, bucket);
-
-        PersistencePlan plan = planner.createPlan(effective, device);
+        PersistencePlan plan = createMinioStandardPlan();
 
         StepPlan storeStep = plan.steps().get(5);
         assertEquals(StepId.STORE, storeStep.stepId(),
                 "Step 5 must be STORE");
         assertEquals(StepExecutionStatus.EXECUTED, storeStep.expectedStatus(),
-                "MINIO_STANDARD: STORE step must always be EXECUTED");
+                "MINIO_STANDARD STORE step must always be EXECUTED");
     }
 }
