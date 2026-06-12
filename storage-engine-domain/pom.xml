@@ -11,7 +11,12 @@
     </parent>
     <artifactId>storage-engine-domain</artifactId>
 
-    <!-- EMPTY — reserved for future use -->
+    <!-- Zero production dependencies — pure Java domain, only test deps allowed -->
     <dependencies>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>

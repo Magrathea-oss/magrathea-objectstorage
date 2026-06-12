@@ -10,7 +10,7 @@ import com.example.magrathea.objectstore.domain.valueobject.SessionToken;
 import com.example.magrathea.objectstore.reactive.repository.application.BucketCommandRepository;
 import com.example.magrathea.objectstore.reactive.repository.application.BucketQueryRepository;
 import com.example.magrathea.objectstore.reactive.repository.application.CommandResult;
-import com.example.magrathea.reactive.infrastructure.adapter.persistence.BucketAlreadyExistsException;
+import com.example.magrathea.objectstore.reactive.repository.application.BucketAlreadyExistsException;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Flux;
 import org.springframework.stereotype.Service;

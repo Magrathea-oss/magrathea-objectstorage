@@ -10,7 +10,7 @@ services:
       - SPRING_PROFILES_ACTIVE=dev
       - admin.server.port=8081
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/ 2>&1 || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 10

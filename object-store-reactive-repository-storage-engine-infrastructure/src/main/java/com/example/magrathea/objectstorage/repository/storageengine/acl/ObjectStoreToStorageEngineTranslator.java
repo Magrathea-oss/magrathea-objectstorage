@@ -28,6 +28,7 @@ import com.example.magrathea.storageengine.domain.valueobject.UploadMode;
 import com.example.magrathea.storageengine.domain.valueobject.UploadRequestContext;
 import com.example.magrathea.storageengine.domain.valueobject.VersionId;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.time.ZonedDateTime;
@@ -41,12 +42,14 @@ import java.util.Optional;
  * Lives in the infrastructure module which depends on both bounded contexts.
  * Translates Object Store domain aggregates/value objects to Storage Engine commands
  * and translates Storage Engine results back to Object Store formats.
+ * Active only when the {@code storage-engine} Spring profile is enabled.
  * </p>
  *
- * NOTE: Both bounded contexts define a {@code ChecksumAlgorithm} and {@code ObjectKey} class.
- * To avoid name collisions, this class uses fully qualified names for these types.
+ * <p>NOTE: Both bounded contexts define a {@code ChecksumAlgorithm} and {@code ObjectKey} class.
+ * To avoid name collisions, this class uses fully qualified names for these types.</p>
  */
 @Component
+@Profile("storage-engine")
 public class ObjectStoreToStorageEngineTranslator {
 
     // ── ObjectStore → StorageEngine: CompleteUploadCommand ──

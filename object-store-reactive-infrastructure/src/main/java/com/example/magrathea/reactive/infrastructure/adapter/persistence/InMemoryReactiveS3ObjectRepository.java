@@ -17,6 +17,7 @@ import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Flux;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 
 import java.nio.charset.StandardCharsets;
@@ -27,7 +28,9 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
+/** In-memory S3 object repository active only in the {@code single-node} (default) profile. */
 @Repository
+@Profile("single-node")
 public class InMemoryReactiveS3ObjectRepository implements S3ObjectCommandRepository, S3ObjectQueryRepository {
 
     private final Map<String, S3Object> storeByObjectKey = new ConcurrentHashMap<>();

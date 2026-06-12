@@ -10,7 +10,7 @@ import com.example.magrathea.objectstore.domain.valueobject.UploadPart;
 import com.example.magrathea.objectstore.reactive.repository.application.CommandResult;
 import com.example.magrathea.reactive.infrastructure.adapter.persistence.InMemoryReactiveBucketRepository;
 import com.example.magrathea.reactive.infrastructure.adapter.persistence.InMemoryReactiveMultipartUploadRepository;
-import com.example.magrathea.reactive.infrastructure.adapter.persistence.MultipartUploadNotFoundException;
+import com.example.magrathea.objectstore.reactive.repository.application.MultipartUploadNotFoundException;
 import io.cucumber.java.Before;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.When;

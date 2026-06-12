@@ -35,5 +35,11 @@ public record ObjectManifest(
             throw new IllegalArgumentException("totalStoredSize must be >= 0: " + totalStoredSize);
         }
         java.util.Objects.requireNonNull(chunks, "chunks must not be null");
+        if (chunkCount != chunks.size()) {
+            throw new IllegalArgumentException(
+                    "chunkCount (" + chunkCount + ") must equal chunks.size() (" + chunks.size() + ")");
+        }
+        policyDecisions = List.copyOf(policyDecisions);
+        chunks = List.copyOf(chunks);
     }
 }

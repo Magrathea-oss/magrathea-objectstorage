@@ -36,15 +36,18 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import org.springframework.context.annotation.Profile;
 
 /**
  * Implementation of S3Object repository interfaces backed by the Storage Engine.
  * <p>
  * Uses {@link ObjectStoreToStorageEngineTranslator} to convert between bounded contexts
  * and {@link ReactiveStorageOrchestrator} to persist objects.
+ * Active only when the {@code storage-engine} Spring profile is enabled.
  * </p>
  */
 @Repository
+@Profile("storage-engine")
 public class StorageEngineReactiveS3ObjectRepository
         implements S3ObjectCommandRepository, S3ObjectQueryRepository {
 

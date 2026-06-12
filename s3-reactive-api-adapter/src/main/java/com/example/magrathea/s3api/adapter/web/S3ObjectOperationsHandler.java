@@ -8,7 +8,7 @@ import com.example.magrathea.reactive.application.service.ReactiveObjectService;
 import com.example.magrathea.s3api.adapter.web.headers.S3Header;
 import com.example.magrathea.s3api.adapter.web.headers.S3RequestExtractor;
 import com.example.magrathea.s3api.adapter.web.headers.S3ResponseBuilder;
-import com.example.magrathea.reactive.infrastructure.adapter.persistence.BucketNotFoundException;
+import com.example.magrathea.objectstore.reactive.repository.application.BucketNotFoundException;
 import com.example.magrathea.s3api.dto.command.DeleteObjectsCommand;
 import com.example.magrathea.s3api.dto.command.RestoreObjectCommand;
 import com.example.magrathea.s3api.dto.command.SelectObjectContentCommand;

@@ -51,10 +51,7 @@
             <artifactId>junit-platform-suite</artifactId>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>com.example</groupId>
-            <artifactId>object-store-reactive-infrastructure</artifactId>
-        </dependency>
+
     </dependencies>
     <build>
         <defaultGoal>test</defaultGoal>

@@ -18,7 +18,7 @@ import com.example.magrathea.objectstore.reactive.repository.application.BucketQ
 import com.example.magrathea.objectstore.reactive.repository.application.S3ObjectCommandRepository;
 import com.example.magrathea.objectstore.reactive.repository.application.S3ObjectQueryRepository;
 import com.example.magrathea.objectstore.reactive.repository.application.CommandResult;
-import com.example.magrathea.reactive.infrastructure.adapter.persistence.BucketNotFoundException;
+import com.example.magrathea.objectstore.reactive.repository.application.BucketNotFoundException;
 import org.springframework.core.io.buffer.DataBuffer;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Flux;

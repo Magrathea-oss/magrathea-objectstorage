@@ -9,13 +9,16 @@ import com.example.magrathea.objectstore.reactive.repository.application.BucketQ
 import com.example.magrathea.objectstore.reactive.repository.application.CommandResult;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Flux;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
+/** In-memory bucket repository active only in the {@code single-node} (default) profile. */
 @Repository
+@Profile("single-node")
 public class InMemoryReactiveBucketRepository implements BucketCommandRepository, BucketQueryRepository {
 
     private final Map<Bucket.Id, Bucket> store = new ConcurrentHashMap<>();

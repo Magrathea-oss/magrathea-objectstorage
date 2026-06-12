@@ -65,7 +65,9 @@ COPY object-store-reactive-repository-storage-engine-infrastructure/src ./object
 COPY s3-reactive-api-adapter/src ./s3-reactive-api-adapter/src/
 COPY bootstrap-application/src ./bootstrap-application/src/
 
-# Pre-generated Javadoc (copied to src/main/resources/static/docs/apidocs/ by host build)
+# TODO (P0 build hygiene): Javadoc is pre-generated on the host and copied here.
+# This is an anti-pattern — Javadoc should be generated inside the builder stage.
+# Tracked in PLAN.md under P0 build hygiene.
 COPY bootstrap-application/src/main/resources/static/docs/apidocs ./bootstrap-application/src/main/resources/static/docs/apidocs/
 
 # Build (Maven will call npm via exec-maven-plugin during generate-resources)

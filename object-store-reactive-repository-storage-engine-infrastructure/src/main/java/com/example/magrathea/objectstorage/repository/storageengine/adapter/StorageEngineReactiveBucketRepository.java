@@ -11,6 +11,7 @@ import com.example.magrathea.storageengine.application.service.ReactiveStorageOr
 import com.example.magrathea.storageengine.domain.valueobject.BucketId;
 import com.example.magrathea.storageengine.domain.valueobject.BucketRef;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Flux;
@@ -23,9 +24,11 @@ import java.util.concurrent.atomic.AtomicLong;
  * Implementation of Bucket repository interfaces backed by the Storage Engine.
  * <p>
  * Manages bucket namespace within the Storage Engine via {@link ReactiveStorageOrchestrator}.
+ * Active only when the {@code storage-engine} Spring profile is enabled.
  * </p>
  */
 @Repository
+@Profile("storage-engine")
 public class StorageEngineReactiveBucketRepository
         implements BucketCommandRepository, BucketQueryRepository {
 

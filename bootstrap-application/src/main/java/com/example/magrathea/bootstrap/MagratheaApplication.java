@@ -6,15 +6,29 @@ import org.springframework.context.annotation.ComponentScan;
 
 /**
  * Spring Boot 4 entry point for Magrathea ObjectStore.
- * S3 API module (s3-api) is auto-configured via META-INF/spring/AutoConfiguration.imports
- * when it's on the classpath. No explicit @ComponentScan needed for s3-api.
- * Disable via s3.api.enabled=false in application.properties.
+ * <p>
+ * S3 API module (s3-reactive-api-adapter) is auto-configured via
+ * META-INF/spring/AutoConfiguration.imports when it is on the classpath.
+ * Disable via {@code s3.api.enabled=false} in application.properties.
+ * <p>
+ * Component scan covers:
+ * <ul>
+ *   <li>{@code com.example.magrathea.objectstore} — object-store domain and port interfaces</li>
+ *   <li>{@code com.example.magrathea.objectstorage} — storage-engine ACL/repository adapters</li>
+ *   <li>{@code com.example.magrathea.reactive} — reactive application services and in-memory infrastructure</li>
+ *   <li>{@code com.example.magrathea.storageengine} — storage-engine domain, application, and infrastructure</li>
+ *   <li>{@code com.example.magrathea.admin} — admin API router and handlers</li>
+ * </ul>
+ * Profile {@code storage-engine} activates storage-engine backend beans.
+ * Profile {@code single-node} (default) activates in-memory backend beans.
  */
 @SpringBootApplication
 @ComponentScan(basePackages = {
     "com.example.magrathea.bootstrap",
     "com.example.magrathea.objectstore",
+    "com.example.magrathea.objectstorage",       // storage-engine ACL adapter
     "com.example.magrathea.reactive",
+    "com.example.magrathea.storageengine",        // storage-engine domain/application/infrastructure
     "com.example.magrathea.admin"
 })
 public class MagratheaApplication {

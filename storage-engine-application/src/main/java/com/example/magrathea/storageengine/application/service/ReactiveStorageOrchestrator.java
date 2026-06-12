@@ -148,18 +148,17 @@ public class ReactiveStorageOrchestrator {
                                             .map(DedupConfig::chunkSize)
                                             .orElse(65536L);
                                     Chunker chunker = new Chunker((int) chunkSize);
+                                    // Return Flux<ChunkPersistenceTrace> directly — no intermediate list wrap
                                     return chunker.chunk(Flux.just(
                                             new org.springframework.core.io.buffer.DefaultDataBufferFactory().wrap(fullData)))
-                                            .concatMap(chunkPayload -> processChunk(chunkPayload, plan))
-                                            .collectList()
-                                            .flatMapMany(Flux::just);
+                                            .concatMap(chunkPayload -> processChunk(chunkPayload, plan));
                                 } else {
                                     // No dedup: process full data as a single chunk
                                     ChunkId singleChunkId = ChunkId.generate();
                                     ApplicationChunkPayload singlePayload =
                                             new ApplicationChunkPayload(singleChunkId, fullData);
-                                    return processChunk(singlePayload, plan)
-                                            .flatMapMany(trace -> Flux.just(trace));
+                                    // Convert Mono to Flux without shadowing the outer 'trace' variable
+                                    return processChunk(singlePayload, plan).flux();
                                 }
                             })
                             .collectList()

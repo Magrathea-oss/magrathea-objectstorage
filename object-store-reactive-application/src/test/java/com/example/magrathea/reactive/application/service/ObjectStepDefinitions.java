@@ -9,7 +9,7 @@ import com.example.magrathea.objectstore.domain.valueobject.ObjectKey;
 import com.example.magrathea.objectstore.reactive.repository.application.CommandResult;
 import com.example.magrathea.reactive.infrastructure.adapter.persistence.InMemoryReactiveBucketRepository;
 import com.example.magrathea.reactive.infrastructure.adapter.persistence.InMemoryReactiveS3ObjectRepository;
-import com.example.magrathea.reactive.infrastructure.adapter.persistence.S3ObjectNotFoundException;
+import com.example.magrathea.objectstore.reactive.repository.application.S3ObjectNotFoundException;
 import io.cucumber.java.Before;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.When;

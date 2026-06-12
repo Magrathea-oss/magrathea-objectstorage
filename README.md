@@ -4,7 +4,7 @@
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0-green)](https://spring.io/)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-**Magrathea ObjectStore** is an AWS S3-compatible object store built with Spring Boot 4 WebFlux and Java 21. The only public HTTP API is the S3 REST API exposed by the pluggable `s3-reactive-api-adapter` module.
+**Magrathea ObjectStore** is an AWS S3-compatible object store built with Spring Boot 4 WebFlux and Java 21. The public object API is the S3 REST API exposed by the pluggable `s3-reactive-api-adapter` module. In addition, `admin-api-adapter` exposes `/admin/**` endpoints for storage policy, device, and configuration management — these are internal/administrative APIs, separate from the S3 object API.
 
 ---
 
@@ -20,14 +20,14 @@
 
 ## Features
 
-- **S3-compatible API only** — no custom internal REST API
-- **Implemented operations** — 111/111 Amazon S3 actions in scope, including bucket/object CRUD, multipart upload, bucket/object metadata, bucket configuration, analytics/inventory/metrics/intelligent-tiering, and Phase F advanced/specialized operations from ADR 0012
+- **S3 object API + admin API** — the S3 REST API is the public object interface; `admin-api-adapter` provides `/admin/**` configuration and management APIs separate from the S3 surface
+- **Route inventory** — 111 Amazon S3 API action routes are mapped; ⚠️ **this is a route/surface inventory, not a semantic implementation metric** — many operations are stubbed or return nominal/placeholder responses; see [`docs/test-report.md`](docs/test-report.md) and [`PLAN.md`](PLAN.md) for the semantic coverage classification
 - **Pluggable S3 API** — auto-configured when `s3-reactive-api-adapter` is on the classpath; disabled with `s3.api.enabled=false`
 - **Spring Boot 4 WebFlux** — functional RouterFunction endpoints
 - **Jackson 3 XML** — `tools.jackson.dataformat:jackson-dataformat-xml` with custom WebFlux encoder
 - **Pure domain** — no Spring, no JPA, no reactive types in `object-store-domain`
 - **In-memory infrastructure** — reactive in-memory bucket, object, and multipart repositories
-- **Testing** — JUnit, Cucumber, AWS CLI compatibility, Clover coverage profile
+- **Testing** — JUnit, Cucumber, AWS CLI compatibility; **JaCoCo is the current coverage baseline** (Clover/OpenClover is optional/legacy)
 
 ---
 
@@ -122,21 +122,24 @@ aws --endpoint-url http://localhost:8080 s3api get-object --bucket test-bucket -
 | 1 | All unit + integration tests | `mvn test` |
 | 2 | Domain JUnit only | `mvn test -pl object-store-domain` |
 | 3 | S3 API Cucumber only | `mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false` |
-| 4 | Clover coverage | `mvn -Pcoverage clover:setup test clover:aggregate clover:clover` |
+| 4 | JaCoCo coverage (current baseline) | `mvn verify` (JaCoCo runs automatically with the default lifecycle) |
+| 4b | Clover coverage (optional/legacy) | `mvn -Pcoverage clover:setup test clover:aggregate clover:clover` |
 | 5 | AWS CLI compatibility | `bash test-aws-cli.sh` |
 | 6 | AWS CLI via Maven profile | `mvn verify -Paws-cli-tests` (auto-starts/stops server) |
 
 Consolidated Markdown report: [`docs/test-report.md`](docs/test-report.md)
 
-### Automated Coverage on Commit
+### Coverage
 
-A **pre-commit git hook** generates Clover coverage before every commit:
+**JaCoCo** is the current coverage baseline and runs automatically with the standard Maven lifecycle (`mvn verify`). Reports are generated under `target/site/jacoco/`.
+
+Clover/OpenClover is optional/legacy. A pre-commit hook exists that runs the Clover profile:
 
 ```bash
-# Normal commit — coverage auto-generates
+# Normal commit — Clover coverage auto-generates (legacy hook)
  git commit -m "msg"
 
-# Skip coverage (fast commit)
+# Skip Clover (recommended; JaCoCo runs with mvn verify)
  git commit --no-verify -m "msg"
 ```
 
@@ -146,8 +149,8 @@ Or use the helper script:
 bash scripts/commit-with-coverage.sh -m "commit message"
 ```
 
-The hook runs `mvn -Pcoverage clover:setup test clover:aggregate clover:clover` and stages
-`target/site/clover/clover.xml` + `docs/test-report.md`.
+The Clover hook runs `mvn -Pcoverage clover:setup test clover:aggregate clover:clover` and stages
+`target/site/clover/clover.xml` + `docs/test-report.md`. This hook is **optional/legacy**; JaCoCo is authoritative.
 
 AWS CLI tests require:
 
@@ -181,11 +184,12 @@ The implementation plan tracks all Amazon S3 actions from:
 
 <https://docs.aws.amazon.com/AmazonS3/latest/API/API_Operations.md>
 
-Current coverage: **111 / 111 Amazon S3 actions**.
+> ⚠️ **Coverage reporting has been reclassified.** The `111/111` figure reflects a route/surface inventory only — it means 111 S3 API action routes are mapped. It does **not** mean 111 operations are semantically implemented, stateful, or AWS CLI compatible.
+>
+> API coverage must now be reported by semantic status: **Mapped / Stubbed / Stateful / AWS CLI compatible / Storage-engine compatible / Semantically S3-compatible**.
+> See [`docs/test-report.md`](docs/test-report.md) for the classification matrix and [`PLAN.md`](PLAN.md) → *S3 API Semantic Completion Plan* for the phased roadmap.
 
-Phases A, B, C, D, E, and F are complete. Phase F advanced/specialized operations are recorded in [ADR 0012](docs/adr/0012-phase-f-advanced-s3-operations.md) and verified by Cucumber.
-
-See [`PLAN.md`](PLAN.md) for the full phased inclusion plan.
+Phases A–F route mapping is recorded in [ADR 0012](docs/adr/0012-phase-f-advanced-s3-operations.md). Semantic implementation completion is tracked separately in the correction plan.
 
 ---
 

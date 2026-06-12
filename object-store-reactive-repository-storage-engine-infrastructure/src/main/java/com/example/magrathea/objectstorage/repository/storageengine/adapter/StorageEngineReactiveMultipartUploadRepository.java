@@ -9,6 +9,7 @@ import com.example.magrathea.objectstore.reactive.repository.application.Multipa
 import com.example.magrathea.objectstore.reactive.repository.application.CommandResult;
 import com.example.magrathea.storageengine.application.service.ReactiveStorageOrchestrator;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Flux;
@@ -21,9 +22,11 @@ import java.util.concurrent.atomic.AtomicLong;
  * Implementation of MultipartUpload repository interfaces backed by the Storage Engine.
  * <p>
  * Delegates multipart upload state to the Storage Engine via {@link ReactiveStorageOrchestrator}.
+ * Active only when the {@code storage-engine} Spring profile is enabled.
  * </p>
  */
 @Repository
+@Profile("storage-engine")
 public class StorageEngineReactiveMultipartUploadRepository
         implements MultipartUploadCommandRepository, MultipartUploadQueryRepository {
 

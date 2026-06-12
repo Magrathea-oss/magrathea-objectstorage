@@ -87,6 +87,20 @@ public class StoredObject {
         this.lastModified = ZonedDateTime.now();
     }
 
+    /**
+     * Transitions the object from STORED to DELETED.
+     *
+     * @throws IllegalStateException if the current state is not STORED
+     */
+    public void markDeleted() {
+        if (state != ObjectState.STORED) {
+            throw new IllegalStateException(
+                    "Cannot delete object in state " + state + "; expected STORED");
+        }
+        this.state = ObjectState.DELETED;
+        this.lastModified = ZonedDateTime.now();
+    }
+
     public ObjectId objectId() { return objectId; }
     public VersionId versionId() { return versionId; }
     public BucketRef bucketRef() { return bucketRef; }
