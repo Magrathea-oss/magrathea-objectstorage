@@ -21,6 +21,13 @@ Generated: 2026-06-05T08:40:11+02:00
 | Maven Surefire | See section | See section | See section | Latest reports under `*/target/surefire-reports` |
 | Clover coverage | See section | - | - | Latest report under `target/site/clover` |
 
+## Current Verified Results
+
+| Scope | Evidence | Result | Notes |
+|---|---|---:|---|
+| Phase 5 domain planning (`storage-engine-domain`) | Commit `b0a5f74`; `PersistencePlannerMinioStandardTest` | 152 tests passing, 0 failures | Verifies deterministic `MINIO_STANDARD` persistence planning in the domain model. |
+| Phase 5 YAML catalogs and MINIO_STANDARD integration (`storage-engine-infrastructure`) | Commit `0ec84cf`; `MinioStandardIntegrationTest` | 26 tests passing, 0 failures | Verifies YAML catalog/device integration and `MINIO_STANDARD` selection; storage-engine runtime read/write wiring remains pending for Phase 6/7. |
+
 ### AWS CLI Test Status
 
 | Feature | Status | Note |

@@ -292,20 +292,22 @@ Tasks:
 - Validate references between policies and devices/topologies.
 - Decide reload semantics: immutable startup snapshot first unless live reload is explicitly planned and tested.
 
-#### Phase 5 — `MINIO_STANDARD` Policy
+#### Phase 5 — `MINIO_STANDARD` Policy ✅ Completed
 
-| Field | Plan |
+| Field | Plan / Result |
 |---|---|
+| Status | Completed 2026-06-12 for policy semantics, YAML catalog loading, device selection, and deterministic domain persistence planning. This does **not** complete storage-engine backend runtime read/write wiring; Phase 6 and Phase 7 remain pending. |
 | Owner agent | `java-domain-coder` for behavior, `java-infra-coder` for YAML/examples, `java-tester` for executable scenarios |
 | Affected files/modules | `storage-engine-domain`, `storage-engine-infrastructure/src/main/resources/storage-policies/minio-standard.yaml`, `storage-engine-infrastructure/src/main/resources/storage-devices/*.yaml`, `docs/**`, storage-engine tests |
-| Expected outputs | Concrete YAML example and explicit expected behavior for `MINIO_STANDARD` |
-| Acceptance criteria | The policy declares whether it is dedup-backed, erasure-coded, replicated, or single-node MinIO-compatible; behavior is deterministic and testable; tests verify the selected policy and resulting persistence plan |
-| Test gates | Domain policy tests; YAML catalog tests; storage-engine orchestration tests using `MINIO_STANDARD` |
+| Expected outputs | Delivered: concrete YAML example and explicit initial behavior for `MINIO_STANDARD` as a deterministic, single-node MinIO-compatible policy scope. |
+| Acceptance criteria | Met for Phase 5 scope: policy semantics are explicit, `storageClassId` is corrected to `STANDARD`, behavior is deterministic and testable, and tests verify selected policy/device behavior plus resulting persistence planning. |
+| Test gates | Passed: `storage-engine-domain` 152 tests / 0 failures, including `PersistencePlannerMinioStandardTest`; `storage-engine-infrastructure` 26 tests / 0 failures, including `MinioStandardIntegrationTest`. |
+| Completion evidence | Prerequisites: Phase 2/3 commit `abb426e`; Phase 4 commit `d53b543`. Phase 5 domain planning commit `b0a5f74`; Phase 5 infrastructure/YAML integration commit `0ec84cf`. |
 
-Tasks:
-- Choose and document one initial behavior. Recommended first executable scope: single-node MinIO-compatible behavior with explicit dedup disabled or enabled, and no ambiguous EC/replication semantics unless implemented.
-- If dedup is enabled, define chunk size, alignment, namespace, duplicate-hit behavior, and content-address rules in YAML.
-- If EC or replication is enabled, define minimum device counts and failure-domain expectations before calling the policy complete.
+Completed scope:
+- Chosen and documented initial single-node MinIO-compatible behavior for `MINIO_STANDARD` without claiming unsupported erasure-coding, replication, or runtime backend read/write semantics.
+- Verified deterministic domain persistence planning through `PersistencePlannerMinioStandardTest`.
+- Verified YAML catalog/device integration through `MinioStandardIntegrationTest`; `minio-standard.yaml` comments were updated and `storageClassId` was corrected to `STANDARD` for Phase 5 semantics.
 
 #### Phase 6 — Orchestrator/Dedup/Store Consistency
 
