@@ -2,19 +2,15 @@ policyId: minio-standard
 version: "1.0"
 storageClassId: STANDARD
 
-# First executable scope: single-node MinIO-compatible behavior.
-# Deduplication is enabled with SHA256 fingerprints and 1 MiB chunks.
-# No erasure coding, no multi-replica behavior, and no encryption by default.
-# Compression is also disabled to match MinIO's default object-storage path.
+# MinIO-compatible STANDARD behavior is modeled as erasure coding, not deduplication.
+# This YAML enables policy-level EC with 4 data blocks and 2 parity blocks.
+# Replication stays at factor 1: EC provides redundancy without multi-replica behavior.
+# Compression and encryption are disabled by default to match the normal object-storage path.
+# Current sample device catalogs validate loading and device selection; they do not yet claim
+# physical EC shard placement across multiple devices.
 
 dedup:
-  enabled: true
-  scope: BUCKET
-  chunkSizeBytes: 1048576
-  algorithm: SHA256
-  alignment: NONE
-  namespace:
-    type: BUCKET
+  enabled: false
 
 compression:
   enabled: false
@@ -29,4 +25,6 @@ replication:
   factor: 1
 
 erasureCoding:
-  enabled: false
+  enabled: true
+  dataBlocks: 4
+  parityBlocks: 2

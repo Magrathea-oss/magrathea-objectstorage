@@ -96,8 +96,13 @@ class StorageEngineBackendContextTest {
         var policy = policyCatalog.findById("minio-standard").block();
         assertThat(policy).isNotNull();
         assertThat(policy.id()).isEqualTo(StorageClassId.STANDARD);
-        assertThat(policy.dedup()).isPresent();
-        assertThat(policy.dedup().get().chunkSize()).isEqualTo(1_048_576L);
+        assertThat(policy.dedup()).isEmpty();
+        assertThat(policy.compression()).isEmpty();
+        assertThat(policy.encryption()).isEmpty();
+        assertThat(policy.replication().factor()).isEqualTo(1);
+        assertThat(policy.erasureCoding()).isPresent();
+        assertThat(policy.erasureCoding().get().dataBlocks()).isEqualTo(4);
+        assertThat(policy.erasureCoding().get().parityBlocks()).isEqualTo(2);
 
         assertThat(policyCatalog.findBy(StorageClassId.STANDARD).block()).isNotNull();
 

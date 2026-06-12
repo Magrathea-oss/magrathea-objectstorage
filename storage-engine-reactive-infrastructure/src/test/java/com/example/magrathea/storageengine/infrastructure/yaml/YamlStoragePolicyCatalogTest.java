@@ -49,27 +49,27 @@ class YamlStoragePolicyCatalogTest {
 
     @Test
     void loadsSinglePolicyFromYaml_findByStorageClassId(@TempDir Path dir) throws IOException {
-        Files.writeString(dir.resolve("minio.yaml"), """
-                policyId: minio-standard
+        Files.writeString(dir.resolve("standard-ec.yaml"), """
+                policyId: standard-ec
                 version: "1.0"
-                storageClassId: MINIO_STANDARD
-                dedup:
+                storageClassId: STANDARD
+                erasureCoding:
                   enabled: true
-                  scope: BUCKET
-                  chunkSizeBytes: 1048576
-                  algorithm: SHA256
-                  alignment: NONE
+                  dataBlocks: 4
+                  parityBlocks: 2
                 replication:
                   factor: 1
                 """);
 
         YamlStoragePolicyCatalog catalog = new YamlStoragePolicyCatalog(dir);
 
-        StepVerifier.create(catalog.findBy(StorageClassId.MINIO_STANDARD))
+        StepVerifier.create(catalog.findBy(StorageClassId.STANDARD))
                 .assertNext(policy -> {
-                    assertThat(policy.id().value()).isEqualTo("MINIO_STANDARD");
-                    assertThat(policy.dedup()).isPresent();
-                    assertThat(policy.dedup().get().chunkSize()).isEqualTo(1_048_576L);
+                    assertThat(policy.id().value()).isEqualTo("STANDARD");
+                    assertThat(policy.dedup()).isEmpty();
+                    assertThat(policy.erasureCoding()).isPresent();
+                    assertThat(policy.erasureCoding().get().dataBlocks()).isEqualTo(4);
+                    assertThat(policy.erasureCoding().get().parityBlocks()).isEqualTo(2);
                 })
                 .verifyComplete();
     }
@@ -227,7 +227,7 @@ class YamlStoragePolicyCatalogTest {
     void loadsDedupPolicyFromYaml(@TempDir Path dir) throws IOException {
         Files.writeString(dir.resolve("dedup.yaml"), """
                 policyId: dedup-policy
-                storageClassId: MINIO_STANDARD
+                storageClassId: STANDARD
                 dedup:
                   enabled: true
                   scope: GLOBAL

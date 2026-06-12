@@ -4,16 +4,14 @@ import com.example.magrathea.storageengine.domain.service.EffectivePolicyResolve
 import com.example.magrathea.storageengine.domain.service.VirtualDeviceResolver;
 import com.example.magrathea.storageengine.domain.valueobject.BucketId;
 import com.example.magrathea.storageengine.domain.valueobject.BucketRef;
-import com.example.magrathea.storageengine.domain.valueobject.ChunkAlignment;
-import com.example.magrathea.storageengine.domain.valueobject.DedupScope;
 import com.example.magrathea.storageengine.domain.valueobject.EncryptionRequest;
-import com.example.magrathea.storageengine.domain.valueobject.FingerprintAlgorithm;
 import com.example.magrathea.storageengine.domain.valueobject.ObjectContentDescriptor;
 import com.example.magrathea.storageengine.domain.valueobject.ObjectKey;
 import com.example.magrathea.storageengine.domain.valueobject.ObjectMetadataDescriptor;
 import com.example.magrathea.storageengine.domain.valueobject.StorageClassId;
 import com.example.magrathea.storageengine.domain.valueobject.StorageDeviceId;
 import com.example.magrathea.storageengine.domain.valueobject.UploadRequestContext;
+import com.example.magrathea.storageengine.domain.valueobject.VirtualDevice;
 import org.junit.jupiter.api.Test;
 import reactor.test.StepVerifier;
 
@@ -22,11 +20,18 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Verifies the executable MINIO_STANDARD YAML scope against the domain policy pipeline.
+ * Verifies the executable MINIO_STANDARD-equivalent YAML scope against the domain policy pipeline.
+ *
+ * <p>MINIO_STANDARD-compatible behavior is modeled as STANDARD storage with erasure coding enabled,
+ * dedup disabled, replication factor 1, and no compression/encryption by default. The sample device
+ * catalog is currently a classpath loading and selection smoke test; physical EC shard placement is
+ * not validated by these catalogs yet.
  */
 class MinioStandardIntegrationTest {
 
-    private static final long MINIO_STANDARD_CHUNK_SIZE = 1_048_576L;
+    private static final int MINIO_STANDARD_EC_DATA_BLOCKS = 4;
+    private static final int MINIO_STANDARD_EC_PARITY_BLOCKS = 2;
+    private static final long OBJECT_SIZE = 1_048_576L;
 
     @Test
     void classpathCatalogsLoadMinioStandardPolicyAndSelectLocalDisk() {
@@ -37,29 +42,40 @@ class MinioStandardIntegrationTest {
         StepVerifier.create(policyCatalog.findById("minio-standard"))
                 .assertNext(policy -> {
                     assertThat(policy.id()).isEqualTo(StorageClassId.STANDARD);
-                    assertThat(policy.dedup()).isPresent();
-                    assertThat(policy.dedup().get().scope()).isEqualTo(DedupScope.BUCKET_LEVEL);
-                    assertThat(policy.dedup().get().chunkSize()).isEqualTo(MINIO_STANDARD_CHUNK_SIZE);
-                    assertThat(policy.dedup().get().algorithm()).isEqualTo(FingerprintAlgorithm.SHA256);
-                    assertThat(policy.dedup().get().alignment()).isEqualTo(ChunkAlignment.NONE);
+                    assertThat(policy.dedup()).isEmpty();
                     assertThat(policy.compression()).isEmpty();
                     assertThat(policy.encryption()).isEmpty();
                     assertThat(policy.replication().factor()).isEqualTo(1);
-                    assertThat(policy.erasureCoding()).isEmpty();
+                    assertThat(policy.erasureCoding()).isPresent();
+                    assertThat(policy.erasureCoding().get().dataBlocks())
+                            .isEqualTo(MINIO_STANDARD_EC_DATA_BLOCKS);
+                    assertThat(policy.erasureCoding().get().parityBlocks())
+                            .isEqualTo(MINIO_STANDARD_EC_PARITY_BLOCKS);
 
                     var effective = new EffectivePolicyResolver().resolve(
                             policy,
-                            uploadContext(MINIO_STANDARD_CHUNK_SIZE));
+                            uploadContext(OBJECT_SIZE));
 
-                    assertThat(effective.dedup()).isPresent();
-                    assertThat(effective.dedup().get().chunkSize())
-                            .as("EffectivePolicyResolver must use the policy-defined 1 MiB chunk size")
-                            .isEqualTo(MINIO_STANDARD_CHUNK_SIZE);
+                    assertThat(effective.storageClassId()).isEqualTo(StorageClassId.STANDARD);
+                    assertThat(effective.dedup()).isEmpty();
+                    assertThat(effective.compression()).isEmpty();
+                    assertThat(effective.encryption()).isEmpty();
+                    assertThat(effective.replication().factor()).isEqualTo(1);
+                    assertThat(effective.erasureCoding()).isPresent();
+                    assertThat(effective.erasureCoding().get().dataBlocks())
+                            .isEqualTo(MINIO_STANDARD_EC_DATA_BLOCKS);
+                    assertThat(effective.erasureCoding().get().parityBlocks())
+                            .isEqualTo(MINIO_STANDARD_EC_PARITY_BLOCKS);
+                    assertThat(new VirtualDeviceResolver().resolve(effective, effective.bucketRef()))
+                            .isInstanceOf(VirtualDevice.BucketDevice.class);
                 })
                 .verifyComplete();
 
         StepVerifier.create(policyCatalog.findBy(StorageClassId.STANDARD))
-                .assertNext(policy -> assertThat(policy.dedup()).isPresent())
+                .assertNext(policy -> {
+                    assertThat(policy.dedup()).isEmpty();
+                    assertThat(policy.erasureCoding()).isPresent();
+                })
                 .verifyComplete();
 
         StepVerifier.create(deviceCatalog.findById(StorageDeviceId.of("local-disk-0")))
@@ -88,17 +104,23 @@ class MinioStandardIntegrationTest {
     }
 
     @Test
-    void effectivePolicyResolverUsesPolicyChunkSizeInsteadOfLegacy64KiBConstant() {
+    void effectivePolicyResolverKeepsEcEnabledAndDedupDisabledForSmallObjects() {
         YamlStoragePolicyCatalog policyCatalog = YamlStoragePolicyCatalog.fromClasspath("storage-policies");
-        long objectSizeAboveLegacyConstant = 65 * 1024L;
+        long smallObjectSize = 65 * 1024L;
 
         StepVerifier.create(policyCatalog.findById("minio-standard")
                         .map(policy -> new EffectivePolicyResolver().resolve(
                                 policy,
-                                uploadContext(objectSizeAboveLegacyConstant))))
-                .assertNext(effective -> assertThat(effective.dedup())
-                        .as("65 KiB is above the old 64 KiB constant but below the policy-defined 1 MiB chunk")
-                        .isEmpty())
+                                uploadContext(smallObjectSize))))
+                .assertNext(effective -> {
+                    assertThat(effective.dedup())
+                            .as("MINIO_STANDARD dedup is disabled, not bypassed by chunk-size thresholds")
+                            .isEmpty();
+                    assertThat(effective.erasureCoding()).isPresent();
+                    assertThat(effective.replication().factor()).isEqualTo(1);
+                    assertThat(effective.compression()).isEmpty();
+                    assertThat(effective.encryption()).isEmpty();
+                })
                 .verifyComplete();
     }
 

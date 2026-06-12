@@ -47,6 +47,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -222,7 +223,21 @@ public class ReactiveStorageOrchestrator {
     public Flux<byte[]> read(ManifestId manifestId) {
         return objectManifestRepository.findBy(manifestId)
                 .flatMapMany(manifest -> Flux.fromIterable(manifest.chunks()))
-                .concatMap(chunk -> chunkStorePort.read(chunk.chunkId()));
+                .concatMap(chunk -> chunkStorePort.read(chunk.chunkId())
+                        .map(storedData -> restoreReadableChunk(storedData, chunk)));
+    }
+
+    private static byte[] restoreReadableChunk(byte[] storedData, ChunkReferenceDescriptor chunk) {
+        if (!hasAppliedErasureCoding(chunk) || storedData.length <= chunk.originalSize()) {
+            return storedData;
+        }
+        return Arrays.copyOf(storedData, Math.toIntExact(chunk.originalSize()));
+    }
+
+    private static boolean hasAppliedErasureCoding(ChunkReferenceDescriptor chunk) {
+        return chunk.stepChecksums().stream()
+                .anyMatch(checksum -> checksum.stepId() == StepId.ERASURE_CODING
+                        && !checksum.inputChecksum().equals(checksum.outputChecksum()));
     }
 
     /**
