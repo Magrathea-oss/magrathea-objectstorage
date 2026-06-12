@@ -1,6 +1,6 @@
 # Magrathea ObjectStorage Test Report
 
-Generated: 2026-06-05T08:40:11+02:00
+Updated: 2026-06-12
 
 > ⚠️ **Report status: STALE / EVIDENCE-ONLY**
 >
@@ -19,6 +19,7 @@ Generated: 2026-06-05T08:40:11+02:00
 |---|---:|---:|---:|---|
 | AWS CLI S3 compatibility | 46 | 82 | 128 | Endpoint: `http://localhost:8080` |
 | Maven Surefire | See section | See section | See section | Latest reports under `*/target/surefire-reports` |
+| Admin API adapter | 9 | 0 | 9 | `mvn -B -pl admin-api-adapter -am test` — build success |
 | JaCoCo coverage | See section | - | - | Current baseline; latest reports under `target/site/jacoco` when generated |
 
 ## Current Verified Results
@@ -27,6 +28,7 @@ Generated: 2026-06-05T08:40:11+02:00
 |---|---|---:|---|
 | Phase 5 domain planning (`storage-engine-domain`) | Commit `b0a5f74`; `PersistencePlannerMinioStandardTest` | 152 tests passing, 0 failures | Verifies deterministic `MINIO_STANDARD` persistence planning in the domain model. |
 | Phase 5 YAML catalogs and MINIO_STANDARD integration (`storage-engine-reactive-infrastructure`) | Commit `0ec84cf`; `MinioStandardIntegrationTest` | 26 tests passing, 0 failures | Verifies YAML catalog/device integration and `MINIO_STANDARD` selection with S3 storage class `STANDARD`, dedup disabled, EC planning `4 data / 2 parity`, replication factor `1`, compression disabled, and encryption disabled by default; storage-engine runtime read/write wiring and physical EC shard placement remain pending for Phase 6/7. |
+| Phase 8 backend Admin API (`admin-api-adapter`) | `mvn -B -pl admin-api-adapter -am test`; `AdminRouterTest` | 9 tests passing, 0 failures, build success | Verifies configuration-as-code/read-only admin catalog behavior for policies/devices/disk sets, structured validation responses for `POST /admin/storage-policies/validate`, non-persistence of validation, and runtime rejection of policy mutations. |
 
 ### AWS CLI Test Status
 
@@ -209,7 +211,8 @@ Bucket: `magrathea-cli-test-1780641560-106784`
 | object-store-reactive-application | com.example.magrathea.reactive.application.service.CucumberTest.txt | 18 | 0 | 0 | 0 | ✅ Passed |
 | s3-reactive-api-adapter | com.example.magrathea.s3api.awscli.AwsCliCucumberTest.txt | 1 | 0 | 0 | 0 | ✅ Passed |
 | s3-reactive-api-adapter | com.example.magrathea.s3api.cucumber.ObjectStoreCucumberTest.txt | 238 | 0 | 0 | 0 | ✅ Passed |
-| **Total** |  | **544** | **0** | **0** | **0** | **✅ Passed** |
+| admin-api-adapter | com.example.magrathea.admin.web.AdminRouterTest.txt | 9 | 0 | 0 | 0 | ✅ Passed |
+| **Total including latest Admin API adapter evidence** |  | **553** | **0** | **0** | **0** | **✅ Passed** |
 
 ## Coverage
 
@@ -242,7 +245,7 @@ Bucket: `magrathea-cli-test-1780641560-106784`
 | Access/security controls | BucketPolicy, PublicAccessBlock, OwnershipControls | Yes | Config storage only | Failing (server not running at test time) | Absent | Config-only / Stubbed | Authorization enforcement absent |
 | Analytics/inventory/metrics | Bucket analytics, inventory, metrics, intelligent-tiering | Yes | Config storage only | Failing (server not running at test time) | Absent | Config-only | No background report generation |
 | Advanced/specialized | SelectObjectContent, RestoreObject, etc. | Some | None verified | Missing | Absent | Stubbed / Out of scope | Likely out of scope without explicit design |
-| Admin/storage-engine APIs | StoragePolicy CRUD, StorageDevice CRUD | Route stubs | None verified | Not applicable | Absent | Not implemented | No concrete StoragePolicyCatalog implementation; lookup always fails |
+| Admin/storage-engine APIs | StoragePolicy/device/disk-set catalog reads; policy validation | Yes | Read-only configuration-as-code catalogs; validation is non-persistent | Not applicable | Admin adapter tests pass; selected-backend S3 scenarios still absent | Partial backend Admin API implemented | `/admin/**` is separate from S3 coverage. `mvn -B -pl admin-api-adapter -am test` passes 9 tests. Policy/device/disk-set catalogs are read-only at runtime; create/update/delete policy requests are rejected. |
 
 ### AWS CLI Cucumber vs WebTestClient Cucumber Parity
 

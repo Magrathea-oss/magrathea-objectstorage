@@ -20,7 +20,7 @@
 
 ## Features
 
-- **S3 object API + admin API** — the S3 REST API is the public object interface; `admin-api-adapter` provides `/admin/**` configuration and management APIs separate from the S3 surface
+- **S3 object API + admin API** — the S3 REST API is the public object interface; `admin-api-adapter` provides `/admin/**` configuration-as-code catalog APIs separate from the S3 surface
 - **Route inventory** — 111 Amazon S3 API action routes are mapped; ⚠️ **this is a route/surface inventory, not a semantic implementation metric** — many operations are stubbed or return nominal/placeholder responses; see [`docs/test-report.md`](docs/test-report.md) and [`PLAN.md`](PLAN.md) for the semantic coverage classification
 - **Pluggable S3 API** — auto-configured when `s3-reactive-api-adapter` is on the classpath; disabled with `s3.api.enabled=false`
 - **Spring Boot 4 WebFlux** — functional RouterFunction endpoints
@@ -36,7 +36,7 @@
 | Module | Responsibility | Notes |
 |---|---|---|
 | `s3-reactive-api-adapter` | Pluggable AWS S3 HTTP adapter | Auto-configuration, RouterFunction, XML responses, Cucumber tests |
-| `admin-api-adapter` | Internal/admin HTTP adapter | `/admin/**` JSON API for storage policy/device/configuration management; separate from S3 object API |
+| `admin-api-adapter` | Internal/admin HTTP adapter | `/admin/**` JSON API for read-only storage policy/device/disk-set catalogs and non-persistent policy validation; separate from S3 object API |
 | `object-store-domain` | S3 domain model | Zero framework dependencies |
 | `object-store-reactive-repository-application` | Reactive CQS repository interfaces | Bucket, object, and multipart command/query ports |
 | `object-store-reactive-application` | Reactive application services and DTOs | Native Mono/Flux service APIs |
@@ -81,6 +81,30 @@ EC differentiates DedupDevice; replication does not.
 ### `MINIO_STANDARD` policy semantics
 
 `MINIO_STANDARD` is the first executable Storage Engine policy use case. Its S3-facing storage class is `STANDARD` (`storageClassId: STANDARD`). Phase 5 semantics are explicit and test-backed: deduplication disabled, erasure-coding planning enabled as `4 data / 2 parity`, replication factor `1`, compression disabled, and encryption disabled by default. The current evidence verifies YAML catalog loading, device selection, and deterministic persistence planning; it does **not** yet claim end-to-end storage-engine read/write wiring or verified physical EC shard placement.
+
+### Admin API (configuration-as-code)
+
+The Admin API is an internal/operator JSON API under `/admin/**`. It is **not** part of the AWS S3 object API and must not be counted in S3 semantic coverage.
+
+Current runtime mutability decision: storage policies, storage devices, and disk sets/topology are YAML-backed **configuration-as-code**. The runtime exposes read-only catalog views. Policy validation is non-persistent: it validates a submitted JSON policy shape and returns structured results without writing YAML or changing active runtime state.
+
+| Endpoint | Purpose | Runtime mutability |
+|---|---|---|
+| `GET /admin/health` | Admin API health and links | Read-only |
+| `GET /admin/storage-policies` | List configured storage policies | Read-only YAML catalog |
+| `GET /admin/storage-policies/{id}` | Read one storage policy | Read-only YAML catalog |
+| `POST /admin/storage-policies/validate` | Validate a policy payload | Non-persistent validation only |
+| `POST /admin/storage-policies` | Policy creation request | Rejected at runtime (`405 Method Not Allowed`) |
+| `PUT /admin/storage-policies/{id}` | Policy update request | Rejected at runtime (`405 Method Not Allowed`) |
+| `DELETE /admin/storage-policies/{id}` | Policy delete request | Rejected at runtime (`405 Method Not Allowed`) |
+| `GET /admin/storage-devices` | List configured storage devices | Read-only YAML catalog |
+| `GET /admin/storage-devices/{id}` | Read one storage device | Read-only YAML catalog |
+| `GET /admin/disk-sets` | List configured disk sets/topology groups | Read-only YAML catalog |
+| `GET /admin/disk-sets/{id}` | Read one disk set/topology group | Read-only YAML catalog |
+
+### Admin UI plan
+
+Planned Vue screens are policy list/detail/validation report, device list/detail, disk-set/topology overview/detail, and backend/status dashboard. Frontend implementation requires an appropriate frontend workflow/agent before changing `magrathea-ui`; the current Java workflow only documents the plan and backend contracts.
 
 ### S3 API activation
 
@@ -127,6 +151,7 @@ aws --endpoint-url http://localhost:8080 s3api get-object --bucket test-bucket -
 | 1 | All unit + integration tests | `mvn test` |
 | 2 | Domain JUnit only | `mvn test -pl object-store-domain` |
 | 3 | S3 API Cucumber only | `mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false` |
+| 3b | Admin API adapter tests | `mvn -B -pl admin-api-adapter -am test` |
 | 4 | JaCoCo coverage (current baseline) | `mvn verify` (JaCoCo runs automatically with the default lifecycle) |
 | 4b | Clover coverage (optional/legacy) | `mvn -Pcoverage clover:setup test clover:aggregate clover:clover` |
 | 5 | AWS CLI compatibility | `bash test-aws-cli.sh` |

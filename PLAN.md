@@ -82,9 +82,9 @@ This section implements [ADR 0017](docs/adr/0017-course-correction-broaden-proje
 |---|---|
 | Owner agent(s) | `documenter` for UI/API plan; `java-infra-coder` for backend admin contracts; frontend implementation requires an appropriate frontend workflow/agent outside the current Java workflow before code changes in `magrathea-ui` |
 | Affected modules/files | `magrathea-ui/**`; `admin-api-adapter`; `storage-engine-reactive-application`; `storage-engine-reactive-infrastructure`; frontend/docs build configuration; `bootstrap-application/src/main/resources/static/**`; README/ARC42 admin sections |
-| Concrete findings | Admin/web UI must manage `StoragePolicy` and `StorageDevice` entities. The Vue UI build is currently coupled to Java source resources. Frontend work may require an appropriate frontend workflow/agent outside the current Java workflow. |
-| Expected correction outputs | UI plan for policy/device list, detail, validation, and edit/read-only flows; backend admin API contracts for storage policies/devices/topologies; decoupled frontend build/package strategy; workflow handoff request before frontend implementation work. |
-| Acceptance gates | UI work remains planned until frontend ownership is assigned; Java admin APIs have contract tests before UI integration; frontend build no longer mutates Java source resources; README/ARC42 describe admin UI scope without claiming unimplemented screens. |
+| Concrete findings | Admin/web UI must manage `StoragePolicy`, `StorageDevice`, and disk-set/topology entities. Backend admin endpoints are now implemented as configuration-as-code/read-only catalog endpoints: YAML-backed policies/devices/disk sets are read at runtime, mutation requests are rejected, and the validation endpoint validates request bodies without persisting them. The Vue UI build is currently coupled to Java source resources. Frontend work requires an appropriate frontend workflow/agent outside the current Java workflow before changing `magrathea-ui`. |
+| Expected correction outputs | UI plan for policy list/detail/validation, device list/detail, disk-set/topology overview, and backend/status screens; backend admin API contracts for read-only storage policies/devices/disk sets plus non-persistent policy validation; decoupled frontend build/package strategy; workflow handoff request before frontend implementation work. |
+| Acceptance gates | Backend admin API contract tests pass for read-only catalog behavior and validation errors; UI work remains planned until frontend ownership is assigned; frontend build no longer mutates Java source resources; README/ARC42 describe admin UI scope without claiming unimplemented screens. |
 
 ### Prioritized roadmap
 
@@ -93,7 +93,7 @@ This section implements [ADR 0017](docs/adr/0017-course-correction-broaden-proje
 | P0 — Stop compounding false signals ✅ (documentation + build hygiene done 2026-06-12) | Clean generated/tracked artifact boundaries; fix Maven/POM/profile hygiene; correct documentation overclaims; establish current test/report baseline; record package/layering risks. **Done 2026-06-12:** (1) README.md and docs/test-report.md documentation overclaims corrected; JaCoCo documented as primary baseline. (2) 789 generated/compiled artifacts untracked from Git (Vue bundles, JaCoCo JSON exports, .class files, META-INF); .gitignore extended. (3) `admin-api-adapter/pom.xml` schema URL fixed (maven-1.0.0.xsd → maven-4.0.0.xsd). (4) `docker-compose.yml` healthcheck changed from `curl` (missing in JRE image) to `wget --spider`. (5) `Dockerfile` pre-generated Javadoc anti-pattern flagged with TODO comment. Remaining P0 gate: `mvn validate` from clean checkout (requires confirming no build mutates source resources). | `mvn validate` from a clean checkout; no generated source-tree mutations; README/PLAN/test report stop claiming unverified runtime/API status; JaCoCo baseline is clear. |
 | P1 — Restore architectural and runtime correctness ⚠️ (layering/scanning done 2026-06-12; runtime correctness pending) | Fix application-to-infrastructure dependency inversion; make backend selection explicit; wire storage-engine backend end to end; repair critical read/write, manifest, chunk, dedup, route, multipart, ETag, and admin catalog behavior. **Done 2026-06-12:** (1) 4 exception classes moved from `object-store-reactive-infrastructure` to `object-store-reactive-repository-application` port module; all imports updated; old classes deprecated; infra dependency removed from application POM. (2) `@ComponentScan` extended with `com.example.magrathea.objectstorage` and `com.example.magrathea.storageengine`. (3) `@Profile("single-node")` added to 3 in-memory repository beans; `@Profile("storage-engine")` added to storage-engine adapter beans and ACL translator. (4) `application.properties` sets `spring.profiles.default=single-node`. (5) Pre-existing compile error in `ReactiveStorageOrchestrator` fixed (duplicate variable, type mismatch). Full project `mvn compile` → BUILD SUCCESS. Remaining: runtime correctness (read path, manifest/chunk/dedup, multipart, ETag, admin catalog) — tracked under P2/P5. | Context tests for both backends; S3 read-after-write through selected backend; storage-engine integration tests; route/multipart/admin tests pass. |
 | P2 — Harden domain and configuration model | Add storage-engine domain tests; enforce invariants and immutability; implement YAML-backed policy/device/topology catalogs; define and test `MINIO_STANDARD`; model physical placement/topology for placement and EC. | Domain and catalog tests pass; malformed config fails clearly; `MINIO_STANDARD` is loaded from YAML and produces deterministic persistence plans. |
-| P3 — Parity, documentation, and UI maturation | Bring AWS CLI Cucumber toward canonical WebTestClient parity; update C4/ARC42/API coverage; plan and hand off frontend admin UI; resolve ADR freshness and remaining docs links. | Scenario parity matrix exists; docs match code and tests; C4 includes admin API/current routers; frontend workflow ownership is established before UI implementation. |
+| P3 — Parity, documentation, and UI maturation ⚠️ (Phase 8 backend Admin API partial done) | Bring AWS CLI Cucumber toward canonical WebTestClient parity; update C4/ARC42/API coverage; plan and hand off frontend admin UI. **Done for Phase 8 backend/API:** read-only configuration-as-code Admin API catalog endpoints and non-persistent policy validation are documented and tested. Remaining: selected backend/status contract beyond `/admin/health`, UI implementation handoff, ADR freshness, and remaining docs links. | Scenario parity matrix exists; docs match code and tests; C4 includes admin API/current routers; frontend workflow ownership is established before UI implementation. |
 
 ## S3 API Semantic Completion Plan
 
@@ -127,7 +127,7 @@ Every S3 operation must be classified independently. An operation may be mapped 
 | Analytics/inventory/metrics/intelligent-tiering | S3-P4 | Bucket config handlers/services; repository metadata tables; reports documentation | Likely config-only first. Store and return configuration documents; reports must state that no background analytics, inventory file generation, metrics publication, or tiering job behavior exists unless implemented. | Config CRUD tests; report matrix notes `config-only` and `no background job behavior`; no completion claim without generated reports/jobs and tests. |
 | Replication/lifecycle/notification execution | S3-P4 | Bucket config services; storage-engine/application background-job infrastructure if introduced; eventing modules if introduced | Distinguish storing configuration from executing background behaviors: lifecycle expiration/transitions, replication copy, and notifications require schedulers/event processing and observable side effects. | Config storage can be stateful; execution needs integration tests proving expiration/transition, replicated objects, or emitted notifications; otherwise status remains config-only or stubbed. |
 | Advanced/specialized APIs: `SelectObjectContent`, `RestoreObject`, torrent, Object Lambda, directory buckets/sessions | S3-P4 or separate scope | S3 specialized handlers; object services; storage-engine cold-storage/select/query infrastructure if introduced | Mark likely unsupported or separate scope unless implemented. `RestoreObject` may be metadata-only until archival tiers exist; Select/Object Lambda/directory buckets require explicit feature designs before semantic claims. | Unsupported APIs return documented unsupported/not-implemented responses or are labeled stubbed; any implemented subset has explicit scenarios and documented deviations. |
-| Admin/storage-engine integration APIs | S3-P0 through S3-P4 depending on dependency | `admin-api-adapter`; `storage-engine-domain`; `storage-engine-reactive-application`; `storage-engine-reactive-infrastructure`; ACL adapter; `bootstrap-application`; docs | These are not AWS S3 APIs, but they are required to make storage policy, device, topology, and backend behavior real and testable. They must expose or verify active backend, policy/device catalogs, and storage-engine scenarios used by S3 operations. | Admin/storage-engine tests prove selected backend and policy/device state; S3 storage-engine compatibility rows cite passing backend scenarios; docs keep admin APIs separate from S3 API coverage. |
+| Admin/storage-engine integration APIs | S3-P0 through S3-P4 depending on dependency | `admin-api-adapter`; `storage-engine-domain`; `storage-engine-reactive-application`; `storage-engine-reactive-infrastructure`; ACL adapter; `bootstrap-application`; docs | These are not AWS S3 APIs, but they are required to make storage policy, device, topology, and backend behavior visible and testable. Current backend Admin API scope is configuration-as-code: read-only catalog endpoints expose YAML-backed policies/devices/disk sets, mutation requests are rejected, and policy validation does not persist. Future backend/status evidence must still prove the selected backend and storage-engine scenarios used by S3 operations. | Admin API tests prove read-only catalog and validation behavior; selected-backend/storage-engine tests prove runtime backend state separately; S3 storage-engine compatibility rows cite passing backend scenarios; docs keep admin APIs separate from S3 API coverage. |
 
 ### Required S3 Semantic Reporting Table Template
 
@@ -179,7 +179,7 @@ This section supersedes earlier planning statements where they conflict with [AD
 - `admin-api-adapter` exists; therefore documentation that says the project is strictly "S3-only" is stale. The S3 API remains the public object API, but admin/configuration APIs must be documented separately.
 - **JaCoCo is the current coverage baseline**. Clover/OpenClover is optional/legacy and must not be documented as the primary coverage gate.
 - AWS CLI Cucumber currently is **not scenario-parallel** to the WebTestClient Cucumber suite. The AWS CLI path must be brought into parity where the AWS CLI can express the same behavior.
-- Storage-engine policy/device configuration is incomplete: YAML-backed policy/device catalogs and a concrete testable `MINIO_STANDARD` policy path are required.
+- Storage-engine policy/device configuration is partially implemented: YAML-backed policy/device/disk-set catalogs and the Admin API now treat these entities as configuration-as-code/read-only at runtime; the concrete `MINIO_STANDARD` policy path is test-backed, while selected-backend runtime read/write evidence remains pending.
 
 ### Architecture Correction Goals
 
@@ -189,7 +189,7 @@ This section supersedes earlier planning statements where they conflict with [AD
 4. Use separate YAML files: **one YAML file per `StorageDevice`, disk set, or topology entity**.
 5. Add YAML-backed repositories/catalogs for `StoragePolicy` and `StorageDevice`/topology entities.
 6. Make `MINIO_STANDARD` the first storage policy use case, with explicit expected behavior and tests.
-7. Add web/admin management for `StoragePolicy` and `StorageDevice` entities.
+7. Add web/admin management for `StoragePolicy`, `StorageDevice`, and disk-set/topology entities as configuration-as-code/read-only runtime catalogs with non-persistent validation.
 8. Make the storage-engine backend selectable and actually wired at runtime.
 9. Make AWS CLI Cucumber execute the same canonical scenarios as WebTestClient Cucumber where possible.
 10. Keep object-store and storage-engine bounded contexts separated by the existing ACL module.
@@ -341,21 +341,24 @@ Tasks:
 - Wire `ReactiveStorageOrchestrator` and filesystem ports only when the storage-engine backend is active.
 - Ensure the ACL module has all dependencies and no package-scan gaps.
 
-#### Phase 8 — Web/Admin API and UI Planning
+#### Phase 8 — Web/Admin API and UI Planning ⚠️ (backend read-only Admin API done; UI implementation pending)
 
 | Field | Plan |
 |---|---|
-| Owner agent | `java-infra-coder` for backend endpoints, `documenter` for API/UI plan, frontend work may require a frontend workflow/agent outside the current Java workflow |
-| Affected files/modules | `admin-api-adapter/src/main/java/**`, `admin-api-adapter/src/main/resources/**`, `storage-engine-reactive-application` ports/services, `storage-engine-reactive-infrastructure` YAML repositories, `magrathea-ui/src/**`, `README.md`, ARC42 runtime/admin sections |
-| Expected outputs | Admin endpoints and UI screen plan for `StoragePolicy` and `StorageDevice` CRUD/validation; explicit separation from S3 object API |
-| Acceptance criteria | Backend exposes list/get/validate/create/update/delete or documented read-only operations for policies/devices; validation errors are structured; UI plan identifies screens, forms, and validation feedback; frontend implementation ownership is clarified before code work starts |
-| Test gates | Admin API WebFlux tests; contract tests for validation errors; UI tests only after frontend workflow is assigned |
+| Owner agent | `java-infra-coder` for backend endpoints, `documenter` for API/UI plan, frontend implementation requires a frontend workflow/agent outside the current Java workflow |
+| Affected files/modules | `admin-api-adapter/src/main/java/**`, `admin-api-adapter/src/main/resources/**`, `storage-engine-reactive-application` ports/services, `storage-engine-reactive-infrastructure` YAML repositories, `magrathea-ui/src/**` (planned only), `README.md`, ARC42 runtime/admin sections |
+| Expected outputs | Backend Admin API exposes configuration-as-code/read-only endpoints for `StoragePolicy`, `StorageDevice`, and disk-set/topology catalogs; policy validation accepts JSON and returns structured validation results without persisting; UI screen plan covers policy list/detail/validation, device list/detail, disk-set/topology, and backend/status; S3 object API remains explicitly separate |
+| Acceptance criteria | ✅ Backend exposes list/get for policies, devices, and disk sets; ✅ storage policy validation errors are structured and non-persistent; ✅ mutation endpoints for policies are documented as read-only/runtime-disabled; ⚠️ backend/status beyond `/admin/health` and selected-backend evidence remain planned; ⚠️ UI implementation remains pending until frontend workflow ownership is assigned before modifying `magrathea-ui` |
+| Test gates | ✅ `mvn -B -pl admin-api-adapter -am test` — 9 tests, 0 failures, build success; UI tests only after frontend workflow is assigned |
 
 Tasks:
-- Decide whether YAML-backed entities are mutable at runtime or managed as configuration-as-code with read/validate APIs only.
-- Add admin API resources for policies and devices/topologies.
-- Plan Vue screens: policy list/detail/editor, device list/detail/editor, validation report, selected active backend/status.
-- Document that frontend implementation may need a frontend-specific workflow/agent outside this Java workflow.
+- [x] Decide runtime mutability: YAML-backed storage policies, devices, and disk sets/topology are configuration-as-code and read-only at runtime.
+- [x] Add admin API resources for policies and devices/topologies: `/admin/storage-policies`, `/admin/storage-devices`, and `/admin/disk-sets` list/detail endpoints.
+- [x] Add non-persistent storage policy validation: `POST /admin/storage-policies/validate` validates request payloads and returns structured results without writing YAML or runtime state.
+- [x] Document that create/update/delete policy requests are rejected at runtime (`405 Method Not Allowed`) and changes must be made through YAML configuration/redeploy or reload.
+- [ ] Plan/implement a richer selected active backend/status contract beyond `/admin/health` when runtime backend evidence is available.
+- [ ] Plan Vue screens: policy list, policy detail, policy validation/report; device list, device detail; disk-set/topology overview/detail; backend/status dashboard.
+- [ ] Request an appropriate frontend workflow/agent before changing `magrathea-ui`; do not implement Vue screens in the Java workflow.
 
 #### Phase 9 — Cucumber Parity
 
@@ -410,7 +413,8 @@ mvn -Pcoverage test jacoco:report
 - [ ] `MINIO_STANDARD` is explicitly defined, loaded from YAML, and testable.
 - [ ] Storage-engine backend can be selected at runtime without duplicate repositories.
 - [ ] S3 write/read path works end to end with the selected storage-engine backend.
-- [ ] Admin API and UI plan cover policy/device management.
+- [x] Backend Admin API exposes read-only policy/device/disk-set catalogs and non-persistent validation as configuration-as-code.
+- [ ] Admin UI plan covers policy/device/disk-set/backend-status screens and awaits frontend workflow ownership.
 - [ ] AWS CLI Cucumber parity exists for canonical scenarios where possible.
 - [ ] Documentation reports planned vs completed work accurately.
 

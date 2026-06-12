@@ -50,7 +50,11 @@ The public object API exposes AWS S3-compatible endpoints. Internal/admin endpoi
 
 === Admin API and Static Documentation Assets
 
-`admin-api-adapter` exposes internal `/admin/**` JSON endpoints for health, storage policy, storage device, and configuration management. `bootstrap-application` also serves generated UI/documentation assets from classpath `static/**` resources, including ARC42 JSON and copied C4/ARC42 image files. These resources support operations and documentation; they are not part of the S3-compatible object API.
+`admin-api-adapter` exposes internal `/admin/**` JSON endpoints for health, read-only storage policy catalogs, read-only storage device catalogs, read-only disk-set/topology catalogs, and non-persistent storage policy validation. `bootstrap-application` also serves generated UI/documentation assets from classpath `static/**` resources, including ARC42 JSON and copied C4/ARC42 image files. These resources support operations and documentation; they are not part of the S3-compatible object API.
+
+The current runtime mutability decision is configuration-as-code: YAML-backed storage policies, devices, and disk sets are managed outside the running process and exposed as read-only catalog data. `POST /admin/storage-policies/validate` validates a submitted payload and returns structured results without persisting it. Policy mutation requests are rejected at runtime with `405 Method Not Allowed`.
+
+Planned Admin UI screens are policy list/detail/validation report, device list/detail, disk-set/topology overview/detail, and backend/status dashboard. Frontend implementation must be handed off to an appropriate frontend workflow/agent before changing `magrathea-ui`.
 
 === Pluggable S3 API Module
 

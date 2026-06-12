@@ -117,6 +117,22 @@ image::../../c4/images/BucketConfigurationRuntime.png[Bucket Configuration Runti
 
 **Verification boundary:** The static resource handoff verifies files are present and JSON is parseable. It does not change S3 API semantics or storage-engine runtime behavior.
 
+=== Scenario 6c — Admin Configuration-as-Code Catalog API
+
+**Description:** Operators and the future Admin UI use `/admin/**` JSON endpoints to inspect YAML-backed storage policies, storage devices, and disk-set/topology catalogs. These endpoints are separate from the public S3 object API and are read-only at runtime.
+
+**Flow:**
+1. Operator/Admin UI → admin-api-adapter: `GET /admin/health` to discover admin links and confirm configuration-as-code mode.
+2. Operator/Admin UI → admin-api-adapter: `GET /admin/storage-policies`, `GET /admin/storage-devices`, or `GET /admin/disk-sets` for catalog lists.
+3. admin-api-adapter → storage-engine catalog ports: read policies, devices, or disk sets from the configured YAML-backed catalogs.
+4. admin-api-adapter → Operator/Admin UI: return JSON list/detail responses with `_links`.
+5. Optional validation: `POST /admin/storage-policies/validate` parses the submitted policy payload and returns `{valid, errors, policy}` without writing YAML files or changing active runtime state.
+6. Runtime mutation requests such as `POST /admin/storage-policies`, `PUT /admin/storage-policies/{id}`, and `DELETE /admin/storage-policies/{id}` return `405 Method Not Allowed` with an `admin-catalog-read-only` error.
+
+**Verification:** `mvn -B -pl admin-api-adapter -am test` completed with 9 tests, 0 failures, and build success for read-only catalog behavior, validation responses, and error semantics.
+
+**UI planning boundary:** Planned Vue screens are policy list/detail/validation, device list/detail, disk-set/topology, and backend/status. Frontend implementation requires a frontend workflow/agent before changing `magrathea-ui`.
+
 === Scenario 7 — Reactive Chain Pattern
 
 **Description:** The reactive chain pattern used throughout the application layer. No blocking `.join()`, no `Mono.fromCallable`, no `.subscribeOn(Schedulers.boundedElastic())`.

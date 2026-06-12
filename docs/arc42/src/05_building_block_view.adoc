@@ -75,10 +75,12 @@ Implements reactive in-memory repositories with ConcurrentHashMap using Mono/Flu
 ==== admin-api-adapter (internal/admin HTTP adapter)
 
 **Blackbox Description:**
-Exposes `/admin/**` JSON endpoints for health, storage policy, storage device, and configuration management. These endpoints are internal/administrative and are not part of the S3 object API coverage.
+Exposes `/admin/**` JSON endpoints for health, storage policy, storage device, disk-set/topology, and configuration-as-code catalog visibility. These endpoints are internal/administrative and are not part of the S3 object API coverage.
 
-- **Provided Interface:** Admin JSON API
-- **Required Interface:** Storage policy/device catalog ports and selected backend status
+The current mutability contract is read-only at runtime: YAML-backed storage policies, devices, and disk sets are exposed through list/detail endpoints; policy validation accepts JSON and returns structured validation results without persisting; policy create/update/delete routes return `405 Method Not Allowed`.
+
+- **Provided Interface:** Admin JSON API (`/admin/health`, `/admin/storage-policies`, `/admin/storage-policies/{id}`, `/admin/storage-policies/validate`, `/admin/storage-devices`, `/admin/storage-devices/{id}`, `/admin/disk-sets`, `/admin/disk-sets/{id}`)
+- **Required Interface:** Storage policy/device/disk-set catalog ports and selected backend status evidence when available
 - **Technology:** Spring Boot 4 WebFlux, Java 21, RouterFunction
 
 ==== storage-engine-reactive-application and storage-engine-reactive-infrastructure
