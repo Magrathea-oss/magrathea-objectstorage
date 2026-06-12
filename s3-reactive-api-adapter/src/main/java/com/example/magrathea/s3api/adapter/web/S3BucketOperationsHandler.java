@@ -107,8 +107,9 @@ public class S3BucketOperationsHandler {
     /** PUT /{bucket}?versioning — PutBucketVersioning */
     public Mono<ServerResponse> putBucketVersioning(ServerRequest request) {
         var bucket = request.pathVariable("bucket");
+        var xmlRequest = xmlCommandRequest(request);
         return bucketService.findByName(bucket)
-            .flatMap(b -> request.bodyToMono(VersioningConfigurationCommand.class)
+            .flatMap(b -> xmlRequest.bodyToMono(VersioningConfigurationCommand.class)
                 .flatMap(cmd -> {
                     var enabled = "Enabled".equals(cmd.status());
                     var updated = enabled ? b.withVersioningEnabled() : b.withVersioningSuspended();
@@ -118,6 +119,17 @@ public class S3BucketOperationsHandler {
             .switchIfEmpty(ServerResponse.status(HttpStatus.NOT_FOUND)
                 .contentType(MediaType.APPLICATION_XML)
                 .bodyValue(ErrorQuery.from("NoSuchBucket", "Bucket not found")));
+    }
+
+    private ServerRequest xmlCommandRequest(ServerRequest request) {
+        var contentType = request.headers().contentType();
+        if (contentType.isEmpty() || contentType.filter(MediaType.APPLICATION_OCTET_STREAM::isCompatibleWith).isPresent()) {
+            return ServerRequest.from(request)
+                .headers(headers -> headers.setContentType(MediaType.APPLICATION_XML))
+                .body(request.exchange().getRequest().getBody())
+                .build();
+        }
+        return request;
     }
 
     /** GET /{bucket} — ListObjects (XML) */
