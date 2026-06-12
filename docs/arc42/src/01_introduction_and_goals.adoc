@@ -12,7 +12,7 @@ It provides a lightweight implementation of the AWS S3 REST API route surface fo
 - **S3 API compatibility**: map the in-scope AWS S3 REST API route surface and classify semantic implementation separately from route count
 - **Reactive by design**: full WebFlux non-blocking I/O, DataBuffer streaming for binary content
 - **Domain-Driven Design**: pure domain with zero framework dependencies, hexagonal architecture
-- **Testability**: domain/unit tests, WebTestClient Cucumber, targeted AWS CLI object CRUD compatibility, explicit unsupported AWS CLI tags, and JaCoCo coverage reporting
+- **Testability**: domain/unit tests, WebTestClient Cucumber, targeted AWS CLI object CRUD compatibility, explicit gap tags when scenarios remain unsupported, and JaCoCo coverage reporting
 
 === Stakeholders
 
