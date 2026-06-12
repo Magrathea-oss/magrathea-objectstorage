@@ -40,13 +40,17 @@ Advanced configuration value objects (BucketAnalyticsConfiguration, BucketInvent
 
 === S3 API Compatibility
 
-The system exposes ONLY AWS S3-compatible endpoints:
+The public object API exposes AWS S3-compatible endpoints. Internal/admin endpoints are exposed separately by `admin-api-adapter` under `/admin/**` and must not be counted as S3 API coverage:
 
 - Same HTTP signature (methods, headers, query parameters)
 - Same XML format (ListAllMyBucketsResult, ListBucketResult, Error, etc.)
 - Same error encoding (NoSuchBucket, NoSuchKey, BucketAlreadyExists)
 - Pluggable via Spring Boot auto-configuration (s3-reactive-api-adapter attaches as an optional module)
 - Toggle with `s3.api.enabled=false`
+
+=== Admin API and Static Documentation Assets
+
+`admin-api-adapter` exposes internal `/admin/**` JSON endpoints for health, storage policy, storage device, and configuration management. `bootstrap-application` also serves generated UI/documentation assets from classpath `static/**` resources, including ARC42 JSON and copied C4/ARC42 image files. These resources support operations and documentation; they are not part of the S3-compatible object API.
 
 === Pluggable S3 API Module
 

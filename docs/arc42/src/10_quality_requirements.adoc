@@ -7,10 +7,10 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 | Category | Goal | Description | Metric |
 |---|---|---|---|
-| Functional | S3 API Compatibility | Implement the in-scope AWS S3 REST API operation set | 111/111 operations implemented |
+| Functional | S3 API Compatibility | Map the in-scope AWS S3 REST route surface and classify semantic behavior independently | Route inventory plus semantic coverage matrix |
 | Performance | Reactive non-blocking I/O | Upload/download without thread blocking | DataBuffer streaming, no byte[] in handlers |
-| Testability | 3-layer testing | Domain JUnit + Cucumber BDD + AWS CLI | Total: 479 tests (213 domain + 18 application + 227 S3 integration + 21 AWS CLI), 12 failures (12 anomaly tests) |
-| Maintainability | Domain-Driven Design | Pure domain, zero framework dependencies | 12 ADRs document decisions |
+| Testability | Layered testing | Domain/unit tests + WebTestClient Cucumber + targeted AWS CLI scenarios + JaCoCo | Current evidence is tracked in `docs/test-report.md`; stale counts must not be used as completion claims |
+| Maintainability | Domain-Driven Design | Pure domain, zero framework dependencies | ADR index maintained in section 9 |
 
 === Quality Scenarios
 
@@ -26,11 +26,11 @@ ifndef::imagesdir[:imagesdir: ../images]
 - **Context:** AWS CLI interacts with the system
 - **Stimulus:** AWS CLI command for each implemented operation
 - **Response:** Output identical to real AWS S3 (same XML, same error codes)
-- **Metric:** 111/111 in-scope operations implemented; AWS CLI checks pass for operations exposed by `aws s3api`
+- **Metric:** route mapped plus semantic classification (`Mapped`, `Stubbed`, `Stateful`, `AWS CLI compatible`, `Storage-engine compatible`, or `Semantically S3-compatible`) with evidence in the test report
 
 ==== Scenario 3 — Test Coverage
 
 - **Context:** A new S3 operation is implemented
 - **Stimulus:** Code commit
-- **Response:** Pre-commit hook generates Clover coverage
-- **Metric:** Coverage > 80% (83.45% current)
+- **Response:** Maven verification generates JaCoCo coverage as the current baseline
+- **Metric:** Coverage trend and thresholds are taken from current JaCoCo reports; Clover/OpenClover is optional/legacy

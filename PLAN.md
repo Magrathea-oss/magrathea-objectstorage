@@ -41,7 +41,7 @@ This section implements [ADR 0017](docs/adr/0017-course-correction-broaden-proje
 | Field | Plan |
 |---|---|
 | Owner agent(s) | `java-infra-coder` primary for adapters/runtime; `java-domain-coder` for orchestrator semantics; `java-tester` for integration and Cucumber gates |
-| Affected modules/files | `object-store-reactive-repository-storage-engine-infrastructure`; `storage-engine-application`; `storage-engine-infrastructure`; `s3-reactive-api-adapter`; `admin-api-adapter`; `bootstrap-application`; repositories, orchestrators, manifest/chunk stores, routers, and error mappers |
+| Affected modules/files | `object-store-reactive-repository-storage-engine-infrastructure`; `storage-engine-reactive-application`; `storage-engine-reactive-infrastructure`; `s3-reactive-api-adapter`; `admin-api-adapter`; `bootstrap-application`; repositories, orchestrators, manifest/chunk stores, routers, and error mappers |
 | Concrete findings | `StorageEngineReactiveS3ObjectRepository#getContent` returns empty. Filesystem manifest and stored-object repositories cannot deserialize complete state. Chunk IDs are inconsistent across orchestrator, manifest, dedup, and filesystem persistence. A dedup hit does not skip duplicate persistence. Full object bodies are accumulated into memory. Production code has blocking-call and blocking filesystem I/O scheduling risks. S3 keys with slash-containing paths likely do not route correctly. Multipart upload does not persist and assemble part bodies. ETag semantics are likely wrong. `AdminRouter` error semantics and policy map are disconnected from `StoragePolicyCatalog`. |
 | Expected correction outputs | End-to-end read-after-write through selected backend; complete manifest/stored-object serialization; consistent chunk identity model; dedup duplicate-hit short-circuit; streaming upload/read path without whole-object buffering; blocking I/O isolated on suitable schedulers; route handling for slash-containing S3 keys; multipart part persistence and assembly; documented and tested ETag behavior; admin errors backed by the real policy catalog. |
 | Acceptance gates | Storage-engine backend integration tests pass for put/get/delete/list and read-after-write; large/chunk-boundary tests do not require full-body aggregation; route tests cover keys with slashes; multipart Cucumber/unit tests persist and assemble content; ETag expectations are asserted; admin API tests validate catalog-backed behavior and error semantics. |
@@ -51,7 +51,7 @@ This section implements [ADR 0017](docs/adr/0017-course-correction-broaden-proje
 | Field | Plan |
 |---|---|
 | Owner agent(s) | `java-domain-coder` for policy/topology model; `java-infra-coder` for YAML-backed repositories and runtime selection; `java-scaffolder` for profiles/autoconfig; `java-tester` for executable scenarios; `documenter` for ADR/ARC42 alignment |
-| Affected modules/files | `storage-engine-domain`; `storage-engine-application`; `storage-engine-infrastructure`; `object-store-reactive-repository-storage-engine-infrastructure`; `bootstrap-application`; storage policy/device YAML directories; README/ARC42/ADR files |
+| Affected modules/files | `storage-engine-domain`; `storage-engine-reactive-application`; `storage-engine-reactive-infrastructure`; `object-store-reactive-repository-storage-engine-infrastructure`; `bootstrap-application`; storage policy/device YAML directories; README/ARC42/ADR files |
 | Concrete findings | Chunking must remain inside `DedupConfig` and be configurable by `StoragePolicy`. The configuration model requires one YAML file per `StoragePolicy` and one YAML file per `StorageDevice`, disk set, or topology entity. Repositories/catalogs must be YAML-backed. `MINIO_STANDARD` is the first concrete use case. Physical disk/device/topology mapping is required for placement and erasure coding. Backend profile/autoconfiguration selection is incomplete. |
 | Expected correction outputs | Domain-pure policy/device/topology model; YAML-backed `StoragePolicy` and storage-device/topology catalogs; explicit `MINIO_STANDARD` YAML and tests; policy-driven dedup/chunking behavior; physical topology metadata sufficient for placement/EC decisions; backend profile/property/autoconfiguration wiring. |
 | Acceptance gates | YAML catalog tests reject malformed, duplicate, and unresolved references; `MINIO_STANDARD` loads from YAML and produces deterministic plans; storage-engine backend starts only when required config is present; policy/device management APIs use the same catalogs as runtime. |
@@ -81,7 +81,7 @@ This section implements [ADR 0017](docs/adr/0017-course-correction-broaden-proje
 | Field | Plan |
 |---|---|
 | Owner agent(s) | `documenter` for UI/API plan; `java-infra-coder` for backend admin contracts; frontend implementation requires an appropriate frontend workflow/agent outside the current Java workflow before code changes in `magrathea-ui` |
-| Affected modules/files | `magrathea-ui/**`; `admin-api-adapter`; `storage-engine-application`; `storage-engine-infrastructure`; frontend/docs build configuration; `bootstrap-application/src/main/resources/static/**`; README/ARC42 admin sections |
+| Affected modules/files | `magrathea-ui/**`; `admin-api-adapter`; `storage-engine-reactive-application`; `storage-engine-reactive-infrastructure`; frontend/docs build configuration; `bootstrap-application/src/main/resources/static/**`; README/ARC42 admin sections |
 | Concrete findings | Admin/web UI must manage `StoragePolicy` and `StorageDevice` entities. The Vue UI build is currently coupled to Java source resources. Frontend work may require an appropriate frontend workflow/agent outside the current Java workflow. |
 | Expected correction outputs | UI plan for policy/device list, detail, validation, and edit/read-only flows; backend admin API contracts for storage policies/devices/topologies; decoupled frontend build/package strategy; workflow handoff request before frontend implementation work. |
 | Acceptance gates | UI work remains planned until frontend ownership is assigned; Java admin APIs have contract tests before UI integration; frontend build no longer mutates Java source resources; README/ARC42 describe admin UI scope without claiming unimplemented screens. |
@@ -127,7 +127,7 @@ Every S3 operation must be classified independently. An operation may be mapped 
 | Analytics/inventory/metrics/intelligent-tiering | S3-P4 | Bucket config handlers/services; repository metadata tables; reports documentation | Likely config-only first. Store and return configuration documents; reports must state that no background analytics, inventory file generation, metrics publication, or tiering job behavior exists unless implemented. | Config CRUD tests; report matrix notes `config-only` and `no background job behavior`; no completion claim without generated reports/jobs and tests. |
 | Replication/lifecycle/notification execution | S3-P4 | Bucket config services; storage-engine/application background-job infrastructure if introduced; eventing modules if introduced | Distinguish storing configuration from executing background behaviors: lifecycle expiration/transitions, replication copy, and notifications require schedulers/event processing and observable side effects. | Config storage can be stateful; execution needs integration tests proving expiration/transition, replicated objects, or emitted notifications; otherwise status remains config-only or stubbed. |
 | Advanced/specialized APIs: `SelectObjectContent`, `RestoreObject`, torrent, Object Lambda, directory buckets/sessions | S3-P4 or separate scope | S3 specialized handlers; object services; storage-engine cold-storage/select/query infrastructure if introduced | Mark likely unsupported or separate scope unless implemented. `RestoreObject` may be metadata-only until archival tiers exist; Select/Object Lambda/directory buckets require explicit feature designs before semantic claims. | Unsupported APIs return documented unsupported/not-implemented responses or are labeled stubbed; any implemented subset has explicit scenarios and documented deviations. |
-| Admin/storage-engine integration APIs | S3-P0 through S3-P4 depending on dependency | `admin-api-adapter`; `storage-engine-domain`; `storage-engine-application`; `storage-engine-infrastructure`; ACL adapter; `bootstrap-application`; docs | These are not AWS S3 APIs, but they are required to make storage policy, device, topology, and backend behavior real and testable. They must expose or verify active backend, policy/device catalogs, and storage-engine scenarios used by S3 operations. | Admin/storage-engine tests prove selected backend and policy/device state; S3 storage-engine compatibility rows cite passing backend scenarios; docs keep admin APIs separate from S3 API coverage. |
+| Admin/storage-engine integration APIs | S3-P0 through S3-P4 depending on dependency | `admin-api-adapter`; `storage-engine-domain`; `storage-engine-reactive-application`; `storage-engine-reactive-infrastructure`; ACL adapter; `bootstrap-application`; docs | These are not AWS S3 APIs, but they are required to make storage policy, device, topology, and backend behavior real and testable. They must expose or verify active backend, policy/device catalogs, and storage-engine scenarios used by S3 operations. | Admin/storage-engine tests prove selected backend and policy/device state; S3 storage-engine compatibility rows cite passing backend scenarios; docs keep admin APIs separate from S3 API coverage. |
 
 ### Required S3 Semantic Reporting Table Template
 
@@ -173,8 +173,8 @@ This section supersedes earlier planning statements where they conflict with [AD
   - `s3-reactive-api-adapter`
 - Storage-engine modules exist but are **not yet reliably runtime-wired as the active backend**:
   - `storage-engine-domain`
-  - `storage-engine-application`
-  - `storage-engine-infrastructure`
+  - `storage-engine-reactive-application`
+  - `storage-engine-reactive-infrastructure`
   - `object-store-reactive-repository-storage-engine-infrastructure`
 - `admin-api-adapter` exists; therefore documentation that says the project is strictly "S3-only" is stale. The S3 API remains the public object API, but admin/configuration APIs must be documented separately.
 - **JaCoCo is the current coverage baseline**. Clover/OpenClover is optional/legacy and must not be documented as the primary coverage gate.
@@ -203,8 +203,8 @@ This section supersedes earlier planning statements where they conflict with [AD
 | In-memory backend | `object-store-reactive-infrastructure` | Default development backend |
 | Storage-engine backend ACL | `object-store-reactive-repository-storage-engine-infrastructure` | Translates object-store repository calls to storage-engine orchestration |
 | Storage engine domain | `storage-engine-domain` | `StoragePolicy`, `DedupConfig`, devices/topology, planning, manifests |
-| Storage engine application | `storage-engine-application` | Orchestrator and ports such as `StoragePolicyCatalog` |
-| Storage engine infrastructure | `storage-engine-infrastructure` | Filesystem backend, YAML catalogs/repositories, runtime config |
+| Storage engine application | `storage-engine-reactive-application` | Orchestrator and ports such as `StoragePolicyCatalog` |
+| Storage engine infrastructure | `storage-engine-reactive-infrastructure` | Filesystem backend, YAML catalogs/repositories, runtime config |
 | Runtime assembly | `bootstrap-application`, root `pom.xml` | Profiles/properties/auto-configuration/backend selection |
 | Admin API | `admin-api-adapter` | Storage policy/device management endpoints |
 | Admin UI | `magrathea-ui` | Vue UI; implementation may require a frontend workflow/agent outside the current Java workflow |
@@ -234,12 +234,12 @@ Tasks:
 |---|---|
 | Owner agent | `java-scaffolder` with `documenter` support |
 | Affected files/modules | Root `pom.xml`, `bootstrap-application/pom.xml`, `bootstrap-application/src/main/resources/**`, `storage-engine-*/pom.xml`, `object-store-reactive-repository-storage-engine-infrastructure/pom.xml`, `README.md`, ARC42 section 5 |
-| Expected outputs | Explicit decision on reactive naming parity; clear Spring component scan / auto-configuration / profile strategy; no duplicate repository beans when selecting a backend |
+| Expected outputs | Reactive naming parity documented as `storage-engine-reactive-application` and `storage-engine-reactive-infrastructure`; clear Spring component scan / auto-configuration / profile strategy; no duplicate repository beans when selecting a backend |
 | Acceptance criteria | One documented backend-selection mechanism exists; `single-node` selects in-memory repositories; `storage-engine` selects storage-engine repositories; module names and package scans are explained; application fails fast on ambiguous repository beans |
 | Test gates | `mvn validate`; Spring context test for default backend; Spring context test for storage-engine backend once Phase 7 beans exist |
 
 Tasks:
-- Decide whether to introduce naming parity such as `storage-engine-reactive-application` or document the intentional naming deviation.
+- Keep documentation, POM/module references, C4, and ARC42 aligned to the reactive naming parity.
 - Define package scanning/autoconfiguration boundaries for storage-engine beans.
 - Choose one primary activation model: Spring profiles/properties, Spring Boot auto-configuration, or a documented combination.
 - Define duplicate-bean prevention rules using profiles/conditions rather than relying on classpath ordering.
@@ -280,10 +280,10 @@ Tasks:
 | Field | Plan |
 |---|---|
 | Owner agent | `java-infra-coder` |
-| Affected files/modules | `storage-engine-application/src/main/java/**/StoragePolicyCatalog.java`; new `StorageDeviceCatalog`/repository ports if needed; `storage-engine-infrastructure/src/main/java/**/yaml/**`; `storage-engine-infrastructure/src/main/resources/storage-policies/*.yaml`; `storage-engine-infrastructure/src/main/resources/storage-devices/*.yaml`; tests under `storage-engine-infrastructure/src/test/**` |
+| Affected files/modules | `storage-engine-reactive-application/src/main/java/**/StoragePolicyCatalog.java`; new `StorageDeviceCatalog`/repository ports if needed; `storage-engine-reactive-infrastructure/src/main/java/**/yaml/**`; `storage-engine-reactive-infrastructure/src/main/resources/storage-policies/*.yaml`; `storage-engine-reactive-infrastructure/src/main/resources/storage-devices/*.yaml`; tests under `storage-engine-reactive-infrastructure/src/test/**` |
 | Expected outputs | YAML-backed catalog/repository implementation for one policy file per `StoragePolicy` and one device/topology file per entity; validation and reload semantics |
 | Acceptance criteria | Duplicate IDs fail; malformed YAML fails with actionable diagnostics; catalog loads all files from configured directories; reload behavior is documented as startup-only, manual reload, or watched reload; no source-code constants are required to define `MINIO_STANDARD` |
-| Test gates | `mvn test -pl storage-engine-infrastructure -am`; repository integration tests with temporary YAML directories; negative validation tests |
+| Test gates | `mvn test -pl storage-engine-reactive-infrastructure -am`; repository integration tests with temporary YAML directories; negative validation tests |
 
 Tasks:
 - Define schema/version fields for policy and device YAML.
@@ -298,14 +298,14 @@ Tasks:
 |---|---|
 | Status | Completed 2026-06-12 for policy semantics, YAML catalog loading, device selection, and deterministic domain persistence planning. This does **not** complete storage-engine backend runtime read/write wiring; Phase 6 and Phase 7 remain pending. |
 | Owner agent | `java-domain-coder` for behavior, `java-infra-coder` for YAML/examples, `java-tester` for executable scenarios |
-| Affected files/modules | `storage-engine-domain`, `storage-engine-infrastructure/src/main/resources/storage-policies/minio-standard.yaml`, `storage-engine-infrastructure/src/main/resources/storage-devices/*.yaml`, `docs/**`, storage-engine tests |
-| Expected outputs | Delivered: concrete YAML example and explicit initial behavior for `MINIO_STANDARD` as a deterministic, single-node MinIO-compatible policy scope. |
-| Acceptance criteria | Met for Phase 5 scope: policy semantics are explicit, `storageClassId` is corrected to `STANDARD`, behavior is deterministic and testable, and tests verify selected policy/device behavior plus resulting persistence planning. |
-| Test gates | Passed: `storage-engine-domain` 152 tests / 0 failures, including `PersistencePlannerMinioStandardTest`; `storage-engine-infrastructure` 26 tests / 0 failures, including `MinioStandardIntegrationTest`. |
+| Affected files/modules | `storage-engine-domain`, `storage-engine-reactive-infrastructure/src/main/resources/storage-policies/minio-standard.yaml`, `storage-engine-reactive-infrastructure/src/main/resources/storage-devices/*.yaml`, `docs/**`, storage-engine tests |
+| Expected outputs | Delivered: concrete YAML example and explicit Phase 5 behavior for `MINIO_STANDARD`: S3 storage class `STANDARD`, deduplication disabled, erasure-coding planning enabled as `4 data / 2 parity`, replication factor `1`, compression disabled, and encryption disabled by default. |
+| Acceptance criteria | Met for Phase 5 scope: policy semantics are explicit, `storageClassId` is corrected to `STANDARD`, behavior is deterministic and testable, and tests verify selected policy/device behavior plus resulting persistence planning. Physical EC shard placement and storage-engine runtime read/write are not claimed by this phase. |
+| Test gates | Passed: `storage-engine-domain` 152 tests / 0 failures, including `PersistencePlannerMinioStandardTest`; `storage-engine-reactive-infrastructure` 26 tests / 0 failures, including `MinioStandardIntegrationTest`. |
 | Completion evidence | Prerequisites: Phase 2/3 commit `abb426e`; Phase 4 commit `d53b543`. Phase 5 domain planning commit `b0a5f74`; Phase 5 infrastructure/YAML integration commit `0ec84cf`. |
 
 Completed scope:
-- Chosen and documented initial single-node MinIO-compatible behavior for `MINIO_STANDARD` without claiming unsupported erasure-coding, replication, or runtime backend read/write semantics.
+- Chosen and documented explicit MinIO-compatible `STANDARD` behavior for `MINIO_STANDARD`: no deduplication, EC planning `4 data / 2 parity`, replication factor `1`, compression disabled, and encryption disabled by default, without claiming runtime backend read/write completion or verified physical EC shard placement.
 - Verified deterministic domain persistence planning through `PersistencePlannerMinioStandardTest`.
 - Verified YAML catalog/device integration through `MinioStandardIntegrationTest`; `minio-standard.yaml` comments were updated and `storageClassId` was corrected to `STANDARD` for Phase 5 semantics.
 
@@ -314,10 +314,10 @@ Completed scope:
 | Field | Plan |
 |---|---|
 | Owner agent | `java-domain-coder` and `java-infra-coder` |
-| Affected files/modules | `storage-engine-application/src/main/java/**/ReactiveStorageOrchestrator.java`, `Chunker.java`, `ApplicationChunkPayload.java`; `storage-engine-application/src/main/java/**/ContentAddressIndex.java`, `ChunkStorePort.java`, `ObjectManifestRepository.java`; `storage-engine-infrastructure/src/main/java/**/FileSystemContentAddressIndex.java`, `FileSystemChunkStorePort.java`, `FileSystemManifestRepository.java`; `storage-engine-domain/src/main/java/**/ObjectManifest.java`, `ChunkId.java`, `ChunkReferenceDescriptor.java`, `ChunkPersistenceTrace.java` |
+| Affected files/modules | `storage-engine-reactive-application/src/main/java/**/ReactiveStorageOrchestrator.java`, `Chunker.java`, `ApplicationChunkPayload.java`; `storage-engine-reactive-application/src/main/java/**/ContentAddressIndex.java`, `ChunkStorePort.java`, `ObjectManifestRepository.java`; `storage-engine-reactive-infrastructure/src/main/java/**/FileSystemContentAddressIndex.java`, `FileSystemChunkStorePort.java`, `FileSystemManifestRepository.java`; `storage-engine-domain/src/main/java/**/ObjectManifest.java`, `ChunkId.java`, `ChunkReferenceDescriptor.java`, `ChunkPersistenceTrace.java` |
 | Expected outputs | Consistent chunk IDs across dedup index, manifest, filesystem persistence, and reads; duplicate hits skip duplicate chunk persistence when dedup is enabled |
 | Acceptance criteria | Reads use manifest chunk references that match persisted chunks; dedup index maps content hash/chunk ID consistently; duplicate uploads avoid duplicate chunk writes when dedup is enabled; non-dedup policy still persists/read streams correctly |
-| Test gates | `mvn test -pl storage-engine-application,storage-engine-infrastructure -am`; orchestrator tests for single chunk, multi-chunk, duplicate content, non-dedup content, and read-after-write |
+| Test gates | `mvn test -pl storage-engine-reactive-application,storage-engine-reactive-infrastructure -am`; orchestrator tests for single chunk, multi-chunk, duplicate content, non-dedup content, and read-after-write |
 
 Tasks:
 - Keep chunking inside dedup behavior, not as a separate pipeline step.
@@ -330,7 +330,7 @@ Tasks:
 | Field | Plan |
 |---|---|
 | Owner agent | `java-infra-coder` with `java-scaffolder` support |
-| Affected files/modules | `bootstrap-application/src/main/java/**`, `bootstrap-application/src/main/resources/application*.properties` / `application*.yaml`, `object-store-reactive-infrastructure`, `object-store-reactive-repository-storage-engine-infrastructure`, `storage-engine-infrastructure`, Spring configuration/auto-configuration resources, root `pom.xml` profiles |
+| Affected files/modules | `bootstrap-application/src/main/java/**`, `bootstrap-application/src/main/resources/application*.properties` / `application*.yaml`, `object-store-reactive-infrastructure`, `object-store-reactive-repository-storage-engine-infrastructure`, `storage-engine-reactive-infrastructure`, Spring configuration/auto-configuration resources, root `pom.xml` profiles |
 | Expected outputs | Spring configuration/profile/property selection between in-memory and storage-engine backends; no duplicate repository implementations active in one context |
 | Acceptance criteria | Default runtime starts with in-memory backend; `storage-engine` profile/property starts with storage-engine backend; startup logs selected backend; missing YAML/device directories fail fast only when storage-engine backend is selected; object S3 operations can exercise the selected backend end to end |
 | Test gates | Spring Boot context tests for both backend modes; `mvn test -pl bootstrap-application -am`; smoke test through S3 API using storage-engine profile |
@@ -346,7 +346,7 @@ Tasks:
 | Field | Plan |
 |---|---|
 | Owner agent | `java-infra-coder` for backend endpoints, `documenter` for API/UI plan, frontend work may require a frontend workflow/agent outside the current Java workflow |
-| Affected files/modules | `admin-api-adapter/src/main/java/**`, `admin-api-adapter/src/main/resources/**`, `storage-engine-application` ports/services, `storage-engine-infrastructure` YAML repositories, `magrathea-ui/src/**`, `README.md`, ARC42 runtime/admin sections |
+| Affected files/modules | `admin-api-adapter/src/main/java/**`, `admin-api-adapter/src/main/resources/**`, `storage-engine-reactive-application` ports/services, `storage-engine-reactive-infrastructure` YAML repositories, `magrathea-ui/src/**`, `README.md`, ARC42 runtime/admin sections |
 | Expected outputs | Admin endpoints and UI screen plan for `StoragePolicy` and `StorageDevice` CRUD/validation; explicit separation from S3 object API |
 | Acceptance criteria | Backend exposes list/get/validate/create/update/delete or documented read-only operations for policies/devices; validation errors are structured; UI plan identifies screens, forms, and validation feedback; frontend implementation ownership is clarified before code work starts |
 | Test gates | Admin API WebFlux tests; contract tests for validation errors; UI tests only after frontend workflow is assigned |
@@ -389,8 +389,8 @@ Minimum gates before claiming correction complete:
 mvn validate
 mvn test
 mvn test -pl storage-engine-domain -am
-mvn test -pl storage-engine-application -am
-mvn test -pl storage-engine-infrastructure -am
+mvn test -pl storage-engine-reactive-application -am
+mvn test -pl storage-engine-reactive-infrastructure -am
 mvn test -pl object-store-reactive-repository-storage-engine-infrastructure -am
 mvn test -pl bootstrap-application -am
 mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false
@@ -423,7 +423,7 @@ mvn -Pcoverage test jacoco:report
 | Data migration | Future policy/device schema changes may strand existing manifests/chunks | Version manifests and YAML schemas; document no-migration assumption for first implementation; add migration ADR before persistent compatibility claims | `java-domain-coder`, `documenter` |
 | Large-object streaming | Buffering entire objects or chunks may break WebFlux behavior and memory use | Add large-object/chunk-boundary tests; keep Flux streaming at application boundaries; avoid whole-object aggregation except in tests/in-memory adapters | `java-infra-coder`, `java-tester` |
 | Real disk placement | Filesystem paths, capacity, health, and failure-domain behavior may diverge from simple tests | Model minimum topology now; add temporary-directory integration tests; document real-disk limitations until operational tests exist | `java-domain-coder`, `java-infra-coder` |
-| MinIO semantic ambiguity | `MINIO_STANDARD` may be interpreted as single-node, replicated, EC, or dedup-backed | Choose one explicit initial behavior in Phase 5; encode it in YAML and tests; avoid claiming unsupported MinIO semantics | `java-domain-coder`, `documenter` |
+| MinIO semantic ambiguity | `MINIO_STANDARD` may be interpreted as single-node, replicated, EC, or dedup-backed | Phase 5 fixes the documented semantics as S3 `STANDARD`, dedup disabled, EC planning `4 data / 2 parity`, replication factor `1`, compression disabled, and encryption disabled by default; continue to avoid claims about runtime backend read/write or verified physical EC shard placement until tested | `java-domain-coder`, `documenter` |
 | AWS CLI environment dependency | CLI tests may fail due to missing AWS CLI, credentials, endpoint, or port conflicts | Provide tagged tests, preflight checks, endpoint overrides, and clear skip/failure reporting | `java-tester` |
 | Frontend workflow availability | Vue UI work may be blocked because current workflow is Java-focused | Plan backend contracts first; request frontend workflow/agent before modifying `magrathea-ui`; keep Java admin API independently testable | `documenter`, `java-infra-coder` |
 
@@ -445,8 +445,8 @@ magrathea-objectstorage/
 ├── object-store-reactive-application/          # Reactive application services and DTOs
 ├── object-store-reactive-infrastructure/       # Reactive in-memory repository implementations
 ├── storage-engine-domain/                      # Storage Engine domain: policy, workflow, device, trace, manifest
-├── storage-engine-application/                 # Storage Engine reactive orchestration and ports
-├── storage-engine-infrastructure/              # Storage Engine filesystem cluster backend and future YAML catalogs
+├── storage-engine-reactive-application/        # Storage Engine reactive orchestration and ports
+├── storage-engine-reactive-infrastructure/     # Storage Engine filesystem cluster backend and future YAML catalogs
 ├── object-store-reactive-repository-storage-engine-infrastructure/ # ACL + adapter: Object Store → Storage Engine
 ├── bootstrap-application/                      # Spring Boot entry point
 ├── magrathea-ui/                               # Vue UI assets and documentation dashboard

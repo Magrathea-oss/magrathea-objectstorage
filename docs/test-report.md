@@ -19,14 +19,14 @@ Generated: 2026-06-05T08:40:11+02:00
 |---|---:|---:|---:|---|
 | AWS CLI S3 compatibility | 46 | 82 | 128 | Endpoint: `http://localhost:8080` |
 | Maven Surefire | See section | See section | See section | Latest reports under `*/target/surefire-reports` |
-| Clover coverage | See section | - | - | Latest report under `target/site/clover` |
+| JaCoCo coverage | See section | - | - | Current baseline; latest reports under `target/site/jacoco` when generated |
 
 ## Current Verified Results
 
 | Scope | Evidence | Result | Notes |
 |---|---|---:|---|
 | Phase 5 domain planning (`storage-engine-domain`) | Commit `b0a5f74`; `PersistencePlannerMinioStandardTest` | 152 tests passing, 0 failures | Verifies deterministic `MINIO_STANDARD` persistence planning in the domain model. |
-| Phase 5 YAML catalogs and MINIO_STANDARD integration (`storage-engine-infrastructure`) | Commit `0ec84cf`; `MinioStandardIntegrationTest` | 26 tests passing, 0 failures | Verifies YAML catalog/device integration and `MINIO_STANDARD` selection; storage-engine runtime read/write wiring remains pending for Phase 6/7. |
+| Phase 5 YAML catalogs and MINIO_STANDARD integration (`storage-engine-reactive-infrastructure`) | Commit `0ec84cf`; `MinioStandardIntegrationTest` | 26 tests passing, 0 failures | Verifies YAML catalog/device integration and `MINIO_STANDARD` selection with S3 storage class `STANDARD`, dedup disabled, EC planning `4 data / 2 parity`, replication factor `1`, compression disabled, and encryption disabled by default; storage-engine runtime read/write wiring and physical EC shard placement remain pending for Phase 6/7. |
 
 ### AWS CLI Test Status
 

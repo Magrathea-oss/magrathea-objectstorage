@@ -5,10 +5,19 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 === Level 1 — Container Diagram
 
-The system is composed of five container runtime modules:
+The C2 model distinguishes the public S3 adapter, the internal/admin adapter, the bootstrap runtime assembly, object-store services and repository ports, the in-memory backend, and the Storage Engine backend. Current Storage Engine module names are `storage-engine-domain`, `storage-engine-reactive-application`, and `storage-engine-reactive-infrastructure`.
 
 .C2 Container Diagram — Magrathea ObjectStore
 image::../../c4/images/Container.png[Container Diagram, width=600]
+
+==== bootstrap-application (runtime assembly)
+
+**Blackbox Description:**
+Spring Boot executable assembly. It wires the selected backend, includes the S3/admin adapters on the classpath, and serves the generated Vue/admin documentation assets from classpath `static/**` resources, including copied C4 images and generated ARC42 JSON.
+
+- **Provided Interface:** Executable application on the configured HTTP port
+- **Required Interface:** S3/admin adapters, object-store services, selected backend beans
+- **Technology:** Spring Boot 4, Java 21, classpath static resources
 
 ==== s3-reactive-api-adapter (HTTP adapter)
 
@@ -22,7 +31,7 @@ Handlers follow a strict **minimal pattern**:
 
 All validation, bucket existence checks, ETag computation, CORS validation, and website routing are **postponed to the repository layer**.
 
-- **Provided Interface:** S3 REST API (111/111 in-scope operations)
+- **Provided Interface:** S3 REST API route surface (111 in-scope routes; route inventory only, not semantic completion)
 - **Required Interface:** ReactiveBucketService, ReactiveObjectService, ReactiveMultipartUploadService
 - **Technology:** Spring Boot 4 WebFlux, Java 21, RouterFunction, Jackson 3 XML
 
@@ -62,6 +71,26 @@ Implements reactive in-memory repositories with ConcurrentHashMap using Mono/Flu
 - **Required Interface:** CQS repository interfaces
 - **Technology:** Java 21, ConcurrentHashMap, Reactor
 - **Tag:** Database
+
+==== admin-api-adapter (internal/admin HTTP adapter)
+
+**Blackbox Description:**
+Exposes `/admin/**` JSON endpoints for health, storage policy, storage device, and configuration management. These endpoints are internal/administrative and are not part of the S3 object API coverage.
+
+- **Provided Interface:** Admin JSON API
+- **Required Interface:** Storage policy/device catalog ports and selected backend status
+- **Technology:** Spring Boot 4 WebFlux, Java 21, RouterFunction
+
+==== storage-engine-reactive-application and storage-engine-reactive-infrastructure
+
+**Blackbox Description:**
+`storage-engine-reactive-application` owns reactive orchestration ports such as the chunker, storage policy catalog, and `ReactiveStorageOrchestrator`. `storage-engine-reactive-infrastructure` provides YAML-backed catalogs and filesystem-oriented persistence adapters. Phase 5 verifies deterministic `MINIO_STANDARD` planning; runtime read/write and physical EC shard placement remain pending verification gates.
+
+`MINIO_STANDARD` maps to S3 storage class `STANDARD`, disables deduplication, enables erasure-coding planning as `4 data / 2 parity`, uses replication factor `1`, disables compression, and leaves encryption disabled by default.
+
+- **Provided Interface:** Storage Engine orchestration and catalog ports/adapters
+- **Required Interface:** Storage Engine domain model and filesystem/configuration resources
+- **Technology:** Java 21, Reactor, YAML configuration, filesystem adapters
 
 === Level 2 — Component Diagram (s3-reactive-api-adapter)
 
@@ -257,8 +286,9 @@ public class S3BucketConfigHandler {
 
 | Interface | Description | Connected Containers |
 |---|---|---|
-| S3 REST API | Public HTTP API — only AWS S3-compatible endpoints | User ↔ s3-reactive-api-adapter |
+| S3 REST API | Public object API — AWS S3-compatible route surface only | User ↔ s3-reactive-api-adapter |
+| Admin JSON API | Internal/administrative `/admin/**` API for policy/device/configuration management; not S3 coverage | Operator/Admin UI ↔ admin-api-adapter |
 | Reactive service calls | ReactiveBucketService, ReactiveObjectService, ReactiveMultipartUploadService via Mono/Flux | s3-reactive-api-adapter ↔ reactive-object-store / reactive-bucket-management |
 | CQS repository interfaces | Mono/Flux-based command and query ports | reactive-object-store / reactive-bucket-management ↔ reactive-repository-application |
-| Repository implementations | Reactive in-memory adapters | reactive-repository-application ↔ reactive-infrastructure |
+| Repository implementations | Reactive in-memory adapters or Storage Engine ACL adapter, selected explicitly | reactive-repository-application ↔ reactive-infrastructure / object-store-reactive-repository-storage-engine-infrastructure |
 | Bucket lookup | Bucket existence validation | reactive-object-store → reactive-bucket-management |

@@ -10,13 +10,13 @@ Production deployments require a persistent, scalable storage backend. The Stora
 
 ### 1. Module Layout — Four New Modules
 
-Three Storage Engine modules plus one Anti-Corruption Layer/adapter module:
+Three Storage Engine modules plus one Anti-Corruption Layer/adapter module. Current module names use reactive naming parity for the application and infrastructure modules:
 
 | Module | Purpose |
 |---|---|
 | `storage-engine-domain` | Storage Engine domain model: policy, workflow, device, trace, manifest — zero framework dependencies |
-| `storage-engine-application` | Storage Engine reactive orchestration: ports, Chunker, ReactiveStorageOrchestrator |
-| `storage-engine-infrastructure` | Storage Engine filesystem cluster backend: FileSystemStorageCluster, content-address index, manifest repository, chaos decorator |
+| `storage-engine-reactive-application` | Storage Engine reactive orchestration: ports, Chunker, ReactiveStorageOrchestrator |
+| `storage-engine-reactive-infrastructure` | Storage Engine filesystem cluster backend: FileSystemStorageCluster, content-address index, manifest repository, chaos decorator |
 | `object-store-reactive-repository-storage-engine-infrastructure` | Anti-Corruption Layer + adapter: translates Object Store repository commands into Storage Engine commands |
 
 ### 2. Two-Backend Repository Strategy
@@ -28,9 +28,7 @@ Two concrete implementations of the Object Store repository interfaces coexist:
 | `single-node` (default) | In-memory repositories | `object-store-reactive-infrastructure` |
 | `storage-engine` | Storage Engine filesystem cluster | `object-store-reactive-repository-storage-engine-infrastructure` |
 
-The Storage Engine backend is selectable via Spring profile or Maven profile at deployment time.
-The ACL/adapter module is the only module that depends on both bounded contexts; all other modules
-remain decoupled.
+The Storage Engine backend is selected explicitly through the documented runtime profile/property path. The ACL/adapter module is the only module that depends on both bounded contexts; all other modules remain decoupled. Runtime read/write completeness remains gated by later integration tests.
 
 ### 3. Anti-Corruption Layer Design
 
@@ -146,7 +144,7 @@ detects the alteration).
 
 ## Status
 
-Accepted
+Accepted. Updated 2026-06-12 to reflect the `storage-engine-reactive-application` / `storage-engine-reactive-infrastructure` module rename and the current verification boundary.
 
 ## Date
 

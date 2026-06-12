@@ -5,14 +5,14 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 The Magrathea ObjectStore project implements an **AWS S3-compatible object storage** built with Spring Boot 4 WebFlux and Java 21.
 
-It provides a lightweight, single-node implementation of the AWS S3 REST API for development, testing, and small-scale deployments.
+It provides a lightweight implementation of the AWS S3 REST API route surface for development, testing, and small-scale deployments, plus separate internal/admin endpoints for operational configuration.
 
 === Goals
 
-- **S3 API compatibility**: implement the in-scope AWS S3 REST API operation set (111/111), including Phase F advanced/specialized operations
+- **S3 API compatibility**: map the in-scope AWS S3 REST API route surface and classify semantic implementation separately from route count
 - **Reactive by design**: full WebFlux non-blocking I/O, DataBuffer streaming for binary content
 - **Domain-Driven Design**: pure domain with zero framework dependencies, hexagonal architecture
-- **Testability**: 3-layer testing (JUnit domain, Cucumber BDD integration, AWS CLI compatibility)
+- **Testability**: domain/unit tests, WebTestClient Cucumber, targeted AWS CLI compatibility, and JaCoCo coverage reporting
 
 === Stakeholders
 

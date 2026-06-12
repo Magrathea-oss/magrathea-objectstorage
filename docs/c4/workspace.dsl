@@ -4,8 +4,20 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
 
   model {
     user = person "User" "End user or automated client using AWS CLI, SDK, curl, or another S3-compatible HTTP client."
+    administrator = person "Administrator" "Operator using the bundled Magrathea admin UI, generated documentation, and JSON management API."
 
-    magrathea = softwareSystem "Magrathea ObjectStore" "AWS S3-compatible object storage built with Spring Boot 4 WebFlux and Java 21." {
+    magrathea = softwareSystem "Magrathea ObjectStore" "AWS S3-compatible object storage and bundled admin/documentation UI built with Spring Boot 4 WebFlux and Java 21." {
+      bootstrapApplication = container "bootstrap-application" "Executable Spring Boot application/fat JAR that composes the S3 API, admin API, object-store capabilities, and selectable persistence backends. It owns the static asset handoff: during generate-resources it builds/copies magrathea-ui dist assets plus generated docs/reports/C4 and arc42 images into bootstrap-application classpath static resources, while admin-api-adapter supplies only admin API routes." "Spring Boot 4 WebFlux, Reactor Netty, Maven resources/exec/antrun, Node.js/Vite" {
+        magratheaApplication = component "MagratheaApplication" "Spring Boot entry point and component-scan boundary for bootstrap, object-store, storage-engine, S3 API, and admin API packages. Activates the single-node in-memory backend by default and the storage-engine backend via profile/property." "Spring Boot @SpringBootApplication"
+        adminServerConfig = component "AdminServerConfig" "Starts the second reactive HTTP server on admin.server.port (default 8081), combines AdminRouter routes with classpath static resource routes for /, /assets/**, /docs/**, favicon.svg, icons.svg, and SPA fallback." "Spring @Configuration, Reactor Netty, RouterFunction"
+        staticResources = component "Bootstrap static resources" "Bundled UI and documentation resources under bootstrap-application classpath static locations: magrathea-ui dist assets, generated documentation JSON, C4 images, arc42 images, and report assets. This is the target of the staged static asset handoff; admin-api-adapter does not own or serve these files directly." "Static HTML/CSS/JS/JSON/images"
+        backendSelection = component "ObjectStoreBackendStatusConfig" "Validates and logs the selected object-store backend. The single-node profile uses in-memory repositories; the storage-engine profile/property selects the Storage Engine-backed repositories." "Spring @Configuration"
+      }
+
+      adminApiAdapter = container "admin-api-adapter" "Management HTTP adapter that exposes JSON admin endpoints such as health and storage policy operations. Frontend/static documentation assets are handed off to bootstrap-application and served from its classpath static resources." "Spring Boot 4 WebFlux, RouterFunction" {
+        adminRouter = component "AdminRouter" "Defines /admin/health and /admin/storage-policies routes, maps storage policy requests to storage-engine domain value objects, and returns JSON/HATEOAS-style responses." "Spring @Configuration, RouterFunction"
+      }
+
       s3ReactiveApiAdapter = container "s3-reactive-api-adapter" "HTTP adapter that exposes the S3-compatible REST API and translates HTTP/XML/binary requests into reactive application use cases." "Spring Boot 4 WebFlux, RouterFunction, Java 21, Jackson XML" {
         bucketOperationsHandler = component "S3BucketOperationsHandler" "Handles bucket lifecycle endpoints: create, delete, head, list, location, versioning and directory-bucket listing." "Java WebFlux handler"
         bucketMetadataHandler = component "S3BucketMetadataHandler" "Handles bucket metadata endpoints such as ACL and tagging." "Java WebFlux handler"
@@ -49,13 +61,27 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
         inMemoryReactiveMultipartUploadRepository = component "InMemoryReactiveMultipartUploadRepository" "In-memory reactive implementation of MultipartUploadCommandRepository and MultipartUploadQueryRepository. Internally stores multipart upload sessions in a ConcurrentHashMap structure." "Spring @Repository"
       }
 
-      storageEngine = container "storage-engine" "Storage Engine bounded context: persistence pipeline, virtual devices, deduplication, erasure coding, content-addressed storage, manifest management." "Java 21, domain-driven" {
-        storageEngineDomain = component "storage-engine-domain" "Pure domain model: StoragePolicy, EffectiveStoragePolicy, VirtualDevice (BucketDevice, DedupDevice), DedupNamespace, WorkflowCompatibilityKey, DeviceConfigurationHash, StepPlan, StepExecutionTrace, ChunkPersistenceTrace, ObjectManifest, StoredObject aggregate. Zero framework dependencies." "Java 21 domain"
-        storageEngineApplication = component "storage-engine-application" "Reactive orchestration layer: ReactiveStorageOrchestrator, Chunker, ApplicationChunkPayload, ports (StoragePolicyCatalog, StoredObjectRepository, ObjectManifestRepository, ContentAddressIndex, ChecksumPort, DataTransformPort, AlterationPort, ChunkStorePort)." "Spring @Service, Reactor"
-        storageEngineInfrastructure = component "storage-engine-infrastructure" "Filesystem cluster backend: FileSystemStorageCluster, FileSystemStorageNode, FileSystemVirtualDeviceMapper, FileSystemContentAddressIndex, FileSystemManifestRepository, FileSystemStoredObjectRepository, checksum/compression/encryption/EC/replication adapters, FaultInjectingStorageCluster chaos decorator." "Java 21, Reactor"
-        storageEngineRepositoryAdapter = component "object-store-reactive-repository-storage-engine-infrastructure" "Anti-Corruption Layer + adapter: implements Object Store repository interfaces using Storage Engine backend. Contains ObjectStoreToStorageEngineTranslator, StorageEngineReactiveS3ObjectRepository, StorageEngineReactiveBucketRepository, StorageEngineReactiveMultipartUploadRepository." "Spring @Repository, Reactor"
+      storageEngine = container "storage-engine" "Storage Engine bounded context: persistence pipeline, virtual devices, storage policies, optional deduplication, erasure coding, content-addressed storage, and manifest management. MINIO_STANDARD is modeled as STANDARD with dedup disabled, EC enabled (4 data / 2 parity), replication factor 1, compression disabled, and encryption disabled by default." "Java 21, domain-driven" {
+        storageEngineDomain = component "storage-engine-domain" "Pure domain model: StoragePolicy, EffectiveStoragePolicy, VirtualDevice, DedupNamespace, WorkflowCompatibilityKey, DeviceConfigurationHash, StepPlan, StepExecutionTrace, ChunkPersistenceTrace, ObjectManifest, StorageDevice, DiskSet, and StoredObject aggregate. Zero framework dependencies. MINIO_STANDARD semantics are STANDARD with dedup disabled, EC enabled (4 data / 2 parity), replication factor 1, compression disabled, and encryption disabled by default." "Java 21 domain"
+        storageEngineReactiveRepositoryApplication = component "storage-engine-reactive-repository-application" "Reactive ports, catalogs, and repository interfaces used by the Storage Engine application: StoragePolicyCatalog, StorageDeviceCatalog, DiskSetCatalog, StoredObjectRepository, ObjectManifestRepository, ContentAddressIndex, ChecksumPort, DataTransformPort, AlterationPort, ChunkStorePort, and ECOutcome." "Java 21 CQS/port interfaces"
+        storageEngineReactiveApplication = component "storage-engine-reactive-application" "Reactive orchestration and use cases: ReactiveStorageOrchestrator, Chunker, and ApplicationChunkPayload coordinate domain planning with repository/catalog/adapter ports." "Spring @Service, Reactor"
+        storageEngineReactiveInfrastructure = component "storage-engine-reactive-infrastructure" "Filesystem and YAML adapters/configuration: FileSystemStorageCluster, FileSystemStorageNode, FileSystemVirtualDeviceMapper, FileSystemContentAddressIndex, FileSystemManifestRepository, FileSystemStoredObjectRepository, YAML policy/device/disk-set catalogs, checksum/compression/encryption/EC/replication adapters, and FaultInjectingStorageCluster chaos decorator. MINIO_STANDARD YAML enables EC (4 data / 2 parity) and disables dedup; current C4 docs do not claim verified physical EC shard placement." "Java 21, Reactor, YAML"
+        storageEngineRepositoryAdapter = component "object-store-reactive-repository-storage-engine-infrastructure" "Anti-Corruption Layer + adapter: implements Object Store repository interfaces using the Storage Engine backend. Contains ObjectStoreToStorageEngineTranslator, StorageEngineReactiveS3ObjectRepository, StorageEngineReactiveBucketRepository, StorageEngineReactiveMultipartUploadRepository." "Spring @Repository, Reactor"
       }
     }
+
+    administrator -> magrathea "Uses admin UI, generated documentation, and management API" "HTTP/JSON"
+    administrator -> magrathea.bootstrapApplication.adminServerConfig "Uses bundled admin UI and generated documentation on the admin port" "HTTP"
+    administrator -> magrathea.adminApiAdapter.adminRouter "Calls admin management endpoints" "HTTP/JSON"
+
+    magrathea.bootstrapApplication.magratheaApplication -> magrathea.s3ReactiveApiAdapter.s3ProxyRouter "Bootstraps S3 API routes on the main WebFlux server" "Spring Boot auto-configuration"
+    magrathea.bootstrapApplication.magratheaApplication -> magrathea.reactiveObjectStore.reactiveObjectService "Component-scans object-store services" "Spring component scan"
+    magrathea.bootstrapApplication.magratheaApplication -> magrathea.reactiveBucketManagement.reactiveBucketService "Component-scans bucket-management services" "Spring component scan"
+    magrathea.bootstrapApplication.adminServerConfig -> magrathea.adminApiAdapter.adminRouter "Mounts admin API routes on the admin server" "RouterFunction"
+    magrathea.bootstrapApplication.adminServerConfig -> magrathea.bootstrapApplication.staticResources "Serves copied UI, documentation, and report assets from the bootstrap classpath" "ClassPathResource"
+    magrathea.bootstrapApplication.backendSelection -> magrathea.reactiveInfrastructure "Selects in-memory repositories for the single-node profile" "Spring profiles/properties"
+    magrathea.bootstrapApplication.backendSelection -> magrathea.storageEngine.storageEngineRepositoryAdapter "Selects Storage Engine-backed repositories for the storage-engine profile" "Spring profiles/properties"
+    magrathea.adminApiAdapter.adminRouter -> magrathea.storageEngine.storageEngineDomain "Uses storage policy value objects for admin request mapping" "Java calls"
 
     user -> magrathea.s3ReactiveApiAdapter.bucketOperationsHandler "Sends S3 bucket operations requests" "HTTP"
     user -> magrathea.s3ReactiveApiAdapter.bucketMetadataHandler "Sends S3 bucket metadata requests" "HTTP"
@@ -114,9 +140,10 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
     magrathea.reactiveRepositoryApplication.multipartUploadCommandRepository -> magrathea.storageEngine.storageEngineRepositoryAdapter "Implemented by (storage-engine profile)" "Implements"
     magrathea.reactiveRepositoryApplication.multipartUploadQueryRepository -> magrathea.storageEngine.storageEngineRepositoryAdapter "Implemented by (storage-engine profile)" "Implements"
 
-    magrathea.storageEngine.storageEngineRepositoryAdapter -> magrathea.storageEngine.storageEngineApplication "Delegates persistence to Storage Engine orchestrator" "Java calls"
-    magrathea.storageEngine.storageEngineApplication -> magrathea.storageEngine.storageEngineDomain "Uses domain services (PersistencePlanner, EffectivePolicyResolver, VirtualDeviceResolver, CompleteUploadService)" "Java calls"
-    magrathea.storageEngine.storageEngineApplication -> magrathea.storageEngine.storageEngineInfrastructure "Persists via ports (ChunkStorePort, ContentAddressIndex, ManifestRepository, StoredObjectRepository)" "Repository interfaces"
+    magrathea.storageEngine.storageEngineRepositoryAdapter -> magrathea.storageEngine.storageEngineReactiveApplication "Delegates persistence to Storage Engine orchestrator" "Java calls"
+    magrathea.storageEngine.storageEngineReactiveApplication -> magrathea.storageEngine.storageEngineDomain "Uses domain services (PersistencePlanner, EffectivePolicyResolver, VirtualDeviceResolver, CompleteUploadService)" "Java calls"
+    magrathea.storageEngine.storageEngineReactiveApplication -> magrathea.storageEngine.storageEngineReactiveRepositoryApplication "Uses ports and catalogs (ChunkStorePort, ContentAddressIndex, ObjectManifestRepository, StoredObjectRepository, StoragePolicyCatalog, StorageDeviceCatalog, DiskSetCatalog)" "Repository interfaces"
+    magrathea.storageEngine.storageEngineReactiveRepositoryApplication -> magrathea.storageEngine.storageEngineReactiveInfrastructure "Implemented by filesystem and YAML adapters" "Implements"
   }
 
   views {
@@ -124,19 +151,48 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
       title "C1 System Context: Magrathea ObjectStore"
       description "External S3-compatible clients interact with Magrathea ObjectStore as a single software system."
       include user
+      include administrator
       include magrathea
       autolayout lr
     }
 
     container magrathea "Container" {
       title "C2 Container: Magrathea ObjectStore"
-      description "s3-reactive-api-adapter exposes the S3 API with RouterFunction dispatch; reactive-object-store and reactive-bucket-management implement core reactive capabilities with Phase F advanced operations; reactive-repository-application provides CQS interfaces; reactive-infrastructure persists state reactively in-process; and storage-engine provides the Storage Engine bounded context for persistence pipeline, virtual devices, deduplication, erasure coding, content-addressed storage, and manifest management."
+      description "bootstrap-application is the executable Spring Boot assembly and owns the static asset handoff for magrathea-ui dist assets, generated docs/reports, C4 images, and arc42 images; admin-api-adapter contributes only JSON admin routes. s3-reactive-api-adapter exposes the S3 API with RouterFunction dispatch; reactive-object-store and reactive-bucket-management implement core reactive capabilities with Phase F advanced operations; reactive-repository-application provides CQS interfaces; reactive-infrastructure persists state reactively in-process; and storage-engine provides the Storage Engine bounded context for persistence pipeline, virtual devices, storage policies, optional deduplication, erasure coding, content-addressed storage, and manifest management. MINIO_STANDARD is STANDARD with dedup disabled, EC enabled (4 data / 2 parity), replication factor 1, compression disabled, and encryption disabled by default."
       include user
+      include administrator
+      include magrathea.bootstrapApplication
+      include magrathea.adminApiAdapter
       include magrathea.s3ReactiveApiAdapter
       include magrathea.reactiveObjectStore
       include magrathea.reactiveBucketManagement
       include magrathea.reactiveRepositoryApplication
       include magrathea.reactiveInfrastructure
+      include magrathea.storageEngine
+      autolayout lr
+    }
+
+    component magrathea.bootstrapApplication "BootstrapApplicationComponents" {
+      title "C3 Component: bootstrap-application"
+      description "Executable application assembly and runtime composition boundary. It starts the S3 WebFlux application, starts the admin/static Netty server, selects the object-store backend, and serves static UI/docs/report assets copied into bootstrap-application during generate-resources. Static assets are no longer owned by admin-api-adapter."
+      include administrator
+      include user
+      include *
+      include magrathea.adminApiAdapter
+      include magrathea.s3ReactiveApiAdapter
+      include magrathea.reactiveObjectStore
+      include magrathea.reactiveBucketManagement
+      include magrathea.reactiveInfrastructure
+      include magrathea.storageEngine
+      autolayout lr
+    }
+
+    component magrathea.adminApiAdapter "AdminApiAdapterComponents" {
+      title "C3 Component: admin-api-adapter"
+      description "JSON management API routes consumed by the bootstrap admin server and the bundled UI. Frontend and generated documentation assets are handed off to bootstrap-application static resources."
+      include administrator
+      include magrathea.bootstrapApplication
+      include *
       include magrathea.storageEngine
       autolayout lr
     }
@@ -196,8 +252,18 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
 
     component magrathea.storageEngine "StorageEngineComponents" {
       title "C3 Component: storage-engine"
-      description "Storage Engine bounded context: domain model, reactive orchestration layer, filesystem cluster backend, and Anti-Corruption Layer adapter that implements Object Store repository interfaces using the Storage Engine backend."
+      description "Storage Engine bounded context: domain model, reactive repository/application ports, reactive orchestration layer, filesystem/YAML adapters, and Anti-Corruption Layer adapter that implements Object Store repository interfaces using the Storage Engine backend. MINIO_STANDARD semantics are STANDARD with dedup disabled and EC enabled (4 data / 2 parity); this view does not claim verified physical EC shard placement."
       include *
+      autolayout lr
+    }
+
+    dynamic magrathea.bootstrapApplication "AdminStaticAssetRuntime" {
+      title "Runtime: Admin UI and Documentation Static Assets"
+      description "The admin server in bootstrap-application serves the bundled UI and generated docs from classpath static resources; admin-api-adapter supplies only /admin JSON API routes."
+      administrator -> magrathea.bootstrapApplication.adminServerConfig "1. GET /, /assets/**, or /docs/**" "HTTP"
+      magrathea.bootstrapApplication.adminServerConfig -> magrathea.bootstrapApplication.staticResources "2. Serve index.html, assets, docs, C4 images, and reports" "ClassPathResource"
+      administrator -> magrathea.bootstrapApplication.adminServerConfig "3. GET/POST/PUT/DELETE /admin/**" "HTTP"
+      magrathea.bootstrapApplication.adminServerConfig -> magrathea.adminApiAdapter.adminRouter "4. Dispatch admin API route" "RouterFunction"
       autolayout lr
     }
 

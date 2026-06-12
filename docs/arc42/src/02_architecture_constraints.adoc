@@ -8,7 +8,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 - **Java 21**: latest LTS, records, sealed interfaces, pattern matching
 - **Spring Boot 4 WebFlux**: reactive non-blocking stack
 - **Maven multi-module**: flat sibling modules per bounded context
-- **S3-only HTTP API**: public HTTP endpoints MUST be AWS S3-compatible; non-S3 internal REST APIs are not allowed
+- **S3 object API boundary**: public object-storage endpoints MUST be AWS S3-compatible. Internal/admin endpoints are allowed only under the separate `admin-api-adapter` `/admin/**` surface and must not be counted as S3 API coverage.
 - **Pluggable S3 adapter**: S3 API lives in `s3-reactive-api-adapter` and is loaded via Spring Boot auto-configuration, not component scanning
 - **S3 API toggle**: `s3.api.enabled=false` disables S3 routes even when the module is present
 - **RouterFunction**: NO `@Controller`, NO `@RequestMapping` — functional WebFlux style only
@@ -21,7 +21,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 - `object-store-domain`: uses ONLY AWS S3 native terminology — no custom abstractions like BinaryContent
 - `object-store-domain`: zero dependencies except test dependencies
 - No `shared-domain` module exists
-- `storage-engine-domain`, `storage-engine-application`, `storage-engine-infrastructure`, and `object-store-reactive-repository-storage-engine-infrastructure` are fully implemented. They form the Storage Engine bounded context for persistent, scalable object storage, selectable via Spring profile (`storage-engine`) as an alternative to the in-memory backend
+- `storage-engine-domain`, `storage-engine-reactive-application`, `storage-engine-reactive-infrastructure`, and `object-store-reactive-repository-storage-engine-infrastructure` form the Storage Engine bounded context. Phase 5 verifies policy/YAML/device planning for `MINIO_STANDARD`; end-to-end storage-engine runtime read/write remains a pending verification gate.
 
 === Infrastructure Constraints
 
@@ -46,4 +46,4 @@ ifndef::imagesdir[:imagesdir: ../images]
 - Domain tests: pure JUnit, NO Spring context
 - Integration tests: Cucumber BDD with WebTestClient in `s3-reactive-api-adapter`
 - AWS CLI compatibility tests: `test-aws-cli.sh`, also runnable via Maven profile `aws-cli-tests`
-- Coverage verification: OpenClover profile `coverage`
+- Coverage verification: JaCoCo via the standard Maven lifecycle is the current baseline; OpenClover remains optional/legacy.

@@ -106,6 +106,17 @@ image::../../c4/images/BucketConfigurationRuntime.png[Bucket Configuration Runti
 
 **Verification:** Phase F is Cucumber-tested; `mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false` completed with 216 tests, 0 failures, and 0 errors.
 
+=== Scenario 6b — Admin Static Asset and Documentation UI
+
+**Description:** The staged static asset handoff packages the generated admin UI and documentation artifacts into `bootstrap-application` classpath resources.
+
+**Flow:**
+1. Browser/Admin UI → bootstrap-application: request `/`, `/assets/*`, or `/docs/*`.
+2. bootstrap-application → classpath `static/**`: serves generated Vue assets, ARC42 JSON, ADR JSON, JaCoCo JSON exports, C4 PNG images, and ARC42 image resources.
+3. Browser/Admin UI renders documentation and links to `/admin/**` JSON endpoints for operational data.
+
+**Verification boundary:** The static resource handoff verifies files are present and JSON is parseable. It does not change S3 API semantics or storage-engine runtime behavior.
+
 === Scenario 7 — Reactive Chain Pattern
 
 **Description:** The reactive chain pattern used throughout the application layer. No blocking `.join()`, no `Mono.fromCallable`, no `.subscribeOn(Schedulers.boundedElastic())`.

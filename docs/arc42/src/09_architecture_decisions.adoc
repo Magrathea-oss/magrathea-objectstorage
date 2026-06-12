@@ -22,3 +22,6 @@ All architectural decisions are documented as Architecture Decision Records (ADR
 | [0013](adr/0013-course-correction-phase-f-domain-application-ownership-and-aws-cli-verification-gate.md) | Course correction: Phase F domain/application ownership and AWS CLI verification gate | ✅ Accepted |
 | [0014](adr/0014-storage-engine-bounded-context.md) | Storage Engine bounded context | ✅ Accepted |
 | [0015](adr/0015-handler-minimal-pattern-and-postponed-repository-responsibilities.md) | Handler minimal pattern and postponed repository responsibilities | ✅ Accepted |
+| [0016](adr/0016-course-correction-storage-engine-policy-device-configuration-and-minio-standard-use-case.md) | Course correction: storage engine policy/device configuration and MINIO_STANDARD use case | ✅ Accepted |
+| [0017](adr/0017-course-correction-broaden-project-wide-correction-plan-beyond-storage-engine-notes.md) | Course correction: broaden project-wide correction plan beyond storage-engine notes | ✅ Accepted |
+| [0018](adr/0018-course-correction-classify-s3-api-coverage-by-semantic-implementation-not-route-count.md) | Course correction: classify S3 API coverage by semantic implementation, not route count | ✅ Accepted |

@@ -36,15 +36,16 @@
 | Module | Responsibility | Notes |
 |---|---|---|
 | `s3-reactive-api-adapter` | Pluggable AWS S3 HTTP adapter | Auto-configuration, RouterFunction, XML responses, Cucumber tests |
+| `admin-api-adapter` | Internal/admin HTTP adapter | `/admin/**` JSON API for storage policy/device/configuration management; separate from S3 object API |
 | `object-store-domain` | S3 domain model | Zero framework dependencies |
 | `object-store-reactive-repository-application` | Reactive CQS repository interfaces | Bucket, object, and multipart command/query ports |
 | `object-store-reactive-application` | Reactive application services and DTOs | Native Mono/Flux service APIs |
 | `object-store-reactive-infrastructure` | Reactive in-memory repository implementations | No HTTP API, no S3 router |
 | `object-store-reactive-repository-storage-engine-infrastructure` | Anti-Corruption Layer + adapter: Object Store → Storage Engine | Implements repository interfaces using Storage Engine backend |
-| `storage-engine-domain` | Storage Engine domain model (puro) | Policy, workflow, device, trace, manifest — zero framework dependencies |
-| `storage-engine-application` | Storage Engine reactive orchestration | Ports, Chunker, ReactiveStorageOrchestrator |
-| `storage-engine-infrastructure` | Storage Engine filesystem cluster backend | FileSystemStorageCluster, content address index, manifest repository, chaos decorator |
-| `bootstrap-application` | Spring Boot entry point | Includes `s3-reactive-api-adapter` to activate S3 endpoints |
+| `storage-engine-domain` | Storage Engine domain model (pure) | Policy, workflow, device, trace, manifest — zero framework dependencies |
+| `storage-engine-reactive-application` | Storage Engine reactive orchestration | Ports, Chunker, ReactiveStorageOrchestrator |
+| `storage-engine-reactive-infrastructure` | Storage Engine filesystem cluster backend | YAML catalogs, FileSystemStorageCluster, content address index, manifest repository, chaos decorator |
+| `bootstrap-application` | Spring Boot entry point | Includes S3/admin adapters and serves generated UI/documentation assets from classpath `static/**` resources |
 
 ### Backend selection
 
@@ -76,6 +77,10 @@ independent of the S3 API domain. It defines:
 
 The pipeline order is fixed: DEDUP → COMPRESS → CRYPT → ERASURE_CODING → REPLICATION → STORE.
 EC differentiates DedupDevice; replication does not.
+
+### `MINIO_STANDARD` policy semantics
+
+`MINIO_STANDARD` is the first executable Storage Engine policy use case. Its S3-facing storage class is `STANDARD` (`storageClassId: STANDARD`). Phase 5 semantics are explicit and test-backed: deduplication disabled, erasure-coding planning enabled as `4 data / 2 parity`, replication factor `1`, compression disabled, and encryption disabled by default. The current evidence verifies YAML catalog loading, device selection, and deterministic persistence planning; it does **not** yet claim end-to-end storage-engine read/write wiring or verified physical EC shard placement.
 
 ### S3 API activation
 

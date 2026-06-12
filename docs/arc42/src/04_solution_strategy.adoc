@@ -6,7 +6,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 === Architecture Strategy
 
 - **Hexagonal Architecture** (Ports and Adapters): domain is pure business logic, application and infrastructure are adapters
-- **DDD with strategic design**: ObjectStore domain with reserved `storage-engine-*` modules for future persistence/storage-engine work
+- **DDD with strategic design**: separate Object Store and Storage Engine bounded contexts, connected only through the object-store-to-storage-engine ACL adapter
 - **Reactive by design**: WebFlux RouterFunction, DataBuffer streaming, native Mono/Flux application and repository interfaces
 
 === Key Technical Decisions
@@ -46,5 +46,5 @@ The `S3BucketConfigHandler` uses a registry/strategy pattern to dispatch configu
 === Quality Strategy
 
 - **Testability**: domain tested with pure JUnit (no Spring), integration tested with Cucumber BDD, S3 compatibility verified with AWS CLI
-- **Simplicity**: single-node in-memory stores for metadata and content
+- **Simplicity and explicit backend selection**: single-node in-memory stores remain the default backend; Storage Engine is selected explicitly and must be verified separately
 - **Traceability**: ADRs document every architectural decision, ARC42 provides full architecture documentation

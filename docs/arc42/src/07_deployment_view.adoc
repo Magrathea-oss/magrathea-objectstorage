@@ -9,8 +9,9 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 | Element | Description |
 |---|---|
-| S3 Server | JAR `bootstrap-application-1.0.0-SNAPSHOT.jar` running on `localhost:8080` |
-| File Store | In-memory (ConcurrentHashMap), allocated in the same JVM heap as the server |
+| Runtime JAR | `bootstrap-application-1.0.0-SNAPSHOT.jar` running on the configured HTTP port |
+| Static resources | Generated Vue/admin documentation assets, ARC42 JSON, ADR JSON, JaCoCo JSON exports, C4 PNGs, and ARC42 images served from classpath `static/**` |
+| Default file store | In-memory (ConcurrentHashMap), allocated in the same JVM heap as the server |
 | Java Runtime | JDK 21 |
 | Build Tool | Apache Maven 3.9+ |
 
@@ -35,4 +36,4 @@ The two-container architecture (`s3-server` + `file-store`) is intentionally mon
 - `file-store` can be replaced by R2DBC + PostgreSQL for relational persistence
 - `file-store` can become a separate container for horizontal scaling
 - `s3-server` can be clustered with session affinity
-- `storage-engine-*` placeholder modules for future storage-engine persistence design
+- Storage Engine deployment uses `storage-engine-reactive-application`, `storage-engine-reactive-infrastructure`, and the ACL adapter. Phase 5 verifies policy/catalog planning; end-to-end runtime read/write remains a pending gate before production claims.
