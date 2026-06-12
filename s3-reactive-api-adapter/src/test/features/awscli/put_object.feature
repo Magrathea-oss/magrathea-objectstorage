@@ -62,10 +62,17 @@ Feature: AWS CLI S3 object CRUD parity
     When object attributes are requested via AWS CLI for "aws-cli-standard.txt"
     Then the AWS CLI object attributes include storage class "STANDARD"
 
-  # Current S3PathRouter maps object keys as /{bucket}/{key}; keys containing slashes
-  # do not match those routes yet. Keep this parity scenario documented but excluded.
-  @awscli @unsupported-awscli
+  @awscli
   Scenario: AWS CLI put-object with a key containing slashes
     Given an object with key "folder/aws-cli-slash.txt" and content "nested key"
     When the object is stored via AWS CLI with default headers
     Then the AWS CLI exit code is 0
+    When the object with key "folder/aws-cli-slash.txt" is retrieved via S3 API
+    Then the response status is 200
+    And the content is "nested key"
+    When the objects are listed via AWS CLI
+    Then the response status is 200
+    And the AWS CLI output contains object "folder/aws-cli-slash.txt"
+    When the object with key "folder/aws-cli-slash.txt" is deleted via AWS CLI
+    Then the response status is 204
+    And object "folder/aws-cli-slash.txt" does not appear in the object list

@@ -14,6 +14,21 @@ Feature: S3-compatible PutObject API — Anomaly Tests (Analysis-Complete)
     And the object appears in the object list
 
   @webclient
+  Scenario: Put, read, list, and delete an object with a key containing slashes
+    Given an object with key "folder/webclient-slash.txt" and content "nested WebTestClient key"
+    When the object is stored via S3 API using an explicit slash-preserving URI
+    Then the response status is 200
+    When the object with key "folder/webclient-slash.txt" is retrieved via S3 API using an explicit slash-preserving URI
+    Then the response status is 200
+    And the content is "nested WebTestClient key"
+    When the objects are listed via S3 API V2
+    Then the response status is 200
+    And the object appears in the object list V2
+    When the object with key "folder/webclient-slash.txt" is deleted via S3 API using an explicit slash-preserving URI
+    Then the response status is 204
+    And object "folder/webclient-slash.txt" does not appear in the object list
+
+  @webclient
   Scenario: Put an object with PARANOIC_MODE storage class
     Given an object with key "paranoid.txt" and content "Top secret"
     When the object is stored via S3 API with storage class "PARANOIC_MODE"

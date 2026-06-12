@@ -24,6 +24,10 @@ public class ObjectSteps {
     private String retrievedContent;
     private String responseBody;
 
+    private String slashPreservingObjectPath(String bucket, String key) {
+        return "/" + bucket + "/" + key;
+    }
+
     @Given("an object with key {string} and content {string}")
     public void anObjectWithKeyAndContent(String key, String content) {
         objectKey = key;
@@ -77,6 +81,19 @@ public class ObjectSteps {
         commonSteps.setResponseHeaders(result.getResponseHeaders());
     }
 
+    @When("the object is stored via S3 API using an explicit slash-preserving URI")
+    public void objectStoredWithExplicitSlashPreservingUri() {
+        var result = webTestClient.put()
+            .uri(slashPreservingObjectPath("test-bucket", objectKey))
+            .header("x-amz-sdk-checksum-algorithm", "crc64nvme")
+            .header("x-amz-checksum-crc64nvme", "AAAAAAAAAAAAAA==")
+            .bodyValue(objectContent)
+            .exchange()
+            .returnResult();
+        commonSteps.setResponseStatus(result.getStatus());
+        commonSteps.setResponseHeaders(result.getResponseHeaders());
+    }
+
     @When("the object is stored via S3 API with storage class {string}")
     public void objectStoredWithStorageClass(String storageClass) {
         var result = webTestClient.put()
@@ -117,6 +134,18 @@ public class ObjectSteps {
     public void objectWithKeyRetrieved(String key) {
         var result = webTestClient.get()
             .uri("/test-bucket/{key}", key)
+            .exchange()
+            .expectBody(String.class)
+            .returnResult();
+        retrievedContent = result.getResponseBody();
+        commonSteps.setResponseStatus(result.getStatus());
+    }
+
+    @When("the object with key {string} is retrieved via S3 API using an explicit slash-preserving URI")
+    public void objectWithKeyRetrievedWithExplicitSlashPreservingUri(String key) {
+        objectKey = key;
+        var result = webTestClient.get()
+            .uri(slashPreservingObjectPath("test-bucket", key))
             .exchange()
             .expectBody(String.class)
             .returnResult();
@@ -346,6 +375,17 @@ public class ObjectSteps {
     public void objectDeleted() {
         var status = webTestClient.delete()
             .uri("/test-bucket/{key}", objectKey)
+            .exchange()
+            .returnResult()
+            .getStatus();
+        commonSteps.setResponseStatus(status);
+    }
+
+    @When("the object with key {string} is deleted via S3 API using an explicit slash-preserving URI")
+    public void objectWithKeyDeletedWithExplicitSlashPreservingUri(String key) {
+        objectKey = key;
+        var status = webTestClient.delete()
+            .uri(slashPreservingObjectPath("test-bucket", key))
             .exchange()
             .returnResult()
             .getStatus();
