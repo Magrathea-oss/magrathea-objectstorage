@@ -1,0 +1,4 @@
+diskSetId: default-diskset
+failureDomain: HOST
+deviceIds:
+  - local-disk-0

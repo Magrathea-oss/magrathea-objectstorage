@@ -1,0 +1,34 @@
+policyId: minio-standard
+version: "1.0"
+storageClassId: MINIO_STANDARD
+
+# Single-node MinIO-compatible behaviour:
+#   - Deduplication enabled with SHA256 fingerprinting and 1 MiB chunk size
+#   - No compression (MinIO does not compress by default)
+#   - No encryption at rest by default
+#   - No erasure coding (single-node topology; EC requires multiple drives/nodes)
+#   - Replication factor 1 (single replica)
+
+dedup:
+  enabled: true
+  scope: BUCKET
+  chunkSizeBytes: 1048576
+  algorithm: SHA256
+  alignment: NONE
+  namespace:
+    type: BUCKET
+
+compression:
+  enabled: false
+  algorithm: ZSTD
+  level: 0
+
+encryption:
+  enabled: false
+  mode: NONE
+
+replication:
+  factor: 1
+
+erasureCoding:
+  enabled: false

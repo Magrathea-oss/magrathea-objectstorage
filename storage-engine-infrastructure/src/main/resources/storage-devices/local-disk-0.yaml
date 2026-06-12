@@ -1,0 +1,6 @@
+deviceId: local-disk-0
+storagePath: /data/local/disk-0
+totalCapacityBytes: 107374182400    # 100 GiB
+availableCapacityBytes: 107374182400
+health: HEALTHY
+failureDomain: DISK
