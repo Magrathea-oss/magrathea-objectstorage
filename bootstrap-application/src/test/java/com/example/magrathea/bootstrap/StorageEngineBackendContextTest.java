@@ -32,9 +32,17 @@ import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import reactor.core.publisher.Flux;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -46,6 +54,49 @@ import static org.assertj.core.api.Assertions.assertThat;
 })
 @ActiveProfiles("storage-engine")
 class StorageEngineBackendContextTest {
+
+    /**
+     * Provision YAML catalog directories from classpath resources.
+     * {@code YamlStoragePolicyCatalog} only handles {@code file:} protocol URLs when
+     * scanning classpath directories; it skips {@code jar:} URLs that appear when
+     * module resources are packaged as JARs. Pointing the catalogs at an extracted
+     * filesystem copy avoids the issue.
+     */
+    @DynamicPropertySource
+    static void catalogProperties(DynamicPropertyRegistry registry) {
+        try {
+            Path catalogRoot = Files.createTempDirectory("magrathea-backend-catalog-");
+            registry.add("storage.engine.policies.dir",
+                () -> extractCatalogDir(catalogRoot, "storage-policies",
+                    List.of("minio-standard.yaml")).toString());
+            registry.add("storage.engine.devices.dir",
+                () -> extractCatalogDir(catalogRoot, "storage-devices",
+                    List.of("local-disk-0.yaml")).toString());
+            registry.add("storage.engine.disksets.dir",
+                () -> extractCatalogDir(catalogRoot, "disk-sets",
+                    List.of("default-diskset.yaml")).toString());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static Path extractCatalogDir(Path catalogRoot, String classpathDir, List<String> fileNames) {
+        try {
+            Path dir = catalogRoot.resolve(classpathDir);
+            Files.createDirectories(dir);
+            ClassLoader cl = Thread.currentThread().getContextClassLoader();
+            for (String fileName : fileNames) {
+                String resourcePath = classpathDir + "/" + fileName;
+                try (InputStream in = cl.getResourceAsStream(resourcePath)) {
+                    if (in == null) throw new IOException("Classpath resource not found: " + resourcePath);
+                    Files.write(dir.resolve(fileName), in.readAllBytes());
+                }
+            }
+            return dir;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
 
     @Autowired
     private ApplicationContext context;
