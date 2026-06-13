@@ -2,6 +2,134 @@
 
 > **Planning status:** This document is a correction and implementation plan. It is **not** an implementation result, and unchecked items must not be described elsewhere as already delivered.
 
+## Post-Audit Production Readiness Plan
+
+The post-audit baseline is that Magrathea ObjectStore remains a prototype with an advanced architecture, not a production-ready object store. Production-readiness work must first close the restart-safety, streaming, filesystem-consistency, observability, and S3 semantic gaps below before any production claim is made.
+
+### Phase 1 — Reliable Upload and Restart Safety
+
+| Field | Plan |
+|---|---|
+| Focus | Make the `PutObject` → storage-engine → `GetObject` path durable, restart-safe, and bounded in memory. |
+| Required outputs | Durable S3 object metadata; durable S3 bucket/key/version to storage-engine `manifestId` mapping; removal of runtime-only `storeByKey` / `manifestByKey` as the source of truth; restart-safe PUT → process restart → GET behavior; HTTP S3 + storage-engine profile E2E coverage; upload path that does not reduce all object bytes to one array and does not retain unbounded traces. |
+| Acceptance gates | A storage-engine-profile HTTP E2E test proves PUT survives restart and GET returns the original bytes and metadata; durable mapping and manifest repositories are used after restart; large-object tests show bounded memory and no global byte-array aggregation in the production upload path. |
+
+Tasks:
+- Persist the object-store key, bucket, metadata, version/null-version state, ETag/checksum data, and selected storage-engine manifest reference.
+- Replace in-memory key-to-manifest lookup with a durable repository and recovery path.
+- Add an HTTP S3 E2E scenario that runs with the storage-engine backend, restarts/recreates the application context, and validates read-after-write.
+- Refactor upload to stream through the storage engine with bounded buffers instead of collecting all content and trace records before storing.
+
+### Phase 2 — Filesystem Reliability
+
+| Field | Plan |
+|---|---|
+| Focus | Make filesystem-backed chunks, manifests, and metadata safe against partial writes, corruption, and crashes. |
+| Required outputs | Atomic write/rename protocol; explicit fsync policy for data and metadata; checksums for chunks/manifests/object metadata; corruption detection; recovery scanner; cleanup or quarantine of incomplete writes; concurrency and crash/failure-injection tests. |
+| Acceptance gates | Interrupted writes do not publish corrupt manifests; checksum mismatch is detected; recovery scanner reports or repairs incomplete state deterministically; concurrent PUT/GET/delete scenarios pass; crash/failure tests document remaining limits. |
+
+Tasks:
+- Write chunks/manifests/object indexes to temporary files and publish them atomically.
+- Define when data files, metadata files, and directories are fsynced, including performance trade-offs.
+- Store and verify checksums at chunk and manifest/index levels.
+- Implement recovery scanning for orphaned chunks, incomplete manifests, broken references, and mismatched checksums.
+- Add concurrency and simulated-crash tests for partial writes, concurrent writers, and recovery.
+
+### Phase 3 — Reactive Pipeline Refactor
+
+| Field | Plan |
+|---|---|
+| Focus | Replace the monolithic orchestrator flow with a staged reactive read/write pipeline. |
+| Required outputs | `StorageStage`, `StorageContext`, and `StorageEvent` abstractions; staged write pipeline; staged read pipeline; backpressure-aware chunking/persistence; no global `reduce`/collect of object content in production; deterministic error propagation and cleanup across stages. |
+| Acceptance gates | Pipeline tests prove stage ordering, backpressure, cancellation cleanup, and bounded-memory behavior; large-object writes and reads do not aggregate full content; stages can be instrumented independently. |
+
+Tasks:
+- Introduce explicit stages for validation, policy resolution, chunking, dedup lookup, chunk persistence, manifest persistence, object-index persistence, read planning, chunk reading, and response streaming.
+- Carry request/object metadata and per-stage decisions in `StorageContext` rather than ad hoc local state.
+- Emit typed `StorageEvent` records for stage start, success, failure, retry, cleanup, and timing.
+- Ensure stage contracts preserve reactive backpressure and avoid blocking I/O on event-loop threads.
+
+### Phase 4 — Observability
+
+| Field | Plan |
+|---|---|
+| Focus | Make storage behavior visible without coupling core logic to one metrics/tracing backend. |
+| Required outputs | Storage listener/event publisher; metrics for bytes, chunks, manifests, failures, recoveries, dedup hits/misses, and latency; tracing/OpenTelemetry integration; stage timing and correlation IDs; operational logging for recovery and corruption events. |
+| Acceptance gates | Tests verify events are emitted for successful and failed pipelines; metrics can be scraped or inspected in integration tests; traces identify request, object key, manifest, and stage timings without exposing sensitive metadata. |
+
+Tasks:
+- Add a listener/event-publisher port around `StorageEvent`.
+- Add Micrometer metrics and OpenTelemetry tracing adapters in infrastructure/bootstrap wiring.
+- Record per-stage durations, queue/backpressure indicators where practical, and failure classifications.
+- Document observability fields that are safe to expose and those that must be redacted.
+
+### Phase 5 — S3 Semantic Compatibility
+
+| Field | Plan |
+|---|---|
+| Focus | Move beyond mapped endpoints and protocol smoke tests toward semantically meaningful S3 behavior. |
+| Required outputs | Real multipart persistence/assembly and multipart ETag semantics; `Range` and conditional requests; correct ETag/checksum behavior; object versioning and delete markers; `CopyObject`; ACL/tagging persistence and enforcement classification; lifecycle, object lock, encryption, retention, restore, and replication semantics clearly implemented or explicitly unsupported/config-only. |
+| Acceptance gates | Semantic scenarios prove supported behavior for multipart, range, conditionals, ETag, versioning, copy, ACL/tagging, and selected configuration/enforcement features; unsupported or metadata-only behavior is reported honestly in the S3 semantic matrix. |
+
+Tasks:
+- Implement multipart part durability, ordered assembly, abort cleanup, list semantics, and multipart ETag behavior against both backends.
+- Implement byte-range reads and conditional request headers for object GET/HEAD/COPY where in scope.
+- Persist and retrieve object versions, delete markers, metadata, ACLs, tags, and copy results with tested semantics.
+- Separate metadata-only encryption/object-lock/lifecycle/replication configuration from real enforcement or background execution.
+
+### Phase 6 — Distributed Readiness
+
+| Field | Plan |
+|---|---|
+| Focus | Design and verify behavior needed before claiming distributed storage readiness. |
+| Required outputs | Real replication; quorum rules; node membership; health model; anti-entropy/self-healing; rebalancing; placement across failure domains; operational recovery workflows. |
+| Acceptance gates | Multi-node tests or simulations prove quorum behavior, replica placement, node loss handling, healing, and rebalancing; documentation explicitly states single-node limitations until these gates pass. |
+
+Tasks:
+- Define replication and erasure-coding placement semantics across nodes and failure domains.
+- Add membership and health state models that drive placement and recovery decisions.
+- Implement self-healing and rebalancing jobs with observable progress and failure handling.
+- Add distributed failure tests before documenting the system as distributed-production ready.
+
+## Gherkin Requirements and ARC42 Appendix
+
+Gherkin feature files are executable requirements for the object store. They must describe business/system behavior and storage invariants, not only anemic request/response/status-code checks.
+
+### Authoring Rules
+
+- Feature files are executable requirements, not transport smoke tests.
+- Scenarios must express meaningful behavior: preconditions, state transitions, outcomes, invariants, durability guarantees, failure behavior, and recovery semantics.
+- Status-code-only scenarios are allowed only as low-level protocol smoke tests and must be tagged accordingly, for example `@protocol-smoke`.
+- Production-readiness scenarios should use tags such as `@requirement`, `@storage-engine`, `@restart-safety`, `@large-object`, `@recovery`, `@observability`, and `@s3-compatibility`.
+- Each requirement scenario should map to a requirement ID and ARC42 section where possible, for example `REQ-STORAGE-RESTART-001` and `arc42:8` or `arc42:10`.
+- AWS CLI and WebTestClient variants should validate the same requirement and acceptance rules; they must not duplicate anemic endpoint calls just to increase scenario counts.
+- Scenario text should make the backend and validation mode explicit when behavior differs by driver, backend, failure mode, or production-readiness phase.
+
+### Reporting Task — Generated Requirements Appendix
+
+| Field | Plan |
+|---|---|
+| Output | Generate a Gherkin requirements report from feature files and include it as an ARC42 appendix. |
+| Proposed generated source target | Prefer `docs/arc42/generated/gherkin-requirements.adoc` or `docs/requirements/generated/gherkin-requirements.adoc`. The source report is generated documentation; do not commit generated static web assets unless a current repository convention explicitly requires it. |
+| Grouping | The appendix groups scenarios by feature, tags, requirement ID, capability area, test backend/driver, ARC42 section, and validation status. |
+| Build integration | The Docker documentation/web build should include or regenerate the appendix for the web app/docs, consistent with the existing decision that web documentation regeneration is Dockerfile-driven rather than dependent on host-generated static assets. |
+| Quality gate | CI or the Docker build must verify the generated appendix is fresh, or regenerate it deterministically from feature files during the documentation build. |
+
+Tasks:
+- Define a lightweight metadata convention for requirement IDs, capability area, ARC42 section references, backend/driver, and validation status in feature files.
+- Implement or configure a generator that scans Gherkin features and writes the ARC42 appendix under `docs/arc42/generated` or `docs/requirements/generated`.
+- Link the generated appendix from the ARC42 appendix/index section.
+- Ensure Docker-driven documentation generation includes the report without committing built static web assets.
+- Add a freshness check or deterministic regeneration step to CI/quality gates.
+
+### Gherkin Appendix Acceptance Criteria
+
+- ARC42 contains an appendix listing all executable requirements derived from Gherkin feature files.
+- Each requirement scenario has an ID, classification/capability area, validation mode, and, where possible, an ARC42 section mapping.
+- The report marks anemic `@protocol-smoke` scenarios separately from production-readiness requirements.
+- AWS CLI and WebTestClient variants are shown as validation modes for the same requirement where they exercise the same behavior.
+- CI/quality gates verify generated appendix freshness or the Docker documentation build regenerates it deterministically.
+
 ## Project-Wide Correction Plan — Full Audit Findings
 
 This section implements [ADR 0017](docs/adr/0017-course-correction-broaden-project-wide-correction-plan-beyond-storage-engine-notes.md). It broadens the correction plan beyond the user's storage-engine configuration notes and promotes project-wide audit findings into first-class work items. The items below are **planned corrections only**; they are not evidence that implementation has happened.
