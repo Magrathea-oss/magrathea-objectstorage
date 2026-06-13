@@ -47,14 +47,26 @@ These instructions apply to all future agents working in this repository. They d
   - `Examples`
   - data tables
   - doc strings
-- Use `Business Need` for externally promised S3 server capabilities, including extended S3 APIs if they are declared supported.
-- Use `Ability` for internal or operational capabilities that support those needs.
+- Use `Business Need` for externally promised S3 server behavior through S3-compatible APIs, including extended S3 APIs if they are declared supported.
+- Use `Ability` for storage-engine internals and other internal or operational capabilities that support S3 needs.
+- Use `Business Need` or `Ability` for admin-only capabilities depending on whether they are user-visible admin product requirements or internal operational support requirements.
+- Admin-only storage-engine features should carry tags such as `@admin-api`, `@storage-policy`, `@storage-device`, `@disk-set`, and `@backend-status`; do not tag them as `@s3-api` unless they are validated through actual S3-compatible endpoints.
 - Use `Feature` for protocol smoke checks, regression checks, or legacy technical checks that are not product-level S3 compatibility promises.
 - Each scenario should include a stable requirement identifier when it represents a production requirement.
 - Scenarios must describe realistic preconditions, actions, validation mode, and observable outcomes.
 - Use domain language for capabilities such as durability, integrity, restart safety, streaming, observability, backend behavior, and storage layout.
 
-## 5. Single shared feature / dual runner policy
+## 5. Storage-engine external boundary
+
+- The storage-engine must not expose a parallel external API for S3 object behaviors.
+- If a behavior is part of S3 semantics, the external API must be S3-compatible endpoints; the storage-engine remains an internal implementation behind the object-store/storage-engine ACL.
+- S3 client requirements must be modeled and validated through S3 APIs, using WebTestClient and AWS CLI runners against shared feature files where both validation modes are required.
+- Storage-engine requirements are internal or operational `Ability` requirements unless they describe admin-only configuration or state that has no S3 API counterpart.
+- External access to storage-engine capabilities exists only through the Admin panel/Admin API, and only for requirements with no S3 API equivalent, such as storage policy definitions, storage devices, disks/disk sets/topology, backend status, and admin validation/reporting.
+- The Admin API/UI may expose storage policies, storage devices, disk sets/topology, backend status, and validation/reporting; it must not become an alternate object API.
+- Do not invent public storage-engine endpoints for object upload, read, delete, list, multipart, metadata, tagging, ACL, bucket, or other S3 object semantics.
+
+## 6. Single shared feature / dual runner policy
 
 - A `.feature` file is the single source of truth for a requirement.
 - Do not duplicate the same feature text into separate WebTestClient and AWS CLI folders.
@@ -62,7 +74,7 @@ These instructions apply to all future agents working in this repository. They d
 - Runner-specific differences belong in duplicated or adapted step definitions, glue code, runner configuration, tags, profiles, or validation adapters, not in duplicated requirement text.
 - When both WebTestClient and AWS CLI validation are required, keep the requirement scenario shared and express runner selection through validation mode, tags, or runner configuration.
 
-## 6. Functional vs non-functional requirement classification
+## 7. Functional vs non-functional requirement classification
 
 - Every production requirement scenario must be classified as functional, non-functional, or both when justified.
 - Use tags for classification and quality attributes, for example:
@@ -76,7 +88,7 @@ These instructions apply to all future agents working in this repository. They d
 - A scenario may carry both `@functional-requirement` and `@non-functional-requirement` only when both classifications are explicit and justified by the scenario text.
 - Do not use `@protocol-smoke` scenarios as substitutes for functional or non-functional production requirements.
 
-## 7. Fixture/path/header policy
+## 8. Fixture/path/header policy
 
 Requirement scenarios must use realistic and reviewable details, including where relevant:
 
@@ -90,7 +102,7 @@ Requirement scenarios must use realistic and reviewable details, including where
 
 Avoid placeholder paths and abstract examples when realistic fixtures or object names would make the requirement clearer.
 
-## 8. ARC42/Gherkin appendix reporting policy
+## 9. ARC42/Gherkin appendix reporting policy
 
 Generated Gherkin requirements reporting must become an ARC42 appendix. The appendix should group scenarios by:
 
@@ -104,7 +116,7 @@ Generated Gherkin requirements reporting must become an ARC42 appendix. The appe
 
 Reports must not invent test results or implementation status. Use observed runner output, tracked implementation state, or clearly mark unknown or pending items.
 
-## 9. Definition of done for future tests
+## 10. Definition of done for future tests
 
 A future test or validation change is done only when:
 
