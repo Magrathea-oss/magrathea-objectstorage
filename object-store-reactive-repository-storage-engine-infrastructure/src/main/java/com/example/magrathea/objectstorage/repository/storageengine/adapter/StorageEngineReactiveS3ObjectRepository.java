@@ -26,6 +26,8 @@ import com.example.magrathea.storageengine.domain.valueobject.ObjectId;
 import com.example.magrathea.storageengine.domain.valueobject.ObjectManifest;
 import com.example.magrathea.storageengine.domain.valueobject.VersionId;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.stereotype.Repository;
@@ -33,6 +35,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -54,6 +57,7 @@ public class StorageEngineReactiveS3ObjectRepository
 
     private final ObjectStoreToStorageEngineTranslator translator;
     private final ReactiveStorageOrchestrator orchestrator;
+    private final S3ObjectManifestReferenceStore referenceStore;
     private final Map<String, S3Object> storeByKey = new ConcurrentHashMap<>();
     private final Map<String, ManifestId> manifestByKey = new ConcurrentHashMap<>();
     private final AtomicLong versionCounter = new AtomicLong(1);
@@ -70,8 +74,18 @@ public class StorageEngineReactiveS3ObjectRepository
     public StorageEngineReactiveS3ObjectRepository(
             ObjectStoreToStorageEngineTranslator translator,
             ReactiveStorageOrchestrator orchestrator) {
+        this(translator, orchestrator, "");
+    }
+
+    @Autowired
+    public StorageEngineReactiveS3ObjectRepository(
+            ObjectStoreToStorageEngineTranslator translator,
+            ReactiveStorageOrchestrator orchestrator,
+            @Value("${storage.engine.filesystem.root:}") String storageRoot) {
         this.translator = translator;
         this.orchestrator = orchestrator;
+        this.referenceStore = new S3ObjectManifestReferenceStore(
+            resolveStorageRoot(storageRoot).resolve("metadata").resolve("s3-object-references"));
     }
 
     // ── Aggregate operations ──
@@ -103,29 +117,29 @@ public class StorageEngineReactiveS3ObjectRepository
             }
             long version = versionCounter.getAndIncrement();
             return Mono.just(new CommandResult.Deleted<>(removed, object.domainEvents(), version));
-        });
+        }).flatMap(result -> referenceStore
+            .delete(object.key().bucket(), object.key().key())
+            .thenReturn(result));
     }
 
     @Override
     public Mono<S3Object> findByBucketAndKey(Bucket.Id bucketId,
                                               com.example.magrathea.objectstore.domain.valueobject.ObjectKey key) {
-        return Mono.defer(() -> Mono.justOrEmpty(
-            storeByKey.get(storeKey(key.bucket(), key.key()))
-        ));
+        return findObjectByBucketNameAndKey(key.bucket(), key);
     }
 
     @Override
     public Mono<S3Object> findByBucketAndKey(
             com.example.magrathea.objectstore.domain.valueobject.ObjectKey key) {
-        return Mono.defer(() -> Mono.justOrEmpty(
-            storeByKey.get(storeKey(key.bucket(), key.key()))
-        ));
+        return findObjectByBucketNameAndKey(key.bucket(), key);
     }
 
     @Override
     public Flux<S3Object> findByBucket(String bucketName) {
         return Flux.defer(() -> Flux.fromIterable(storeByKey.values())
-            .filter(obj -> obj.key().bucket().equals(bucketName)));
+                .filter(obj -> obj.key().bucket().equals(bucketName)))
+            .switchIfEmpty(referenceStore.findByBucket(bucketName)
+                .map(this::cacheAndRestore));
     }
 
     @Override
@@ -161,7 +175,8 @@ public class StorageEngineReactiveS3ObjectRepository
                 long version = versionCounter.getAndIncrement();
                 CommandResult<S3Object> result =
                     new CommandResult.Created<>(clean, object.domainEvents(), version);
-                return Mono.just(result);
+                return referenceStore.save(clean, storedObject.manifestId(), storedObject.versionId())
+                    .thenReturn(result);
             });
     }
 
@@ -191,21 +206,29 @@ public class StorageEngineReactiveS3ObjectRepository
                 CommandResult<S3Object> result =
                     new CommandResult.Created<>(
                         activeObject, activeObject.domainEvents(), version);
-                return Mono.just(result);
+                return referenceStore.save(activeObject, storedObject.manifestId(), storedObject.versionId())
+                    .thenReturn(result);
             });
     }
 
     @Override
     public Flux<DataBuffer> getContent(
             com.example.magrathea.objectstore.domain.valueobject.ObjectKey key) {
-        return Flux.defer(() -> {
-            ManifestId manifestId = manifestByKey.get(storeKey(key.bucket(), key.key()));
-            if (manifestId == null) {
-                return Flux.empty();
-            }
-            return orchestrator.read(manifestId)
-                    .map(DATA_BUFFER_FACTORY::wrap);
-        });
+        return Mono.defer(() -> {
+                ManifestId manifestId = manifestByKey.get(storeKey(key.bucket(), key.key()));
+                if (manifestId != null) {
+                    return Mono.just(manifestId);
+                }
+                return referenceStore.find(key.bucket(), key.key())
+                    .flatMap(optional -> optional
+                        .map(reference -> {
+                            cacheAndRestore(reference);
+                            return Mono.just(reference.manifestId());
+                        })
+                        .orElseGet(Mono::empty));
+            })
+            .flatMapMany(orchestrator::read)
+            .map(DATA_BUFFER_FACTORY::wrap);
     }
 
     // ── Phase F object config queries ──
@@ -334,8 +357,27 @@ public class StorageEngineReactiveS3ObjectRepository
             String bucketName,
             com.example.magrathea.objectstore.domain.valueobject.ObjectKey key) {
         return Mono.defer(() -> Mono.justOrEmpty(
-            storeByKey.get(storeKey(bucketName, key))
-        ));
+                storeByKey.get(storeKey(bucketName, key))))
+            .switchIfEmpty(referenceStore.find(bucketName, key.key())
+                .flatMap(optional -> optional
+                    .map(reference -> Mono.just((S3Object) cacheAndRestore(reference)))
+                    .orElseGet(Mono::empty)));
+    }
+
+    private S3Object cacheAndRestore(S3ObjectManifestReferenceStore.Reference reference) {
+        S3Object object = reference.toS3Object().clearEvents();
+        String storeKey = storeKey(reference.bucket(), reference.key());
+        storeByKey.put(storeKey, object);
+        manifestByKey.put(storeKey, reference.manifestId());
+        return object;
+    }
+
+    private static Path resolveStorageRoot(String configuredRoot) {
+        if (configuredRoot == null || configuredRoot.isBlank()) {
+            return Path.of(System.getProperty("java.io.tmpdir"),
+                "magrathea-objectstorage", "storage-engine");
+        }
+        return Path.of(configuredRoot);
     }
 
     /**

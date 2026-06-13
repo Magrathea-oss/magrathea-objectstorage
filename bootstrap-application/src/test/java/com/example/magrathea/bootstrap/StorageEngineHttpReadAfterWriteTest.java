@@ -1,12 +1,15 @@
 package com.example.magrathea.bootstrap;
 
 import com.example.magrathea.bootstrap.ObjectStoreBackendStatus.Backend;
+import com.example.magrathea.objectstore.domain.valueobject.ObjectKey;
 import com.example.magrathea.objectstore.reactive.repository.application.BucketCommandRepository;
 import com.example.magrathea.objectstore.reactive.repository.application.BucketQueryRepository;
 import com.example.magrathea.objectstore.reactive.repository.application.S3ObjectCommandRepository;
 import com.example.magrathea.objectstore.reactive.repository.application.S3ObjectQueryRepository;
+import com.example.magrathea.objectstorage.repository.storageengine.acl.ObjectStoreToStorageEngineTranslator;
 import com.example.magrathea.objectstorage.repository.storageengine.adapter.StorageEngineReactiveBucketRepository;
 import com.example.magrathea.objectstorage.repository.storageengine.adapter.StorageEngineReactiveS3ObjectRepository;
+import com.example.magrathea.storageengine.application.service.ReactiveStorageOrchestrator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -57,6 +60,12 @@ class StorageEngineHttpReadAfterWriteTest {
     @Autowired
     private ObjectStoreBackendStatus backendStatus;
 
+    @Autowired
+    private ObjectStoreToStorageEngineTranslator translator;
+
+    @Autowired
+    private ReactiveStorageOrchestrator orchestrator;
+
     @Test
     void REQ_UPLOAD_005_successfulPutObjectIsImmediatelyReadableFromFilesystemBackedStorage() {
         assertThat(backendStatus.backend()).isEqualTo(Backend.STORAGE_ENGINE);
@@ -82,22 +91,12 @@ class StorageEngineHttpReadAfterWriteTest {
             .exchange()
             .expectStatus().isOk();
 
-        String downloaded = client.get()
+        String downloaded = drain(client.get()
             .uri(slashPreservingPath(BUCKET, OBJECT_KEY))
             .exchange()
             .expectStatus().isOk()
             .returnResult(DataBuffer.class)
-            .getResponseBody()
-            .map(buffer -> {
-                try {
-                    return buffer.toString(StandardCharsets.UTF_8);
-                } finally {
-                    DataBufferUtils.release(buffer);
-                }
-            })
-            .collectList()
-            .map(parts -> String.join("", parts))
-            .block();
+            .getResponseBody());
 
         assertThat(downloaded).isEqualTo(FIXTURE_CONTENT);
         Path manifestsRoot = STORAGE_ROOT.resolve("metadata").resolve("manifests");
@@ -109,6 +108,55 @@ class StorageEngineHttpReadAfterWriteTest {
         assertThat(hasRegularFileEnding(manifestsRoot, ".properties")).isTrue();
         assertThat(hasRegularFileEnding(objectsRoot, ".json")).isTrue();
         assertThat(hasAnyRegularFile(chunksRoot)).isTrue();
+    }
+
+    @Test
+    void REQ_UPLOAD_002_freshRepositoryRecoversLatestObjectManifestReferenceFromFilesystemState() {
+        WebTestClient client = WebTestClient.bindToServer()
+            .baseUrl("http://127.0.0.1:" + port)
+            .build();
+        String bucket = "req-upload-002-durable-reference-bucket";
+        String objectKey = "documents/2026/reload/object.txt";
+        String fixtureContent = "Durable reference survives repository reload.";
+
+        client.put()
+            .uri(slashPreservingPath(bucket))
+            .exchange()
+            .expectStatus().isOk();
+
+        client.put()
+            .uri(slashPreservingPath(bucket, objectKey))
+            .contentType(MediaType.TEXT_PLAIN)
+            .header("x-amz-storage-class", "STANDARD")
+            .bodyValue(fixtureContent)
+            .exchange()
+            .expectStatus().isOk();
+
+        StorageEngineReactiveS3ObjectRepository freshRepository =
+            new StorageEngineReactiveS3ObjectRepository(
+                translator, orchestrator, STORAGE_ROOT.toString());
+        ObjectKey key = ObjectKey.of(bucket, objectKey);
+
+        assertThat(freshRepository.findByBucketAndKey(key).block())
+            .extracting(found -> found.key())
+            .isEqualTo(key);
+
+        String recoveredContent = drain(freshRepository.getContent(key));
+        assertThat(recoveredContent).isEqualTo(fixtureContent);
+    }
+
+    private static String drain(reactor.core.publisher.Flux<DataBuffer> content) {
+        return content
+            .map(buffer -> {
+                try {
+                    return buffer.toString(StandardCharsets.UTF_8);
+                } finally {
+                    DataBufferUtils.release(buffer);
+                }
+            })
+            .collectList()
+            .map(parts -> String.join("", parts))
+            .block();
     }
 
     private static String slashPreservingPath(String bucket) {
