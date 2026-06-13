@@ -18,22 +18,43 @@ These instructions apply to all future agents working in this repository. They d
 - Requirement scenarios must be written or refreshed before implementation work for the corresponding phase begins.
 - Implementation, runner glue, and validation code must follow the requirement text, not the other way around.
 
-## 3. Gherkin authoring rules
+## 3. Completion evidence and requirement status policy
+
+- **Completion claims require code + semantic tests.** An API, feature, route family, or requirement may be described as done only when production code implements the promised behavior and semantic tests validate the observable outcomes.
+- Route existence, handler names, route inventories, README text, generated API lists, status-code smoke tests, or Cucumber status-only checks are not evidence of semantic completion.
+- If an API or feature is declared supported but the implementation is placeholder, configuration-only, partial, or unvalidated, downgrade the documentation, route inventory, API matrix, and requirement report to an explicit requirement/backlog status instead of calling it complete.
+- Use these status tags for requirements and feature/API reports:
+  - `@implemented-and-validated`: production behavior is implemented and semantic tests pass in all agreed validation modes for the declared scope.
+  - `@implemented-not-e2e-validated`: production behavior exists, but agreed end-to-end or black-box validation is missing, incomplete, stale, or not yet run.
+  - `@partial`: a meaningful subset exists, but scope gaps, semantic gaps, backend gaps, or validation gaps remain.
+  - `@config-only`: configuration can be stored, returned, or validated, but enforcement, background jobs, side effects, or runtime behavior are not implemented.
+  - `@placeholder`: route, handler, schema, or documentation scaffolding exists without meaningful semantic behavior.
+  - `@absent`: no route, handler, implementation, or executable requirement exists for the declared capability.
+  - `@not-implemented`: the capability is declared in scope or externally relevant, but the repository intentionally does not implement it yet or returns documented unsupported/not-implemented behavior.
+- If a feature is declared supported but is placeholder or config-only, create or update a shared requirement feature classified as `Business Need` when it is part of S3 compatibility, including extended S3 APIs that are declared supported. Tag the scenarios with `@partial`, `@config-only`, `@placeholder`, or `@not-implemented` as appropriate.
+- Do not mark a capability done until the behavior is implemented and validated by both agreed validation modes where applicable, for example WebTestClient and AWS CLI for shared S3 compatibility scenarios.
+- `@protocol-smoke` scenarios and status-code-only checks cannot upgrade a requirement or feature status.
+
+## 4. Gherkin taxonomy and authoring rules
 
 - Prefer semantic Gherkin over comments. The feature text should explain intent; comments should be rare and limited to conventions that cannot be expressed in Gherkin.
 - Requirement features may use expressive Gherkin keywords and structures, including:
   - `Business Need`
   - `Ability`
+  - `Feature`
   - `Rule`
   - `Scenario Outline`
   - `Examples`
   - data tables
   - doc strings
+- Use `Business Need` for externally promised S3 server capabilities, including extended S3 APIs if they are declared supported.
+- Use `Ability` for internal or operational capabilities that support those needs.
+- Use `Feature` for protocol smoke checks, regression checks, or legacy technical checks that are not product-level S3 compatibility promises.
 - Each scenario should include a stable requirement identifier when it represents a production requirement.
 - Scenarios must describe realistic preconditions, actions, validation mode, and observable outcomes.
 - Use domain language for capabilities such as durability, integrity, restart safety, streaming, observability, backend behavior, and storage layout.
 
-## 4. Single shared feature / dual runner policy
+## 5. Single shared feature / dual runner policy
 
 - A `.feature` file is the single source of truth for a requirement.
 - Do not duplicate the same feature text into separate WebTestClient and AWS CLI folders.
@@ -41,7 +62,7 @@ These instructions apply to all future agents working in this repository. They d
 - Runner-specific differences belong in duplicated or adapted step definitions, glue code, runner configuration, tags, profiles, or validation adapters, not in duplicated requirement text.
 - When both WebTestClient and AWS CLI validation are required, keep the requirement scenario shared and express runner selection through validation mode, tags, or runner configuration.
 
-## 5. Functional vs non-functional requirement classification
+## 6. Functional vs non-functional requirement classification
 
 - Every production requirement scenario must be classified as functional, non-functional, or both when justified.
 - Use tags for classification and quality attributes, for example:
@@ -55,7 +76,7 @@ These instructions apply to all future agents working in this repository. They d
 - A scenario may carry both `@functional-requirement` and `@non-functional-requirement` only when both classifications are explicit and justified by the scenario text.
 - Do not use `@protocol-smoke` scenarios as substitutes for functional or non-functional production requirements.
 
-## 6. Fixture/path/header policy
+## 7. Fixture/path/header policy
 
 Requirement scenarios must use realistic and reviewable details, including where relevant:
 
@@ -69,7 +90,7 @@ Requirement scenarios must use realistic and reviewable details, including where
 
 Avoid placeholder paths and abstract examples when realistic fixtures or object names would make the requirement clearer.
 
-## 7. ARC42/Gherkin appendix reporting policy
+## 8. ARC42/Gherkin appendix reporting policy
 
 Generated Gherkin requirements reporting must become an ARC42 appendix. The appendix should group scenarios by:
 
@@ -79,11 +100,11 @@ Generated Gherkin requirements reporting must become an ARC42 appendix. The appe
 - rule;
 - tags;
 - validation mode;
-- implementation status.
+- declared support status and validated implementation status.
 
 Reports must not invent test results or implementation status. Use observed runner output, tracked implementation state, or clearly mark unknown or pending items.
 
-## 8. Definition of done for future tests
+## 9. Definition of done for future tests
 
 A future test or validation change is done only when:
 
@@ -94,4 +115,4 @@ A future test or validation change is done only when:
 - realistic fixtures, paths, headers, backend details, validation modes, and expected outcomes are present where relevant;
 - WebTestClient and AWS CLI validation reuse the shared feature text instead of duplicating it;
 - runner-specific behavior is isolated to glue, step definitions, runner configuration, or validation adapters;
-- generated requirements reporting can place the scenario in the ARC42 appendix with requirement ID, classification, capability area, rule, tags, validation mode, and implementation status.
+- generated requirements reporting can place the scenario in the ARC42 appendix with requirement ID, classification, capability area, rule, tags, validation mode, declared support status, and validated implementation status.

@@ -95,6 +95,8 @@ Tasks:
 
 Gherkin feature files are executable requirements for the object store. They must describe business/system behavior and storage invariants, not only anemic request/response/status-code checks.
 
+First pass: reconcile false-positive API/feature completion claims into explicit requirement statuses such as `@implemented-and-validated`, `@implemented-not-e2e-validated`, `@partial`, `@config-only`, `@placeholder`, `@absent`, or `@not-implemented`. The ARC42 appendix must show declared-vs-validated status instead of treating route existence, docs text, or status-code smoke tests as completion evidence.
+
 ### Authoring Rules
 
 - Feature files are executable requirements, not transport smoke tests.
