@@ -36,6 +36,9 @@ import java.nio.file.Path;
 @Profile("storage-engine")
 public class StorageEngineFilesystemConfig {
 
+    @Value("${storage.engine.chunk-size-bytes:65536}")
+    private int defaultChunkSizeBytes;
+
     @Bean
     public FileSystemStorageCluster fileSystemStorageCluster(
             @Value("${storage.engine.filesystem.root:}") String root,
@@ -152,6 +155,7 @@ public class StorageEngineFilesystemConfig {
             alterationPort,
             chunkStorePort,
             storedObjectRepository,
-            objectManifestRepository);
+            objectManifestRepository,
+            defaultChunkSizeBytes);
     }
 }

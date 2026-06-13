@@ -170,7 +170,8 @@ class ReactiveStorageOrchestratorTest {
                     null,
                     chunkStore,
                     new InMemoryStoredObjectRepository(),
-                    manifestRepository);
+                    manifestRepository,
+                    65536);
         }
     }
 

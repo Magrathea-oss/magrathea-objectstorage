@@ -4,12 +4,8 @@ import com.example.magrathea.storageengine.domain.valueobject.ChunkId;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Chunker — splits a Flux<DataBuffer> into a Flux<ApplicationChunkPayload>
@@ -31,83 +27,43 @@ public class Chunker {
 
     /**
      * Splits the incoming DataBuffer flux into chunks of at most chunkSize bytes.
-     * Each chunk gets a new ChunkId and carries the accumulated byte array.
+     * Emits each full chunk as it accumulates — no full-object buffering (REQ-UPLOAD-003).
      */
     public Flux<ApplicationChunkPayload> chunk(Flux<DataBuffer> dataBuffers) {
-        return dataBuffers
-                .reduce(
-                        new ChunkAccumulator(chunkSize),
-                        (accumulator, buffer) -> {
-                            accumulator.feed(buffer);
-                            return accumulator;
-                        })
-                .flatMapMany(accumulator -> {
-                    List<ApplicationChunkPayload> payloads = new ArrayList<>();
-                    for (byte[] chunk : accumulator.getChunks()) {
-                        payloads.add(new ApplicationChunkPayload(ChunkId.generate(), chunk));
+        return Flux.create(sink -> {
+            ByteArrayOutputStream current = new ByteArrayOutputStream(chunkSize);
+            dataBuffers.subscribe(
+                buffer -> {
+                    try {
+                        byte[] bytes = new byte[buffer.readableByteCount()];
+                        buffer.read(bytes);
+                        DataBufferUtils.release(buffer);
+                        int offset = 0;
+                        while (offset < bytes.length) {
+                            int space = chunkSize - current.size();
+                            if (space <= 0) {
+                                sink.next(new ApplicationChunkPayload(
+                                    ChunkId.generate(), current.toByteArray()));
+                                current.reset();
+                                space = chunkSize;
+                            }
+                            int toCopy = Math.min(space, bytes.length - offset);
+                            current.write(bytes, offset, toCopy);
+                            offset += toCopy;
+                        }
+                    } catch (Exception e) {
+                        sink.error(e);
                     }
-                    // If there's a remaining partial chunk
-                    byte[] remainder = accumulator.getRemainder();
-                    if (remainder.length > 0) {
-                        payloads.add(new ApplicationChunkPayload(ChunkId.generate(), remainder));
+                },
+                sink::error,
+                () -> {
+                    if (current.size() > 0) {
+                        sink.next(new ApplicationChunkPayload(
+                            ChunkId.generate(), current.toByteArray()));
                     }
-                    return Flux.fromIterable(payloads);
-                });
-    }
-
-    /**
-     * Internal accumulator that accumulates bytes up to chunkSize before flushing.
-     */
-    private static class ChunkAccumulator {
-        private final int chunkSize;
-        private final List<byte[]> chunks = new ArrayList<>();
-        private ByteArrayOutputStream partial = new ByteArrayOutputStream();
-
-        ChunkAccumulator(int chunkSize) {
-            this.chunkSize = chunkSize;
-        }
-
-        void feed(DataBuffer buffer) {
-            byte[] bytes = new byte[buffer.readableByteCount()];
-            buffer.read(bytes);
-            org.springframework.core.io.buffer.DataBufferUtils.release(buffer);
-            int offset = 0;
-            while (offset < bytes.length) {
-                int remaining = chunkSize - partial.size();
-                if (remaining <= 0) {
-                    flushPartial();
-                    remaining = chunkSize;
+                    sink.complete();
                 }
-                int toCopy = Math.min(remaining, bytes.length - offset);
-                partial.write(bytes, offset, toCopy);
-                offset += toCopy;
-            }
-        }
-
-        void flushPartial() {
-            try {
-                partial.close();
-            } catch (IOException e) {
-                throw new RuntimeException("Failed to close ByteArrayOutputStream", e);
-            }
-            byte[] chunk = partial.toByteArray();
-            if (chunk.length > 0) {
-                chunks.add(chunk);
-            }
-            partial = new ByteArrayOutputStream();
-        }
-
-        List<byte[]> getChunks() {
-            return chunks;
-        }
-
-        byte[] getRemainder() {
-            try {
-                partial.close();
-            } catch (IOException e) {
-                throw new RuntimeException("Failed to close ByteArrayOutputStream", e);
-            }
-            return partial.toByteArray();
-        }
+            );
+        });
     }
 }

@@ -77,6 +77,8 @@ public class ReactiveStorageOrchestrator {
     private final StoredObjectRepository storedObjectRepository;
     private final ObjectManifestRepository objectManifestRepository;
 
+    private final int defaultChunkSizeBytes;
+
     public ReactiveStorageOrchestrator(
             CompleteUploadService completeUploadService,
             StoragePolicyCatalog storagePolicyCatalog,
@@ -89,7 +91,8 @@ public class ReactiveStorageOrchestrator {
             AlterationPort alterationPort,
             ChunkStorePort chunkStorePort,
             StoredObjectRepository storedObjectRepository,
-            ObjectManifestRepository objectManifestRepository) {
+            ObjectManifestRepository objectManifestRepository,
+            int defaultChunkSizeBytes) {
         this.completeUploadService = completeUploadService;
         this.storagePolicyCatalog = storagePolicyCatalog;
         this.effectivePolicyResolver = effectivePolicyResolver;
@@ -102,6 +105,7 @@ public class ReactiveStorageOrchestrator {
         this.chunkStorePort = chunkStorePort;
         this.storedObjectRepository = storedObjectRepository;
         this.objectManifestRepository = objectManifestRepository;
+        this.defaultChunkSizeBytes = defaultChunkSizeBytes;
     }
 
     /**
@@ -129,39 +133,14 @@ public class ReactiveStorageOrchestrator {
                     // Step 5: Create persistence plan
                     PersistencePlan plan = persistencePlanner.createPlan(effectivePolicy, device);
 
-                    // Step 6: Accumulate full data, then decide if chunking is needed
-                    return data.reduceWith(() -> new byte[0], (acc, buf) -> {
-                                byte[] bytes = new byte[acc.length + buf.readableByteCount()];
-                                System.arraycopy(acc, 0, bytes, 0, acc.length);
-                                buf.read(bytes, acc.length, buf.readableByteCount());
-                                org.springframework.core.io.buffer.DataBufferUtils.release(buf);
-                                return bytes;
-                            })
-                            .flatMapMany(fullData -> {
-                                // Check if dedup is enabled — only then chunk
-                                boolean dedupEnabled = plan.effectivePolicy().dedup()
-                                        .filter(d -> plan.steps().get(0).expectedStatus() == StepExecutionStatus.EXECUTED)
-                                        .isPresent();
-
-                                if (dedupEnabled) {
-                                    // Chunk using dedup config chunk size
-                                    long chunkSize = plan.effectivePolicy().dedup()
-                                            .map(DedupConfig::chunkSize)
-                                            .orElse(65536L);
-                                    Chunker chunker = new Chunker((int) chunkSize);
-                                    // Return Flux<ChunkPersistenceTrace> directly — no intermediate list wrap
-                                    return chunker.chunk(Flux.just(
-                                            new org.springframework.core.io.buffer.DefaultDataBufferFactory().wrap(fullData)))
-                                            .concatMap(chunkPayload -> processChunk(chunkPayload, plan));
-                                } else {
-                                    // No dedup: process full data as a single chunk
-                                    ChunkId singleChunkId = ChunkId.generate();
-                                    ApplicationChunkPayload singlePayload =
-                                            new ApplicationChunkPayload(singleChunkId, fullData);
-                                    // Convert Mono to Flux without shadowing the outer 'trace' variable
-                                    return processChunk(singlePayload, plan).flux();
-                                }
-                            })
+                    // Step 6: Stream-chunk data without full-object materialization (REQ-UPLOAD-003)
+                    boolean dedupEnabled = plan.steps().get(0).expectedStatus() == StepExecutionStatus.EXECUTED;
+                    long chunkSize = dedupEnabled
+                            ? plan.effectivePolicy().dedup().map(DedupConfig::chunkSize).orElse((long) defaultChunkSizeBytes)
+                            : defaultChunkSizeBytes;
+                    Chunker chunker = new Chunker((int) chunkSize);
+                    return chunker.chunk(data)
+                            .concatMap(chunkPayload -> processChunk(chunkPayload, plan))
                             .collectList()
                             .flatMap(chunkTraces -> {
                                 // Step 9: Build ChunkReferenceDescriptor list

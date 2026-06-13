@@ -59,7 +59,7 @@ class StorageEngineReactiveS3ObjectRepositoryTest {
         private final Map<ManifestId, byte[]> contentByManifestId = new ConcurrentHashMap<>();
 
         private FakeOrchestrator() {
-            super(null, null, null, null, null, null, null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null, null, null, null, null, null, 65536);
         }
 
         @Override
