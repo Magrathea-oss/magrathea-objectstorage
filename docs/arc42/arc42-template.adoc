@@ -68,4 +68,11 @@ include::src/11_technical_risks.adoc[]
 // 12. Glossary
 include::src/12_glossary.adoc[]
 
+<<<<
+// Appendix: Gherkin Requirements (generated)
+// Required by AGENTS.md §B.7 — generated requirements reporting must become an ARC42 appendix.
+// Source: scripts/generate-gherkin-requirements-appendix.py
+:numbered!:
+include::generated/gherkin-requirements.adoc[]
+
 

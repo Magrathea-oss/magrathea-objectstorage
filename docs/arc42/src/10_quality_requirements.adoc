@@ -34,3 +34,6 @@ ifndef::imagesdir[:imagesdir: ../images]
 - **Stimulus:** Code commit
 - **Response:** Maven verification generates JaCoCo coverage as the current baseline
 - **Metric:** Coverage trend and thresholds are taken from current JaCoCo reports; Clover/OpenClover is optional/legacy
+
+// The generated Gherkin requirements report is included as a top-level ARC42 appendix
+// from arc42-template.adoc (see AGENTS.md §B.7), not as a subsection of this chapter.
