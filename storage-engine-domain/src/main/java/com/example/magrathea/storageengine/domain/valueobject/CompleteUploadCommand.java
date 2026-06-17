@@ -12,5 +12,6 @@ public record CompleteUploadCommand(
         java.util.Objects.requireNonNull(context, "context must not be null");
         java.util.Objects.requireNonNull(uploadMode, "uploadMode must not be null");
         java.util.Objects.requireNonNull(parts, "parts must not be null");
+        parts = parts.map(List::copyOf);
     }
 }

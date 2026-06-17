@@ -1,6 +1,7 @@
 package com.example.magrathea.storageengine.infrastructure.yaml;
 
 import com.example.magrathea.storageengine.domain.service.EffectivePolicyResolver;
+import com.example.magrathea.storageengine.domain.service.PersistencePlanner;
 import com.example.magrathea.storageengine.domain.service.VirtualDeviceResolver;
 import com.example.magrathea.storageengine.domain.valueobject.BucketId;
 import com.example.magrathea.storageengine.domain.valueobject.BucketRef;
@@ -8,6 +9,9 @@ import com.example.magrathea.storageengine.domain.valueobject.EncryptionRequest;
 import com.example.magrathea.storageengine.domain.valueobject.ObjectContentDescriptor;
 import com.example.magrathea.storageengine.domain.valueobject.ObjectKey;
 import com.example.magrathea.storageengine.domain.valueobject.ObjectMetadataDescriptor;
+import com.example.magrathea.storageengine.domain.valueobject.StepExecutionStatus;
+import com.example.magrathea.storageengine.domain.valueobject.StepId;
+import com.example.magrathea.storageengine.domain.valueobject.StepPlan;
 import com.example.magrathea.storageengine.domain.valueobject.StorageClassId;
 import com.example.magrathea.storageengine.domain.valueobject.StorageDeviceId;
 import com.example.magrathea.storageengine.domain.valueobject.UploadRequestContext;
@@ -66,8 +70,35 @@ class MinioStandardIntegrationTest {
                             .isEqualTo(MINIO_STANDARD_EC_DATA_BLOCKS);
                     assertThat(effective.erasureCoding().get().parityBlocks())
                             .isEqualTo(MINIO_STANDARD_EC_PARITY_BLOCKS);
-                    assertThat(new VirtualDeviceResolver().resolve(effective, effective.bucketRef()))
-                            .isInstanceOf(VirtualDevice.BucketDevice.class);
+                    VirtualDeviceResolver virtualDeviceResolver = new VirtualDeviceResolver();
+                    VirtualDevice targetDevice = virtualDeviceResolver.resolve(effective, effective.bucketRef());
+                    assertThat(targetDevice).isInstanceOf(VirtualDevice.BucketDevice.class);
+
+                    var plan = new PersistencePlanner().createPlan(effective, targetDevice);
+                    assertThat(plan.effectivePolicy().storageClassId()).isEqualTo(StorageClassId.STANDARD);
+                    assertThat(plan.steps()).extracting(StepPlan::stepId).containsExactly(
+                            StepId.DEDUP,
+                            StepId.COMPRESS,
+                            StepId.CRYPT,
+                            StepId.ERASURE_CODING,
+                            StepId.REPLICATION,
+                            StepId.STORE);
+                    assertThat(plan.steps()).extracting(StepPlan::expectedStatus).containsExactly(
+                            StepExecutionStatus.SKIPPED,
+                            StepExecutionStatus.SKIPPED,
+                            StepExecutionStatus.SKIPPED,
+                            StepExecutionStatus.EXECUTED,
+                            StepExecutionStatus.EXECUTED,
+                            StepExecutionStatus.EXECUTED);
+                    assertThat(plan.steps().get(3).config()).isPresent();
+                    assertThat(plan.steps().get(4).config()).isPresent();
+
+                    var repeatedPlan = new PersistencePlanner().createPlan(effective, targetDevice);
+                    assertThat(repeatedPlan.deviceHash()).isEqualTo(plan.deviceHash());
+                    assertThat(repeatedPlan.steps()).extracting(StepPlan::stepId)
+                            .containsExactlyElementsOf(plan.steps().stream().map(StepPlan::stepId).toList());
+                    assertThat(repeatedPlan.steps()).extracting(StepPlan::expectedStatus)
+                            .containsExactlyElementsOf(plan.steps().stream().map(StepPlan::expectedStatus).toList());
                 })
                 .verifyComplete();
 
@@ -97,8 +128,10 @@ class MinioStandardIntegrationTest {
 
         StepVerifier.create(policyCatalog.findById("minio-standard")
                         .zipWith(deviceCatalog.findAll().collectList())
-                        .map(tuple -> new VirtualDeviceResolver()
-                                .selectDevice(tuple.getT1(), tuple.getT2())))
+                        .map(tuple -> {
+                            assertThat(tuple.getT2()).hasSize(1);
+                            return new VirtualDeviceResolver().selectDevice(tuple.getT1(), tuple.getT2());
+                        }))
                 .assertNext(selected -> assertThat(selected.id().value()).isEqualTo("local-disk-0"))
                 .verifyComplete();
     }

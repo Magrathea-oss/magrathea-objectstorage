@@ -1,4 +1,4 @@
-@requirement @phase-1 @upload @storage-engine @not-implemented
+@requirement @phase-1 @upload @storage-engine @partial
 Business Need: Phase 1 upload reliability requirements for the storage-engine backend
   As an S3-compatible client, storage-engine operator, and system owner,
   I want PutObject and GetObject through the storage-engine backend to be durable,
@@ -19,7 +19,7 @@ Business Need: Phase 1 upload reliability requirements for the storage-engine ba
 
   Until matching implementation and runner glue are added, this shared requirement
   resource remains outside the currently selected Cucumber runners. Keep every
-  @REQ-UPLOAD-* requirement ID unchanged when the scenarios become executable.
+  REQ-UPLOAD-* requirement ID unchanged when the scenarios become executable.
 
   Validation roles:
     - S3 client validates behavior in WebTestClient and AWS CLI modes.
@@ -72,7 +72,7 @@ Business Need: Phase 1 upload reliability requirements for the storage-engine ba
     A committed PutObject publishes durable bytes, manifest metadata, and object reference
     before process restart. Reads after restart must use filesystem state, not discarded memory.
 
-    @REQ-UPLOAD-001 @functional-requirement @non-functional-requirement @durability @restart-safety @webclient-required @awscli-required @not-implemented
+    @REQ-UPLOAD-001 @functional-requirement @non-functional-requirement @durability @restart-safety @webclient-required @awscli-required @implemented-not-e2e-validated
     Scenario Outline: S3 client reads an uploaded object after application restart
       Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
       And the storage engine operator uses filesystem root "<storage_root>"
@@ -115,7 +115,7 @@ Business Need: Phase 1 upload reliability requirements for the storage-engine ba
     Object references and upload manifests are reloaded independently from the filesystem
     and still identify the original byte stream and durable metadata.
 
-    @REQ-UPLOAD-002 @functional-requirement @non-functional-requirement @durability @manifest-durability @webclient-required @awscli-required @not-implemented
+    @REQ-UPLOAD-002 @functional-requirement @non-functional-requirement @durability @manifest-durability @webclient-required @awscli-required @implemented-not-e2e-validated
     Scenario Outline: Storage engine operator can reload committed upload manifests and object references
       Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
       And the storage engine operator uses filesystem root "<storage_root>"
@@ -148,7 +148,7 @@ Business Need: Phase 1 upload reliability requirements for the storage-engine ba
     Upload and read paths stream large payloads as ordered durable chunks while respecting
     backpressure and avoiding whole-object materialization.
 
-    @REQ-UPLOAD-003 @functional-requirement @non-functional-requirement @large-object @streaming @webclient-required @awscli-required @not-implemented
+    @REQ-UPLOAD-003 @functional-requirement @non-functional-requirement @large-object @streaming @webclient-required @awscli-required @implemented-not-e2e-validated
     Scenario Outline: S3 client streams a large upload with bounded memory and exact read-back
       Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
       And the storage engine operator uses filesystem root "<storage_root>"
@@ -183,7 +183,7 @@ Business Need: Phase 1 upload reliability requirements for the storage-engine ba
     A failed PutObject may leave recovery artifacts, but it must not expose a readable
     object, committed manifest, or durable object metadata.
 
-    @REQ-UPLOAD-004 @functional-requirement @non-functional-requirement @atomicity @recovery @webclient-required @awscli-required @not-implemented
+    @REQ-UPLOAD-004 @functional-requirement @non-functional-requirement @atomicity @recovery @webclient-required @awscli-required @implemented-not-e2e-validated
     Scenario Outline: Recovery process does not publish a failed partial upload
       Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
       And the storage engine operator uses filesystem root "<storage_root>"
@@ -214,7 +214,7 @@ Business Need: Phase 1 upload reliability requirements for the storage-engine ba
     A successful PutObject response means the chunks, manifest, object reference, storage
     class, and headers are already durable and visible through the read path.
 
-    @REQ-UPLOAD-005 @functional-requirement @durability @read-after-write @webclient-required @awscli-required @not-implemented
+    @REQ-UPLOAD-005 @functional-requirement @durability @read-after-write @webclient-required @awscli-required @implemented-and-validated
     Scenario Outline: S3 client immediately reads a successful PutObject from filesystem persistence
       Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
       And the storage-engine repositories are backed by storage-engine filesystem root "<storage_root>"
@@ -253,7 +253,7 @@ Business Need: Phase 1 upload reliability requirements for the storage-engine ba
     The storage engine validates client-supplied integrity data where present and uses
     object/chunk checksums to reject corrupted bytes on reads.
 
-    @REQ-UPLOAD-006 @functional-requirement @non-functional-requirement @checksum @integrity @webclient-required @awscli-required @not-implemented
+    @REQ-UPLOAD-006 @functional-requirement @non-functional-requirement @checksum @integrity @webclient-required @awscli-required @implemented-and-validated
     Scenario Outline: Storage engine detects chunk corruption before returning uploaded bytes
       Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
       And the storage engine operator uses filesystem root "<storage_root>"

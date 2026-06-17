@@ -1,4 +1,6 @@
 # Node.js artifacts
+node_modules/
+**/node_modules/
 magrathea-ui/node_modules/
 magrathea-ui/node/
 magrathea-ui/dist/
@@ -13,6 +15,14 @@ bootstrap-application/src/main/resources/static/icons.svg
 
 # Maven build artifacts
 **/target/
+
+# Accidental compiler/JAR outputs; keep source resource META-INF directories in the context.
+*.class
+META-INF/maven/
+
+# Local tool caches
+.cache/
+.pi/
 
 # Git metadata
 .git/

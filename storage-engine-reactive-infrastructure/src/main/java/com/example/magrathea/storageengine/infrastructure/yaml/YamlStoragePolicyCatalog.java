@@ -241,6 +241,10 @@ public class YamlStoragePolicyCatalog implements StoragePolicyCatalog {
             throw new IllegalStateException(
                     "Duplicate policyId '" + dto.policyId + "' found in " + source);
         }
+        if (byClassId.containsKey(dto.storageClassId)) {
+            throw new IllegalStateException(
+                    "Duplicate storageClassId '" + dto.storageClassId + "' found in " + source);
+        }
 
         StoragePolicy policy = toDomain(dto, source);
         byId.put(dto.policyId, policy);

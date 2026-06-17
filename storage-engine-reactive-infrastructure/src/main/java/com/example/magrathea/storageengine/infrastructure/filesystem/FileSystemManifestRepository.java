@@ -1,5 +1,6 @@
 package com.example.magrathea.storageengine.infrastructure.filesystem;
 
+import com.example.magrathea.storageengine.application.exception.ManifestIntegrityException;
 import com.example.magrathea.storageengine.application.port.ObjectManifestRepository;
 import com.example.magrathea.storageengine.domain.valueobject.BucketId;
 import com.example.magrathea.storageengine.domain.valueobject.BucketRef;
@@ -7,6 +8,7 @@ import com.example.magrathea.storageengine.domain.valueobject.ChecksumAlgorithm;
 import com.example.magrathea.storageengine.domain.valueobject.ChunkId;
 import com.example.magrathea.storageengine.domain.valueobject.ChunkReferenceDescriptor;
 import com.example.magrathea.storageengine.domain.valueobject.ContentHash;
+import com.example.magrathea.storageengine.domain.valueobject.DeclaredChecksum;
 import com.example.magrathea.storageengine.domain.valueobject.DeviceConfigurationHash;
 import com.example.magrathea.storageengine.domain.valueobject.EffectiveStoragePolicy;
 import com.example.magrathea.storageengine.domain.valueobject.Fingerprint;
@@ -15,6 +17,7 @@ import com.example.magrathea.storageengine.domain.valueobject.ManifestId;
 import com.example.magrathea.storageengine.domain.valueobject.NodeId;
 import com.example.magrathea.storageengine.domain.valueobject.ObjectId;
 import com.example.magrathea.storageengine.domain.valueobject.ObjectManifest;
+import com.example.magrathea.storageengine.domain.valueobject.PartChecksumResult;
 import com.example.magrathea.storageengine.domain.valueobject.PolicyDecision;
 import com.example.magrathea.storageengine.domain.valueobject.PolicyDecisionReason;
 import com.example.magrathea.storageengine.domain.valueobject.PolicyDecisionStatus;
@@ -27,16 +30,21 @@ import com.example.magrathea.storageengine.domain.valueobject.UploadMode;
 import com.example.magrathea.storageengine.domain.valueobject.VersionId;
 import com.example.magrathea.storageengine.domain.valueobject.VirtualDevice;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
@@ -45,13 +53,36 @@ import java.util.UUID;
 /**
  * Filesystem-backed manifest repository.
  * Persists complete manifest fields needed for read-after-write reconstruction.
+ *
+ * <h2>Atomic write protocol (REQ-FS-002)</h2>
+ * Manifest content is written to a uniquely-named temp file and atomically renamed
+ * to the final committed manifest path. An interrupted write never leaves a partial
+ * file at the committed path.
+ *
+ * <h2>Manifest checksum (REQ-FS-004)</h2>
+ * A SHA-256 checksum of the serialized manifest is appended as a
+ * {@code manifest.checksum=<hex>} trailer line before writing. On every read the
+ * checksum is verified before the manifest is parsed. A mismatch throws
+ * {@link ManifestIntegrityException}.
  */
 public class FileSystemManifestRepository implements ObjectManifestRepository {
 
+    /** Property key used for the manifest self-checksum trailer. */
+    static final String CHECKSUM_KEY = "manifest.checksum";
+    /** Separator that appears immediately before the checksum trailer line. */
+    private static final String CHECKSUM_LINE_PREFIX = "\n" + CHECKSUM_KEY + "=";
+    private static final String TMP_SUFFIX_FORMAT = ".tmp.";
+
     private final Path manifestsRoot;
+    private final FileSystemWriteFaultInjector faultInjector;
 
     public FileSystemManifestRepository(Path manifestsRoot) {
+        this(manifestsRoot, FileSystemWriteFaultInjector.disabled());
+    }
+
+    public FileSystemManifestRepository(Path manifestsRoot, FileSystemWriteFaultInjector faultInjector) {
         this.manifestsRoot = java.util.Objects.requireNonNull(manifestsRoot, "manifestsRoot must not be null");
+        this.faultInjector = java.util.Objects.requireNonNull(faultInjector, "faultInjector must not be null");
         try {
             Files.createDirectories(manifestsRoot);
         } catch (IOException e) {
@@ -59,24 +90,49 @@ public class FileSystemManifestRepository implements ObjectManifestRepository {
         }
     }
 
+    public Path manifestsRoot() {
+        return manifestsRoot;
+    }
+
     @Override
     public Mono<Void> save(ObjectManifest manifest) {
-        return Mono.fromRunnable(() -> {
+        return BlockingFileSystemOperation.fromRunnable(() -> {
                     try {
-                        Path manifestFile = manifestsRoot.resolve(manifest.manifestId().value() + ".properties");
-                        Files.writeString(manifestFile, serialize(manifest),
-                                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+                        Path finalPath = manifestsRoot.resolve(manifest.manifestId().value() + ".properties");
+                        Path tempPath = manifestsRoot.resolve(
+                                manifest.manifestId().value() + ".properties" + TMP_SUFFIX_FORMAT + UUID.randomUUID());
+
+                        String finalContent = buildContentWithChecksum(serialize(manifest));
+
+                        try {
+                            Files.writeString(tempPath, finalContent, StandardOpenOption.CREATE_NEW);
+                            try (FileChannel channel = FileChannel.open(tempPath, StandardOpenOption.WRITE)) {
+                                channel.force(true);
+                            }
+                            faultInjector.afterManifestTempFileWritten(
+                                    new FileSystemWriteFaultInjector.ManifestWriteContext(
+                                            manifest.manifestId(), tempPath, finalPath,
+                                            finalContent.getBytes(StandardCharsets.UTF_8).length));
+                            Files.move(tempPath, finalPath,
+                                    StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+                        } catch (Exception e) {
+                            if (!preserveTemporaryArtifacts(e)) {
+                                try { Files.deleteIfExists(tempPath); } catch (Exception ignored) { /* best effort */ }
+                            }
+                            if (e instanceof IOException ioe) {
+                                throw new UncheckedIOException("Atomic manifest write failed", ioe);
+                            }
+                            throw e;
+                        }
                     } catch (IOException e) {
                         throw new UncheckedIOException("Failed to save manifest", e);
                     }
-                })
-                .subscribeOn(Schedulers.boundedElastic())
-                .then();
+                });
     }
 
     @Override
     public Mono<ObjectManifest> findBy(ManifestId manifestId) {
-        return Mono.fromCallable(() -> {
+        return BlockingFileSystemOperation.fromCallable(() -> {
                     Path manifestFile = manifestsRoot.resolve(manifestId.value() + ".properties");
                     if (!Files.exists(manifestFile)) {
                         // Backward compatibility with the previous extension during rolling upgrades.
@@ -85,10 +141,72 @@ public class FileSystemManifestRepository implements ObjectManifestRepository {
                     if (!Files.exists(manifestFile)) {
                         throw new java.util.NoSuchElementException("Manifest not found: " + manifestId.value());
                     }
-                    return deserialize(Files.readString(manifestFile));
-                })
-                .subscribeOn(Schedulers.boundedElastic());
+                    String rawContent = Files.readString(manifestFile);
+                    verifyManifestChecksum(rawContent, manifestId);
+                    return deserialize(rawContent);
+                });
     }
+
+    // ─────────────────────────────────────────────────────
+    //  Checksum helpers
+    // ─────────────────────────────────────────────────────
+
+    /**
+     * Appends a {@code manifest.checksum=<sha256hex>} trailer to the serialized manifest.
+     * The checksum is computed over the serialized Properties string (without the trailer).
+     */
+    private static boolean preserveTemporaryArtifacts(Exception e) {
+        return e instanceof FileSystemWriteInterruptedException interrupted
+                && interrupted.preserveTemporaryArtifacts();
+    }
+
+    static String buildContentWithChecksum(String serialized) {
+        // Ensure the Properties output ends with exactly one newline before appending the trailer.
+        String normalized = serialized.endsWith("\n") ? serialized : serialized + "\n";
+        String checksumHex = sha256Hex(normalized);
+        return normalized + CHECKSUM_KEY + "=" + checksumHex + "\n";
+    }
+
+    /**
+     * Verifies the {@code manifest.checksum} trailer of the given raw file content.
+     *
+     * @throws ManifestIntegrityException if the trailer is absent or the checksum does not match.
+     */
+    static void verifyManifestChecksum(String rawContent, ManifestId manifestId) {
+        int idx = rawContent.lastIndexOf(CHECKSUM_LINE_PREFIX);
+        if (idx < 0) {
+            // The manifest may be a legacy file written without a checksum — treat as missing
+            throw new ManifestIntegrityException(
+                    "Manifest checksum trailer missing for manifest: " + manifestId.value());
+        }
+        // Content that was checksummed = everything up to and including the \n before the trailer
+        String contentForVerification = rawContent.substring(0, idx + 1);
+        String checksumLine = rawContent.substring(idx + 1);              // "manifest.checksum=<hex>\n"
+        String storedHex = checksumLine.substring(CHECKSUM_KEY.length() + 1).trim(); // strip key= and trailing whitespace
+        String computedHex = sha256Hex(contentForVerification);
+        if (!computedHex.equals(storedHex)) {
+            throw new ManifestIntegrityException(
+                    "Manifest checksum mismatch for manifest: " + manifestId.value()
+                    + " — stored=" + storedHex + " computed=" + computedHex);
+        }
+    }
+
+    static String sha256Hex(String content) {
+        return sha256Hex(content.getBytes(StandardCharsets.UTF_8));
+    }
+
+    static String sha256Hex(byte[] data) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(md.digest(data));
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("SHA-256 not available", e);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────
+    //  Serialization
+    // ─────────────────────────────────────────────────────
 
     private String serialize(ObjectManifest manifest) {
         Properties properties = new Properties();
@@ -103,11 +221,34 @@ public class FileSystemManifestRepository implements ObjectManifestRepository {
 
         UploadCompletionTrace uploadTrace = manifest.uploadTrace();
         properties.setProperty("upload.mode", uploadTrace.uploadMode().name());
+        uploadTrace.declaredChecksum().ifPresent(declaredChecksum -> {
+            properties.setProperty("upload.declaredChecksum.present", "true");
+            properties.setProperty("upload.declaredChecksum.algorithm", declaredChecksum.algorithm().name());
+            properties.setProperty("upload.declaredChecksum.value", declaredChecksum.value());
+        });
         properties.setProperty("upload.consolidatedChecksum.algorithm", uploadTrace.consolidatedChecksum().algorithm().name());
         properties.setProperty("upload.consolidatedChecksum.value", uploadTrace.consolidatedChecksum().value());
         properties.setProperty("upload.verificationPassed", Boolean.toString(uploadTrace.verificationPassed()));
         properties.setProperty("upload.totalObjectSize", Long.toString(uploadTrace.totalObjectSize()));
         properties.setProperty("upload.metadataValidated", Boolean.toString(uploadTrace.metadataValidated()));
+        uploadTrace.partChecksumResults().ifPresent(partResults -> {
+            properties.setProperty("upload.partChecksumResults.present", "true");
+            properties.setProperty("upload.partChecksumResults.count", Integer.toString(partResults.size()));
+            for (int i = 0; i < partResults.size(); i++) {
+                PartChecksumResult partResult = partResults.get(i);
+                String prefix = "upload.partChecksumResult." + i + ".";
+                properties.setProperty(prefix + "partNumber", Integer.toString(partResult.partNumber()));
+                properties.setProperty(prefix + "partSize", Long.toString(partResult.partSize()));
+                partResult.declaredChecksum().ifPresent(declaredChecksum -> {
+                    properties.setProperty(prefix + "declaredChecksum.present", "true");
+                    properties.setProperty(prefix + "declaredChecksum.algorithm", declaredChecksum.algorithm().name());
+                    properties.setProperty(prefix + "declaredChecksum.value", declaredChecksum.value());
+                });
+                properties.setProperty(prefix + "calculatedChecksum.algorithm", partResult.calculatedChecksum().algorithm().name());
+                properties.setProperty(prefix + "calculatedChecksum.value", partResult.calculatedChecksum().value());
+                properties.setProperty(prefix + "matched", Boolean.toString(partResult.matched()));
+            }
+        });
 
         properties.setProperty("policyDecisionCount", Integer.toString(manifest.policyDecisions().size()));
         for (int i = 0; i < manifest.policyDecisions().size(); i++) {
@@ -169,14 +310,14 @@ public class FileSystemManifestRepository implements ObjectManifestRepository {
 
         UploadCompletionTrace uploadTrace = new UploadCompletionTrace(
                 UploadMode.valueOf(required(properties, "upload.mode")),
-                Optional.empty(),
+                readOptionalDeclaredChecksum(properties, "upload.declaredChecksum."),
                 ContentHash.of(
                         ChecksumAlgorithm.valueOf(required(properties, "upload.consolidatedChecksum.algorithm")),
                         required(properties, "upload.consolidatedChecksum.value")),
                 Boolean.parseBoolean(required(properties, "upload.verificationPassed")),
                 Long.parseLong(required(properties, "upload.totalObjectSize")),
                 Boolean.parseBoolean(required(properties, "upload.metadataValidated")),
-                Optional.empty());
+                readOptionalPartChecksumResults(properties));
 
         List<PolicyDecision> policyDecisions = new ArrayList<>();
         int policyDecisionCount = Integer.parseInt(properties.getProperty("policyDecisionCount", "0"));
@@ -221,6 +362,35 @@ public class FileSystemManifestRepository implements ObjectManifestRepository {
                 totalOriginalSize,
                 totalStoredSize,
                 chunks);
+    }
+
+    private Optional<DeclaredChecksum> readOptionalDeclaredChecksum(Properties properties, String prefix) {
+        if (!Boolean.parseBoolean(properties.getProperty(prefix + "present", "false"))) {
+            return Optional.empty();
+        }
+        return Optional.of(DeclaredChecksum.of(
+                ChecksumAlgorithm.valueOf(required(properties, prefix + "algorithm")),
+                required(properties, prefix + "value")));
+    }
+
+    private Optional<List<PartChecksumResult>> readOptionalPartChecksumResults(Properties properties) {
+        if (!Boolean.parseBoolean(properties.getProperty("upload.partChecksumResults.present", "false"))) {
+            return Optional.empty();
+        }
+        int count = Integer.parseInt(properties.getProperty("upload.partChecksumResults.count", "0"));
+        List<PartChecksumResult> results = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            String prefix = "upload.partChecksumResult." + i + ".";
+            results.add(PartChecksumResult.of(
+                    Integer.parseInt(required(properties, prefix + "partNumber")),
+                    Long.parseLong(required(properties, prefix + "partSize")),
+                    readOptionalDeclaredChecksum(properties, prefix + "declaredChecksum."),
+                    ContentHash.of(
+                            ChecksumAlgorithm.valueOf(required(properties, prefix + "calculatedChecksum.algorithm")),
+                            required(properties, prefix + "calculatedChecksum.value")),
+                    Boolean.parseBoolean(required(properties, prefix + "matched"))));
+        }
+        return Optional.of(List.copyOf(results));
     }
 
     private List<StepChecksumDescriptor> readStepChecksums(Properties properties, String prefix) {

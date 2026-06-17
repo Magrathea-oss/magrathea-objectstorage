@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -115,6 +116,13 @@ public class YamlStorageDeviceCatalog implements StorageDeviceCatalog {
     public Flux<StorageDevice> findEligibleForWrite() {
         return Flux.fromIterable(deviceById.get().values())
                 .filter(StorageDevice::isWriteEligible);
+    }
+
+    /**
+     * Returns the immutable startup snapshot of loaded device IDs for cross-catalog validation.
+     */
+    public Set<String> loadedDeviceIds() {
+        return Set.copyOf(deviceById.get().keySet());
     }
 
     // -------------------------------------------------------------------------

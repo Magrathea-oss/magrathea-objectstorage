@@ -32,6 +32,13 @@
             <version>${project.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>storage-engine-reactive-infrastructure</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+
         <!-- Reactive core -->
         <dependency>
             <groupId>io.projectreactor</groupId>

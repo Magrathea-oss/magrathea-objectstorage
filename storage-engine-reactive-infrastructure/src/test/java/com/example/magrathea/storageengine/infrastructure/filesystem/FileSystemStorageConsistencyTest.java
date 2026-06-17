@@ -3,6 +3,7 @@ package com.example.magrathea.storageengine.infrastructure.filesystem;
 import com.example.magrathea.storageengine.domain.valueobject.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
 
 import java.nio.charset.StandardCharsets;
@@ -62,6 +63,67 @@ class FileSystemStorageConsistencyTest {
     }
 
     @Test
+    void manifestRepositoryRoundTripsUploadTraceDeclaredChecksumAndMultipartPartResults() {
+        FileSystemManifestRepository repository = new FileSystemManifestRepository(tempDir.resolve("manifests"));
+        UploadCompletionTrace uploadTrace = new UploadCompletionTrace(
+                UploadMode.MULTIPART,
+                Optional.of(DeclaredChecksum.of(ChecksumAlgorithm.SHA256, "declared-total")),
+                ContentHash.of(ChecksumAlgorithm.SHA256, "calculated-total"),
+                false,
+                6,
+                true,
+                Optional.of(List.of(
+                        PartChecksumResult.of(1, 4,
+                                Optional.of(DeclaredChecksum.of(ChecksumAlgorithm.SHA256, "declared-part-1")),
+                                ContentHash.of(ChecksumAlgorithm.SHA256, "calculated-part-1"),
+                                true),
+                        PartChecksumResult.of(2, 2,
+                                Optional.empty(),
+                                ContentHash.of(ChecksumAlgorithm.SHA256, "calculated-part-2"),
+                                true))));
+        ObjectManifest manifest = manifest(List.of(
+                chunk("cccccccc-cccc-cccc-cccc-cccccccccccc", 4, "node-001"),
+                chunk("dddddddd-dddd-dddd-dddd-dddddddddddd", 2, "node-001")), uploadTrace);
+
+        StepVerifier.create(repository.save(manifest)).verifyComplete();
+
+        StepVerifier.create(repository.findBy(manifest.manifestId()))
+                .assertNext(restored -> {
+                    UploadCompletionTrace restoredTrace = restored.uploadTrace();
+                    assertThat(restoredTrace.uploadMode()).isEqualTo(UploadMode.MULTIPART);
+                    assertThat(restoredTrace.declaredChecksum()).contains(DeclaredChecksum.of(ChecksumAlgorithm.SHA256, "declared-total"));
+                    assertThat(restoredTrace.consolidatedChecksum()).isEqualTo(ContentHash.of(ChecksumAlgorithm.SHA256, "calculated-total"));
+                    assertThat(restoredTrace.verificationPassed()).isFalse();
+                    assertThat(restoredTrace.totalObjectSize()).isEqualTo(6L);
+                    assertThat(restoredTrace.metadataValidated()).isTrue();
+                    assertThat(restoredTrace.partChecksumResults()).isPresent();
+                    assertThat(restoredTrace.partChecksumResults().orElseThrow()).hasSize(2);
+                    assertThat(restoredTrace.partChecksumResults().orElseThrow().get(0).declaredChecksum())
+                            .contains(DeclaredChecksum.of(ChecksumAlgorithm.SHA256, "declared-part-1"));
+                    assertThat(restoredTrace.partChecksumResults().orElseThrow().get(1).declaredChecksum())
+                            .isEmpty();
+                })
+                .verifyComplete();
+    }
+
+    @Test
+    void contentAddressIndexFindRunsBlockingLookupOnBoundedElastic() {
+        FileSystemContentAddressIndex index = new FileSystemContentAddressIndex(tempDir.resolve("index-scheduler"));
+        var callerScheduler = Schedulers.newSingle("event-loop-probe");
+        try {
+            StepVerifier.create(index.find(
+                            DeviceConfigurationHash.of("device-hash"),
+                            Fingerprint.of(FingerprintAlgorithm.SHA256, "fingerprint-value"))
+                    .map(ignored -> Thread.currentThread().getName())
+                    .subscribeOn(callerScheduler))
+                    .assertNext(threadName -> assertThat(threadName).contains("boundedElastic"))
+                    .verifyComplete();
+        } finally {
+            callerScheduler.dispose();
+        }
+    }
+
+    @Test
     void contentAddressIndexFindsRecordedDuplicateMapping() {
         FileSystemContentAddressIndex index = new FileSystemContentAddressIndex(tempDir.resolve("index"));
         DeviceConfigurationHash deviceHash = DeviceConfigurationHash.of("device-hash");
@@ -107,6 +169,11 @@ class FileSystemStorageConsistencyTest {
                 6,
                 true,
                 Optional.empty());
+        return manifest(chunks, uploadTrace);
+    }
+
+    private ObjectManifest manifest(List<ChunkReferenceDescriptor> chunks, UploadCompletionTrace uploadTrace) {
+        PersistencePlan plan = plan();
         return new ObjectManifest(
                 ManifestId.generate(),
                 ObjectId.of("bucket/key"),

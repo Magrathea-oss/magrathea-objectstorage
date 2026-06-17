@@ -1,7 +1,5 @@
 package com.example.magrathea.storageengine.infrastructure.yaml.config;
 
-import com.example.magrathea.storageengine.application.port.DiskSetCatalog;
-import com.example.magrathea.storageengine.application.port.StorageDeviceCatalog;
 import com.example.magrathea.storageengine.application.port.StoragePolicyCatalog;
 import com.example.magrathea.storageengine.infrastructure.yaml.YamlDiskSetCatalog;
 import com.example.magrathea.storageengine.infrastructure.yaml.YamlStorageDeviceCatalog;
@@ -51,7 +49,7 @@ public class StorageEngineYamlCatalogConfig {
      * classpath {@code storage-devices/}.
      */
     @Bean
-    public StorageDeviceCatalog storageDeviceCatalog(
+    public YamlStorageDeviceCatalog storageDeviceCatalog(
             @Value("${storage.engine.devices.dir:}") String devicesDir) {
         return YamlStorageDeviceCatalog.create(devicesDir);
     }
@@ -63,8 +61,11 @@ public class StorageEngineYamlCatalogConfig {
      * classpath {@code disk-sets/}.
      */
     @Bean
-    public DiskSetCatalog diskSetCatalog(
-            @Value("${storage.engine.disksets.dir:}") String disksetsDir) {
-        return YamlDiskSetCatalog.create(disksetsDir);
+    public YamlDiskSetCatalog diskSetCatalog(
+            @Value("${storage.engine.disksets.dir:}") String disksetsDir,
+            YamlStorageDeviceCatalog storageDeviceCatalog) {
+        YamlDiskSetCatalog catalog = YamlDiskSetCatalog.create(disksetsDir);
+        catalog.validateDeviceReferences(storageDeviceCatalog.loadedDeviceIds());
+        return catalog;
     }
 }

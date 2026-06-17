@@ -17,6 +17,7 @@ public record PersistencePlan(
         java.util.Objects.requireNonNull(workflowKey, "workflowKey must not be null");
         java.util.Objects.requireNonNull(deviceHash, "deviceHash must not be null");
         java.util.Objects.requireNonNull(steps, "steps must not be null");
+        steps = List.copyOf(steps);
         if (steps.size() != 6) {
             throw new IllegalArgumentException("steps must have exactly 6 entries: " + steps.size());
         }

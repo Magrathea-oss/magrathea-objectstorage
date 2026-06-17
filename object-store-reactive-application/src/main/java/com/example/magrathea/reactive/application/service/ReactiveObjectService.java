@@ -235,6 +235,21 @@ public class ReactiveObjectService {
     public record ObjectWithContent(S3Object object, Flux<DataBuffer> content) {}
 
     /**
+     * Update object tags on an existing object identified by its natural {@link ObjectKey}.
+     * Gets the current object, applies the new tags, and persists.
+     */
+    public Mono<CommandResult<S3Object>> updateObjectTags(ObjectKey objectKey, Map<String, String> tags) {
+        return getObject(objectKey)
+            .flatMap(obj -> {
+                if (obj instanceof ActiveS3Object active) {
+                    return commandRepository.save(active.withObjectTags(tags));
+                }
+                return Mono.error(new IllegalStateException(
+                    "Object is not in active state: " + objectKey));
+            });
+    }
+
+    /**
      * Delete an object identified by its natural {@link ObjectKey}.
      * Looks up the bucket internally.
      * <p>If the bucket is not found, returns {@code Mono.error(BucketNotFoundException)}.

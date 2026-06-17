@@ -132,21 +132,25 @@ public class InMemoryReactiveS3ObjectRepository implements S3ObjectCommandReposi
                 var storeKey = objectKeyStoreKey(object);
                 contentByKey.put(storeKey, bytes);
 
-                // Create a clean ActiveS3Object with the computed checksum
-                // If the object is already an ActiveS3Object, use its properties
-                // Otherwise, create a fresh ActiveS3Object from the object's data
+                String hexEtag = hasExistingMd5 ? null : hexMd5ETag(bytes);
+
                 S3Object storedObject;
                 if (object instanceof ActiveS3Object active) {
-                    // Re-create with updated checksum
                     storedObject = ActiveS3Object.restoreActive(
                         active.key(), active.storageClass(), active.userMetadata(),
                         active.encryption(), combinedChecksum, bytes.length,
                         active.createdAt(), active.domainEvents()).clearEvents();
+                    if (hexEtag != null) {
+                        storedObject = ((ActiveS3Object) storedObject).withEtag(hexEtag);
+                    }
                 } else {
                     storedObject = ActiveS3Object.restoreActive(
                         object.key(), object.storageClass(), object.userMetadata(),
                         object.encryption(), combinedChecksum, bytes.length,
                         object.createdAt(), object.domainEvents()).clearEvents();
+                    if (hexEtag != null) {
+                        storedObject = ((ActiveS3Object) storedObject).withEtag(hexEtag);
+                    }
                 }
 
                 storeByObjectKey.put(storeKey, storedObject);
@@ -334,6 +338,21 @@ public class InMemoryReactiveS3ObjectRepository implements S3ObjectCommandReposi
             md.update(bytes);
             var digest = md.digest();
             return java.util.Base64.getEncoder().encodeToString(digest);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("MD5 not available", e);
+        }
+    }
+
+    private static String hexMd5ETag(byte[] bytes) {
+        try {
+            var md = MessageDigest.getInstance("MD5");
+            md.update(bytes);
+            var digest = md.digest();
+            var sb = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                sb.append(String.format("%02x", b & 0xff));
+            }
+            return "\"" + sb + "\"";
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException("MD5 not available", e);
         }

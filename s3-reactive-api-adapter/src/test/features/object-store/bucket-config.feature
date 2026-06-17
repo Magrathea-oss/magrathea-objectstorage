@@ -743,7 +743,8 @@ Feature: S3-compatible Bucket Configuration APIs (CORS, Policy, Encryption, etc.
   @webclient
   Scenario: Get object lock when no configuration exists
     When bucket object lock configuration is requested
-    Then the response status is 404
+    Then the response status is 200
+    And the metadata response contains "ObjectLockEnabled"
 
   @webclient
   Scenario: Put object lock for nonexistent bucket

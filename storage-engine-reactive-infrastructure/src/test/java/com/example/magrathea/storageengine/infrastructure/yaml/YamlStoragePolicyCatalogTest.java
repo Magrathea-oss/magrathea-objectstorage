@@ -128,8 +128,28 @@ class YamlStoragePolicyCatalogTest {
                 .hasMessageContaining("same-id");
     }
 
+    @Test
+    void rejectsDuplicateStorageClassIds(@TempDir Path dir) throws IOException {
+        Files.writeString(dir.resolve("standard-a.yaml"), """
+                policyId: standard-a
+                storageClassId: STANDARD
+                replication:
+                  factor: 1
+                """);
+        Files.writeString(dir.resolve("standard-b.yaml"), """
+                policyId: standard-b
+                storageClassId: STANDARD
+                replication:
+                  factor: 1
+                """);
+
+        assertThatThrownBy(() -> new YamlStoragePolicyCatalog(dir))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Duplicate storageClassId 'STANDARD'");
+    }
+
     // -------------------------------------------------------------------------
-    // Malformed YAML
+    // Malformed and domain-invalid YAML
     // -------------------------------------------------------------------------
 
     @Test
@@ -142,6 +162,56 @@ class YamlStoragePolicyCatalogTest {
 
         assertThatThrownBy(() -> new YamlStoragePolicyCatalog(dir))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void rejectsDomainInvalidReplicationConfig(@TempDir Path dir) throws IOException {
+        Files.writeString(dir.resolve("invalid-replication.yaml"), """
+                policyId: invalid-replication
+                storageClassId: STANDARD
+                replication:
+                  factor: 0
+                """);
+
+        assertThatThrownBy(() -> new YamlStoragePolicyCatalog(dir))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("factor must be >= 1");
+    }
+
+    @Test
+    void rejectsDomainInvalidErasureCodingConfig(@TempDir Path dir) throws IOException {
+        Files.writeString(dir.resolve("invalid-ec.yaml"), """
+                policyId: invalid-ec
+                storageClassId: STANDARD
+                erasureCoding:
+                  enabled: true
+                  dataBlocks: 1
+                  parityBlocks: 2
+                replication:
+                  factor: 1
+                """);
+
+        assertThatThrownBy(() -> new YamlStoragePolicyCatalog(dir))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dataBlocks (k) must be >= 2");
+    }
+
+    @Test
+    void rejectsUnknownCompressionAlgorithm(@TempDir Path dir) throws IOException {
+        Files.writeString(dir.resolve("invalid-compression.yaml"), """
+                policyId: invalid-compression
+                storageClassId: STANDARD
+                compression:
+                  enabled: true
+                  algorithm: BROTLI
+                  level: 1
+                replication:
+                  factor: 1
+                """);
+
+        assertThatThrownBy(() -> new YamlStoragePolicyCatalog(dir))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Unknown compression algorithm 'BROTLI'");
     }
 
     // -------------------------------------------------------------------------

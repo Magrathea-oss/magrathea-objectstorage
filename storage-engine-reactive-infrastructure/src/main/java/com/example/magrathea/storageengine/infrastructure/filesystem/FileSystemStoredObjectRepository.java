@@ -13,7 +13,6 @@ import com.example.magrathea.storageengine.domain.valueobject.StorageClassId;
 import com.example.magrathea.storageengine.domain.valueobject.VersionId;
 import com.example.magrathea.storageengine.domain.valueobject.VirtualDevice;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -42,7 +41,7 @@ public class FileSystemStoredObjectRepository implements StoredObjectRepository 
 
     @Override
     public Mono<Void> save(StoredObject storedObject) {
-        return Mono.fromRunnable(() -> {
+        return BlockingFileSystemOperation.fromRunnable(() -> {
                 try {
                     Path objectDir = metadataRoot.resolve("objects")
                             .resolve(storedObject.objectId().value().replace("/", "_"));
@@ -54,14 +53,12 @@ public class FileSystemStoredObjectRepository implements StoredObjectRepository 
                 } catch (IOException e) {
                     throw new UncheckedIOException("Failed to save StoredObject", e);
                 }
-            })
-            .subscribeOn(Schedulers.boundedElastic())
-            .then();
+            });
     }
 
     @Override
     public Mono<StoredObject> findBy(ObjectId objectId, VersionId versionId) {
-        return Mono.fromCallable(() -> {
+        return BlockingFileSystemOperation.fromCallable(() -> {
                 Path objectDir = metadataRoot.resolve("objects")
                         .resolve(objectId.value().replace("/", "_"));
                 Path versionFile = objectDir.resolve(versionId.value() + ".json");
@@ -71,8 +68,7 @@ public class FileSystemStoredObjectRepository implements StoredObjectRepository 
                 }
                 String json = Files.readString(versionFile);
                 return deserializeFromJson(json);
-            })
-            .subscribeOn(Schedulers.boundedElastic());
+            });
     }
 
     private String serializeToJson(StoredObject obj) {

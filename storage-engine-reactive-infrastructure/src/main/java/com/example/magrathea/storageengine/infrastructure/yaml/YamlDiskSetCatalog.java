@@ -19,7 +19,9 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -108,6 +110,28 @@ public class YamlDiskSetCatalog implements DiskSetCatalog {
     @Override
     public Flux<DiskSet> findAll() {
         return Flux.fromIterable(diskSetById.get().values());
+    }
+
+    /**
+     * Validates that every device ID referenced by every disk set exists in the device catalog snapshot.
+     *
+     * @param knownDeviceIds loaded device catalog IDs
+     * @throws IllegalStateException when a disk set references an unknown device ID
+     */
+    public void validateDeviceReferences(Set<String> knownDeviceIds) {
+        if (knownDeviceIds == null) {
+            throw new IllegalArgumentException("knownDeviceIds must not be null");
+        }
+        Set<String> missing = new LinkedHashSet<>();
+        diskSetById.get().values().forEach(diskSet -> diskSet.devices().forEach(deviceId -> {
+            if (!knownDeviceIds.contains(deviceId.value())) {
+                missing.add("diskSet='" + diskSet.name() + "' deviceId='" + deviceId.value() + "'");
+            }
+        }));
+        if (!missing.isEmpty()) {
+            throw new IllegalStateException(
+                    "Disk-set catalog contains unresolved storage device references: " + missing);
+        }
     }
 
     // -------------------------------------------------------------------------

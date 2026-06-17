@@ -26,8 +26,10 @@ public final class ActiveS3Object extends S3Object {
     ActiveS3Object(ObjectKey key, String storageClass,
                    Map<String, String> userMetadata, EncryptionConfiguration encryption,
                    ObjectChecksum checksum, long size, ZonedDateTime createdAt,
-                   WriteState writeState, List<ObjectStoreEvent> events) {
-        super(key, storageClass, userMetadata, encryption, checksum, size, createdAt, writeState, events);
+                   WriteState writeState, List<ObjectStoreEvent> events,
+                   String etag, Map<String, String> objectTags) {
+        super(key, storageClass, userMetadata, encryption, checksum, size, createdAt,
+              writeState, events, etag, objectTags);
     }
 
     /**
@@ -47,7 +49,7 @@ public final class ActiveS3Object extends S3Object {
                 lockConfiguration.retention().duration(), ZonedDateTime.now()));
         return new LockedS3Object(key(), storageClass(), userMetadata(),
             encryption(), checksum(), size(), createdAt(),
-            lockConfiguration, writeState(), newEvents);
+            lockConfiguration, writeState(), newEvents, etag(), objectTags());
     }
 
     /**
@@ -60,7 +62,7 @@ public final class ActiveS3Object extends S3Object {
             new ObjectStoreEvent.ObjectArchived(key(), ZonedDateTime.now()));
         return new ArchivedS3Object(key(), storageClass(), userMetadata(),
             encryption(), checksum(), size(), createdAt(),
-            false, null, writeState(), newEvents);
+            false, null, writeState(), newEvents, etag(), objectTags());
     }
 
     /**
@@ -73,28 +75,55 @@ public final class ActiveS3Object extends S3Object {
         var newEvents = appendEvent(domainEvents(),
             new ObjectStoreEvent.ObjectDeleted(key(), ZonedDateTime.now()));
         return new DeletedS3Object(key(), storageClass(), userMetadata(),
-            createdAt(), WriteState.DELETED, newEvents);
+            createdAt(), WriteState.DELETED, newEvents, etag(), objectTags());
+    }
+
+    /**
+     * Returns a new {@code ActiveS3Object} with the given ETag, all other fields unchanged,
+     * events preserved.
+     *
+     * @param etag the ETag value (may be null to indicate not yet computed)
+     * @return new instance with the given ETag
+     */
+    public ActiveS3Object withEtag(String etag) {
+        return new ActiveS3Object(key(), storageClass(), userMetadata(),
+            encryption(), checksum(), size(), createdAt(),
+            writeState(), domainEvents(), etag, objectTags());
+    }
+
+    /**
+     * Returns a new {@code ActiveS3Object} with the given object tags (copy), all other fields
+     * unchanged, events preserved.
+     *
+     * @param tags the object tags map (may be null; treated as empty)
+     * @return new instance with the given tags
+     */
+    public ActiveS3Object withObjectTags(Map<String, String> tags) {
+        var newTags = tags != null ? Map.copyOf(tags) : Map.<String, String>of();
+        return new ActiveS3Object(key(), storageClass(), userMetadata(),
+            encryption(), checksum(), size(), createdAt(),
+            writeState(), domainEvents(), etag(), newTags);
     }
 
     @Override
     public S3Object clearEvents() {
         return new ActiveS3Object(key(), storageClass(), userMetadata(),
             encryption(), checksum(), size(), createdAt(),
-            writeState(), List.of());
+            writeState(), List.of(), etag(), objectTags());
     }
 
     @Override
     protected S3Object withWriteState(WriteState newState) {
         return new ActiveS3Object(key(), storageClass(), userMetadata(),
             encryption(), checksum(), size(), createdAt(),
-            newState, domainEvents());
+            newState, domainEvents(), etag(), objectTags());
     }
 
     @Override
     protected S3Object withWriteStateAndContent(ObjectChecksum checksum, long size, List<ObjectStoreEvent> events) {
         return new ActiveS3Object(key(), storageClass(), userMetadata(),
             encryption(), checksum, size, createdAt(),
-            WriteState.WRITTEN, events);
+            WriteState.WRITTEN, events, etag(), objectTags());
     }
 
     @Override

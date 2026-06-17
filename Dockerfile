@@ -124,6 +124,11 @@ RUN mvn -B clean package -DskipTests -fn && \
 
 # Stage 2: Runtime
 FROM docker.io/eclipse-temurin:21-jre
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends wget \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 COPY --from=builder /app.jar /app.jar
 COPY --from=builder /build/docs /app/docs

@@ -24,9 +24,23 @@ public class FileSystemStorageCluster {
 
     private final Path clusterRoot;
     private final List<FileSystemStorageNode> nodes;
+    private final FileSystemWriteFaultInjector faultInjector;
+
+    /** Returns the write fault injector shared by all storage nodes in this cluster. */
+    public FileSystemWriteFaultInjector faultInjector() {
+        return faultInjector;
+    }
 
     public FileSystemStorageCluster(Path clusterRoot, int nodeCount) {
+        this(clusterRoot, nodeCount, FileSystemWriteFaultInjector.disabled());
+    }
+
+    public FileSystemStorageCluster(
+            Path clusterRoot,
+            int nodeCount,
+            FileSystemWriteFaultInjector faultInjector) {
         this.clusterRoot = java.util.Objects.requireNonNull(clusterRoot, "clusterRoot must not be null");
+        this.faultInjector = java.util.Objects.requireNonNull(faultInjector, "faultInjector must not be null");
         if (nodeCount < 1) {
             throw new IllegalArgumentException("nodeCount must be >= 1: " + nodeCount);
         }
@@ -52,7 +66,7 @@ public class FileSystemStorageCluster {
             } catch (IOException e) {
                 throw new UncheckedIOException("Failed to create node directory: " + nodePath, e);
             }
-            nodeList.add(new FileSystemStorageNode(nodePath, nodeId));
+            nodeList.add(new FileSystemStorageNode(nodePath, nodeId, faultInjector));
         }
         this.nodes = List.copyOf(nodeList);
     }
@@ -92,7 +106,7 @@ public class FileSystemStorageCluster {
      */
     public FileSystemManifestRepository manifestRepository() {
         return new FileSystemManifestRepository(
-                clusterRoot.resolve("metadata").resolve("manifests"));
+                clusterRoot.resolve("metadata").resolve("manifests"), faultInjector);
     }
 
     /**

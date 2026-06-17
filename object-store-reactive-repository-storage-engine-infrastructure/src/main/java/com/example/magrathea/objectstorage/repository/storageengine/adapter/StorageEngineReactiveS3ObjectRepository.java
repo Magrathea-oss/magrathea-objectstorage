@@ -12,6 +12,9 @@ import com.example.magrathea.objectstore.domain.valueobject.RestoreConfiguration
 import com.example.magrathea.objectstore.reactive.repository.application.S3ObjectCommandRepository;
 import com.example.magrathea.objectstore.reactive.repository.application.S3ObjectQueryRepository;
 import com.example.magrathea.objectstore.reactive.repository.application.CommandResult;
+import com.example.magrathea.objectstore.reactive.repository.application.StorageObjectIntegrityException;
+import com.example.magrathea.storageengine.application.exception.ChunkIntegrityException;
+import com.example.magrathea.storageengine.application.exception.ManifestIntegrityException;
 import com.example.magrathea.objectstorage.repository.storageengine.acl.ChecksumDescriptor;
 import com.example.magrathea.objectstorage.repository.storageengine.acl.EncryptionDescriptor;
 import com.example.magrathea.objectstorage.repository.storageengine.acl.ObjectStoreToStorageEngineTranslator;
@@ -153,8 +156,7 @@ public class StorageEngineReactiveS3ObjectRepository
             ? Optional.of(convertEncryption(object.encryption()))
             : Optional.<EncryptionDescriptor>empty();
 
-        var effectiveStorageClass = storageClass != null
-            ? storageClass : object.storageClass();
+        var effectiveStorageClass = effectiveStorageClass(storageClass, object.storageClass());
 
         var command = translator.translatePutObject(
             object.key(),
@@ -169,7 +171,7 @@ public class StorageEngineReactiveS3ObjectRepository
         return orchestrator.store(command, content)
             .flatMap(storedObject -> {
                 var storeKey = storeKey(object.key().bucket(), object.key().key());
-                S3Object clean = object.clearEvents();
+                S3Object clean = objectWithEffectiveStorageClass(object, effectiveStorageClass);
                 storeByKey.put(storeKey, clean);
                 manifestByKey.put(storeKey, storedObject.manifestId());
                 long version = versionCounter.getAndIncrement();
@@ -187,7 +189,7 @@ public class StorageEngineReactiveS3ObjectRepository
         // Build a CompleteUploadCommand from just the key and content
         var command = translator.translatePutObject(
             objectKey,
-            storageClass,
+            effectiveStorageClass(storageClass, null),
             Map.of(),
             -1L, // size unknown — will be determined from content
             "application/octet-stream",
@@ -228,7 +230,10 @@ public class StorageEngineReactiveS3ObjectRepository
                         .orElseGet(Mono::empty));
             })
             .flatMapMany(orchestrator::read)
-            .map(DATA_BUFFER_FACTORY::wrap);
+            .<DataBuffer>map(DATA_BUFFER_FACTORY::wrap)
+            .onErrorMap(
+                e -> e instanceof ChunkIntegrityException || e instanceof ManifestIntegrityException,
+                e -> new StorageObjectIntegrityException(e.getMessage(), e));
     }
 
     // ── Phase F object config queries ──
@@ -393,7 +398,7 @@ public class StorageEngineReactiveS3ObjectRepository
 
         return translator.translatePutObject(
             object.key(),
-            object.storageClass(),
+            effectiveStorageClass(object.storageClass(), null),
             object.userMetadata(),
             object.size(),
             "application/octet-stream",
@@ -416,6 +421,31 @@ public class StorageEngineReactiveS3ObjectRepository
             encryption.algorithm(),
             encryption.keyReference(),
             encryption.encryptionContext());
+    }
+
+    private static String effectiveStorageClass(String primaryStorageClass, String fallbackStorageClass) {
+        if (primaryStorageClass != null && !primaryStorageClass.isBlank()) {
+            return primaryStorageClass.trim();
+        }
+        if (fallbackStorageClass != null && !fallbackStorageClass.isBlank()) {
+            return fallbackStorageClass.trim();
+        }
+        return "STANDARD";
+    }
+
+    private static S3Object objectWithEffectiveStorageClass(S3Object object, String effectiveStorageClass) {
+        if (effectiveStorageClass.equals(object.storageClass())) {
+            return object.clearEvents();
+        }
+        return ActiveS3Object.restoreActive(
+            object.key(),
+            effectiveStorageClass,
+            object.userMetadata(),
+            object.encryption(),
+            object.checksum(),
+            object.size(),
+            object.createdAt(),
+            java.util.List.of());
     }
 
     /**

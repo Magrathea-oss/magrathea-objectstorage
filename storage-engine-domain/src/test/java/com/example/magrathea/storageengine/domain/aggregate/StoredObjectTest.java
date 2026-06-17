@@ -160,6 +160,42 @@ class StoredObjectTest {
         assertEquals(modified, obj.lastModified());
     }
 
+    @Test
+    void restore_storedWithoutManifest_throwsIllegalArgumentException() {
+        ZonedDateTime created = ZonedDateTime.now().minusDays(1);
+        ZonedDateTime modified = ZonedDateTime.now();
+
+        assertThrows(IllegalArgumentException.class, () -> StoredObject.restore(
+                objectId, versionId, bucketRef,
+                TestFixtures.aStorageClassId(),
+                null, targetDevice,
+                ObjectState.STORED, created, modified));
+    }
+
+    @Test
+    void restore_creatingWithManifest_throwsIllegalArgumentException() {
+        ZonedDateTime created = ZonedDateTime.now().minusDays(1);
+        ZonedDateTime modified = ZonedDateTime.now();
+
+        assertThrows(IllegalArgumentException.class, () -> StoredObject.restore(
+                objectId, versionId, bucketRef,
+                TestFixtures.aStorageClassId(),
+                TestFixtures.aManifestId(), targetDevice,
+                ObjectState.CREATING, created, modified));
+    }
+
+    @Test
+    void restore_lastModifiedBeforeCreated_throwsIllegalArgumentException() {
+        ZonedDateTime created = ZonedDateTime.now();
+        ZonedDateTime modified = created.minusSeconds(1);
+
+        assertThrows(IllegalArgumentException.class, () -> StoredObject.restore(
+                objectId, versionId, bucketRef,
+                TestFixtures.aStorageClassId(),
+                TestFixtures.aManifestId(), targetDevice,
+                ObjectState.STORED, created, modified));
+    }
+
     // -------------------------------------------------------------------------
     // equals() — based on objectId + versionId + bucketRef only
     // -------------------------------------------------------------------------

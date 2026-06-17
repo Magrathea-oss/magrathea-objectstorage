@@ -15,6 +15,7 @@ public record ChunkPersistenceTrace(
             throw new IllegalArgumentException("originalSize must be >= 0: " + originalSize);
         }
         java.util.Objects.requireNonNull(steps, "steps must not be null");
+        steps = List.copyOf(steps);
         if (steps.size() != 6) {
             throw new IllegalArgumentException("steps must have exactly 6 entries: " + steps.size());
         }

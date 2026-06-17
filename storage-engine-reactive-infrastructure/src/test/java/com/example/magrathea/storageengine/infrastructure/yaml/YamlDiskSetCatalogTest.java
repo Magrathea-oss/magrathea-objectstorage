@@ -9,6 +9,7 @@ import reactor.test.StepVerifier;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -177,6 +178,69 @@ class YamlDiskSetCatalogTest {
         StepVerifier.create(catalog.findById("disk-set"))
                 .assertNext(s -> assertThat(s.failureDomain()).isEqualTo(FailureDomain.DISK))
                 .verifyComplete();
+    }
+
+    @Test
+    void validatesDeviceReferencesAgainstKnownStorageDevices(@TempDir Path dir) throws IOException {
+        Files.writeString(dir.resolve("default.yaml"), """
+                diskSetId: default-diskset
+                failureDomain: HOST
+                deviceIds:
+                  - disk-a
+                  - missing-disk
+                """);
+
+        YamlDiskSetCatalog catalog = new YamlDiskSetCatalog(dir);
+
+        assertThatThrownBy(() -> catalog.validateDeviceReferences(Set.of("disk-a")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("unresolved storage device references")
+                .hasMessageContaining("default-diskset")
+                .hasMessageContaining("missing-disk");
+    }
+
+    @Test
+    void acceptsResolvedDeviceReferences(@TempDir Path dir) throws IOException {
+        Files.writeString(dir.resolve("default.yaml"), """
+                diskSetId: default-diskset
+                failureDomain: HOST
+                deviceIds:
+                  - disk-a
+                  - disk-b
+                """);
+
+        YamlDiskSetCatalog catalog = new YamlDiskSetCatalog(dir);
+
+        catalog.validateDeviceReferences(Set.of("disk-a", "disk-b"));
+    }
+
+    @Test
+    void rejectsUnknownFailureDomain(@TempDir Path dir) throws IOException {
+        Files.writeString(dir.resolve("bad-domain.yaml"), """
+                diskSetId: bad-domain
+                failureDomain: CHASSIS
+                deviceIds:
+                  - disk-a
+                """);
+
+        assertThatThrownBy(() -> new YamlDiskSetCatalog(dir))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Unknown failure domain 'CHASSIS'");
+    }
+
+    @Test
+    void rejectsBlankDeviceReference(@TempDir Path dir) throws IOException {
+        Files.writeString(dir.resolve("blank-device.yaml"), """
+                diskSetId: blank-device
+                failureDomain: HOST
+                deviceIds:
+                  - disk-a
+                  - ""
+                """);
+
+        assertThatThrownBy(() -> new YamlDiskSetCatalog(dir))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Blank deviceId in disk-set 'blank-device'");
     }
 
     // -------------------------------------------------------------------------

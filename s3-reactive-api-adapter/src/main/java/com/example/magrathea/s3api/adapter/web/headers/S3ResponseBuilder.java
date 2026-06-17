@@ -35,7 +35,9 @@ public final class S3ResponseBuilder {
     // ─────────────────────────────────────────────────────
 
     private static void applyEtag(ServerResponse.HeadersBuilder<?> builder, S3Object obj) {
-        var etag = computeEtag(obj);
+        // Prefer the pre-computed hex MD5 ETag stored on the aggregate;
+        // fall back to checksum-based computation for backward compat (e.g. Content-MD5 echo).
+        var etag = obj.etag() != null ? obj.etag() : computeEtag(obj);
         builder.header("ETag", etag);
     }
 

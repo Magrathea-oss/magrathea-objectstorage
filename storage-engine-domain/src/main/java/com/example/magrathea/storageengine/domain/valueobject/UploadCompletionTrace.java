@@ -20,5 +20,6 @@ public record UploadCompletionTrace(
             throw new IllegalArgumentException("totalObjectSize must be >= 0: " + totalObjectSize);
         }
         java.util.Objects.requireNonNull(partChecksumResults, "partChecksumResults must not be null");
+        partChecksumResults = partChecksumResults.map(List::copyOf);
     }
 }

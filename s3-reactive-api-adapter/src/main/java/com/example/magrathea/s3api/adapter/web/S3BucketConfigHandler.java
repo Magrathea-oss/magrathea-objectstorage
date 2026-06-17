@@ -880,8 +880,9 @@ public class S3BucketConfigHandler {
             .flatMap(bucket -> {
                 var config = objectLockConfigs.get(bucketName);
                 if (config == null || !config.enabled()) {
-                    return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchObjectLockConfiguration",
-                        "The object lock configuration does not exist");
+                    return ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_XML)
+                        .bodyValue(ObjectLockConfigurationQuery.fromEnabled(false));
                 }
                 return ServerResponse.ok()
                     .contentType(MediaType.APPLICATION_XML)

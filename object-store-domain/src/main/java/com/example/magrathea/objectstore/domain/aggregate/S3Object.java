@@ -48,6 +48,8 @@ public sealed abstract class S3Object
     private final ZonedDateTime createdAt;
     private final WriteState writeState;
     private final List<ObjectStoreEvent> events;
+    private final String etag;
+    private final Map<String, String> objectTags;
 
     /**
      * Package-private constructor for subclasses.
@@ -55,7 +57,8 @@ public sealed abstract class S3Object
     S3Object(ObjectKey key, String storageClass,
              Map<String, String> userMetadata, EncryptionConfiguration encryption,
              ObjectChecksum checksum, long size, ZonedDateTime createdAt,
-             WriteState writeState, List<ObjectStoreEvent> events) {
+             WriteState writeState, List<ObjectStoreEvent> events,
+             String etag, Map<String, String> objectTags) {
         this.key = Objects.requireNonNull(key, "key must not be null");
         this.storageClass = storageClass;
         this.userMetadata = Map.copyOf(Objects.requireNonNull(userMetadata, "userMetadata must not be null"));
@@ -64,7 +67,9 @@ public sealed abstract class S3Object
         this.size = size;
         this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
         this.writeState = Objects.requireNonNull(writeState, "writeState must not be null");
-        this.events = Objects.requireNonNull(events, "events must not be null");
+        this.events = List.copyOf(Objects.requireNonNull(events, "events must not be null"));
+        this.etag = etag;
+        this.objectTags = objectTags != null ? Map.copyOf(objectTags) : Map.of();
     }
 
     // ── Getters ──
@@ -101,6 +106,12 @@ public sealed abstract class S3Object
 
     /** Returns {@code true} if a checksum is attached. */
     public boolean hasChecksum() { return checksum != null; }
+
+    /** Returns the ETag for this object, or {@code null} if not yet computed. */
+    public String etag() { return etag; }
+
+    /** Returns the object tags as an unmodifiable map. Never null. */
+    public Map<String, String> objectTags() { return objectTags; }
 
     /** Returns {@code true} if a storage class is set. */
     public boolean hasStorageClass() { return storageClass != null; }
@@ -151,7 +162,7 @@ public sealed abstract class S3Object
             new ObjectStoreEvent.ObjectCreated(key, now)
         );
         return new ActiveS3Object(key, storageClass, meta, encryption,
-            checksum, size, now, WriteState.WRITTEN, events);
+            checksum, size, now, WriteState.WRITTEN, events, null, Map.of());
     }
 
     /**
@@ -177,7 +188,7 @@ public sealed abstract class S3Object
             : Map.<String, String>of();
         var now = ZonedDateTime.now();
         return new ActiveS3Object(key, storageClass, meta, encryption,
-            null, 0L, now, WriteState.CREATED, List.of());
+            null, 0L, now, WriteState.CREATED, List.of(), null, Map.of());
     }
 
     /**
@@ -196,7 +207,7 @@ public sealed abstract class S3Object
         var evts = events != null ? List.<ObjectStoreEvent>copyOf(events) : List.<ObjectStoreEvent>of();
         var writeState = checksum != null ? WriteState.WRITTEN : WriteState.CREATED;
         return new ActiveS3Object(key, storageClass, meta, encryption,
-            checksum, size, createdAt, writeState, evts);
+            checksum, size, createdAt, writeState, evts, null, Map.of());
     }
 
     /**
@@ -217,7 +228,7 @@ public sealed abstract class S3Object
         var evts = events != null ? List.<ObjectStoreEvent>copyOf(events) : List.<ObjectStoreEvent>of();
         var writeState = WriteState.WRITTEN;
         return new LockedS3Object(key, storageClass, meta, encryption,
-            checksum, size, createdAt, lockConfiguration, writeState, evts);
+            checksum, size, createdAt, lockConfiguration, writeState, evts, null, Map.of());
     }
 
     /**
@@ -237,7 +248,7 @@ public sealed abstract class S3Object
         var evts = events != null ? List.<ObjectStoreEvent>copyOf(events) : List.<ObjectStoreEvent>of();
         var writeState = WriteState.WRITTEN;
         return new ArchivedS3Object(key, storageClass, meta, encryption,
-            checksum, size, createdAt, restored, restoreExpiry, writeState, evts);
+            checksum, size, createdAt, restored, restoreExpiry, writeState, evts, null, Map.of());
     }
 
     /**
@@ -254,7 +265,7 @@ public sealed abstract class S3Object
             ? Map.<String, String>copyOf(userMetadata)
             : Map.<String, String>of();
         var evts = events != null ? List.<ObjectStoreEvent>copyOf(events) : List.<ObjectStoreEvent>of();
-        return new DeletedS3Object(key, storageClass, meta, createdAt, WriteState.DELETED, evts);
+        return new DeletedS3Object(key, storageClass, meta, createdAt, WriteState.DELETED, evts, null, Map.of());
     }
 
     // ── Write state machine transitions ──

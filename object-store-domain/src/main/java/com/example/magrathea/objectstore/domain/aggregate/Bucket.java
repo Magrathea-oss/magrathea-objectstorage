@@ -74,6 +74,7 @@ public record Bucket(
         Objects.requireNonNull(storageClass);
         Objects.requireNonNull(bucketConfig);
         Objects.requireNonNull(events);
+        events = List.copyOf(events);
         if (name.isBlank()) throw new IllegalArgumentException("Bucket name must not be blank");
         if (name.length() < 3 || name.length() > 63)
             throw new IllegalArgumentException("Bucket name must be 3-63 characters");

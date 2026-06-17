@@ -49,6 +49,8 @@ public record MultipartUpload(
         Objects.requireNonNull(initiated);
         Objects.requireNonNull(parts);
         Objects.requireNonNull(events);
+        parts = List.copyOf(parts);
+        events = List.copyOf(events);
         if (completed && aborted)
             throw new IllegalStateException("MultipartUpload cannot be both completed and aborted");
     }

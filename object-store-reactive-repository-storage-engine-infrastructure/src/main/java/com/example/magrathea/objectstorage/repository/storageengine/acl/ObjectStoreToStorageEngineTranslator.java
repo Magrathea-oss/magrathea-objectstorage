@@ -85,8 +85,9 @@ public class ObjectStoreToStorageEngineTranslator {
             BucketId.of(objectKey.bucket()),
             objectKey.bucket());
 
-        // Convert storage class
-        StorageClassId storageClassId = StorageClassId.of(storageClass);
+        // Convert storage class. S3 PutObject defaults to STANDARD when the
+        // x-amz-storage-class header is absent or blank.
+        StorageClassId storageClassId = toStorageClassId(storageClass);
 
         // Convert content descriptor
         ObjectContentDescriptor contentDescriptor =
@@ -153,7 +154,7 @@ public class ObjectStoreToStorageEngineTranslator {
         BucketRef bucketRef = BucketRef.of(
             BucketId.of(objectKey.bucket()),
             objectKey.bucket());
-        StorageClassId storageClassId = StorageClassId.of(storageClass);
+        StorageClassId storageClassId = toStorageClassId(storageClass);
         ObjectContentDescriptor contentDescriptor =
             ObjectContentDescriptor.of(mimeType, objectSize);
         ObjectMetadataDescriptor metadataDescriptor =
@@ -255,6 +256,13 @@ public class ObjectStoreToStorageEngineTranslator {
     }
 
     // ── Helper translations ──
+
+    private StorageClassId toStorageClassId(String storageClass) {
+        if (storageClass == null || storageClass.isBlank()) {
+            return StorageClassId.STANDARD;
+        }
+        return StorageClassId.of(storageClass.trim());
+    }
 
     /**
      * Translates an Object Store EncryptionDescriptor to a Storage Engine EncryptionRequest.

@@ -132,21 +132,32 @@ public class InMemoryReactiveS3ObjectRepository implements S3ObjectCommandReposi
                 var storeKey = objectKeyStoreKey(object);
                 contentByKey.put(storeKey, bytes);
 
+                // Compute hex MD5 ETag (S3-compatible format) only when no Content-MD5 was provided.
+                // When Content-MD5 is provided by the client, the existing checksum is preserved
+                // and echoed back as the ETag (backward compat).
+                String hexEtag = hasExistingMd5 ? null : hexMd5ETag(bytes);
+
                 // Create a clean ActiveS3Object with the computed checksum
                 // If the object is already an ActiveS3Object, use its properties
                 // Otherwise, create a fresh ActiveS3Object from the object's data
                 S3Object storedObject;
                 if (object instanceof ActiveS3Object active) {
-                    // Re-create with updated checksum
+                    // Re-create with updated checksum and hex ETag
                     storedObject = ActiveS3Object.restoreActive(
                         active.key(), active.storageClass(), active.userMetadata(),
                         active.encryption(), combinedChecksum, bytes.length,
                         active.createdAt(), active.domainEvents()).clearEvents();
+                    if (hexEtag != null) {
+                        storedObject = ((ActiveS3Object) storedObject).withEtag(hexEtag);
+                    }
                 } else {
                     storedObject = ActiveS3Object.restoreActive(
                         object.key(), object.storageClass(), object.userMetadata(),
                         object.encryption(), combinedChecksum, bytes.length,
                         object.createdAt(), object.domainEvents()).clearEvents();
+                    if (hexEtag != null) {
+                        storedObject = ((ActiveS3Object) storedObject).withEtag(hexEtag);
+                    }
                 }
 
                 storeByObjectKey.put(storeKey, storedObject);
@@ -334,6 +345,25 @@ public class InMemoryReactiveS3ObjectRepository implements S3ObjectCommandReposi
             md.update(bytes);
             var digest = md.digest();
             return java.util.Base64.getEncoder().encodeToString(digest);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("MD5 not available", e);
+        }
+    }
+
+    /**
+     * Computes the quoted lowercase hex MD5 ETag of a byte array, as used by S3.
+     * Format: {@code "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"} (32 hex chars enclosed in double quotes).
+     */
+    private static String hexMd5ETag(byte[] bytes) {
+        try {
+            var md = MessageDigest.getInstance("MD5");
+            md.update(bytes);
+            var digest = md.digest();
+            var sb = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                sb.append(String.format("%02x", b & 0xff));
+            }
+            return "\"" + sb + "\"";
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException("MD5 not available", e);
         }

@@ -12,6 +12,9 @@ import com.example.magrathea.objectstore.domain.valueobject.UserMetadata;
 import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.server.ServerRequest;
 
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -216,6 +219,38 @@ public final class S3RequestExtractor {
         } catch (NumberFormatException e) {
             return 0L;
         }
+    }
+
+    // ─────────────────────────────────────────────────────
+    //  User Metadata
+    // ─────────────────────────────────────────────────────
+
+    // ─────────────────────────────────────────────────────
+    //  Object Tagging (x-amz-tagging)
+    // ─────────────────────────────────────────────────────
+
+    /**
+     * Extracts the {@code x-amz-tagging} header as a parsed map of tag key-value pairs.
+     * The header format is URL-encoded: {@code key=value&key2=value2}.
+     *
+     * @param request the HTTP request
+     * @return a map of tag key to tag value, empty if the header is absent or blank
+     */
+    public static Map<String, String> extractObjectTagging(ServerRequest request) {
+        var tagging = request.headers().firstHeader("x-amz-tagging");
+        if (tagging == null || tagging.isBlank()) {
+            return Map.of();
+        }
+        Map<String, String> tags = new HashMap<>();
+        for (String pair : tagging.split("&")) {
+            var idx = pair.indexOf('=');
+            if (idx > 0) {
+                var key = URLDecoder.decode(pair.substring(0, idx), StandardCharsets.UTF_8);
+                var value = URLDecoder.decode(pair.substring(idx + 1), StandardCharsets.UTF_8);
+                tags.put(key, value);
+            }
+        }
+        return Map.copyOf(tags);
     }
 
     // ─────────────────────────────────────────────────────

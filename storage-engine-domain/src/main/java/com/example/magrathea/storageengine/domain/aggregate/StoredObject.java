@@ -35,11 +35,20 @@ public class StoredObject {
         this.versionId = Objects.requireNonNull(versionId, "versionId must not be null");
         this.bucketRef = Objects.requireNonNull(bucketRef, "bucketRef must not be null");
         this.storageClassId = Objects.requireNonNull(storageClassId, "storageClassId must not be null");
-        this.manifestId = manifestId; // nullable
         this.targetDevice = Objects.requireNonNull(targetDevice, "targetDevice must not be null");
         this.state = Objects.requireNonNull(state, "state must not be null");
+        if (state == ObjectState.CREATING && manifestId != null) {
+            throw new IllegalArgumentException("CREATING objects must not have a manifestId");
+        }
+        if (state != ObjectState.CREATING && manifestId == null) {
+            throw new IllegalArgumentException("Stored or deleted objects must have a manifestId");
+        }
+        this.manifestId = manifestId; // nullable only while CREATING
         this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
         this.lastModified = Objects.requireNonNull(lastModified, "lastModified must not be null");
+        if (this.lastModified.isBefore(this.createdAt)) {
+            throw new IllegalArgumentException("lastModified must not be before createdAt");
+        }
     }
 
     public static StoredObject create(

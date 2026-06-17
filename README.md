@@ -163,6 +163,17 @@ aws --endpoint-url http://localhost:8080 s3api get-object --bucket test-bucket -
 
 Consolidated Markdown report: [`docs/test-report.md`](docs/test-report.md)
 
+### Requirements appendix generation
+
+The ARC42 Gherkin requirements appendix is generated deterministically from the shared requirement feature files under `s3-reactive-api-adapter/src/test/features/requirements`.
+
+```bash
+python3 scripts/generate-gherkin-requirements-appendix.py
+python3 scripts/generate-gherkin-requirements-appendix.py --check
+```
+
+The generated source is `docs/arc42/generated/gherkin-requirements.adoc` and is included from the ARC42 source docs. Do not commit regenerated static web assets for this step.
+
 ### Coverage
 
 **JaCoCo** is the current coverage baseline and runs automatically with the standard Maven lifecycle (`mvn verify`). Reports are generated under `target/site/jacoco/`.

@@ -16,20 +16,22 @@ public final class DeletedS3Object extends S3Object {
     DeletedS3Object(ObjectKey key, String storageClass,
                     Map<String, String> userMetadata,
                     ZonedDateTime createdAt,
-                    WriteState writeState, List<ObjectStoreEvent> events) {
-        super(key, storageClass, userMetadata, null, null, 0L, createdAt, writeState, events);
+                    WriteState writeState, List<ObjectStoreEvent> events,
+                    String etag, Map<String, String> objectTags) {
+        super(key, storageClass, userMetadata, null, null, 0L, createdAt, writeState, events,
+              etag, objectTags);
     }
 
     @Override
     public S3Object clearEvents() {
         return new DeletedS3Object(key(), storageClass(), userMetadata(),
-            createdAt(), writeState(), List.of());
+            createdAt(), writeState(), List.of(), etag(), objectTags());
     }
 
     @Override
     protected S3Object withWriteState(WriteState newState) {
         return new DeletedS3Object(key(), storageClass(), userMetadata(),
-            createdAt(), newState, domainEvents());
+            createdAt(), newState, domainEvents(), etag(), objectTags());
     }
 
     @Override

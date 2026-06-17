@@ -8,6 +8,8 @@ import com.example.magrathea.storageengine.application.port.DataTransformPort;
 import com.example.magrathea.storageengine.application.port.ObjectManifestRepository;
 import com.example.magrathea.storageengine.application.port.StoragePolicyCatalog;
 import com.example.magrathea.storageengine.application.port.StoredObjectRepository;
+import com.example.magrathea.storageengine.application.pipeline.DataProcessingPipelinePort;
+import com.example.magrathea.storageengine.application.pipeline.StorageEventPublisher;
 import com.example.magrathea.storageengine.application.service.ReactiveStorageOrchestrator;
 import com.example.magrathea.storageengine.domain.service.CompleteUploadService;
 import com.example.magrathea.storageengine.domain.service.EffectivePolicyResolver;
@@ -17,6 +19,7 @@ import com.example.magrathea.storageengine.infrastructure.filesystem.AesGcmEncry
 import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemChunkStorePort;
 import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemDataTransformPort;
 import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemStorageCluster;
+import com.example.magrathea.storageengine.infrastructure.filesystem.PropertyControlledFileSystemWriteFaultInjector;
 import com.example.magrathea.storageengine.infrastructure.filesystem.NoOpAlterationPort;
 import com.example.magrathea.storageengine.infrastructure.filesystem.ReedSolomonECAdapter;
 import com.example.magrathea.storageengine.infrastructure.filesystem.Sha256ChecksumPort;
@@ -42,11 +45,23 @@ public class StorageEngineFilesystemConfig {
     @Bean
     public FileSystemStorageCluster fileSystemStorageCluster(
             @Value("${storage.engine.filesystem.root:}") String root,
-            @Value("${storage.engine.filesystem.node-count:1}") int nodeCount) {
+            @Value("${storage.engine.filesystem.node-count:1}") int nodeCount,
+            @Value("${storage.engine.filesystem.fault-injection.interrupt-after-chunk-temp-write:false}")
+                    boolean interruptAfterChunkTempWrite,
+            @Value("${storage.engine.filesystem.fault-injection.interrupt-after-manifest-temp-write:false}")
+                    boolean interruptAfterManifestTempWrite,
+            @Value("${storage.engine.filesystem.fault-injection.leave-partial-temporary-artifacts:true}")
+                    boolean leavePartialTemporaryArtifacts) {
         Path clusterRoot = (root == null || root.isBlank())
             ? Path.of(System.getProperty("java.io.tmpdir"), "magrathea-objectstorage", "storage-engine")
             : Path.of(root);
-        return new FileSystemStorageCluster(clusterRoot, nodeCount);
+        return new FileSystemStorageCluster(
+                clusterRoot,
+                nodeCount,
+                new PropertyControlledFileSystemWriteFaultInjector(
+                        interruptAfterChunkTempWrite,
+                        interruptAfterManifestTempWrite,
+                        leavePartialTemporaryArtifacts));
     }
 
     @Bean
@@ -137,12 +152,12 @@ public class StorageEngineFilesystemConfig {
             VirtualDeviceResolver virtualDeviceResolver,
             PersistencePlanner persistencePlanner,
             ChecksumPort checksumPort,
-            DataTransformPort dataTransformPort,
             ContentAddressIndex contentAddressIndex,
-            AlterationPort alterationPort,
             ChunkStorePort chunkStorePort,
             StoredObjectRepository storedObjectRepository,
-            ObjectManifestRepository objectManifestRepository) {
+            ObjectManifestRepository objectManifestRepository,
+            StorageEventPublisher storageEventPublisher,
+            DataProcessingPipelinePort dataPipelinePort) {
         return new ReactiveStorageOrchestrator(
             completeUploadService,
             storagePolicyCatalog,
@@ -150,12 +165,12 @@ public class StorageEngineFilesystemConfig {
             virtualDeviceResolver,
             persistencePlanner,
             checksumPort,
-            dataTransformPort,
             contentAddressIndex,
-            alterationPort,
             chunkStorePort,
             storedObjectRepository,
             objectManifestRepository,
-            defaultChunkSizeBytes);
+            defaultChunkSizeBytes,
+            storageEventPublisher,
+            dataPipelinePort);
     }
 }

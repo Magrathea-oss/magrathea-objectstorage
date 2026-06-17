@@ -29,8 +29,10 @@ public final class LockedS3Object extends S3Object {
                    Map<String, String> userMetadata, EncryptionConfiguration encryption,
                    ObjectChecksum checksum, long size, ZonedDateTime createdAt,
                    ObjectLockConfiguration lockConfiguration,
-                   WriteState writeState, List<ObjectStoreEvent> events) {
-        super(key, storageClass, userMetadata, encryption, checksum, size, createdAt, writeState, events);
+                   WriteState writeState, List<ObjectStoreEvent> events,
+                   String etag, Map<String, String> objectTags) {
+        super(key, storageClass, userMetadata, encryption, checksum, size, createdAt,
+              writeState, events, etag, objectTags);
         this.lockConfiguration = Objects.requireNonNull(lockConfiguration,
             "lockConfiguration must not be null");
     }
@@ -54,7 +56,7 @@ public final class LockedS3Object extends S3Object {
             new ObjectStoreEvent.LegalHoldRemoved(key(), ZonedDateTime.now()));
         return new ActiveS3Object(key(), storageClass(), userMetadata(),
             encryption(), checksum(), size(), createdAt(),
-            writeState(), newEvents);
+            writeState(), newEvents, etag(), objectTags());
     }
 
     /**
@@ -67,28 +69,28 @@ public final class LockedS3Object extends S3Object {
             new ObjectStoreEvent.ObjectArchived(key(), ZonedDateTime.now()));
         return new ArchivedS3Object(key(), storageClass(), userMetadata(),
             encryption(), checksum(), size(), createdAt(),
-            false, null, writeState(), newEvents);
+            false, null, writeState(), newEvents, etag(), objectTags());
     }
 
     @Override
     public S3Object clearEvents() {
         return new LockedS3Object(key(), storageClass(), userMetadata(),
             encryption(), checksum(), size(), createdAt(),
-            lockConfiguration, writeState(), List.of());
+            lockConfiguration, writeState(), List.of(), etag(), objectTags());
     }
 
     @Override
     protected S3Object withWriteState(WriteState newState) {
         return new LockedS3Object(key(), storageClass(), userMetadata(),
             encryption(), checksum(), size(), createdAt(),
-            lockConfiguration, newState, domainEvents());
+            lockConfiguration, newState, domainEvents(), etag(), objectTags());
     }
 
     @Override
     protected S3Object withWriteStateAndContent(ObjectChecksum checksum, long size, List<ObjectStoreEvent> events) {
         return new LockedS3Object(key(), storageClass(), userMetadata(),
             encryption(), checksum, size, createdAt(),
-            lockConfiguration, WriteState.WRITTEN, events);
+            lockConfiguration, WriteState.WRITTEN, events, etag(), objectTags());
     }
 
     @Override

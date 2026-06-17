@@ -9,9 +9,10 @@ import java.util.Objects;
 public record EncryptionContext(Map<String, String> context) {
     public EncryptionContext {
         Objects.requireNonNull(context, "context must not be null");
+        context = Map.copyOf(context);
     }
 
     public static EncryptionContext of(Map<String, String> context) {
-        return new EncryptionContext(Map.copyOf(context));
+        return new EncryptionContext(context);
     }
 }

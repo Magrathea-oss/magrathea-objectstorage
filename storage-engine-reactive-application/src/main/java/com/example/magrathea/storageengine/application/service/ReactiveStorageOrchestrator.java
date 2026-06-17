@@ -1,15 +1,22 @@
 package com.example.magrathea.storageengine.application.service;
 
-import com.example.magrathea.storageengine.application.port.AlterationPort;
 import com.example.magrathea.storageengine.application.port.ChecksumPort;
 import com.example.magrathea.storageengine.application.port.ChunkStorePort;
 import com.example.magrathea.storageengine.application.port.ContentAddressIndex;
-import com.example.magrathea.storageengine.application.port.DataTransformPort;
-import com.example.magrathea.storageengine.application.port.ECOutcome;
 import com.example.magrathea.storageengine.application.port.ObjectManifestRepository;
 import com.example.magrathea.storageengine.application.port.StoragePolicyCatalog;
 import com.example.magrathea.storageengine.application.port.StoredObjectRepository;
-import com.example.magrathea.storageengine.domain.aggregate.ObjectState;
+import com.example.magrathea.storageengine.application.pipeline.DataProcessingPipeline;
+import com.example.magrathea.storageengine.application.pipeline.DataProcessingPipelinePort;
+import com.example.magrathea.storageengine.application.pipeline.StorageCleanupHandle;
+import com.example.magrathea.storageengine.application.pipeline.StorageContext;
+import com.example.magrathea.storageengine.application.pipeline.StorageEventMeasurements;
+import com.example.magrathea.storageengine.application.pipeline.StorageEventPublisher;
+import com.example.magrathea.storageengine.application.pipeline.StorageOperation;
+import com.example.magrathea.storageengine.application.pipeline.StoragePipelineExecutor;
+import com.example.magrathea.storageengine.application.pipeline.StorageStage;
+import com.example.magrathea.storageengine.application.pipeline.StorageTrace;
+import com.example.magrathea.storageengine.application.pipeline.StorageUnit;
 import com.example.magrathea.storageengine.domain.aggregate.StoredObject;
 import com.example.magrathea.storageengine.domain.service.CompleteUploadService;
 import com.example.magrathea.storageengine.domain.service.EffectivePolicyResolver;
@@ -24,10 +31,15 @@ import com.example.magrathea.storageengine.domain.valueobject.ChunkReferenceDesc
 import com.example.magrathea.storageengine.domain.valueobject.CompleteUploadCommand;
 import com.example.magrathea.storageengine.domain.valueobject.ChecksumAlgorithm;
 import com.example.magrathea.storageengine.domain.valueobject.ContentHash;
+import com.example.magrathea.storageengine.domain.pipeline.DataProcessingSpec;
+import com.example.magrathea.storageengine.domain.pipeline.StepSpec;
 import com.example.magrathea.storageengine.domain.valueobject.DedupConfig;
+import com.example.magrathea.storageengine.domain.valueobject.EffectiveStoragePolicy;
+import com.example.magrathea.storageengine.domain.valueobject.EncryptionConfig;
 import com.example.magrathea.storageengine.domain.valueobject.Fingerprint;
 import com.example.magrathea.storageengine.domain.valueobject.FingerprintAlgorithm;
 import com.example.magrathea.storageengine.domain.valueobject.ManifestId;
+import com.example.magrathea.storageengine.domain.valueobject.ObjectId;
 import com.example.magrathea.storageengine.domain.valueobject.ObjectManifest;
 import com.example.magrathea.storageengine.domain.valueobject.PersistencePlan;
 import com.example.magrathea.storageengine.domain.valueobject.PolicyDecision;
@@ -36,31 +48,38 @@ import com.example.magrathea.storageengine.domain.valueobject.PolicyDecisionStat
 import com.example.magrathea.storageengine.domain.valueobject.StepChecksumDescriptor;
 import com.example.magrathea.storageengine.domain.valueobject.StepExecutionRecord;
 import com.example.magrathea.storageengine.domain.valueobject.StepExecutionStatus;
+import com.example.magrathea.storageengine.domain.valueobject.StepConfig;
 import com.example.magrathea.storageengine.domain.valueobject.StepPlan;
 import com.example.magrathea.storageengine.domain.valueobject.StepId;
 import com.example.magrathea.storageengine.domain.valueobject.StepOutcome;
 import com.example.magrathea.storageengine.domain.valueobject.UploadCompletionTrace;
+import com.example.magrathea.storageengine.domain.valueobject.VersionId;
 import com.example.magrathea.storageengine.domain.valueobject.VirtualDevice;
+import com.example.magrathea.storageengine.domain.valueobject.StorageUnitInfo;
 import org.springframework.core.io.buffer.DataBuffer;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.function.Function;
 
 /**
  * Reactive application service orchestrating the full object storage pipeline.
  * <p>
- * Pipeline steps per chunk:
- * 1. DEDUP — fingerprint + content-address lookup
- * 2. COMPRESS — compress data
- * 3. CRYPT — encrypt data
- * 4. ERASURE_CODING — erasure encode data
- * 5. REPLICATION — replicate data across nodes
- * 6. STORE — persist data to storage nodes
+ * All uploads are routed through the DataProcessingPipeline which handles both
+ * dedup-enabled and non-dedup policies via configured DataProcessingStep implementations.
+ * <p>
+ * Pipeline steps per chunk (executed by DataProcessingPipeline):
+ * 1. DEDUP — fingerprint + content-address lookup (when enabled)
+ * 2. COMPRESS — compress data (when enabled)
+ * 3. CRYPT — encrypt data (when enabled)
+ * 4. ERASURE_CODING — erasure encode data (when enabled)
+ * 5. REPLICATION — replicate data across nodes (when enabled)
+ * 6. STORE — persist data to storage nodes (always)
  */
 public class ReactiveStorageOrchestrator {
 
@@ -70,12 +89,14 @@ public class ReactiveStorageOrchestrator {
     private final VirtualDeviceResolver virtualDeviceResolver;
     private final PersistencePlanner persistencePlanner;
     private final ChecksumPort checksumPort;
-    private final DataTransformPort dataTransformPort;
     private final ContentAddressIndex contentAddressIndex;
-    private final AlterationPort alterationPort;
     private final ChunkStorePort chunkStorePort;
     private final StoredObjectRepository storedObjectRepository;
     private final ObjectManifestRepository objectManifestRepository;
+    private final StorageEventPublisher storageEventPublisher;
+    private final StoragePipelineExecutor pipelineExecutor;
+    /** Required pipeline port for the DataProcessingPipeline. */
+    private final DataProcessingPipelinePort dataPipelinePort;
 
     private final int defaultChunkSizeBytes;
 
@@ -86,124 +107,474 @@ public class ReactiveStorageOrchestrator {
             VirtualDeviceResolver virtualDeviceResolver,
             PersistencePlanner persistencePlanner,
             ChecksumPort checksumPort,
-            DataTransformPort dataTransformPort,
             ContentAddressIndex contentAddressIndex,
-            AlterationPort alterationPort,
             ChunkStorePort chunkStorePort,
             StoredObjectRepository storedObjectRepository,
             ObjectManifestRepository objectManifestRepository,
-            int defaultChunkSizeBytes) {
+            int defaultChunkSizeBytes,
+            StorageEventPublisher eventPublisher,
+            DataProcessingPipelinePort dataPipelinePort) {
         this.completeUploadService = completeUploadService;
         this.storagePolicyCatalog = storagePolicyCatalog;
         this.effectivePolicyResolver = effectivePolicyResolver;
         this.virtualDeviceResolver = virtualDeviceResolver;
         this.persistencePlanner = persistencePlanner;
         this.checksumPort = checksumPort;
-        this.dataTransformPort = dataTransformPort;
         this.contentAddressIndex = contentAddressIndex;
-        this.alterationPort = alterationPort;
         this.chunkStorePort = chunkStorePort;
         this.storedObjectRepository = storedObjectRepository;
         this.objectManifestRepository = objectManifestRepository;
+        this.storageEventPublisher = eventPublisher;
         this.defaultChunkSizeBytes = defaultChunkSizeBytes;
+        this.dataPipelinePort = dataPipelinePort;
+        this.pipelineExecutor = new StoragePipelineExecutor(eventPublisher);
     }
 
     /**
      * Stores an object by completing the upload, resolving policy, planning persistence,
-     * chunking the data, running the 6-step pipeline per chunk, building the manifest,
-     * and persisting the aggregate.
+     * chunking the data, running the per-chunk persistence pipeline, building the manifest,
+     * and publishing the aggregate through explicit reactive stages.
      *
      * @param command the complete upload command
      * @param data    the raw object data as a flux of DataBuffers
      * @return the stored StoredObject
      */
     public Mono<StoredObject> store(CompleteUploadCommand command, Flux<DataBuffer> data) {
-        // Step 1: Complete upload — validate and produce trace
-        UploadCompletionTrace trace = completeUploadService.complete(command);
+        return pipelineExecutor.execute(StorageContext.write(command, data), writePipelineStages())
+                .map(context -> context.storedObject()
+                        .orElseThrow(() -> new IllegalStateException("Write pipeline completed without a stored object")));
+    }
 
-        // Step 2: Look up storage policy
+    /**
+     * Reads the content for a persisted manifest by assembling a staged read pipeline and
+     * streaming referenced chunks in manifest order.
+     */
+    public Flux<byte[]> read(ManifestId manifestId) {
+        return pipelineExecutor.execute(StorageContext.read(manifestId), readPipelineStages())
+                .flatMapMany(context -> context.responseContent()
+                        .orElseThrow(() -> new IllegalStateException("Read pipeline completed without response content")));
+    }
+
+    List<StorageStage> writePipelineStages() {
+        return List.of(
+                stage("validation", StorageOperation.WRITE, this::validateWrite),
+                stage("policy-resolution", StorageOperation.WRITE, this::resolveWritePolicy),
+                stage("chunking", StorageOperation.WRITE, this::prepareWriteChunks),
+                stage("dedup-lookup", StorageOperation.WRITE, this::prepareDedupLookup),
+                stage("chunk-persistence", StorageOperation.WRITE, this::persistChunks),
+                stage("manifest-persistence", StorageOperation.WRITE, this::persistManifest),
+                stage("object-index-persistence", StorageOperation.WRITE, this::persistObjectIndex));
+    }
+
+    List<StorageStage> readPipelineStages() {
+        return List.of(
+                stage("validation", StorageOperation.READ, this::validateRead),
+                stage("policy-resolution", StorageOperation.READ, this::resolveReadPolicy),
+                stage("read-planning", StorageOperation.READ, this::planRead),
+                stage("chunk-reading", StorageOperation.READ, this::prepareChunkReading),
+                stage("response-streaming", StorageOperation.READ, this::prepareResponseStreaming));
+    }
+
+    private StorageStage stage(
+            String name,
+            StorageOperation operation,
+            Function<StorageContext, Mono<StorageContext>> action) {
+        return new NamedStorageStage(name, operation, action);
+    }
+
+    private Mono<StorageContext> validateWrite(StorageContext context) {
+        return Mono.fromCallable(() -> context
+                .withUploadTrace(completeUploadService.complete(context.command().orElseThrow()))
+                .withStageDecision("validation", "complete-upload-accepted"));
+    }
+
+    private Mono<StorageContext> resolveWritePolicy(StorageContext context) {
+        CompleteUploadCommand command = context.command().orElseThrow();
         return storagePolicyCatalog.findBy(command.context().storageClassId())
-                .flatMap(policy -> {
-                    // Step 3: Resolve effective policy
+                .map(policy -> {
                     var effectivePolicy = effectivePolicyResolver.resolve(policy, command.context());
-
-                    // Step 4: Resolve virtual device
                     VirtualDevice device = virtualDeviceResolver.resolve(effectivePolicy, command.context().bucket());
-
-                    // Step 5: Create persistence plan
                     PersistencePlan plan = persistencePlanner.createPlan(effectivePolicy, device);
-
-                    // Step 6: Stream-chunk data without full-object materialization (REQ-UPLOAD-003)
                     boolean dedupEnabled = plan.steps().get(0).expectedStatus() == StepExecutionStatus.EXECUTED;
                     long chunkSize = dedupEnabled
                             ? plan.effectivePolicy().dedup().map(DedupConfig::chunkSize).orElse((long) defaultChunkSizeBytes)
                             : defaultChunkSizeBytes;
-                    Chunker chunker = new Chunker((int) chunkSize);
-                    return chunker.chunk(data)
-                            .concatMap(chunkPayload -> processChunk(chunkPayload, plan))
-                            .collectList()
-                            .flatMap(chunkTraces -> {
-                                // Step 9: Build ChunkReferenceDescriptor list
-                                List<ChunkReferenceDescriptor> descriptors = buildDescriptors(chunkTraces);
-
-                                // Step 10: Build ObjectManifest
-                                long totalOriginalSize = descriptors.stream()
-                                        .mapToLong(ChunkReferenceDescriptor::originalSize)
-                                        .sum();
-                                long totalStoredSize = descriptors.stream()
-                                        .mapToLong(ChunkReferenceDescriptor::storedSize)
-                                        .sum();
-
-                                List<PolicyDecision> policyDecisions = buildPolicyDecisions(plan);
-
-                                ManifestId manifestId = ManifestId.generate();
-                                com.example.magrathea.storageengine.domain.valueobject.ObjectId objectId =
-                                        com.example.magrathea.storageengine.domain.valueobject.ObjectId.of(
-                                                command.context().objectKey().bucket() + "/" + command.context().objectKey().key());
-                                com.example.magrathea.storageengine.domain.valueobject.VersionId versionId =
-                                        com.example.magrathea.storageengine.domain.valueobject.VersionId.of(
-                                                java.util.UUID.randomUUID().toString());
-                                ObjectManifest manifest = new ObjectManifest(
-                                        manifestId,
-                                        objectId,
-                                        versionId,
-                                        command.context().storageClassId(),
-                                        device,
-                                        plan.deviceHash(),
-                                        trace,
-                                        policyDecisions,
-                                        descriptors.size(),
-                                        totalOriginalSize,
-                                        totalStoredSize,
-                                        descriptors);
-
-                                // Validate manifest
-                                persistencePlanner.validateManifest(manifest, plan);
-
-                                // Step 11: Save StoredObject and ObjectManifest
-                                StoredObject storedObject = StoredObject.create(
-                                        objectId,
-                                        versionId,
-                                        command.context().bucket(),
-                                        command.context().storageClassId(),
-                                        device);
-                                storedObject.attachManifest(manifestId);
-
-                                return storedObjectRepository.save(storedObject)
-                                        .then(objectManifestRepository.save(manifest))
-                                        .then(Mono.just(storedObject));
-                            });
+                    return context.withPolicyDecision(effectivePolicy, device, plan, Math.toIntExact(chunkSize))
+                            .withStageDecision("policy-resolution", "chunk-size-bytes=" + chunkSize);
                 });
     }
 
+    private Mono<StorageContext> prepareWriteChunks(StorageContext context) {
+        // All uploads are routed through DataProcessingPipeline.
+        // The pipeline handles both dedup-enabled and non-dedup policies via
+        // configured DataProcessingStep implementations (DeduplicationStep, etc.).
+        return Mono.just(context
+                .withStageDecision("chunking", "streaming-pipeline")
+                .addCleanupHandle(StorageCleanupHandle.named("chunking", Mono.empty())));
+    }
+
+    private Mono<StorageContext> prepareDedupLookup(StorageContext context) {
+        return Mono.just(context.withStageDecision(
+                "dedup-lookup",
+                "per-chunk lookup is evaluated lazily during chunk-persistence to preserve streaming demand"));
+    }
+
+    private Mono<StorageContext> persistChunks(StorageContext context) {
+        PersistencePlan plan = context.plan().orElseThrow();
+        // All uploads go through DataProcessingPipeline (both dedup and non-dedup).
+        return persistChunksViaPipeline(context, plan);
+    }
+
     /**
-     * Reads the content for a persisted manifest by fetching referenced chunks in manifest order.
+     * Chunk persistence via DataProcessingPipeline.
+     * The object is streamed as a single FileUnit through the configured processing steps
+     * (including DeduplicationStep when dedup is enabled) and written to the store.
+     * <p>
+     * For dedup-enabled policies, the pipeline produces multiple ChunkUnit instances —
+     * one per window — each resulting in a separate StorageTrace. For non-dedup policies,
+     * the pipeline produces a single StorageTrace for the whole FileUnit.
+     * <p>
+     * New fingerprints are recorded in the content address index after storing.
      */
-    public Flux<byte[]> read(ManifestId manifestId) {
-        return objectManifestRepository.findBy(manifestId)
-                .flatMapMany(manifest -> Flux.fromIterable(manifest.chunks()))
+    private Mono<StorageContext> persistChunksViaPipeline(
+            StorageContext context, PersistencePlan plan) {
+        EffectiveStoragePolicy effectivePolicy = plan.effectivePolicy();
+        DataProcessingSpec spec = buildDataProcessingSpec(effectivePolicy);
+        DataProcessingPipeline pipeline = dataPipelinePort.build(spec);
+
+        CompleteUploadCommand command = context.command().orElseThrow();
+        long contentLength = command.context().contentDescriptor().objectSize();
+        StorageUnitInfo info = StorageUnitInfo.of(
+                command.context(), contentLength, plan.deviceHash());
+        StorageUnit.FileUnit fileUnit = new StorageUnit.FileUnit(
+                context.uploadData().orElseThrow(), info);
+
+        return pipeline.execute(fileUnit)
+                .concatMap(trace -> {
+                    // For dedup reuse traces, retrieve the existing chunkId from the index
+                    if (trace.deduplicatedReuse() && trace.fingerprint().isPresent()) {
+                        Fingerprint fp = trace.fingerprint().get();
+                        return contentAddressIndex.find(plan.deviceHash(), fp)
+                                .map(optDescriptor -> {
+                                    ChunkReferenceDescriptor existing = optDescriptor
+                                            .orElseThrow(() -> new IllegalStateException(
+                                                    "Dedup reuse but fingerprint not found in index"));
+                                    ChunkPersistenceTrace chunkTrace = toChunkPersistenceTrace(
+                                            trace, plan, existing.chunkId());
+                                    return chunkTrace;
+                                });
+                    }
+                    // For new chunks, convert trace and record in content address index
+                    ChunkPersistenceTrace chunkTrace = toChunkPersistenceTrace(trace, plan);
+                    if (trace.fingerprint().isPresent() && trace.storageRef().isPresent()) {
+                        Fingerprint fp = trace.fingerprint().get();
+                        ChunkId chunkId = ChunkId.of(
+                                UUID.fromString(trace.storageRef().get()));
+                        return contentAddressIndex.record(plan.deviceHash(), fp, chunkId)
+                                .then(Mono.just(chunkTrace));
+                    }
+                    return Mono.just(chunkTrace);
+                })
+                .collectList()
+                .map(traces -> context
+                        .withChunkTraces(traces)
+                        .withStageDecision("chunk-persistence",
+                                "chunk-trace-count=" + traces.size())
+                        .addCleanupHandle(
+                                StorageCleanupHandle.named("chunk-persistence", Mono.empty())));
+    }
+
+    /**
+     * Builds a DataProcessingSpec from the effective policy.
+     * Includes all processing steps that are enabled in the policy.
+     * Fixed order: Dedup → Compress → Encrypt → EC.
+     */
+    private static DataProcessingSpec buildDataProcessingSpec(EffectiveStoragePolicy effectivePolicy) {
+        List<StepSpec> steps = new ArrayList<>();
+        effectivePolicy.dedup().ifPresent(d ->
+                steps.add(new StepSpec.Dedup(d)));
+        effectivePolicy.compression().ifPresent(c ->
+                steps.add(new StepSpec.Compress(c)));
+        effectivePolicy.encryption().ifPresent(ep ->
+                steps.add(new StepSpec.Encrypt(
+                        new EncryptionConfig(ep.algorithm(), ep.defaultKeyReference()))));
+        effectivePolicy.erasureCoding().ifPresent(ec ->
+                steps.add(new StepSpec.EC(ec)));
+        return new DataProcessingSpec(steps);
+    }
+
+    /**
+     * Converts a StorageTrace produced by the DataProcessingPipeline into a
+     * ChunkPersistenceTrace compatible with buildDescriptors() and persistManifest().
+     * <p>
+     * For FileUnit traces (non-dedup path), the trace carries a fingerprint set by
+     * StorePort. For ChunkUnit traces (dedup path), the fingerprint is set by the
+     * DeduplicationStep and passed through by StorePort.
+     * <p>
+     * All NoOp transform steps share the same checksum (data is unmodified).
+     * REPLICATION and STORE are always EXECUTED per PersistencePlan.create().
+     */
+    /**
+     * Converts a StorageTrace to ChunkPersistenceTrace, using the given chunkId
+     * for dedup reuse traces (retrieved from the content address index).
+     */
+    private ChunkPersistenceTrace toChunkPersistenceTrace(
+            StorageTrace storageTrace, PersistencePlan plan) {
+        return toChunkPersistenceTrace(storageTrace, plan, null);
+    }
+
+    private ChunkPersistenceTrace toChunkPersistenceTrace(
+            StorageTrace storageTrace, PersistencePlan plan, ChunkId existingChunkId) {
+        // Extract fingerprint from trace — present for both FileUnit and ChunkUnit
+        Fingerprint fingerprint = storageTrace.fingerprint()
+                .orElseGet(() -> Fingerprint.of(FingerprintAlgorithm.SHA256,
+                        checksumPort.calculate(new byte[0], ChecksumAlgorithm.SHA256).value()));
+        ContentHash contentHash = ContentHash.of(ChecksumAlgorithm.SHA256, fingerprint.value());
+
+        // Build chunkId: use existingChunkId for dedup reuse, or storageRef for new chunks
+        ChunkId chunkId;
+        if (existingChunkId != null) {
+            chunkId = existingChunkId;
+        } else if (storageTrace.storageRef().isPresent()) {
+            chunkId = ChunkId.of(UUID.fromString(storageTrace.storageRef().get()));
+        } else {
+            chunkId = ChunkId.generate();
+        }
+
+        List<StepExecutionRecord> steps = new ArrayList<>();
+        for (StepPlan stepPlan : plan.steps()) {
+            StepId stepId = stepPlan.stepId();
+            StepExecutionStatus expectedStatus = stepPlan.expectedStatus();
+
+            if (storageTrace.deduplicatedReuse() && stepId == StepId.DEDUP) {
+                // Dedup hit: emit DedupOutcome with matched=true
+                steps.add(new StepExecutionRecord(
+                        StepId.DEDUP, StepExecutionStatus.EXECUTED,
+                        Optional.of(new StepOutcome.DedupOutcome(true, Optional.of(chunkId))),
+                        Optional.of(ChecksumCalculationResult.of(contentHash)),
+                        Optional.of(AlterationResult.notApplied()),
+                        Optional.of(ChecksumVerificationResult.verified()),
+                        Optional.empty(),
+                        Optional.of(contentHash),
+                        Optional.of(contentHash)));
+                continue;
+            }
+
+            if (storageTrace.deduplicatedReuse()) {
+                // For deduplicated chunks, all subsequent steps are synthesised
+                // without actual data transformation.
+                if (expectedStatus == StepExecutionStatus.EXECUTED) {
+                    steps.add(buildExecutedStep(stepId,
+                            noOpOutcomeForDedupReuse(stepPlan, plan),
+                            contentHash, contentHash));
+                } else {
+                    steps.add(buildSkippedStep(stepId, contentHash));
+                }
+                continue;
+            }
+
+            if (stepId == StepId.STORE) {
+                // STORE is always EXECUTED; storedSize from the trace.
+                steps.add(buildExecutedStep(
+                        StepId.STORE,
+                        new StepOutcome.StoreOutcome(
+                                plan.targetDevice(),
+                                List.of(),
+                                storageTrace.storedSize()),
+                        contentHash, contentHash));
+            } else if (expectedStatus == StepExecutionStatus.EXECUTED) {
+                // EXECUTED step: synthesise a NoOp outcome (pipeline handles real transforms).
+                steps.add(buildExecutedStep(stepId,
+                        noOpPipelineOutcomeFor(stepPlan, plan),
+                        contentHash, contentHash));
+            } else {
+                // SKIPPED step (DEDUP, COMPRESS, CRYPT, ERASURE_CODING for a minimal policy).
+                steps.add(buildSkippedStep(stepId, contentHash));
+            }
+        }
+
+        return new ChunkPersistenceTrace(chunkId, fingerprint, storageTrace.originalSize(), steps);
+    }
+
+    /**
+     * Synthesises a NoOp StepOutcome for EXECUTED steps in the pipeline path.
+     * Data is unmodified (all pipeline steps are currently NoOp), so sizes and locations
+     * carry zero/empty values.
+     */
+    private StepOutcome noOpPipelineOutcomeFor(StepPlan stepPlan, PersistencePlan plan) {
+        return switch (stepPlan.stepId()) {
+            case REPLICATION -> {
+                int factor = stepPlan.config()
+                        .map(c -> ((StepConfig.ReplicationStepConfig) c).config().factor())
+                        .orElse(1);
+                yield new StepOutcome.ReplicationOutcome(factor, List.of());
+            }
+            case COMPRESS -> new StepOutcome.CompressOutcome(
+                    com.example.magrathea.storageengine.domain.valueobject.CompressionAlgorithm.GZIP, 0, 0);
+            case CRYPT -> new StepOutcome.CryptOutcome(
+                    com.example.magrathea.storageengine.domain.valueobject.EncryptionAlgorithm.SSE_S3,
+                    Optional.empty());
+            case ERASURE_CODING -> {
+                var ecConfig = stepPlan.config()
+                        .map(c -> ((StepConfig.ECStepConfig) c).config())
+                        .orElseThrow();
+                yield new StepOutcome.ErasureCodingOutcome(
+                        ecConfig.dataBlocks(), ecConfig.parityBlocks(), List.of(), List.of());
+            }
+            case DEDUP -> new StepOutcome.DedupOutcome(false, Optional.empty());
+            case STORE -> new StepOutcome.StoreOutcome(plan.targetDevice(), List.of(), 0);
+        };
+    }
+
+    /**
+     * Synthesises a NoOp StepOutcome for EXECUTED steps when a chunk is deduplicated.
+     * Locations from the existing chunk are reused for REPLICATION and STORE.
+     */
+    private StepOutcome noOpOutcomeForDedupReuse(StepPlan stepPlan, PersistencePlan plan) {
+        return switch (stepPlan.stepId()) {
+            case COMPRESS -> new StepOutcome.CompressOutcome(
+                    com.example.magrathea.storageengine.domain.valueobject.CompressionAlgorithm.GZIP, 0, 0);
+            case CRYPT -> new StepOutcome.CryptOutcome(
+                    com.example.magrathea.storageengine.domain.valueobject.EncryptionAlgorithm.SSE_S3,
+                    Optional.empty());
+            case ERASURE_CODING -> {
+                var ecConfig = stepPlan.config()
+                        .map(c -> ((StepConfig.ECStepConfig) c).config())
+                        .orElseThrow();
+                yield new StepOutcome.ErasureCodingOutcome(
+                        ecConfig.dataBlocks(), ecConfig.parityBlocks(), List.of(), List.of());
+            }
+            case REPLICATION -> {
+                int factor = stepPlan.config()
+                        .map(c -> ((StepConfig.ReplicationStepConfig) c).config())
+                        .orElseThrow().factor();
+                yield new StepOutcome.ReplicationOutcome(factor, List.of());
+            }
+            case STORE -> new StepOutcome.StoreOutcome(plan.targetDevice(), List.of(), 0);
+            case DEDUP -> new StepOutcome.DedupOutcome(true, Optional.empty());
+        };
+    }
+
+    private Mono<StorageContext> persistManifest(StorageContext context) {
+        return Mono.fromCallable(() -> {
+                    List<ChunkReferenceDescriptor> descriptors = buildDescriptors(context.chunkTraces());
+                    long totalOriginalSize = descriptors.stream()
+                            .mapToLong(ChunkReferenceDescriptor::originalSize)
+                            .sum();
+                    long totalStoredSize = descriptors.stream()
+                            .mapToLong(ChunkReferenceDescriptor::storedSize)
+                            .sum();
+
+                    List<PolicyDecision> policyDecisions = buildPolicyDecisions(context.plan().orElseThrow());
+                    ManifestId manifestId = ManifestId.generate();
+                    CompleteUploadCommand command = context.command().orElseThrow();
+                    ObjectId objectId = ObjectId.of(
+                            command.context().objectKey().bucket() + "/" + command.context().objectKey().key());
+                    VersionId versionId = VersionId.of(java.util.UUID.randomUUID().toString());
+                    ObjectManifest manifest = new ObjectManifest(
+                            manifestId,
+                            objectId,
+                            versionId,
+                            command.context().storageClassId(),
+                            context.device().orElseThrow(),
+                            context.plan().orElseThrow().deviceHash(),
+                            context.uploadTrace().orElseThrow(),
+                            policyDecisions,
+                            descriptors.size(),
+                            totalOriginalSize,
+                            totalStoredSize,
+                            descriptors);
+                    persistencePlanner.validateManifest(manifest, context.plan().orElseThrow());
+
+                    StoredObject storedObject = StoredObject.create(
+                            objectId,
+                            versionId,
+                            command.context().bucket(),
+                            command.context().storageClassId(),
+                            context.device().orElseThrow());
+                    storedObject.attachManifest(manifestId);
+
+                    return context
+                            .withChunkDescriptors(descriptors)
+                            .withManifestIdentity(manifestId, objectId, versionId)
+                            .withManifest(manifest)
+                            .withStoredObject(storedObject);
+                })
+                .flatMap(prepared -> objectManifestRepository.save(prepared.manifest().orElseThrow())
+                        .thenReturn(prepared
+                                .withStageDecision("manifest-persistence", "manifest-committed")
+                                .addCleanupHandle(StorageCleanupHandle.named("manifest-persistence", Mono.empty()))));
+    }
+
+    private Mono<StorageContext> persistObjectIndex(StorageContext context) {
+        return storedObjectRepository.save(context.storedObject().orElseThrow())
+                .thenReturn(context.withStageDecision("object-index-persistence", "object-reference-committed"));
+    }
+
+    private Mono<StorageContext> validateRead(StorageContext context) {
+        return Mono.just(context.withStageDecision("validation", "manifest-id-accepted"));
+    }
+
+    private Mono<StorageContext> resolveReadPolicy(StorageContext context) {
+        return Mono.just(context.withStageDecision(
+                "policy-resolution",
+                "read policy is derived from committed manifest during read-planning"));
+    }
+
+    private Mono<StorageContext> planRead(StorageContext context) {
+        return objectManifestRepository.findBy(context.requestedManifestId().orElseThrow())
+                .map(manifest -> context
+                        .withManifest(manifest)
+                        .withChunkDescriptors(manifest.chunks())
+                        .withStageDecision("read-planning", "manifest-chunk-count=" + manifest.chunks().size()));
+    }
+
+    private Mono<StorageContext> prepareChunkReading(StorageContext context) {
+        Flux<byte[]> readableChunks = Flux.fromIterable(context.chunkDescriptors())
                 .concatMap(chunk -> chunkStorePort.read(chunk.chunkId())
-                        .map(storedData -> restoreReadableChunk(storedData, chunk)));
+                        .map(storedData -> restoreReadableChunk(storedData, chunk)), 1);
+        return Mono.just(context
+                .withResponseContent(readableChunks)
+                .withStageDecision("chunk-reading", "manifest-order"));
+    }
+
+    private Mono<StorageContext> prepareResponseStreaming(StorageContext context) {
+        Flux<byte[]> observedResponse = context.responseContent().orElseThrow()
+                .onErrorResume(error -> storageEventPublisher.publish(lazyReadFailed(context, error))
+                        .thenMany(Flux.error(error)));
+        return Mono.just(context
+                .withResponseContent(observedResponse)
+                .withStageDecision("response-streaming", "deferred-flux"));
+    }
+
+    private static Optional<String> manifestIdValue(StorageContext context) {
+        return context.manifestId().map(manifestId -> manifestId.value().toString());
+    }
+
+    private static com.example.magrathea.storageengine.application.pipeline.StorageEvent.StageFailed lazyReadFailed(
+            StorageContext context,
+            Throwable error) {
+        return new com.example.magrathea.storageengine.application.pipeline.StorageEvent.StageFailed(
+                context.operation(),
+                context.correlationId(),
+                "chunk-reading",
+                context.bucketName(),
+                context.objectKey(),
+                manifestIdValue(context),
+                java.time.Instant.now(),
+                java.time.Duration.ZERO,
+                error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage(),
+                StorageEventMeasurements.failure());
+    }
+
+    private record NamedStorageStage(
+            String name,
+            StorageOperation operation,
+            Function<StorageContext, Mono<StorageContext>> action) implements StorageStage {
+        @Override
+        public Mono<StorageContext> execute(StorageContext context) {
+            return action.apply(context);
+        }
     }
 
     private static byte[] restoreReadableChunk(byte[] storedData, ChunkReferenceDescriptor chunk) {
@@ -217,227 +588,6 @@ public class ReactiveStorageOrchestrator {
         return chunk.stepChecksums().stream()
                 .anyMatch(checksum -> checksum.stepId() == StepId.ERASURE_CODING
                         && !checksum.inputChecksum().equals(checksum.outputChecksum()));
-    }
-
-    /**
-     * Runs the 6-step persistence pipeline for a single chunk.
-     */
-    private Mono<ChunkPersistenceTrace> processChunk(ApplicationChunkPayload payload, PersistencePlan plan) {
-        byte[] currentData = payload.data();
-        ChunkId requestedChunkId = payload.chunkId();
-        List<StepExecutionRecord> steps = new ArrayList<>();
-
-        // Calculate initial fingerprint for dedup
-        Fingerprint fingerprint = checksumPort.fingerprint(
-                currentData, plan.effectivePolicy().dedup()
-                        .map(com.example.magrathea.storageengine.domain.valueobject.DedupConfig::algorithm)
-                        .orElse(FingerprintAlgorithm.SHA256));
-        long originalSize = currentData.length;
-
-        // Use a scheduler for CPU-bound work
-        return Mono.fromRunnable(() -> {
-                    // We'll build steps sequentially inside a flatMap chain
-                })
-                .then(Mono.defer(() -> {
-                    // STEP 1: DEDUP
-                    StepPlan dedupPlan = plan.steps().get(0);
-                    if (dedupPlan.expectedStatus() == StepExecutionStatus.EXECUTED) {
-                        return processDedupStep(currentData, fingerprint, plan)
-                                .flatMap(result -> {
-                                    steps.add(result.record());
-                                    if (result.reused()) {
-                                        appendDedupReuseShortCircuitSteps(
-                                                steps, plan, currentData, result.locations());
-                                        return Mono.just(new ChunkProcessingState(
-                                                result.chunkId(), currentData, true));
-                                    }
-                                    return Mono.just(new ChunkProcessingState(
-                                            requestedChunkId, currentData, false));
-                                });
-                    } else {
-                        ContentHash inputHash = checksumPort.calculate(currentData, ChecksumAlgorithm.SHA256);
-                        steps.add(buildSkippedStep(StepId.DEDUP, inputHash));
-                        return Mono.just(new ChunkProcessingState(requestedChunkId, currentData, false));
-                    }
-                }))
-                .flatMap(stateAfterDedup -> {
-                    if (stateAfterDedup.reused()) {
-                        return Mono.just(stateAfterDedup);
-                    }
-                    byte[] dataAfterDedup = stateAfterDedup.data();
-                    // STEP 2: COMPRESS
-                    StepPlan compressPlan = plan.steps().get(1);
-                    if (compressPlan.expectedStatus() == StepExecutionStatus.EXECUTED) {
-                        byte[] compressed = dataTransformPort.compress(
-                                dataAfterDedup,
-                                compressPlan.config()
-                                        .map(c -> ((com.example.magrathea.storageengine.domain.valueobject.StepConfig.CompressStepConfig) c).config())
-                                        .orElseThrow());
-                        ContentHash inputHash = checksumPort.calculate(dataAfterDedup, ChecksumAlgorithm.SHA256);
-                        ContentHash outputHash = checksumPort.calculate(compressed, ChecksumAlgorithm.SHA256);
-                        steps.add(buildExecutedStep(
-                                StepId.COMPRESS,
-                                new StepOutcome.CompressOutcome(
-                                        com.example.magrathea.storageengine.domain.valueobject.CompressionAlgorithm.GZIP,
-                                        dataAfterDedup.length, compressed.length),
-                                inputHash, outputHash));
-                        return Mono.just(stateAfterDedup.withData(compressed));
-                    } else {
-                        ContentHash inputHash = checksumPort.calculate(dataAfterDedup, ChecksumAlgorithm.SHA256);
-                        steps.add(buildSkippedStep(StepId.COMPRESS, inputHash));
-                        return Mono.just(stateAfterDedup);
-                    }
-                })
-                .flatMap(stateAfterCompress -> {
-                    if (stateAfterCompress.reused()) {
-                        return Mono.just(stateAfterCompress);
-                    }
-                    byte[] dataAfterCompress = stateAfterCompress.data();
-                    // STEP 3: CRYPT
-                    StepPlan cryptPlan = plan.steps().get(2);
-                    if (cryptPlan.expectedStatus() == StepExecutionStatus.EXECUTED) {
-                        byte[] encrypted = dataTransformPort.encrypt(
-                                dataAfterCompress,
-                                cryptPlan.config()
-                                        .map(c -> ((com.example.magrathea.storageengine.domain.valueobject.StepConfig.CryptStepConfig) c).config())
-                                        .orElseThrow());
-                        ContentHash inputHash = checksumPort.calculate(dataAfterCompress, ChecksumAlgorithm.SHA256);
-                        ContentHash outputHash = checksumPort.calculate(encrypted, ChecksumAlgorithm.SHA256);
-                        steps.add(buildExecutedStep(
-                                StepId.CRYPT,
-                                new StepOutcome.CryptOutcome(
-                                        com.example.magrathea.storageengine.domain.valueobject.EncryptionAlgorithm.SSE_S3,
-                                        Optional.empty()),
-                                inputHash, outputHash));
-                        return Mono.just(stateAfterCompress.withData(encrypted));
-                    } else {
-                        ContentHash inputHash = checksumPort.calculate(dataAfterCompress, ChecksumAlgorithm.SHA256);
-                        steps.add(buildSkippedStep(StepId.CRYPT, inputHash));
-                        return Mono.just(stateAfterCompress);
-                    }
-                })
-                .flatMap(stateAfterCrypt -> {
-                    if (stateAfterCrypt.reused()) {
-                        return Mono.just(stateAfterCrypt);
-                    }
-                    byte[] dataAfterCrypt = stateAfterCrypt.data();
-                    // STEP 4: ERASURE_CODING
-                    StepPlan ecPlan = plan.steps().get(3);
-                    if (ecPlan.expectedStatus() == StepExecutionStatus.EXECUTED) {
-                        return dataTransformPort.erasureEncode(
-                                dataAfterCrypt,
-                                ecPlan.config()
-                                        .map(c -> ((com.example.magrathea.storageengine.domain.valueobject.StepConfig.ECStepConfig) c).config())
-                                        .orElseThrow())
-                                .flatMap(ecOutcome -> {
-                                    ContentHash inputHash = checksumPort.calculate(dataAfterCrypt, ChecksumAlgorithm.SHA256);
-                                    ContentHash outputHash = checksumPort.calculate(
-                                            ecOutcome.encodedData(), ChecksumAlgorithm.SHA256);
-                                    steps.add(buildExecutedStep(
-                                            StepId.ERASURE_CODING,
-                                            new StepOutcome.ErasureCodingOutcome(
-                                                    ecPlan.config()
-                                                            .map(c -> ((com.example.magrathea.storageengine.domain.valueobject.StepConfig.ECStepConfig) c).config())
-                                                            .orElseThrow().dataBlocks(),
-                                                    ecPlan.config()
-                                                            .map(c -> ((com.example.magrathea.storageengine.domain.valueobject.StepConfig.ECStepConfig) c).config())
-                                                            .orElseThrow().parityBlocks(),
-                                                    ecOutcome.dataNodes(),
-                                                    ecOutcome.parityNodes()),
-                                            inputHash, outputHash));
-                                    return Mono.just(stateAfterCrypt.withData(ecOutcome.encodedData()));
-                                });
-                    } else {
-                        ContentHash inputHash = checksumPort.calculate(dataAfterCrypt, ChecksumAlgorithm.SHA256);
-                        steps.add(buildSkippedStep(StepId.ERASURE_CODING, inputHash));
-                        return Mono.just(stateAfterCrypt);
-                    }
-                })
-                .flatMap(stateAfterEC -> {
-                    if (stateAfterEC.reused()) {
-                        return Mono.just(stateAfterEC);
-                    }
-                    byte[] dataAfterEC = stateAfterEC.data();
-                    // STEP 5: REPLICATION
-                    StepPlan replPlan = plan.steps().get(4);
-                    if (replPlan.expectedStatus() == StepExecutionStatus.EXECUTED) {
-                        int factor = replPlan.config()
-                                .map(c -> ((com.example.magrathea.storageengine.domain.valueobject.StepConfig.ReplicationStepConfig) c).config())
-                                .orElseThrow().factor();
-                        return dataTransformPort.replicate(dataAfterEC, factor)
-                                .flatMap(nodes -> {
-                                    ContentHash inputHash = checksumPort.calculate(dataAfterEC, ChecksumAlgorithm.SHA256);
-                                    ContentHash outputHash = checksumPort.calculate(dataAfterEC, ChecksumAlgorithm.SHA256);
-                                    steps.add(buildExecutedStep(
-                                            StepId.REPLICATION,
-                                            new StepOutcome.ReplicationOutcome(factor, nodes),
-                                            inputHash, outputHash));
-                                    return Mono.just(stateAfterEC);
-                                });
-                    } else {
-                        ContentHash inputHash = checksumPort.calculate(dataAfterEC, ChecksumAlgorithm.SHA256);
-                        steps.add(buildSkippedStep(StepId.REPLICATION, inputHash));
-                        return Mono.just(stateAfterEC);
-                    }
-                })
-                .flatMap(stateAfterRepl -> {
-                    if (stateAfterRepl.reused()) {
-                        return Mono.just(stateAfterRepl);
-                    }
-                    byte[] dataAfterRepl = stateAfterRepl.data();
-                    // STEP 6: STORE
-                    return chunkStorePort.store(stateAfterRepl.chunkId(), dataAfterRepl, plan)
-                            .flatMap(nodes -> {
-                                ContentHash inputHash = checksumPort.calculate(dataAfterRepl, ChecksumAlgorithm.SHA256);
-                                ContentHash outputHash = checksumPort.calculate(dataAfterRepl, ChecksumAlgorithm.SHA256);
-                                StepOutcome.StoreOutcome storeOutcome = new StepOutcome.StoreOutcome(
-                                        plan.targetDevice(), nodes, dataAfterRepl.length);
-                                steps.add(buildExecutedStep(StepId.STORE, storeOutcome, inputHash, outputHash));
-                                Mono<Void> recordNewChunk = plan.steps().get(0).expectedStatus() == StepExecutionStatus.EXECUTED
-                                        ? contentAddressIndex.record(plan.deviceHash(), fingerprint, stateAfterRepl.chunkId())
-                                        : Mono.empty();
-                                return recordNewChunk.thenReturn(stateAfterRepl);
-                            });
-                })
-                .flatMap(finalState -> Mono.fromCallable(() -> {
-                    // Build ChunkPersistenceTrace
-                    // Validate trace against plan
-                    ChunkPersistenceTrace trace = new ChunkPersistenceTrace(
-                            finalState.chunkId(), fingerprint, originalSize, List.copyOf(steps));
-                    persistencePlanner.validateTrace(trace, plan);
-                    return trace;
-                }));
-    }
-
-    private Mono<DedupResult> processDedupStep(
-            byte[] data, Fingerprint fingerprint, PersistencePlan plan) {
-        ContentHash inputHash = checksumPort.calculate(data, ChecksumAlgorithm.SHA256);
-        return contentAddressIndex.find(plan.deviceHash(), fingerprint)
-                .map(optDescriptor -> {
-                    if (optDescriptor.isPresent()) {
-                        ChunkReferenceDescriptor existing = optDescriptor.get();
-                        StepExecutionRecord record = new StepExecutionRecord(
-                                StepId.DEDUP, StepExecutionStatus.EXECUTED,
-                                Optional.of(new StepOutcome.DedupOutcome(true, Optional.of(existing.chunkId()))),
-                                Optional.of(ChecksumCalculationResult.of(inputHash)),
-                                Optional.of(AlterationResult.notApplied()),
-                                Optional.of(ChecksumVerificationResult.verified()),
-                                Optional.empty(),
-                                Optional.of(inputHash),
-                                Optional.of(inputHash));
-                        return new DedupResult(record, existing.chunkId(), true, existing.locations());
-                    }
-                    StepExecutionRecord record = new StepExecutionRecord(
-                            StepId.DEDUP, StepExecutionStatus.EXECUTED,
-                            Optional.of(new StepOutcome.DedupOutcome(false, Optional.empty())),
-                            Optional.of(ChecksumCalculationResult.of(inputHash)),
-                            Optional.of(AlterationResult.notApplied()),
-                            Optional.of(ChecksumVerificationResult.verified()),
-                            Optional.empty(),
-                            Optional.of(inputHash),
-                            Optional.of(inputHash));
-                    return new DedupResult(record, null, false, List.of());
-                });
     }
 
     private StepExecutionRecord buildExecutedStep(
@@ -464,67 +614,6 @@ public class ReactiveStorageOrchestrator {
                 Optional.empty(),
                 Optional.of(inputHash),
                 Optional.of(inputHash));
-    }
-
-    private void appendDedupReuseShortCircuitSteps(
-            List<StepExecutionRecord> steps,
-            PersistencePlan plan,
-            byte[] originalData,
-            List<com.example.magrathea.storageengine.domain.valueobject.NodeId> existingLocations) {
-        ContentHash currentHash = checksumPort.calculate(originalData, ChecksumAlgorithm.SHA256);
-        for (int index = 1; index < plan.steps().size(); index++) {
-            StepPlan stepPlan = plan.steps().get(index);
-            if (stepPlan.expectedStatus() == StepExecutionStatus.SKIPPED) {
-                steps.add(buildSkippedStep(stepPlan.stepId(), currentHash));
-            } else {
-                steps.add(buildExecutedStep(
-                        stepPlan.stepId(),
-                        noOpOutcomeForDedupReuse(stepPlan, plan, existingLocations),
-                        currentHash,
-                        currentHash));
-            }
-        }
-    }
-
-    private StepOutcome noOpOutcomeForDedupReuse(
-            StepPlan stepPlan,
-            PersistencePlan plan,
-            List<com.example.magrathea.storageengine.domain.valueobject.NodeId> existingLocations) {
-        return switch (stepPlan.stepId()) {
-            case COMPRESS -> new StepOutcome.CompressOutcome(
-                    com.example.magrathea.storageengine.domain.valueobject.CompressionAlgorithm.GZIP, 0, 0);
-            case CRYPT -> new StepOutcome.CryptOutcome(
-                    com.example.magrathea.storageengine.domain.valueobject.EncryptionAlgorithm.SSE_S3,
-                    Optional.empty());
-            case ERASURE_CODING -> {
-                var ecConfig = stepPlan.config()
-                        .map(c -> ((com.example.magrathea.storageengine.domain.valueobject.StepConfig.ECStepConfig) c).config())
-                        .orElseThrow();
-                yield new StepOutcome.ErasureCodingOutcome(
-                        ecConfig.dataBlocks(), ecConfig.parityBlocks(), List.of(), List.of());
-            }
-            case REPLICATION -> {
-                int factor = stepPlan.config()
-                        .map(c -> ((com.example.magrathea.storageengine.domain.valueobject.StepConfig.ReplicationStepConfig) c).config())
-                        .orElseThrow().factor();
-                yield new StepOutcome.ReplicationOutcome(factor, existingLocations);
-            }
-            case STORE -> new StepOutcome.StoreOutcome(plan.targetDevice(), existingLocations, 0);
-            case DEDUP -> new StepOutcome.DedupOutcome(true, Optional.empty());
-        };
-    }
-
-    private record DedupResult(
-            StepExecutionRecord record,
-            ChunkId chunkId,
-            boolean reused,
-            List<com.example.magrathea.storageengine.domain.valueobject.NodeId> locations) {
-    }
-
-    private record ChunkProcessingState(ChunkId chunkId, byte[] data, boolean reused) {
-        ChunkProcessingState withData(byte[] newData) {
-            return new ChunkProcessingState(chunkId, newData, reused);
-        }
     }
 
     private List<ChunkReferenceDescriptor> buildDescriptors(List<ChunkPersistenceTrace> traces) {

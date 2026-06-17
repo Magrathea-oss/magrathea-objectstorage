@@ -27,8 +27,10 @@ public final class ArchivedS3Object extends S3Object {
                      Map<String, String> userMetadata, EncryptionConfiguration encryption,
                      ObjectChecksum checksum, long size, ZonedDateTime createdAt,
                      boolean restored, ZonedDateTime restoreExpiry,
-                     WriteState writeState, List<ObjectStoreEvent> events) {
-        super(key, storageClass, userMetadata, encryption, checksum, size, createdAt, writeState, events);
+                     WriteState writeState, List<ObjectStoreEvent> events,
+                     String etag, Map<String, String> objectTags) {
+        super(key, storageClass, userMetadata, encryption, checksum, size, createdAt,
+              writeState, events, etag, objectTags);
         this.restored = restored;
         this.restoreExpiry = restoreExpiry;
     }
@@ -49,21 +51,21 @@ public final class ArchivedS3Object extends S3Object {
         var newEvents = appendEvent(domainEvents(),
             new ObjectStoreEvent.ObjectDeleted(key(), ZonedDateTime.now()));
         return new DeletedS3Object(key(), storageClass(), userMetadata(),
-            createdAt(), WriteState.DELETED, newEvents);
+            createdAt(), WriteState.DELETED, newEvents, etag(), objectTags());
     }
 
     @Override
     public S3Object clearEvents() {
         return new ArchivedS3Object(key(), storageClass(), userMetadata(),
             encryption(), checksum(), size(), createdAt(),
-            restored, restoreExpiry, writeState(), List.of());
+            restored, restoreExpiry, writeState(), List.of(), etag(), objectTags());
     }
 
     @Override
     protected S3Object withWriteState(WriteState newState) {
         return new ArchivedS3Object(key(), storageClass(), userMetadata(),
             encryption(), checksum(), size(), createdAt(),
-            restored, restoreExpiry, newState, domainEvents());
+            restored, restoreExpiry, newState, domainEvents(), etag(), objectTags());
     }
 
     @Override

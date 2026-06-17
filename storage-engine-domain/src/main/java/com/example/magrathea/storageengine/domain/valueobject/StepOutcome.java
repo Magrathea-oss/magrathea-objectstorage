@@ -42,6 +42,8 @@ public sealed interface StepOutcome {
             }
             java.util.Objects.requireNonNull(dataNodes, "dataNodes must not be null");
             java.util.Objects.requireNonNull(parityNodes, "parityNodes must not be null");
+            dataNodes = List.copyOf(dataNodes);
+            parityNodes = List.copyOf(parityNodes);
         }
     }
 
@@ -51,6 +53,7 @@ public sealed interface StepOutcome {
                 throw new IllegalArgumentException("factor must be >= 1: " + factor);
             }
             java.util.Objects.requireNonNull(nodes, "nodes must not be null");
+            nodes = List.copyOf(nodes);
         }
     }
 
@@ -59,6 +62,7 @@ public sealed interface StepOutcome {
         public StoreOutcome {
             java.util.Objects.requireNonNull(targetDevice, "targetDevice must not be null");
             java.util.Objects.requireNonNull(locations, "locations must not be null");
+            locations = List.copyOf(locations);
             if (storedSize < 0) {
                 throw new IllegalArgumentException("storedSize must be >= 0: " + storedSize);
             }

@@ -13,12 +13,17 @@ import com.example.magrathea.s3api.dto.query.UploadPartResultQuery;
 import com.example.magrathea.s3api.dto.query.CompleteMultipartUploadQuery;
 import com.example.magrathea.s3api.dto.query.ListMultipartUploadsQuery;
 import com.example.magrathea.s3api.dto.query.ListPartsQuery;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+
+import java.util.Comparator;
+import java.util.stream.Collectors;
 
 /**
  * Multipart upload S3 operations handler.
@@ -92,22 +97,28 @@ public class S3MultipartHandler {
         var partNumberStr = request.queryParam("partNumber").orElse("");
         var uploadId = UploadId.of(uploadIdStr);
         int partNumber = Integer.parseInt(partNumberStr);
-        var size = request.headers().contentLength().orElse(0L);
 
         return multipartUploadService.findById(uploadId)
-            .flatMap(upload -> {
-                // TODO: ETag computation postponed — use placeholder
-                var etag = "\"placeholder-etag\"";
-                var part = com.example.magrathea.objectstore.domain.valueobject.UploadPart.create(
-                    PartNumber.of(partNumber), etag, size
-                );
-                var updated = upload.withPart(part);
-                return multipartUploadService.saveUpload(updated)
-                    .then(ServerResponse.ok()
-                        .header("ETag", etag)
-                        .contentType(MediaType.APPLICATION_XML)
-                        .bodyValue(UploadPartResultQuery.from(etag)));
-            })
+            .flatMap(upload ->
+                // Collect the part body to compute a real MD5 ETag
+                DataBufferUtils.join(request.bodyToFlux(DataBuffer.class))
+                    .defaultIfEmpty(new org.springframework.core.io.buffer.DefaultDataBufferFactory().wrap(new byte[0]))
+                    .flatMap(joined -> {
+                        byte[] bytes = new byte[joined.readableByteCount()];
+                        joined.read(bytes);
+                        DataBufferUtils.release(joined);
+                        var etag = ETagComputer.computeETag(bytes);
+                        var part = com.example.magrathea.objectstore.domain.valueobject.UploadPart.create(
+                            PartNumber.of(partNumber), etag, bytes.length
+                        );
+                        var updated = upload.withPart(part);
+                        return multipartUploadService.saveUpload(updated)
+                            .then(ServerResponse.ok()
+                                .header("ETag", etag)
+                                .contentType(MediaType.APPLICATION_XML)
+                                .bodyValue(UploadPartResultQuery.from(etag)));
+                    })
+            )
             .switchIfEmpty(ServerResponse.status(HttpStatus.NOT_FOUND)
                 .contentType(MediaType.APPLICATION_XML)
                 .bodyValue(ErrorQuery.from("NoSuchUpload", "UploadId not found")));
@@ -125,8 +136,19 @@ public class S3MultipartHandler {
                 var completed = upload.withCompleted();
                 return multipartUploadService.saveUpload(completed)
                     .then(Mono.defer(() -> {
-                        // TODO: ETag computation postponed — use placeholder
-                        var finalEtag = "\"placeholder-etag\"";
+                        // Compute multipart ETag from all parts sorted by part number
+                        var sortedParts = upload.parts().stream()
+                            .sorted(Comparator.comparingInt(p -> p.partNumber().value()))
+                            .collect(Collectors.toList());
+                        String finalEtag;
+                        if (sortedParts.isEmpty()) {
+                            finalEtag = "\"\"";
+                        } else {
+                            var partEtags = sortedParts.stream()
+                                .map(com.example.magrathea.objectstore.domain.valueobject.UploadPart::etag)
+                                .collect(Collectors.toList());
+                            finalEtag = ETagComputer.computeMultipartETag(partEtags);
+                        }
                         var result = CompleteMultipartUploadQuery.from(bucket, key, finalEtag);
                         return ServerResponse.ok()
                             .contentType(MediaType.APPLICATION_XML)

@@ -36,7 +36,7 @@ public class FileSystemContentAddressIndex implements ContentAddressIndex {
 
     @Override
     public Mono<Optional<ChunkReferenceDescriptor>> find(DeviceConfigurationHash deviceHash, Fingerprint fingerprint) {
-        return Mono.fromCallable(() -> {
+        return BlockingFileSystemOperation.fromCallable(() -> {
             Path entryPath = indexRoot
                     .resolve(deviceHash.value())
                     .resolve(fingerprint.value());
@@ -56,7 +56,7 @@ public class FileSystemContentAddressIndex implements ContentAddressIndex {
 
     @Override
     public Mono<Void> record(DeviceConfigurationHash deviceHash, Fingerprint fingerprint, ChunkId chunkId) {
-        return Mono.fromRunnable(() -> {
+        return BlockingFileSystemOperation.fromRunnable(() -> {
             try {
                 Path deviceDir = indexRoot.resolve(deviceHash.value());
                 Files.createDirectories(deviceDir);

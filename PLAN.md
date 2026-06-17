@@ -4,92 +4,126 @@
 
 ## Post-Audit Production Readiness Plan
 
-The post-audit baseline is that Magrathea ObjectStore remains a prototype with an advanced architecture, not a production-ready object store. Production-readiness work must first close the restart-safety, streaming, filesystem-consistency, observability, and S3 semantic gaps below before any production claim is made.
+The post-audit baseline is that Magrathea ObjectStore remains a prototype with an advanced architecture, not a production-ready object store. The declared Phase 2 filesystem reliability scope is now implemented and validated, but production-readiness work must still close restart-safety, streaming, observability, distributed-readiness, and broader S3 semantic gaps below before any production claim is made.
 
-### Phase 1 — Reliable Upload and Restart Safety
+### Phase 1 — Reliable Upload and Restart Safety ⚠️ Partially implemented and validated
 
-| Field | Plan |
+| Field | Plan / Result |
 |---|---|
 | Focus | Make the `PutObject` → storage-engine → `GetObject` path durable, restart-safe, and bounded in memory. |
 | Required outputs | Durable S3 object metadata; durable S3 bucket/key/version to storage-engine `manifestId` mapping; removal of runtime-only `storeByKey` / `manifestByKey` as the source of truth; restart-safe PUT → process restart → GET behavior; HTTP S3 + storage-engine profile E2E coverage; upload path that does not reduce all object bytes to one array and does not retain unbounded traces. |
-| Acceptance gates | A storage-engine-profile HTTP E2E test proves PUT survives restart and GET returns the original bytes and metadata; durable mapping and manifest repositories are used after restart; large-object tests show bounded memory and no global byte-array aggregation in the production upload path. |
+| Current status | `@implemented-not-e2e-validated` for REQ-UPLOAD-001, REQ-UPLOAD-002, REQ-UPLOAD-003, and REQ-UPLOAD-004. `@implemented-and-validated` for REQ-UPLOAD-005 and REQ-UPLOAD-006: both WebTestClient (5+3 examples via `Phase1UploadStorageEngineCucumberTest`) and AWS CLI (5+3 examples via `Phase1UploadStorageEngineAwsCliCucumberTest`) Cucumber runners pass. REQ-UPLOAD-001 and REQ-UPLOAD-002 require two independent Spring application contexts for restart semantics; no Cucumber runner covers them. REQ-UPLOAD-003 requires `fixtures/upload/large-object.bin` (256 MiB, not yet created). REQ-UPLOAD-004 requires `large-object.bin` and fault-injection step definitions; no Cucumber runner covers it. |
+| Validation evidence | `StorageEngineRestartSafetyTest` (1 test, bootstrap module) — programmatically starts two independent Spring contexts sharing the same storage root and verifies PUT in the first context survives full context close/restart, with GET returning the same bytes from filesystem persistence in the second context (REQ-UPLOAD-001). `StorageEngineMultiChunkUploadTest` (1 test) — uploads a 128 KB payload with 32 KB chunk size, asserts ≥ 2 chunk files are written to the filesystem, and verifies byte-for-byte read-back without whole-object aggregation (REQ-UPLOAD-003). `StorageEngineHttpReadAfterWriteTest` (2 tests) — proves immediate read-after-write is served from filesystem persistence with manifests/object references/chunks on disk (REQ-UPLOAD-005), and proves a fresh `StorageEngineReactiveS3ObjectRepository` instance reloads the committed object manifest from the same storage root and reads back the original content without shared in-memory state (REQ-UPLOAD-002). `StorageEngineUploadAtomicityTest` (1 test, bootstrap) — fault-injected interrupted PUT produces no committed manifest and no readable object (REQ-UPLOAD-004). `StorageEngineIntegrityDetectionTest` (1 test, bootstrap) — chunk corruption is detected before returning bytes, GET returns non-200 (REQ-UPLOAD-006). `Phase1UploadStorageEngineCucumberTest` WebTestClient Cucumber runner: 30 tests run, 0 failures, 22 skipped (`@awscli`-tagged rows excluded): REQ-UPLOAD-005 5 webclient examples (content-type, user-metadata, storage-class, checksum-sha256, sse-s3-metadata) and REQ-UPLOAD-006 3 webclient examples (default-put, checksum-sha256, content-md5), all pass. Full suite: `mvn -B test` PASS — BUILD SUCCESS, 0 failures, 0 errors. `Phase1UploadStorageEngineAwsCliCucumberTest` AWS CLI Cucumber runner (package `phase2awscli`): 30 tests run, 0 failures, 22 skipped (non-@awscli filtered); 8 @awscli examples executed — REQ-UPLOAD-005 (5: content-type, user-metadata, standard-storage-class, checksum-sha256, sse-s3-metadata) and REQ-UPLOAD-006 (3: default-put, checksum-sha256, content-md5), all pass. |
+| Acceptance gates | Bootstrap JUnit gates met for all six requirements. Cucumber e2e gates: REQ-UPLOAD-005 and REQ-UPLOAD-006 fully met — WebTestClient and AWS CLI runners both pass for all declared examples. REQ-UPLOAD-001 and REQ-UPLOAD-002 Cucumber gates remain open (restart semantics require multi-context runner not yet built). REQ-UPLOAD-003 and REQ-UPLOAD-004 Cucumber gates remain open (require `fixtures/upload/large-object.bin` and fault-injection steps not yet built). |
 
 Tasks:
-- Persist the object-store key, bucket, metadata, version/null-version state, ETag/checksum data, and selected storage-engine manifest reference.
-- Replace in-memory key-to-manifest lookup with a durable repository and recovery path.
-- Add an HTTP S3 E2E scenario that runs with the storage-engine backend, restarts/recreates the application context, and validates read-after-write.
-- Refactor upload to stream through the storage engine with bounded buffers instead of collecting all content and trace records before storing.
+- [x] Persist the object-store key, bucket, metadata, version/null-version state, ETag/checksum data, and selected storage-engine manifest reference.
+- [x] Replace in-memory key-to-manifest lookup with a durable repository and recovery path.
+- [x] Add an HTTP S3 E2E scenario that runs with the storage-engine backend, restarts/recreates the application context, and validates read-after-write.
+- [x] Refactor upload to stream through the storage engine with bounded buffers instead of collecting all content and trace records before storing.
+- [x] Add Phase 1 Cucumber WebTestClient runner glue so `phase-1-upload-storage-engine.feature` scenarios become executable Cucumber tests. `Phase1UploadStorageEngineCucumberTest` covers REQ-UPLOAD-005 (5 webclient examples) and REQ-UPLOAD-006 (3 webclient examples); restart (REQ-UPLOAD-001, 002) and large-object (REQ-UPLOAD-003) scenarios remain validated through bootstrap integration tests only.
+- [x] Add `@awscli` runner for REQ-UPLOAD-005: `Phase1UploadStorageEngineAwsCliCucumberTest` (package `phase2awscli`) covers 5 @awscli examples — all pass.
+- [ ] Create `fixtures/upload/large-object.bin` (deterministic 256 MiB binary) to unblock REQ-UPLOAD-003 and REQ-UPLOAD-004 Cucumber examples.
+- [ ] Add multi-context restart Cucumber runner for REQ-UPLOAD-001 and REQ-UPLOAD-002, or formally accept bootstrap integration tests as the sole validation mode and document the rationale in the feature file.
+- [x] Implement REQ-UPLOAD-004 failed-upload atomicity: `StorageEngineUploadAtomicityTest` (bootstrap) proves fault-injected interrupted PUT leaves no committed manifest or readable object.
+- [ ] Add Cucumber e2e runner for REQ-UPLOAD-004: requires `fixtures/upload/large-object.bin` (256 MiB, deterministic) and WebTestClient fault-injection step definitions; `@awscli` example also pending.
+- [x] Implement REQ-UPLOAD-006 integrity/corruption detection: `StorageEngineIntegrityDetectionTest` (bootstrap) plus `Phase1UploadStorageEngineCucumberTest` REQ-UPLOAD-006 WebTestClient (3 examples) prove chunk corruption is detected on read.
+- [x] Add `@awscli` runner for REQ-UPLOAD-006: `Phase1UploadStorageEngineAwsCliCucumberTest` covers 3 @awscli examples — all pass.
 
-### Phase 2 — Filesystem Reliability
+### Phase 2 — Filesystem Reliability ✅ Implemented and validated for declared Phase 2 scope
 
-| Field | Plan |
+| Field | Plan / Current status |
 |---|---|
 | Focus | Make filesystem-backed chunks, manifests, and metadata safe against partial writes, corruption, and crashes. |
-| Required outputs | Atomic write/rename protocol; explicit fsync policy for data and metadata; checksums for chunks/manifests/object metadata; corruption detection; recovery scanner; cleanup or quarantine of incomplete writes; concurrency and crash/failure-injection tests. |
-| Acceptance gates | Interrupted writes do not publish corrupt manifests; checksum mismatch is detected; recovery scanner reports or repairs incomplete state deterministically; concurrent PUT/GET/delete scenarios pass; crash/failure tests document remaining limits. |
+| Current status | `@implemented-and-validated` for the declared Phase 2 filesystem reliability scope. Production/runtime code implements atomic chunk and manifest publication, checksum verification, recovery scanning/quarantine, S3 XML integrity-error mapping, disabled-by-default write fault injection for interrupted-write validation, and storage-engine `PutObject` storage-class defaulting. |
+| Implemented outputs | Atomic chunk writes using temporary files, fsync, and rename plus SHA-256 sidecar checksums; atomic manifest writes using temporary files, fsync, and rename plus checksum trailers; read-time checksum verification for chunks and manifests; `FileSystemRecoveryScanner` with reporting, quarantine, and idempotence; storage-engine integrity exceptions mapped to S3 XML error responses; disabled-by-default write fault injection for interrupted chunk/manifest write tests; storage-engine `PutObject` storage-class default fixed so `null`/blank maps to `STANDARD`. |
+| Validation evidence | `mvn -B -pl s3-reactive-api-adapter -am test -Dsurefire.failIfNoSpecifiedTests=false` PASS; `mvn -B test` PASS; full Surefire XML aggregate: 827 tests, 0 failures, 0 errors, 11 skipped. Phase 2 WebTestClient requirements: 11 examples total, 7 passed, 4 skipped/excluded (`@awscli`); REQ-FS-001 through REQ-FS-006 WebTestClient-required scope passed. Dedicated storage-engine AWS CLI Phase 2 validation: 4 scenarios/examples, 4 passed, 0 failed, 0 skipped. |
+| Validated Phase 2 scenarios | WebTestClient: REQ-FS-001 interrupted chunk write; REQ-FS-002 interrupted manifest write; REQ-FS-003 corrupted chunk detection; REQ-FS-004 corrupted manifest detection; REQ-FS-005 recovery scanner; REQ-FS-006 concurrent PUT of different keys and same key. AWS CLI: REQ-FS-003, REQ-FS-004, REQ-FS-006 different keys, and REQ-FS-006 same key. |
+| Remaining notes | No declared Phase 2 filesystem reliability validation gap remains. This does **not** claim distributed readiness, broader S3 semantic completion, physical erasure-coding placement, or later-phase production readiness. |
+| Acceptance gates | Met for the declared Phase 2 scope. Interrupted-write publication safety, checksum mismatch detection, recovery scanner behavior, selected concurrency scenarios, and applicable AWS CLI storage-engine validation are passing. |
 
 Tasks:
-- Write chunks/manifests/object indexes to temporary files and publish them atomically.
-- Define when data files, metadata files, and directories are fsynced, including performance trade-offs.
-- Store and verify checksums at chunk and manifest/index levels.
-- Implement recovery scanning for orphaned chunks, incomplete manifests, broken references, and mismatched checksums.
-- Add concurrency and simulated-crash tests for partial writes, concurrent writers, and recovery.
+- [x] Write chunks/manifests to temporary files and publish them atomically for the implemented chunk/manifest paths.
+- [x] Store and verify checksums at chunk and manifest levels.
+- [x] Implement recovery scanning for orphaned/incomplete/corrupt filesystem state with quarantine and deterministic/idempotent reporting.
+- [x] Add semantic WebTestClient validation for corruption detection, recovery scanning, and concurrent PUT scenarios.
+- [x] Define and document the fsync-backed atomic publication policy for data files, metadata files, and directories within the declared Phase 2 scope.
+- [x] Add executable interrupted-write/fault-injection validation for partial chunk and manifest writes (REQ-FS-001 and REQ-FS-002).
+- [x] Add AWS CLI validation mode for Phase 2 filesystem reliability examples where applicable.
 
-### Phase 3 — Reactive Pipeline Refactor
+### Phase 3 — Reactive Pipeline Refactor ⚠️ Implemented, not e2e validated
 
-| Field | Plan |
+| Field | Plan / Current status |
 |---|---|
 | Focus | Replace the monolithic orchestrator flow with a staged reactive read/write pipeline. |
-| Required outputs | `StorageStage`, `StorageContext`, and `StorageEvent` abstractions; staged write pipeline; staged read pipeline; backpressure-aware chunking/persistence; no global `reduce`/collect of object content in production; deterministic error propagation and cleanup across stages. |
-| Acceptance gates | Pipeline tests prove stage ordering, backpressure, cancellation cleanup, and bounded-memory behavior; large-object writes and reads do not aggregate full content; stages can be instrumented independently. |
+| Current status | `@implemented-not-e2e-validated`. Phase 3 core application behavior is implemented and unit/application validated in `storage-engine-reactive-application`, but no Phase 3 WebTestClient, AWS CLI, or end-to-end Cucumber validation has been executed yet. |
+| Implemented outputs | `StorageStage`, `StorageContext`, `StorageEvent`, `StorageEventPublisher`, cleanup handle, and `StoragePipelineExecutor`; `ReactiveStorageOrchestrator` refactored into staged write and read pipelines; bounded-demand chunk processing without whole-object aggregation; deterministic failure propagation, cancellation cleanup, and stage event publication. No Phase 4 metrics/tracing adapters are implemented as part of this phase. |
+| Validation evidence | Requirement feature created at `s3-reactive-api-adapter/src/test/features/requirements/phase-3-reactive-pipeline.feature`. `mvn -B -pl storage-engine-reactive-application -am test` PASS: 159 total, 159 passed, 0 failed/errors/skipped. `mvn -B -pl s3-reactive-api-adapter -am test -Dsurefire.failIfNoSpecifiedTests=false` PASS: 814 total, 803 passed, 0 failed/errors, 11 skipped. `mvn -B test` PASS: 833 total, 822 passed, 0 failed/errors, 11 skipped. |
+| Validated Phase 3 scenarios | REQ-PIPELINE-001 stage order/events; REQ-PIPELINE-002 bounded demand/backpressure/no whole-object aggregation; REQ-PIPELINE-003 read manifest chunk order; REQ-PIPELINE-004 failure propagation/cleanup/later stages stopped; REQ-PIPELINE-005 cancellation event and cleanup; REQ-PIPELINE-006 instrumentation metadata/correlation/no payload leakage. |
+| Remaining validation gap | Phase 3 is not yet validated through WebTestClient, AWS CLI, or end-to-end Cucumber runners. |
+| Acceptance gates | Unit/application pipeline tests pass for stage ordering, backpressure, cancellation cleanup, bounded-memory behavior, read ordering, and independent event metadata. External/e2e validation remains open. |
 
 Tasks:
-- Introduce explicit stages for validation, policy resolution, chunking, dedup lookup, chunk persistence, manifest persistence, object-index persistence, read planning, chunk reading, and response streaming.
-- Carry request/object metadata and per-stage decisions in `StorageContext` rather than ad hoc local state.
-- Emit typed `StorageEvent` records for stage start, success, failure, retry, cleanup, and timing.
-- Ensure stage contracts preserve reactive backpressure and avoid blocking I/O on event-loop threads.
+- [x] Introduce explicit stages for validation, policy resolution, chunking, dedup lookup, chunk persistence, manifest persistence, object-index persistence, read planning, chunk reading, and response streaming.
+- [x] Carry request/object metadata and per-stage decisions in `StorageContext` rather than ad hoc local state.
+- [x] Emit typed `StorageEvent` records for stage start, success, failure, retry, cleanup, and timing.
+- [x] Ensure stage contracts preserve reactive backpressure and avoid blocking I/O on event-loop threads.
+- [ ] Add Phase 3 WebTestClient/AWS CLI/end-to-end validation when the pipeline behavior is exposed through the agreed external runners.
 
-### Phase 4 — Observability
+### Phase 4 — Observability ⚠️ Implemented and bootstrap-validated; no Cucumber e2e runner exists
 
-| Field | Plan |
+| Field | Plan / Result |
 |---|---|
 | Focus | Make storage behavior visible without coupling core logic to one metrics/tracing backend. |
 | Required outputs | Storage listener/event publisher; metrics for bytes, chunks, manifests, failures, recoveries, dedup hits/misses, and latency; tracing/OpenTelemetry integration; stage timing and correlation IDs; operational logging for recovery and corruption events. |
-| Acceptance gates | Tests verify events are emitted for successful and failed pipelines; metrics can be scraped or inspected in integration tests; traces identify request, object key, manifest, and stage timings without exposing sensitive metadata. |
+| Current status | `@implemented-not-e2e-validated` for all Phase 4 requirements. Production observability adapters (Micrometer metrics, OpenTelemetry tracing, composite event publisher, redaction policy, recovery logging) are implemented and validated through `Phase4ObservabilityIntegrationTest` and `Phase4ObservabilityFaultInjectionIntegrationTest` (bootstrap JUnit, 5 tests total). No Cucumber e2e runner exists for Phase 4; the Cucumber scenarios in `phase-4-observability.feature` are never executed as Cucumber tests. The feature file top tag correctly reflects `@implemented-not-e2e-validated`. REQ-OBS-003 dedup/recovery metrics remain unit-only validated (`@implemented-not-e2e-validated`). No Phase 4 AWS CLI runner exists. |
+| Acceptance gates | Bootstrap JUnit integration gates met: events emitted for success/failure pipelines, metrics inspectable in integration tests, traces identify request/manifest/stage timings without sensitive metadata leakage. Cucumber e2e gates remain open: no Phase 4 WebTestClient Cucumber runner executes the `phase-4-observability.feature` scenarios; no Phase 4 AWS CLI runner exists. |
+| Validation evidence | Requirement feature: `s3-reactive-api-adapter/src/test/features/requirements/phase-4-observability.feature`. Integration tests: `bootstrap-application` `Phase4ObservabilityIntegrationTest` (4 tests), `Phase4ObservabilityFaultInjectionIntegrationTest` (1 test). Infrastructure: `StorageObservabilityAdaptersTest` (2 tests), `FileSystemRecoveryScannerObservabilityTest` (1 test). `mvn -B test` PASS: 834 total, 0 failures, 0 errors. |
+| Validated Phase 4 scenarios | REQ-OBS-001 stage events/timing/correlation (unit+integration); REQ-OBS-002 failure-event classification/cleanup/redaction (unit+integration); REQ-OBS-003 Micrometer dedup/recovery metrics (unit only — `@implemented-not-e2e-validated`); REQ-OBS-004 OpenTelemetry tracing/stage-spans/redaction (integration); REQ-OBS-005 recovery/corruption operational logging (integration); REQ-OBS-006 redaction policy/no payload leakage (unit+integration). |
+| Implemented outputs | Composite `StorageEventPublisher`; Micrometer metrics adapter (bytes, chunks, failures, latency, dedup hit/miss, recovery); OpenTelemetry adapter with in-process exporter; `FileSystemRecoveryScanner` operational logging; redaction policy banning object body and user-metadata from logs/traces/metrics. |
 
-Tasks:
-- Add a listener/event-publisher port around `StorageEvent`.
-- Add Micrometer metrics and OpenTelemetry tracing adapters in infrastructure/bootstrap wiring.
-- Record per-stage durations, queue/backpressure indicators where practical, and failure classifications.
-- Document observability fields that are safe to expose and those that must be redacted.
+Completed scope:
+- Composite listener/event-publisher port wrapping `StorageEvent`.
+- Micrometer metrics and OpenTelemetry tracing adapters wired in infrastructure and bootstrap.
+- Per-stage durations, failure classifications, and recovery findings recorded.
+- Redaction policy documented and validated: object payloads and user metadata excluded from all telemetry surfaces.
 
-### Phase 5 — S3 Semantic Compatibility
+### Phase 5 — S3 Semantic Compatibility ✅ Implemented and WebTestClient-validated for declared Phase 5 scope
 
-| Field | Plan |
+| Field | Plan / Result |
 |---|---|
 | Focus | Move beyond mapped endpoints and protocol smoke tests toward semantically meaningful S3 behavior. |
 | Required outputs | Real multipart persistence/assembly and multipart ETag semantics; `Range` and conditional requests; correct ETag/checksum behavior; object versioning and delete markers; `CopyObject`; ACL/tagging persistence and enforcement classification; lifecycle, object lock, encryption, retention, restore, and replication semantics clearly implemented or explicitly unsupported/config-only. |
-| Acceptance gates | Semantic scenarios prove supported behavior for multipart, range, conditionals, ETag, versioning, copy, ACL/tagging, and selected configuration/enforcement features; unsupported or metadata-only behavior is reported honestly in the S3 semantic matrix. |
+| Current status | `@implemented-and-validated` for 24 Phase 5 WebTestClient scenarios. `@implemented-not-e2e-validated` for REQ-S3-002-C multipart restart/durability because validation uses WebTestClient plus direct filesystem same-directory repository inspection, not a full process/Spring restart. REQ-S3-007 scenarios are validated unsupported/config-only classification, not real enforcement. |
+| Validation evidence | Requirement feature: `s3-reactive-api-adapter/src/test/features/requirements/phase-5-s3-semantic-compatibility.feature`. WebTestClient runner: `s3-reactive-api-adapter/src/test/java/com/example/magrathea/s3api/cucumber/requirements/Phase5S3SemanticCompatibilityRequirementsCucumberTest.java` PASS: 25 scenarios/tests, 0 failures, 0 errors, 0 skipped. Step glue: `s3-reactive-api-adapter/src/test/java/com/example/magrathea/s3api/cucumber/requirements/Phase5S3SemanticCompatibilitySteps.java`. Full suite: `mvn -B test --no-transfer-progress` PASS / BUILD SUCCESS, 0 failures/errors. |
+| Validated Phase 5 scenarios | REQ-S3-001 PutObject/HeadObject ETag format and consistency; REQ-S3-002 UploadPart and CompleteMultipartUpload ETag semantics, with restart durability not e2e validated; REQ-S3-003 byte-range GET and unsatisfiable range; REQ-S3-004 conditional request headers; REQ-S3-005 CopyObject ETag; REQ-S3-006 object tagging lifecycle and inline `x-amz-tagging`; REQ-S3-007 explicit unsupported/config-only classification for versioning, object lock, and lifecycle. |
+| Implemented outputs | RFC-compatible quoted lowercase MD5 ETag computation for PutObject/HeadObject; ETag persistence through the S3 object domain model (`etag`) and repository translators; object tags persisted through the S3 object domain model (`objectTags`) and object tagging endpoints; Range GET handling with 206 Partial Content, `Content-Range`, and 416 `InvalidRange`; conditional GET/HEAD behavior for `If-Match`, `If-None-Match`, `If-Modified-Since`, and `If-Unmodified-Since`; CopyObject destination ETag propagation; real multipart part and final ETags; filesystem-backed multipart upload repository; explicit unsupported/config-only S3 responses. |
+| Remaining validation gaps | No Phase 5 AWS CLI runner has been added yet despite some scenarios carrying `@awscli-required`; no full application restart e2e validation exists for multipart uploaded-part durability; object versioning/delete markers/object-lock/lifecycle/replication enforcement remains intentionally unsupported or config-only. |
 
-Tasks:
-- Implement multipart part durability, ordered assembly, abort cleanup, list semantics, and multipart ETag behavior against both backends.
-- Implement byte-range reads and conditional request headers for object GET/HEAD/COPY where in scope.
-- Persist and retrieve object versions, delete markers, metadata, ACLs, tags, and copy results with tested semantics.
-- Separate metadata-only encryption/object-lock/lifecycle/replication configuration from real enforcement or background execution.
+Completed scope:
+- Correct single-part and multipart ETag behavior for the declared WebTestClient validation scope.
+- Range and conditional request semantics for S3 GET/HEAD paths.
+- CopyObject ETag propagation and object tagging persistence.
+- Honest unsupported/config-only behavior for features not yet enforced.
 
-### Phase 6 — Distributed Readiness
+### Phase 6 — Distributed Readiness ⚠️ Modeled and unit-validated, not e2e/distributed-production-ready
 
-| Field | Plan |
+| Field | Plan / Result |
 |---|---|
 | Focus | Design and verify behavior needed before claiming distributed storage readiness. |
 | Required outputs | Real replication; quorum rules; node membership; health model; anti-entropy/self-healing; rebalancing; placement across failure domains; operational recovery workflows. |
-| Acceptance gates | Multi-node tests or simulations prove quorum behavior, replica placement, node loss handling, healing, and rebalancing; documentation explicitly states single-node limitations until these gates pass. |
+| Current status | `@implemented-not-e2e-validated` for the declared Phase 6 modeled domain scope. Deterministic placement, health-aware membership decisions, quorum decisions, anti-entropy/healing plans, rebalance plans, and readiness classification are implemented and unit validated. Real networked membership, replication execution, healing/rebalance job runners, and full multi-node end-to-end validation remain absent. |
+| Validation evidence | Requirement feature: `s3-reactive-api-adapter/src/test/features/requirements/phase-6-distributed-readiness.feature`. Domain tests: `DistributedPlacementPlannerTest`, `QuorumPolicyTest`, `AntiEntropyPlannerTest`, `RebalancePlannerTest`, `DistributedReadinessReporterTest`. `mvn -B -pl storage-engine-domain test --no-transfer-progress` PASS: 164 tests, 0 failures/errors/skipped. `mvn -B test --no-transfer-progress` PASS / BUILD SUCCESS: 883 test cases observed, 0 failures/errors, 11 skipped. |
+| Validated Phase 6 scenarios | REQ-DIST-001 modeled placement across failure domains and insufficient-domain failure; REQ-DIST-002 write/read quorum and integrity-aware read failure; REQ-DIST-003 health-aware membership placement and exclusions; REQ-DIST-004 anti-entropy findings and planned healing tasks; REQ-DIST-005 safe rebalance planning and failed-copy retry classification; REQ-DIST-006 readiness classification that avoids distributed-production claims. |
+| Implemented outputs | Pure domain distributed-readiness model under `storage-engine-domain/.../distributed`: topology/node health, placement decisions, quorum policy, replica observations, anti-entropy findings/healing tasks, rebalance plans/task results, and readiness reports. |
+| Remaining validation gaps | No real networked membership service; no real replication execution across processes/nodes; no durable multi-node manifest publication; no healing or rebalance job runner; no WebTestClient/AWS CLI/full e2e multi-node validation. Distributed production readiness is not claimed. |
 
-Tasks:
-- Define replication and erasure-coding placement semantics across nodes and failure domains.
-- Add membership and health state models that drive placement and recovery decisions.
-- Implement self-healing and rebalancing jobs with observable progress and failure handling.
-- Add distributed failure tests before documenting the system as distributed-production ready.
+Completed modeled scope:
+- Deterministic failure-domain placement and health-aware candidate selection.
+- Explicit quorum and integrity decisions.
+- Observable anti-entropy/healing/rebalance plans without job execution claims.
+- Honest readiness status reporting for single-node/distributed-simulation modes.
+- No public storage-engine object API endpoints were added; S3 object behavior remains exposed through S3-compatible APIs only.
 
 ## Gherkin Requirements and ARC42 Appendix
 
@@ -118,15 +152,16 @@ First pass: reconcile false-positive API/feature completion claims into explicit
 | Output | Generate a Gherkin requirements report from feature files and include it as an ARC42 appendix. |
 | Proposed generated source target | Prefer `docs/arc42/generated/gherkin-requirements.adoc` or `docs/requirements/generated/gherkin-requirements.adoc`. The source report is generated documentation; do not commit generated static web assets unless a current repository convention explicitly requires it. |
 | Grouping | The appendix groups scenarios by feature, tags, requirement ID, capability area, test backend/driver, ARC42 section, and validation status. |
-| Build integration | The Docker documentation/web build should include or regenerate the appendix for the web app/docs, consistent with the existing decision that web documentation regeneration is Dockerfile-driven rather than dependent on host-generated static assets. |
-| Quality gate | CI or the Docker build must verify the generated appendix is fresh, or regenerate it deterministically from feature files during the documentation build. |
+| Build integration | Remaining: the Docker documentation/web build should include or regenerate the appendix for the web app/docs, consistent with the existing decision that web documentation regeneration is Dockerfile-driven rather than dependent on host-generated static assets. No generated static web assets were changed by the appendix-generator task. |
+| Quality gate | Implemented locally: `python3 scripts/generate-gherkin-requirements-appendix.py --check` verifies freshness. Remaining: wire this check into CI or the Docker documentation build. |
 
 Tasks:
-- Define a lightweight metadata convention for requirement IDs, capability area, ARC42 section references, backend/driver, and validation status in feature files.
-- Implement or configure a generator that scans Gherkin features and writes the ARC42 appendix under `docs/arc42/generated` or `docs/requirements/generated`.
-- Link the generated appendix from the ARC42 appendix/index section.
-- Ensure Docker-driven documentation generation includes the report without committing built static web assets.
-- Add a freshness check or deterministic regeneration step to CI/quality gates.
+- [x] Define a lightweight metadata convention for requirement IDs, capability area, ARC42 section references, backend/driver, and validation status in feature files by using existing Gherkin scenario tags and generated report classification rules.
+- [x] Implement a dependency-light Python generator that scans Gherkin features and writes the ARC42 appendix to `docs/arc42/generated/gherkin-requirements.adoc`.
+- [x] Link the generated appendix from the ARC42 source docs.
+- [ ] Ensure Docker-driven documentation generation includes the report without committing built static web assets.
+- [x] Add a freshness check command: `python3 scripts/generate-gherkin-requirements-appendix.py --check`.
+- [ ] Wire the freshness check into CI or Docker quality gates.
 
 ### Gherkin Appendix Acceptance Criteria
 
@@ -150,6 +185,12 @@ This section implements [ADR 0017](docs/adr/0017-course-correction-broaden-proje
 | Expected correction outputs | Clean source tree boundaries; generated artifacts moved to build output or explicitly ignored; unified Maven plugin management and one canonical coverage profile; frontend/docs build outputs regenerated during Docker image creation instead of copied from host-generated bootstrap static resources; Docker healthcheck/runtime dependencies reconciled; duplicated npm install path removed or justified; corrected `admin-api-adapter` POM metadata. |
 | Acceptance gates | `mvn validate` succeeds from a clean checkout; `git status` remains clean after build/test/doc generation except intended outputs; no `.class` or generated `META-INF` artifacts are committed under source paths; one documented coverage profile is authoritative; Docker image healthcheck dependencies are present or the healthcheck is changed; admin API module POM validates. |
 
+Current status / result — safe first pass completed: root `pom.xml` now centralizes `spring-boot-maven-plugin` version management through `${spring-boot.version}` and documents the root `-Pcoverage` profile as the canonical coverage profile. Source/build hygiene ignores were tightened in `.gitignore` and `.dockerignore` for class files, Maven/node build outputs, frontend dist output, and misplaced root generated output without hiding intended source resources. `Dockerfile` now installs `wget`, matching the docker-compose healthcheck dependency. `scripts/check-source-hygiene.sh` was added and the ignored generated root output directories `com/` and `META-INF/` were removed.
+
+Validation evidence for this first pass: `mvn -B validate --no-transfer-progress` PASS / BUILD SUCCESS; `bash scripts/check-source-hygiene.sh` PASS. Docker compose config and full Docker image validation were not run because `docker` is unavailable in this environment.
+
+Remaining gaps: full duplicate module-level `coverage` profile consolidation in `bootstrap-application/pom.xml` is still pending because `bootstrap-application/**` was outside the java-scaffolder-owned correction scope. Full Docker build validation is also pending. Therefore section A is not complete yet.
+
 ### B. Module/layering architecture
 
 | Field | Plan |
@@ -160,15 +201,21 @@ This section implements [ADR 0017](docs/adr/0017-course-correction-broaden-proje
 | Expected correction outputs | Application modules depend only on ports/domain abstractions; infrastructure-specific exceptions are translated at boundaries; bootstrap dependencies are reduced or made explicit through auto-configuration; storage-engine backend has a real profile/property selection path; package naming and scanning rules are made consistent or explicitly bridged. |
 | Acceptance gates | Dependency analysis shows no application-to-infrastructure dependency inversion; Spring context tests prove in-memory and storage-engine backend selection separately; duplicate repository beans fail fast or are prevented; package scanning covers intended beans without broad accidental scanning. |
 
+Current status / result — bounded first pass completed: root `pom.xml` now runs `scripts/check-module-layering.sh` during root-only `validate`. The guard prevents `object-store-reactive-application` from depending on object-store or storage-engine infrastructure modules, prevents `storage-engine-reactive-application` from depending on storage-engine infrastructure, and prevents repository-application modules from depending on infrastructure modules. It also preserves the explicit package naming bridge while `objectstore` and `objectstorage` coexist by requiring `MagratheaApplication` scan roots for both `com.example.magrathea.objectstore` and `com.example.magrathea.objectstorage`. Backend selection remains explicit: in-memory repositories are guarded under `@Profile({"single-node", "default"})`, storage-engine repositories under `@Profile("storage-engine")`, and backend conflict messages remain present. Existing context tests cover selection behavior: `DefaultBackendContextTest` asserts in-memory repository beans are active and storage-engine beans absent; `StorageEngineBackendContextTest` asserts storage-engine repository beans are active and in-memory beans absent; `ObjectStoreBackendStatusConfig` fails fast for conflicting backend property/profile combinations. Validation evidence: `mvn -B validate --no-transfer-progress` PASS, `bash scripts/check-module-layering.sh` PASS, and `mvn -B test --no-transfer-progress` PASS / BUILD SUCCESS after the ARC42 docs conversion fix that changed generated appendix output from `NOTE:` admonition syntax to a plain paragraph.
+
+Remaining gaps: this is a bounded first pass, not complete architecture cleanup. No large package rename was performed, so the `objectstore` versus `objectstorage` naming inconsistency remains intentionally bridged by explicit scan roots and guards. `bootstrap-application` still intentionally depends on multiple modules for application assembly, and no major bootstrap dependency reduction was performed. The architecture guard is shell/POM based; no Java/ArchUnit test was added because test-file ownership belongs to `java-tester`.
+
 ### C. Domain quality
 
 | Field | Plan |
 |---|---|
 | Owner agent(s) | `java-domain-coder` primary; `java-tester` for domain test gates; `documenter` for documenting domain invariants |
 | Affected modules/files | `storage-engine-domain/src/main/java/**`; `storage-engine-domain/src/test/java/**`; domain classes including `StoredObject`, `Bucket`, `MultipartUpload`, `ActiveS3Object`, `StoragePolicy`, `DedupConfig`, collection-bearing records, and `EncryptionConfiguration` variants |
-| Concrete findings | `storage-engine-domain` has no tests. `StoredObject` is mutable and diverges from the immutable/record style used elsewhere. Domain records leak collection mutability. Duplicate or ambiguous names such as multiple `EncryptionConfiguration` variants reduce clarity. Lifecycle invariants are incomplete in `Bucket`, `MultipartUpload`, and `ActiveS3Object`. Optional state is represented in a null-heavy style. |
+| Concrete findings | Earlier audit evidence said `storage-engine-domain` had no tests; that statement is now outdated because substantial domain tests exist. `StoredObject` remains mutable through controlled lifecycle methods and diverges from the immutable/record style used elsewhere. Domain records previously leaked collection mutability. Duplicate or ambiguous names such as multiple encryption configuration/context variants reduce clarity. Lifecycle invariants remain incomplete in areas such as `Bucket` deletion state and broader aggregate lifecycle modeling. Optional state is represented in a null-heavy style. |
 | Expected correction outputs | Domain invariants captured in constructors/factories/behavior methods; immutable aggregates/value objects where appropriate; defensive copies or immutable collections in records; naming cleanup for duplicate/ambiguous concepts; explicit optional-state model; storage-engine domain unit test suite. |
 | Acceptance gates | `mvn test -pl storage-engine-domain -am` passes with meaningful tests; mutation and null-state regressions are covered; invalid lifecycle transitions fail deterministically; public domain APIs avoid leaking mutable internal collections. |
+
+Current status / result — bounded first pass completed: defensive collection copies and immutable exposure were added in object-store domain aggregates/value objects including `Bucket`, `MultipartUpload`, `S3Object`, and `EncryptionContext`, and in storage-engine/domain planning and trace types including `ObjectMetadataDescriptor`, `PersistencePlan`, `ChunkPersistenceTrace`, `StepOutcome`, `CompleteUploadCommand`, and `UploadCompletionTrace`. `StoredObject` invariants were strengthened so `CREATING` objects must not have a `manifestId`, `STORED`/`DELETED` objects must have a `manifestId`, and `lastModified` cannot be before `createdAt`. Validation evidence: `mvn -B -pl storage-engine-domain,object-store-domain test --no-transfer-progress` PASS with 172 `storage-engine-domain` tests and 292 `object-store-domain` tests; `mvn -B test --no-transfer-progress` PASS. Remaining gaps: `StoredObject` is still intentionally mutable through controlled lifecycle methods; duplicate/ambiguous encryption class names were not renamed; `Bucket` deletion lifecycle still appears event-only without an explicit deleted terminal state; and no broad lifecycle or immutable-aggregate redesign was attempted.
 
 ### D. Application/infrastructure/runtime correctness
 
@@ -180,7 +227,11 @@ This section implements [ADR 0017](docs/adr/0017-course-correction-broaden-proje
 | Expected correction outputs | End-to-end read-after-write through selected backend; complete manifest/stored-object serialization; consistent chunk identity model; dedup duplicate-hit short-circuit; streaming upload/read path without whole-object buffering; blocking I/O isolated on suitable schedulers; route handling for slash-containing S3 keys preserved by Phase 9 catch-all normalization; multipart part persistence and assembly; documented and tested ETag behavior; admin errors backed by the real policy catalog. |
 | Acceptance gates | Storage-engine backend integration tests pass for put/get/delete/list and read-after-write; large/chunk-boundary tests do not require full-body aggregation; route tests cover keys with slashes; multipart Cucumber/unit tests persist and assemble content; ETag expectations are asserted; admin API tests validate catalog-backed behavior and error semantics. |
 
-### E. Storage-engine/MINIO_STANDARD/configuration
+Current status / result — bounded first pass completed: `StorageEngineReactiveS3ObjectRepository#getContent` was verified to perform real storage-engine read-through from persisted manifest references via `orchestrator.read(...)`, with strengthened regression coverage that writes through the storage-engine repository, reads content back through a new repository instance, and verifies metadata/content plus slash-containing key preservation. `FileSystemManifestRepository` manifest serialization now round-trips declared upload checksums and multipart part checksum results. Blocking filesystem reads/writes in `FileSystemContentAddressIndex`, `FileSystemStorageNode`, `FileSystemManifestRepository`, and `FileSystemStoredObjectRepository` now use the `BlockingFileSystemOperation` helper on `Schedulers.boundedElastic()`. Validation evidence: `mvn -B -pl object-store-reactive-repository-storage-engine-infrastructure,storage-engine-reactive-infrastructure,s3-reactive-api-adapter,bootstrap-application -am test --no-transfer-progress` PASS / BUILD SUCCESS, and `mvn -B test --no-transfer-progress` PASS / BUILD SUCCESS.
+
+Remaining gaps: this is not complete section D closure. Full-body accumulation remains in S3 handler `DataBufferUtils.join` paths; the broad streaming rewrite was intentionally not attempted. Phase 5 multipart ETag behavior is preserved, but multipart part body persistence and final object assembly remain incomplete and tracked. Broader chunk identity, dedup short-circuit, complete admin catalog-backed error semantics, and full runtime correctness acceptance gates remain open unless separately validated.
+
+### E. Storage-engine/MINIO_STANDARD/configuration ✅ Bounded first pass completed
 
 | Field | Plan |
 |---|---|
@@ -190,13 +241,17 @@ This section implements [ADR 0017](docs/adr/0017-course-correction-broaden-proje
 | Expected correction outputs | Domain-pure policy/device/topology model; YAML-backed `StoragePolicy` and storage-device/topology catalogs; explicit `MINIO_STANDARD` YAML and tests; policy-driven dedup/chunking behavior; physical topology metadata sufficient for placement/EC decisions; backend profile/property/autoconfiguration wiring. |
 | Acceptance gates | YAML catalog tests reject malformed, duplicate, and unresolved references; `MINIO_STANDARD` loads from YAML and produces deterministic plans; storage-engine backend starts only when required config is present; policy/device management APIs use the same catalogs as runtime. |
 
+Current status / result — bounded first pass completed: All four acceptance gates are met. `YamlStoragePolicyCatalog`, `YamlStorageDeviceCatalog`, and `YamlDiskSetCatalog` are fully implemented with robust validation: 14 + 10 + 12 catalog tests cover malformed YAML, duplicate IDs, duplicate storageClassId, domain-invalid configs (replication factor, EC config, unknown algorithms), zero-device disk sets, blank device references, unknown failure domains, unresolved device references, and empty directories. `MINIO_STANDARD` is loaded from classpath YAML and produces deterministic persistence plans (`MinioStandardIntegrationTest`, 2 tests — EC `4 data / 2 parity`, dedup disabled, replication factor 1). The storage-engine backend fails fast on missing external config directories (`StorageEngineMissingExternalConfigTest`, 1 test). Backend profile selection is validated via Spring context tests proving mutually exclusive repository beans and YAML catalog loading (`StorageEngineBackendContextTest`, 3 tests — profile selection, catalog loading, write+read smoke). The Admin API catalog endpoints are integrated via the same `StoragePolicyCatalog`, `StorageDeviceCatalog`, and `DiskSetCatalog` Spring beans (`AdminRouterTest`, 9 tests — list/get policies/devices/disk-sets, validate, read-only mutation rejection, service-unavailable when catalog absent). Full suite: `mvn -B test` PASS — 902 tests, 0 failures, 0 errors.
+
+Remaining gaps: no integration test exercises the Admin API through a real YAML-backed Spring Boot context (unit test uses stub catalogs); physical EC shard placement and multi-node topology are not validated at runtime; policy schema versioning and migration strategy are documented but not enforced at the infrastructure level.
+
 ### F. Testing/quality
 
 | Field | Plan |
 |---|---|
 | Owner agent(s) | `java-tester` primary; `documenter` for report integration; implementation agents own fixes for failures in their modules |
 | Affected modules/files | Surefire reports under `*/target/surefire-reports/**`; root and module test suites; `s3-reactive-api-adapter/src/test/features/**`; AWS CLI Cucumber features/steps; `test-aws-cli.sh`; JaCoCo configuration and reports; `docs/test-report.md`; CI scripts if present |
-| Concrete findings | Existing Surefire reports showed broad passing coverage, but many modules still have no tests. The standalone AWS CLI report is stale/failing and separate from Cucumber parity. AWS CLI Cucumber now has a first object CRUD increment plus slash-key support (10 scenarios total, all run, 0 skipped) while WebTestClient Cucumber has 238 scenarios. Target design remains the same canonical scenarios executed with WebTestClient and AWS CLI drivers where possible. JaCoCo is the coverage baseline; Clover is optional/legacy. `docs/test-report.md` must stay evidence-based. |
+| Concrete findings | Current validation evidence is broad but not a project-wide completion claim: latest full Surefire XML aggregate is 833 tests, 0 failures, 0 errors, 11 skipped. Legacy WebTestClient Cucumber has 239 passed scenarios; the existing AWS CLI Cucumber parity suite has 26 passed scenarios; dedicated storage-engine AWS CLI Phase 2 validation adds 4 passed scenarios/examples; the isolated Phase 2 WebTestClient requirements runner has 11 examples total, 7 passed and 4 `@awscli` examples skipped/excluded. Phase 2 filesystem reliability is implemented-and-validated for declared scope. Phase 3 reactive pipeline behavior is implemented-not-e2e-validated with unit/application validation only; no Phase 3 WebTestClient, AWS CLI, or e2e Cucumber validation has been executed yet. Broader S3 semantic completion and distributed readiness remain pending. The standalone AWS CLI report is stale/failing and separate from Cucumber parity. Target design remains the same canonical scenarios executed with WebTestClient and AWS CLI drivers where possible. JaCoCo is the coverage baseline; Clover is optional/legacy. `docs/test-report.md` must stay evidence-based. |
 | Expected correction outputs | Current test inventory by module; tests added for untested modules, especially `storage-engine-domain`; canonical Cucumber scenario model with WebTestClient and AWS CLI drivers/tags; fresh AWS CLI compatibility status; JaCoCo baseline documented; stale Clover-primary wording removed; updated test report that separates verified results from planned gates. |
 | Acceptance gates | `mvn test` and targeted module gates pass; untested critical modules have meaningful tests or explicit risk entries; WebTestClient/AWS CLI scenario parity matrix exists; AWS CLI failures are reproducible or explicitly skipped with reasons; `docs/test-report.md` matches current command results and report paths. |
 
@@ -312,7 +367,7 @@ This section supersedes earlier planning statements where they conflict with [AD
   - `object-store-reactive-repository-storage-engine-infrastructure`
 - `admin-api-adapter` exists; therefore documentation that says the project is strictly "S3-only" is stale. The S3 API remains the public object API, but admin/configuration APIs must be documented separately and limited to non-S3 storage-engine concepts such as policies, devices, topology, backend status, and validation/reporting.
 - **JaCoCo is the current coverage baseline**. Clover/OpenClover is optional/legacy and must not be documented as the primary coverage gate.
-- AWS CLI Cucumber is **not yet scenario-parallel** to the WebTestClient Cucumber suite. The first AWS CLI object CRUD increment is complete and now includes slash-containing object keys (10 scenarios total, all run, 0 skipped), but the AWS CLI path must continue toward parity where the AWS CLI can express the same behavior.
+- AWS CLI Cucumber is **not yet scenario-parallel** to the WebTestClient Cucumber suite. The AWS CLI object CRUD, bucket operations, metadata/tagging, and multipart increments currently include 26 passing scenarios, and dedicated storage-engine AWS CLI Phase 2 validation adds 4 passing filesystem reliability scenarios/examples. The AWS CLI path must continue toward parity where the AWS CLI can express the same behavior; Phase 2 filesystem reliability is validated only for its declared storage-engine AWS CLI scope, not as full S3 semantic parity.
 - Storage-engine policy/device configuration is partially implemented: YAML-backed policy/device/disk-set catalogs and the Admin API now treat these entities as configuration-as-code/read-only at runtime; the concrete `MINIO_STANDARD` policy path is test-backed, while selected-backend runtime read/write evidence remains pending.
 
 ### Architecture Correction Goals
@@ -502,7 +557,7 @@ Tasks:
 | Affected files/modules | `s3-reactive-api-adapter/src/test/features/object-store/**`, `s3-reactive-api-adapter/src/test/features/awscli/**`, `s3-reactive-api-adapter/src/test/java/com/example/magrathea/s3api/cucumber/**`, `s3-reactive-api-adapter/src/test/java/com/example/magrathea/s3api/awscli/**`, `test-aws-cli.sh`, `docs/test-report.md` |
 | Expected outputs | Canonical shared scenarios with WebTestClient and AWS CLI drivers; unsupported/CLI-only cases tagged when still applicable; shell script checks migrated into Cucumber or retained as a compatibility report with clear scope. First increment delivered targeted AWS CLI object CRUD parity for canonical basics, including slash-containing object keys, but not full S3 parity. |
 | Acceptance criteria | Partial: AWS CLI Cucumber now covers the first canonical object CRUD increment, including slash-containing object keys. Full Phase 9 remains open until every canonical S3 scenario has either both `@webclient` and `@awscli` coverage or an explicit skip/unsupported reason; `MINIO_STANDARD` storage-engine scenarios can run through WebTestClient and AWS CLI where possible; AWS CLI environment requirements are documented. |
-| Test gates | ✅ `mvn -B -pl s3-reactive-api-adapter -am test -Dsurefire.failIfNoSpecifiedTests=false` — 265 tests, 0 failures, 0 errors, 0 skipped; AWS CLI Cucumber: 26 scenarios total, all run, 0 skipped; optional `bash test-aws-cli.sh` compatibility report remains separate/stale. |
+| Test gates | ✅ `mvn -B -pl s3-reactive-api-adapter -am test -Dsurefire.failIfNoSpecifiedTests=false` passed: 814 total, 803 passed, 0 failed/errors, 11 skipped. Current Cucumber/requirements counts: legacy WebTestClient 239 passed; existing AWS CLI parity suite 26 passed; dedicated storage-engine AWS CLI Phase 2 validation 4 passed, 0 failed, 0 skipped; isolated Phase 2 WebTestClient requirements 11 total examples, 7 passed and 4 `@awscli` examples excluded/skipped. Phase 3 pipeline validation is unit/application only, not WebTestClient/AWS CLI/e2e. Optional `bash test-aws-cli.sh` compatibility report remains separate/stale. |
 | Completion evidence | Phase 9 slash-key production commit `9ff5a08`; tests commit `94f3e47`. Phase 9 bucket operations production fix commit `b2c333c`; tests commit `cdbcc9d`. Phase 9 metadata/tagging and multipart parity commit `a03bc4a`. |
 
 Completed first-increment scope:
@@ -551,7 +606,7 @@ Tasks:
 | Owner agent | `java-tester` with `documenter` for report integration |
 | Affected files/modules | Root `pom.xml`, all module POMs, `docs/test-report.md`, JaCoCo report paths under `*/target/site/jacoco/**` |
 | `mvn validate` | ✅ BUILD SUCCESS — all module POMs valid |
-| `mvn test` | ✅ 768 tests, 0 failures, 0 errors, 0 skipped (all 10 modules) |
+| `mvn test` | Historical Phase 10 gate: ✅ 768 tests, 0 failures, 0 errors, 0 skipped (all 10 modules). Latest Phase 3 validation: ✅ 833 tests, 0 failures, 0 errors, 11 skipped. |
 | `mvn -Pcoverage test jacoco:report` | ✅ JaCoCo reports generated; see coverage table below |
 | Acceptance criteria | All required Maven test gates documented and run; reports use JaCoCo as baseline; docs and tests agree on AWS CLI parity status |
 
@@ -575,13 +630,13 @@ Verified gates (all ✅):
 
 ```bash
 mvn validate                                                             # ✅ BUILD SUCCESS
-mvn test                                                                 # ✅ 768 tests, 0 failures
+mvn test                                                                 # Historical Phase 10: ✅ 768 tests, 0 failures; latest Phase 3 validation: ✅ 833 tests, 0 failures, 0 errors, 11 skipped
 mvn test -pl storage-engine-domain -am                                   # ✅ 149 tests
 mvn test -pl storage-engine-reactive-application -am                     # ✅ 4 tests
 mvn test -pl storage-engine-reactive-infrastructure -am                  # ✅ 29 tests
 mvn test -pl object-store-reactive-repository-storage-engine-infrastructure -am  # ✅ 1 test
 mvn test -pl bootstrap-application -am                                   # ✅ 6 tests
-mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false  # ✅ 265 tests
+mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false  # ✅ passed; latest counts: 239 legacy WebTestClient passed, 26 existing AWS CLI parity scenarios passed, 4 dedicated Phase 2 AWS CLI scenarios/examples passed, 7/11 Phase 2 WebTestClient examples passed with 4 @awscli examples excluded/skipped
 mvn -Pcoverage test jacoco:report                                        # ✅ reports generated
 ```
 
@@ -591,15 +646,15 @@ mvn -Pcoverage test jacoco:report                                        # ✅ r
 - [x] JaCoCo is documented as the current coverage baseline; Clover is optional/legacy only.
 - [ ] Admin API presence is documented and no longer contradicted by S3-only wording.
 - [ ] `StoragePolicy` owns dedup/chunk configuration through `DedupConfig`.
-- [ ] One YAML file exists per `StoragePolicy`.
-- [ ] One YAML file exists per `StorageDevice`, disk set, or topology entity.
-- [ ] YAML-backed policy and device/topology catalogs validate IDs, schemas, and references.
+- [x] One YAML file exists per `StoragePolicy`.
+- [x] One YAML file exists per `StorageDevice`, disk set, or topology entity.
+- [x] YAML-backed policy and device/topology catalogs validate IDs, schemas, and references.
 - [ ] `MINIO_STANDARD` is explicitly defined, loaded from YAML, and testable.
-- [ ] Storage-engine backend can be selected at runtime without duplicate repositories.
-- [ ] S3 write/read path works end to end with the selected storage-engine backend.
+- [x] Storage-engine backend can be selected at runtime without duplicate repositories.
+- [x] S3 write/read path works end to end with the selected storage-engine backend.
 - [x] Backend Admin API exposes read-only policy/device/disk-set catalogs and non-persistent validation as configuration-as-code.
 - [ ] Admin UI plan covers policy/device/disk-set/backend-status screens and awaits frontend workflow ownership.
-- [ ] AWS CLI Cucumber parity exists for canonical scenarios where possible. Object CRUD, bucket operations, metadata/tagging, and multipart increments are complete: 26 AWS CLI scenarios total, all run, 0 skipped, including slash-containing keys, bucket lifecycle operations, ACL/tagging (bucket and object), object attributes, and multipart upload lifecycle.
+- [ ] AWS CLI Cucumber parity exists for canonical scenarios where possible. Object CRUD, bucket operations, metadata/tagging, and multipart increments are complete in the existing parity suite: 26 AWS CLI scenarios total, all run, 0 skipped, including slash-containing keys, bucket lifecycle operations, ACL/tagging (bucket and object), object attributes, and multipart upload lifecycle. Dedicated storage-engine AWS CLI Phase 2 filesystem reliability validation is also complete for declared scope: 4 scenarios/examples passed, 0 failed, 0 skipped. Full AWS CLI/WebTestClient parity beyond these scopes remains pending.
 - [x] Documentation reports planned vs completed work accurately.
 
 ### Risk Table
@@ -696,7 +751,7 @@ Activation modes:
 | 1 | Pure JUnit | `mvn test -pl object-store-domain` and `mvn test -pl storage-engine-domain -am` | Domain only, no Spring |
 | 2 | Module tests | `mvn test -pl <module> -am` | Run affected modules during each phase |
 | 3 | WebTestClient Cucumber | `mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false` | Canonical S3 behavior through in-process WebFlux driver |
-| 4 | AWS CLI Cucumber | `mvn -B -pl s3-reactive-api-adapter -am test -Dsurefire.failIfNoSpecifiedTests=false` | First object CRUD increment runs in the S3 adapter suite; must continue sharing canonical scenarios where possible |
+| 4 | AWS CLI Cucumber | `mvn -B -pl s3-reactive-api-adapter -am test -Dsurefire.failIfNoSpecifiedTests=false` | Existing object CRUD/bucket/metadata/multipart parity suite plus dedicated Phase 2 storage-engine AWS CLI validation run in the S3 adapter suite; must continue sharing canonical scenarios where possible |
 | 5 | AWS CLI compatibility script | `bash test-aws-cli.sh` | May remain as separate compatibility report if not fully migrated |
 | 6 | JaCoCo coverage | `mvn -Pcoverage test jacoco:report` or project-finalized equivalent | Current coverage baseline |
 | 7 | Clover/OpenClover | Optional/legacy only | Do not use as primary gate unless a future ADR revives it |
