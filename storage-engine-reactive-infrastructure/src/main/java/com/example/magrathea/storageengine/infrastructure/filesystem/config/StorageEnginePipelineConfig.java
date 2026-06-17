@@ -1,19 +1,16 @@
 package com.example.magrathea.storageengine.infrastructure.filesystem.config;
 
 import com.example.magrathea.storageengine.application.pipeline.CompressionStep;
-import com.example.magrathea.storageengine.application.pipeline.DeduplicationStep;
 import com.example.magrathea.storageengine.application.pipeline.EncryptionStep;
 import com.example.magrathea.storageengine.application.pipeline.ErasureCodingStep;
 import com.example.magrathea.storageengine.application.pipeline.StorePort;
+import com.example.magrathea.storageengine.application.port.ContentAddressIndex;
 import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemStorageCluster;
 import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemWriteFaultInjector;
 import com.example.magrathea.storageengine.infrastructure.pipeline.DataProcessingPipelineFactory;
 import com.example.magrathea.storageengine.infrastructure.pipeline.DataProcessingSpecBuilder;
 import com.example.magrathea.storageengine.infrastructure.pipeline.FileSystemStorePort;
 import com.example.magrathea.storageengine.infrastructure.pipeline.NoOpCompressionStep;
-import com.example.magrathea.storageengine.application.port.ContentAddressIndex;
-import com.example.magrathea.storageengine.infrastructure.pipeline.FixedWindowDedupStep;
-import com.example.magrathea.storageengine.infrastructure.pipeline.NoOpDeduplicationStep;
 import com.example.magrathea.storageengine.infrastructure.pipeline.NoOpEncryptionStep;
 import com.example.magrathea.storageengine.infrastructure.pipeline.NoOpErasureCodingStep;
 import org.springframework.beans.factory.ObjectProvider;
@@ -34,15 +31,6 @@ import java.nio.file.Path;
  */
 @Configuration
 public class StorageEnginePipelineConfig {
-
-    @Bean
-    public DeduplicationStep deduplicationStep(ObjectProvider<ContentAddressIndex> contentAddressIndexProvider) {
-        ContentAddressIndex index = contentAddressIndexProvider.getIfAvailable();
-        if (index != null) {
-            return new FixedWindowDedupStep(index);
-        }
-        return new NoOpDeduplicationStep();
-    }
 
     @Bean
     public CompressionStep compressionStep() {
@@ -84,11 +72,14 @@ public class StorageEnginePipelineConfig {
 
     @Bean
     public DataProcessingPipelineFactory dataProcessingPipelineFactory(
-            DeduplicationStep dedup,
+            ObjectProvider<ContentAddressIndex> contentAddressIndexProvider,
             CompressionStep compress,
             EncryptionStep encrypt,
             ErasureCodingStep ec,
             StorePort store) {
-        return new DataProcessingPipelineFactory(dedup, compress, encrypt, ec, store);
+        // Pass ContentAddressIndex so build() can create FixedWindowDedupStep with
+        // the chunk size from the spec (DedupConfig.chunkSize()) rather than a hardcoded default.
+        ContentAddressIndex index = contentAddressIndexProvider.getIfAvailable();
+        return new DataProcessingPipelineFactory(index, compress, encrypt, ec, store);
     }
 }

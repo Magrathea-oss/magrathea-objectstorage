@@ -151,7 +151,6 @@ class FileSystemInterruptedWriteFaultInjectionTest {
                 new EffectivePolicyResolver(),
                 new VirtualDeviceResolver(),
                 new PersistencePlanner(),
-                new Sha256ChecksumPort(),
                 cluster.addressIndex(),
                 new FileSystemChunkStorePort(cluster),
                 cluster.storedObjectRepository(),

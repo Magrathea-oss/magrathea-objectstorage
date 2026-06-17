@@ -1,6 +1,5 @@
 package com.example.magrathea.storageengine.application.service;
 
-import com.example.magrathea.storageengine.application.port.ChecksumPort;
 import com.example.magrathea.storageengine.application.port.ChunkStorePort;
 import com.example.magrathea.storageengine.application.port.ContentAddressIndex;
 import com.example.magrathea.storageengine.application.port.DiskSetCatalog;
@@ -457,7 +456,6 @@ class ReactiveStorageOrchestratorTest {
                     new EffectivePolicyResolver(),
                     new VirtualDeviceResolver(),
                     new PersistencePlanner(),
-                    new DigestChecksumPort(),
                     addressIndex,
                     chunkStore,
                     storedObjectRepository,
@@ -503,30 +501,6 @@ class ReactiveStorageOrchestratorTest {
         }
     }
 
-    private static final class DigestChecksumPort implements ChecksumPort {
-        @Override
-        public Fingerprint fingerprint(byte[] data, FingerprintAlgorithm algorithm) {
-            return Fingerprint.of(algorithm, sha256(data));
-        }
-
-        @Override
-        public ContentHash calculate(byte[] data, ChecksumAlgorithm algorithm) {
-            return ContentHash.of(algorithm, sha256(data));
-        }
-
-        @Override
-        public boolean verify(byte[] data, ContentHash expected) {
-            return calculate(data, expected.algorithm()).equals(expected);
-        }
-
-        private static String sha256(byte[] data) {
-            try {
-                return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(data));
-            } catch (Exception e) {
-                throw new IllegalStateException(e);
-            }
-        }
-    }
 
 
 

@@ -33,7 +33,6 @@ import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemD
 import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemStorageCluster;
 import com.example.magrathea.storageengine.infrastructure.filesystem.NoOpAlterationPort;
 import com.example.magrathea.storageengine.infrastructure.filesystem.ReedSolomonECAdapter;
-import com.example.magrathea.storageengine.infrastructure.filesystem.Sha256ChecksumPort;
 import com.example.magrathea.storageengine.infrastructure.filesystem.SimpleReplicationAdapter;
 import com.example.magrathea.storageengine.infrastructure.filesystem.ZstdCompressionAdapter;
 import org.junit.jupiter.api.Test;
@@ -182,7 +181,6 @@ class StorageEngineReactiveS3ObjectRepositoryTest {
                 new EffectivePolicyResolver(),
                 new VirtualDeviceResolver(),
                 new PersistencePlanner(),
-                new Sha256ChecksumPort(),
                 cluster.addressIndex(),
                 new FileSystemChunkStorePort(cluster),
                 cluster.storedObjectRepository(),
@@ -236,7 +234,7 @@ class StorageEngineReactiveS3ObjectRepositoryTest {
         private volatile String lastStorageClassId;
 
         private FakeOrchestrator() {
-            super(null, null, null, null, null, null, null, null, null, null, 65536,
+            super(null, null, null, null, null, null, null, null, null, 65536,
                     StorageEventPublisher.noop(),
                     spec -> { throw new UnsupportedOperationException("FakeOrchestrator does not use the pipeline"); });
         }

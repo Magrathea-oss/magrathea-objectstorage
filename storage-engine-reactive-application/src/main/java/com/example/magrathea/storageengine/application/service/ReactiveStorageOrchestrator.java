@@ -1,6 +1,5 @@
 package com.example.magrathea.storageengine.application.service;
 
-import com.example.magrathea.storageengine.application.port.ChecksumPort;
 import com.example.magrathea.storageengine.application.port.ChunkStorePort;
 import com.example.magrathea.storageengine.application.port.ContentAddressIndex;
 import com.example.magrathea.storageengine.application.port.ObjectManifestRepository;
@@ -88,7 +87,6 @@ public class ReactiveStorageOrchestrator {
     private final EffectivePolicyResolver effectivePolicyResolver;
     private final VirtualDeviceResolver virtualDeviceResolver;
     private final PersistencePlanner persistencePlanner;
-    private final ChecksumPort checksumPort;
     private final ContentAddressIndex contentAddressIndex;
     private final ChunkStorePort chunkStorePort;
     private final StoredObjectRepository storedObjectRepository;
@@ -106,7 +104,6 @@ public class ReactiveStorageOrchestrator {
             EffectivePolicyResolver effectivePolicyResolver,
             VirtualDeviceResolver virtualDeviceResolver,
             PersistencePlanner persistencePlanner,
-            ChecksumPort checksumPort,
             ContentAddressIndex contentAddressIndex,
             ChunkStorePort chunkStorePort,
             StoredObjectRepository storedObjectRepository,
@@ -119,7 +116,6 @@ public class ReactiveStorageOrchestrator {
         this.effectivePolicyResolver = effectivePolicyResolver;
         this.virtualDeviceResolver = virtualDeviceResolver;
         this.persistencePlanner = persistencePlanner;
-        this.checksumPort = checksumPort;
         this.contentAddressIndex = contentAddressIndex;
         this.chunkStorePort = chunkStorePort;
         this.storedObjectRepository = storedObjectRepository;
@@ -325,10 +321,12 @@ public class ReactiveStorageOrchestrator {
 
     private ChunkPersistenceTrace toChunkPersistenceTrace(
             StorageTrace storageTrace, PersistencePlan plan, ChunkId existingChunkId) {
-        // Extract fingerprint from trace — present for both FileUnit and ChunkUnit
+        // Extract fingerprint from trace — always present for both FileUnit and ChunkUnit paths.
+        // The pipeline guarantees a fingerprint on every StorageTrace; absence is a pipeline bug.
         Fingerprint fingerprint = storageTrace.fingerprint()
-                .orElseGet(() -> Fingerprint.of(FingerprintAlgorithm.SHA256,
-                        checksumPort.calculate(new byte[0], ChecksumAlgorithm.SHA256).value()));
+                .orElseThrow(() -> new IllegalStateException(
+                        "Pipeline StorageTrace is missing a fingerprint — "
+                        + "every pipeline step must produce a fingerprint on the StorageTrace"));
         ContentHash contentHash = ContentHash.of(ChecksumAlgorithm.SHA256, fingerprint.value());
 
         // Build chunkId: use existingChunkId for dedup reuse, or storageRef for new chunks
