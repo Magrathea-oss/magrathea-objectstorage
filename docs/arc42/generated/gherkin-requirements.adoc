@@ -19,7 +19,7 @@ Generated from `s3-reactive-api-adapter/src/test/features/requirements` using `p
 === Summary
 
 * Feature files scanned: 6
-* Scenarios discovered: 65
+* Scenarios discovered: 66
 * Protocol-smoke scenarios: 0
 
 ==== Status tag counts
@@ -28,9 +28,9 @@ Generated from `s3-reactive-api-adapter/src/test/features/requirements` using `p
 |===
 |Tag |Scenario count
 |`@config-only` |1
-|`@implemented-and-validated` |38
-|`@implemented-not-e2e-validated` |21
-|`@not-implemented` |10
+|`@implemented-and-validated` |41
+|`@implemented-not-e2e-validated` |17
+|`@not-implemented` |12
 |===
 
 ==== Validation mode tag counts
@@ -38,13 +38,15 @@ Generated from `s3-reactive-api-adapter/src/test/features/requirements` using `p
 [cols="1,1",options="header"]
 |===
 |Tag |Scenario count
-|`@awscli-required` |22
+|`@awscli-required` |19
+|`@bootstrap-integration-required` |2
 |`@filesystem-inspection-required` |1
 |`@log-inspection-required` |3
 |`@metrics-inspection-required` |3
 |`@pipeline-unit-required` |9
+|`@static-architecture-required` |2
 |`@tracing-inspection-required` |2
-|`@webclient-required` |48
+|`@webclient-required` |45
 |`unknown/not-tagged` |15
 |===
 
@@ -54,7 +56,7 @@ Generated from `s3-reactive-api-adapter/src/test/features/requirements` using `p
 |===
 |Tag |Scenario count
 |`@functional-requirement` |60
-|`@non-functional-requirement` |49
+|`@non-functional-requirement` |50
 |===
 
 === Scenarios by Feature and Requirement ID
@@ -64,7 +66,7 @@ Scenario entries are grouped first by feature file/title, then by requirement gr
 ==== s3-reactive-api-adapter/src/test/features/requirements/phase-1-upload-storage-engine.feature
 
 * Feature title: Business Need: Phase 1 upload reliability requirements for the storage-engine backend
-* Feature tags: `@requirement`, `@phase-1`, `@upload`, `@storage-engine`, `@partial`
+* Feature tags: `@requirement`, `@phase-1`, `@upload`, `@storage-engine`
 * Feature description:
 +
 ----
@@ -82,9 +84,39 @@ resource. Each runner should bind the same step text to its own glue package and
 executable step definitions. Validation modes should be selected with tags and
 Examples filtering, such as @webclient and @awscli, rather than by creating
 separate object-store or awscli feature files.
-Until matching implementation and runner glue are added, this shared requirement
-resource remains outside the currently selected Cucumber runners. Keep every
-REQ-UPLOAD-* requirement ID unchanged when the scenarios become executable.
+Both runners now select this shared feature: Phase1UploadStorageEngineCucumberTest
+selects the @webclient examples and Phase1UploadStorageEngineAwsCliCucumberTest
+selects the @awscli examples. Keep every REQ-UPLOAD-* requirement ID unchanged.
+Validation-mode decision (2026-07-02) for REQ-UPLOAD-001 and REQ-UPLOAD-002:
+bootstrap JUnit integration validation is formally accepted as the sole required
+runtime validation mode for these two requirements, as authorized by the Phase 1
+correction plan. Rationale: both requirements assert behavior across a full
+application-process stop/start against the same storage-engine filesystem root.
+The bootstrap-application integration tests StorageEngineRestartSafetyTest
+(REQ-UPLOAD-001) and StorageEngineHttpReadAfterWriteTest manifest-reload coverage
+(REQ-UPLOAD-002) create, dispose, and recreate the real Spring application context
+against the same storage root, which the in-process WebTestClient Cucumber glue
+cannot do without duplicating that bootstrap harness, and which the AWS CLI mode
+additionally cannot drive because it requires an externally restartable server
+process plus the aws binary on PATH. The @webclient and @awscli examples for
+REQ-UPLOAD-001 and REQ-UPLOAD-002 remain in this shared feature as supplementary
+regression examples, but the Phase 1 Cucumber runners exclude scenarios tagged
+with `@bootstrap-integration-required` so that the agreed bootstrap-validation
+boundary stays explicit. The stale REQ-UPLOAD-003 executable scenario has
+been removed from Phase 1 because it described multiple durable chunks for
+large non-dedup uploads; that behavior was intentionally removed and must not
+be reintroduced through Phase 1 tests. REQ-UPLOAD-004 required separate
+validation evidence in both agreed validation modes before it could be
+promoted out of `@implemented-not-e2e-validated`; that independent evidence
+now exists. On 2026-07-02, Phase1UploadStorageEngineCucumberTest (@webclient)
+and Phase1UploadStorageEngineAwsCliCucumberTest (@awscli) both executed the
+full "Recovery process does not publish a failed partial upload" scenario
+(28 discovered scenarios each, 0 failures, 0 errors) against
+magrathea-build:fedora42, with every Given/When/Then/And step for the
+REQ-UPLOAD-004 example completing without failure in each runner. All five
+REQ-UPLOAD-001/002/004/005/006 scenarios in this feature now carry
+`@implemented-and-validated`, so the feature-level `@partial` tag has been
+removed.
 Validation roles:
 - S3 client validates behavior in WebTestClient and AWS CLI modes.
 - WebTestClient glue exercises object-store RouterFunction endpoints directly.
@@ -118,7 +150,6 @@ Requirement buckets, nested object keys, and fixture choices:
 | requirement    | bucket                              | key                                        | fixture resource path                    |
 | REQ-UPLOAD-001 | req-upload-restart-bucket           | documents/2026/restart-safe-object.txt    | fixtures/upload/small-object.txt         |
 | REQ-UPLOAD-002 | req-upload-manifest-bucket          | manifests/2026/payload.bin                | fixtures/upload/small-object.txt         |
-| REQ-UPLOAD-003 | req-upload-large-bucket             | archive/2026/large/streamed-object.bin    | fixtures/upload/large-object.bin         |
 | REQ-UPLOAD-004 | req-upload-atomicity-bucket         | uploads/2026/failed/partial-object.bin    | fixtures/upload/large-object.bin         |
 | REQ-UPLOAD-005 | req-upload-read-after-write-bucket  | documents/2026/read-after-write/object.txt | fixtures/upload/small-object.txt         |
 | REQ-UPLOAD-006 | req-upload-integrity-bucket         | integrity/2026/corruptible-object.bin     | fixtures/upload/corruptible-object.bin   |
@@ -135,15 +166,15 @@ And each scenario uses a clean storage-engine filesystem root "target/storage-en
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-1-upload-storage-engine.feature:76`
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-1-upload-storage-engine.feature:106`
 |Rule |Committed uploads survive application restart
 |Requirement ID(s) |`REQ-UPLOAD-001`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
 |Capability area tags |`@upload`, `@storage-engine`, `@durability`, `@restart-safety`
-|Validation mode tags |`@webclient-required`, `@awscli-required`
-|Declared/validated status |`@implemented-not-e2e-validated`
+|Validation mode tags |`@bootstrap-integration-required`
+|Declared/validated status |`@implemented-and-validated`
 |Protocol smoke |`no`
-|All tags |`@requirement`, `@phase-1`, `@upload`, `@storage-engine`, `@partial`, `@REQ-UPLOAD-001`, `@functional-requirement`, `@non-functional-requirement`, `@durability`, `@restart-safety`, `@webclient-required`, `@awscli-required`, `@implemented-not-e2e-validated`
+|All tags |`@requirement`, `@phase-1`, `@upload`, `@storage-engine`, `@REQ-UPLOAD-001`, `@functional-requirement`, `@non-functional-requirement`, `@durability`, `@restart-safety`, `@bootstrap-integration-required`, `@implemented-and-validated`
 |===
 
 .Rule description
@@ -204,15 +235,15 @@ before process restart. Reads after restart must use filesystem state, not disca
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-1-upload-storage-engine.feature:119`
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-1-upload-storage-engine.feature:149`
 |Rule |Object-to-manifest references are durable
 |Requirement ID(s) |`REQ-UPLOAD-002`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
 |Capability area tags |`@upload`, `@storage-engine`, `@durability`, `@manifest-durability`
-|Validation mode tags |`@webclient-required`, `@awscli-required`
-|Declared/validated status |`@implemented-not-e2e-validated`
+|Validation mode tags |`@bootstrap-integration-required`
+|Declared/validated status |`@implemented-and-validated`
 |Protocol smoke |`no`
-|All tags |`@requirement`, `@phase-1`, `@upload`, `@storage-engine`, `@partial`, `@REQ-UPLOAD-002`, `@functional-requirement`, `@non-functional-requirement`, `@durability`, `@manifest-durability`, `@webclient-required`, `@awscli-required`, `@implemented-not-e2e-validated`
+|All tags |`@requirement`, `@phase-1`, `@upload`, `@storage-engine`, `@REQ-UPLOAD-002`, `@functional-requirement`, `@non-functional-requirement`, `@durability`, `@manifest-durability`, `@bootstrap-integration-required`, `@implemented-and-validated`
 |===
 
 .Rule description
@@ -256,67 +287,6 @@ and still identify the original byte stream and durable metadata.
 | REQ-UPLOAD-002 | awscli | standard-storage-class | x-amz-storage-class=STANDARD | x-amz-storage-class=STANDARD | req-upload-manifest-bucket | manifests/2026/payload.bin | fixtures/upload/small-object.txt | target/storage-engine-it/REQ-UPLOAD-002-awscli-storage-class | STANDARD
 |===
 
-===== REQ-UPLOAD-003
-
-====== Scenario Outline: S3 client streams a large upload with bounded memory and exact read-back
-
-[cols="1h,3",options="header"]
-|===
-|Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-1-upload-storage-engine.feature:152`
-|Rule |Large uploads are bounded-memory streams
-|Requirement ID(s) |`REQ-UPLOAD-003`
-|Classification |`@functional-requirement`, `@non-functional-requirement`
-|Capability area tags |`@upload`, `@storage-engine`, `@large-object`, `@streaming`
-|Validation mode tags |`@webclient-required`, `@awscli-required`
-|Declared/validated status |`@implemented-not-e2e-validated`
-|Protocol smoke |`no`
-|All tags |`@requirement`, `@phase-1`, `@upload`, `@storage-engine`, `@partial`, `@REQ-UPLOAD-003`, `@functional-requirement`, `@non-functional-requirement`, `@large-object`, `@streaming`, `@webclient-required`, `@awscli-required`, `@implemented-not-e2e-validated`
-|===
-
-.Rule description
-----
-Upload and read paths stream large payloads as ordered durable chunks while respecting
-backpressure and avoiding whole-object materialization.
-----
-
-.Gherkin steps
-[source,gherkin]
-----
-  Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
-  And the storage engine operator uses filesystem root "<storage_root>"
-  And bucket "<bucket>" exists
-  And fixture file "<fixture_file>" is a deterministic 256 MiB object
-  And an S3 client has object content from fixture file "<fixture_file>" for bucket "<bucket>" and key "<object_key>"
-  And the S3 client applies PutObject header profile "<header_profile>" with headers "<headers>"
-  And the storage engine chunk size is configured to a bounded value smaller than the object
-  When the S3 client uploads fixture file "<fixture_file>" to bucket "<bucket>" and key "<object_key>" through the S3 HTTP PutObject API using a streaming request body
-  Then the storage engine writes the object as multiple durable chunks
-  And no component materializes the complete 256 MiB object in memory at once
-  And upload processing respects downstream backpressure while chunks are written
-  And the committed manifest contains the ordered chunk references needed to reconstruct the object
-  And the committed manifest records storage class "<expected_storage_class>"
-  And the committed manifest records durable object headers and metadata "<expected_manifest_metadata>"
-  When the S3 client reads bucket "<bucket>" and key "<object_key>" through the S3 HTTP GetObject API
-  Then the streamed response bytes exactly match fixture file "<fixture_file>"
-  And the streamed response attributes and metadata include "<expected_manifest_metadata>"
-  And the read path emits chunks in manifest order without loading the complete object into memory
-----
-
-.Examples: WebTestClient validation `@webclient`
-[cols="1,1,1,1,1,1,1,1,1,1",options="header"]
-|===
-| requirement_id | validation_mode | header_profile | headers | expected_manifest_metadata | bucket | object_key | fixture_file | storage_root | expected_storage_class
-| REQ-UPLOAD-003 | webclient | content-type-text | Content-Type=text/plain | Content-Type=text/plain | req-upload-large-bucket | archive/2026/large/streamed-object.bin | fixtures/upload/large-object.bin | target/storage-engine-it/REQ-UPLOAD-003-webclient-content | STANDARD
-|===
-
-.Examples: AWS CLI validation `@awscli`
-[cols="1,1,1,1,1,1,1,1,1,1",options="header"]
-|===
-| requirement_id | validation_mode | header_profile | headers | expected_manifest_metadata | bucket | object_key | fixture_file | storage_root | expected_storage_class
-| REQ-UPLOAD-003 | awscli | sse-s3-metadata | x-amz-server-side-encryption=AES256 | x-amz-server-side-encryption=AES256 | req-upload-large-bucket | archive/2026/large/streamed-object.bin | fixtures/upload/large-object.bin | target/storage-engine-it/REQ-UPLOAD-003-awscli-sse | STANDARD
-|===
-
 ===== REQ-UPLOAD-004
 
 ====== Scenario Outline: Recovery process does not publish a failed partial upload
@@ -324,15 +294,15 @@ backpressure and avoiding whole-object materialization.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-1-upload-storage-engine.feature:187`
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-1-upload-storage-engine.feature:182`
 |Rule |Failed uploads are not published
 |Requirement ID(s) |`REQ-UPLOAD-004`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
 |Capability area tags |`@upload`, `@storage-engine`, `@atomicity`, `@recovery`
 |Validation mode tags |`@webclient-required`, `@awscli-required`
-|Declared/validated status |`@implemented-not-e2e-validated`
+|Declared/validated status |`@implemented-and-validated`
 |Protocol smoke |`no`
-|All tags |`@requirement`, `@phase-1`, `@upload`, `@storage-engine`, `@partial`, `@REQ-UPLOAD-004`, `@functional-requirement`, `@non-functional-requirement`, `@atomicity`, `@recovery`, `@webclient-required`, `@awscli-required`, `@implemented-not-e2e-validated`
+|All tags |`@requirement`, `@phase-1`, `@upload`, `@storage-engine`, `@REQ-UPLOAD-004`, `@functional-requirement`, `@non-functional-requirement`, `@atomicity`, `@recovery`, `@webclient-required`, `@awscli-required`, `@implemented-and-validated`
 |===
 
 .Rule description
@@ -381,7 +351,7 @@ object, committed manifest, or durable object metadata.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-1-upload-storage-engine.feature:218`
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-1-upload-storage-engine.feature:213`
 |Rule |Read-after-write uses filesystem persistence
 |Requirement ID(s) |`REQ-UPLOAD-005`
 |Classification |`@functional-requirement`
@@ -389,7 +359,7 @@ object, committed manifest, or durable object metadata.
 |Validation mode tags |`@webclient-required`, `@awscli-required`
 |Declared/validated status |`@implemented-and-validated`
 |Protocol smoke |`no`
-|All tags |`@requirement`, `@phase-1`, `@upload`, `@storage-engine`, `@partial`, `@REQ-UPLOAD-005`, `@functional-requirement`, `@durability`, `@read-after-write`, `@webclient-required`, `@awscli-required`, `@implemented-and-validated`
+|All tags |`@requirement`, `@phase-1`, `@upload`, `@storage-engine`, `@REQ-UPLOAD-005`, `@functional-requirement`, `@durability`, `@read-after-write`, `@webclient-required`, `@awscli-required`, `@implemented-and-validated`
 |===
 
 .Rule description
@@ -446,7 +416,7 @@ class, and headers are already durable and visible through the read path.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-1-upload-storage-engine.feature:257`
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-1-upload-storage-engine.feature:252`
 |Rule |Integrity metadata protects stored chunks
 |Requirement ID(s) |`REQ-UPLOAD-006`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -454,7 +424,7 @@ class, and headers are already durable and visible through the read path.
 |Validation mode tags |`@webclient-required`, `@awscli-required`
 |Declared/validated status |`@implemented-and-validated`
 |Protocol smoke |`no`
-|All tags |`@requirement`, `@phase-1`, `@upload`, `@storage-engine`, `@partial`, `@REQ-UPLOAD-006`, `@functional-requirement`, `@non-functional-requirement`, `@checksum`, `@integrity`, `@webclient-required`, `@awscli-required`, `@implemented-and-validated`
+|All tags |`@requirement`, `@phase-1`, `@upload`, `@storage-engine`, `@REQ-UPLOAD-006`, `@functional-requirement`, `@non-functional-requirement`, `@checksum`, `@integrity`, `@webclient-required`, `@awscli-required`, `@implemented-and-validated`
 |===
 
 .Rule description
@@ -1155,6 +1125,89 @@ array assembly over the complete object body in production object-content paths.
 | REQ-PIPELINE-002 | webclient | pipeline-backpressure-bucket | pipeline/2026/write/large-streamed-object.bin | target/test-fixtures/pipeline/large-object-256m.bin | target/storage-engine-it/REQ-PIPELINE-002-webclient
 |===
 
+===== REQ-PIPELINE-007
+
+====== Scenario: PutObject computes ETag while teeing the request body into storage
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-3-reactive-pipeline.feature:153`
+|Rule |Upload ETag computation and dedup windowing preserve streaming request-body paths
+|Requirement ID(s) |`REQ-PIPELINE-007`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@reactive-pipeline`, `@storage-engine`, `@streaming`, `@integrity`, `@bounded-memory`, `@s3-api`
+|Validation mode tags |`@static-architecture-required`
+|Declared/validated status |`@not-implemented`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@not-implemented`, `@REQ-PIPELINE-007`, `@functional-requirement`, `@non-functional-requirement`, `@streaming`, `@integrity`, `@bounded-memory`, `@static-architecture-required`, `@s3-api`
+|===
+
+.Rule description
+----
+PutObject MUST compute ETag and supported request checksums as a tee over the incoming
+DataBuffer stream while forwarding the same logical bytes into the selected storage path.
+It MUST NOT aggregate the complete request body with DataBufferUtils.join or re-wrap a
+whole-object byte array before calling storage. Fixed-window deduplication MUST consume
+FileUnit DataBuffers incrementally and emit configured-size windows without first
+materializing the complete FileUnit.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given validation mode "static-architecture" is selected for requirement "REQ-PIPELINE-007"
+  And production source path "s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/adapter/web/S3ObjectOperationsHandler.java" implements the S3 PutObject route
+  And bucket "pipeline-backpressure-bucket" exists for key "pipeline/2026/write/large-streamed-object.bin"
+  When the static architecture runner inspects method "putObject" in the production source path
+  Then method "putObject" does not invoke "DataBufferUtils.join"
+  And method "putObject" does not materialize the request body into a whole-object "byte[] bytes" array
+  And method "putObject" does not pass storage a Flux created by re-wrapping a whole-object byte array
+  And the implementation computes the single-part ETag and supported checksum headers while teeing the DataBuffer stream into saveObjectWithContent
+  And the S3 PutObject response can expose the computed ETag without requiring a second full-body aggregation
+----
+
+===== REQ-PIPELINE-008
+
+====== Scenario: Fixed-window deduplication emits configured windows without joining the FileUnit
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-3-reactive-pipeline.feature:165`
+|Rule |Upload ETag computation and dedup windowing preserve streaming request-body paths
+|Requirement ID(s) |`REQ-PIPELINE-008`
+|Classification |`@non-functional-requirement`
+|Capability area tags |`@reactive-pipeline`, `@storage-engine`, `@streaming`, `@deduplication`, `@bounded-memory`
+|Validation mode tags |`@static-architecture-required`
+|Declared/validated status |`@not-implemented`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@not-implemented`, `@REQ-PIPELINE-008`, `@non-functional-requirement`, `@streaming`, `@deduplication`, `@bounded-memory`, `@static-architecture-required`
+|===
+
+.Rule description
+----
+PutObject MUST compute ETag and supported request checksums as a tee over the incoming
+DataBuffer stream while forwarding the same logical bytes into the selected storage path.
+It MUST NOT aggregate the complete request body with DataBufferUtils.join or re-wrap a
+whole-object byte array before calling storage. Fixed-window deduplication MUST consume
+FileUnit DataBuffers incrementally and emit configured-size windows without first
+materializing the complete FileUnit.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given validation mode "static-architecture" is selected for requirement "REQ-PIPELINE-008"
+  And production source path "storage-engine-reactive-infrastructure/src/main/java/com/example/magrathea/storageengine/infrastructure/pipeline/FixedWindowDedupStep.java" implements fixed-window deduplication
+  And the configured dedup window size is "1 MiB"
+  When the static architecture runner inspects the production source path
+  Then FixedWindowDedupStep does not invoke "DataBufferUtils.join"
+  And FixedWindowDedupStep does not materialize the complete FileUnit into a whole-object "byte[] allBytes" array
+  And FixedWindowDedupStep fingerprints and looks up each configured window as DataBuffers are consumed incrementally
+  And emitted ChunkUnit data is bounded by the configured dedup window size rather than total FileUnit size
+----
+
 ===== REQ-PIPELINE-003
 
 ====== Scenario Outline: GetObject streams manifest-ordered chunks without collecting the whole object
@@ -1162,7 +1215,7 @@ array assembly over the complete object body in production object-content paths.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-3-reactive-pipeline.feature:151`
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-3-reactive-pipeline.feature:182`
 |Rule |Read objects stream chunks in manifest order without aggregating the object
 |Requirement ID(s) |`REQ-PIPELINE-003`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -1219,7 +1272,7 @@ before response streaming begins.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-3-reactive-pipeline.feature:187`
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-3-reactive-pipeline.feature:218`
 |Rule |Stage failures propagate deterministically and clean up completed resources
 |Requirement ID(s) |`REQ-PIPELINE-004`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -1278,7 +1331,7 @@ a deterministic S3 error without publishing a readable object.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-3-reactive-pipeline.feature:220`
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-3-reactive-pipeline.feature:251`
 |Rule |Cancellation before publication cleans up pipeline-owned resources
 |Requirement ID(s) |`REQ-PIPELINE-005`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -1336,7 +1389,7 @@ unpublished chunks or temporary files, and leave no readable object behind.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-3-reactive-pipeline.feature:252`
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-3-reactive-pipeline.feature:283`
 |Rule |Each pipeline stage emits independent typed instrumentation events
 |Requirement ID(s) |`REQ-PIPELINE-006`
 |Classification |`@non-functional-requirement`

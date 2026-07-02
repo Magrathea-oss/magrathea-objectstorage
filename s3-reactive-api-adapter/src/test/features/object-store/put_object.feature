@@ -135,11 +135,16 @@ Feature: S3-compatible PutObject API — Anomaly Tests (Analysis-Complete)
   # ── Checksum header tests ──
 
   @webclient
-  Scenario: Put object with Content-MD5 header echoes Content-MD5 and uses ETag = md5
+  Scenario: Put object with Content-MD5 header stores it as metadata while ETag is the MD5 hex of the stored bytes
+    # Since the single-pass streaming upload refactor, the ETag is always the MD5 hex
+    # digest computed from the actual stored body bytes (S3-compatible semantics,
+    # see REQ-UPLOAD-006). The client-supplied Content-MD5 header is retained as
+    # object metadata and echoed by HEAD, but it is never echoed back as the ETag.
+    # MD5("data") = 8d777f385d3dfec8815d20f7496026dc.
     Given an object with key "content-md5-test.txt" and content "data"
     When the object is stored via S3 API with Content-MD5 header "dGVzdA=="
     Then the response status is 200
-    And the response ETag header is "\"dGVzdA==\""
+    And the response ETag header is "\"8d777f385d3dfec8815d20f7496026dc\""
     And the object metadata returned by HEAD contains header "Content-MD5" with value "dGVzdA=="
 
   @webclient

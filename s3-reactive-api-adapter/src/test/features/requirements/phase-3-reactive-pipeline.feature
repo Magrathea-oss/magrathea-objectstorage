@@ -141,6 +141,37 @@ Ability: Phase 3 staged reactive read and write pipeline
         | requirement_id   | validation_mode | bucket                       | object_key                                  | fixture_file                                       | storage_root                                         |
         | REQ-PIPELINE-002 | webclient       | pipeline-backpressure-bucket | pipeline/2026/write/large-streamed-object.bin | target/test-fixtures/pipeline/large-object-256m.bin | target/storage-engine-it/REQ-PIPELINE-002-webclient |
 
+  Rule: Upload ETag computation and dedup windowing preserve streaming request-body paths
+    PutObject MUST compute ETag and supported request checksums as a tee over the incoming
+    DataBuffer stream while forwarding the same logical bytes into the selected storage path.
+    It MUST NOT aggregate the complete request body with DataBufferUtils.join or re-wrap a
+    whole-object byte array before calling storage. Fixed-window deduplication MUST consume
+    FileUnit DataBuffers incrementally and emit configured-size windows without first
+    materializing the complete FileUnit.
+
+    @REQ-PIPELINE-007 @functional-requirement @non-functional-requirement @streaming @integrity @bounded-memory @static-architecture-required @s3-api @not-implemented
+    Scenario: PutObject computes ETag while teeing the request body into storage
+      Given validation mode "static-architecture" is selected for requirement "REQ-PIPELINE-007"
+      And production source path "s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/adapter/web/S3ObjectOperationsHandler.java" implements the S3 PutObject route
+      And bucket "pipeline-backpressure-bucket" exists for key "pipeline/2026/write/large-streamed-object.bin"
+      When the static architecture runner inspects method "putObject" in the production source path
+      Then method "putObject" does not invoke "DataBufferUtils.join"
+      And method "putObject" does not materialize the request body into a whole-object "byte[] bytes" array
+      And method "putObject" does not pass storage a Flux created by re-wrapping a whole-object byte array
+      And the implementation computes the single-part ETag and supported checksum headers while teeing the DataBuffer stream into saveObjectWithContent
+      And the S3 PutObject response can expose the computed ETag without requiring a second full-body aggregation
+
+    @REQ-PIPELINE-008 @non-functional-requirement @streaming @deduplication @bounded-memory @static-architecture-required @storage-engine @not-implemented
+    Scenario: Fixed-window deduplication emits configured windows without joining the FileUnit
+      Given validation mode "static-architecture" is selected for requirement "REQ-PIPELINE-008"
+      And production source path "storage-engine-reactive-infrastructure/src/main/java/com/example/magrathea/storageengine/infrastructure/pipeline/FixedWindowDedupStep.java" implements fixed-window deduplication
+      And the configured dedup window size is "1 MiB"
+      When the static architecture runner inspects the production source path
+      Then FixedWindowDedupStep does not invoke "DataBufferUtils.join"
+      And FixedWindowDedupStep does not materialize the complete FileUnit into a whole-object "byte[] allBytes" array
+      And FixedWindowDedupStep fingerprints and looks up each configured window as DataBuffers are consumed incrementally
+      And emitted ChunkUnit data is bounded by the configured dedup window size rather than total FileUnit size
+
   Rule: Read objects stream chunks in manifest order without aggregating the object
     GetObject MUST use a staged read pipeline that loads the object reference and manifest,
     verifies read preconditions, reads chunks in manifest order, and streams them to the

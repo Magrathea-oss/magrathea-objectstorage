@@ -17,7 +17,6 @@ import com.example.magrathea.s3api.dto.query.CopyObjectResultQuery;
 import com.example.magrathea.s3api.dto.query.DeleteResultQuery;
 import com.example.magrathea.s3api.dto.query.SelectObjectContentQuery;
 import org.springframework.core.io.buffer.DataBuffer;
-import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -27,11 +26,15 @@ import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
@@ -61,39 +64,86 @@ public class S3ObjectOperationsHandler {
         var inlineTags = S3RequestExtractor.extractObjectTagging(request);
         var storageClass = S3RequestExtractor.extractStorageClass(request);
         var effectiveStorageClass = storageClass == null || storageClass.isBlank() ? "STANDARD" : storageClass;
-        return DataBufferUtils.join(request.bodyToFlux(DataBuffer.class))
-            .defaultIfEmpty(DefaultDataBufferFactory.sharedInstance.wrap(new byte[0]))
-            .flatMap(joined -> {
-                byte[] bytes = new byte[joined.readableByteCount()];
-                joined.read(bytes);
-                DataBufferUtils.release(joined);
-                var userMetadata = S3RequestExtractor.extractUserMetadata(request);
-                var active = ActiveS3Object.create(
-                        objectKey,
-                        effectiveStorageClass,
-                        userMetadata != null ? userMetadata.entries() : Map.of(),
-                        S3RequestExtractor.extractEncryption(request),
-                        S3RequestExtractor.extractChecksum(request),
-                        bytes.length)
-                    .withEtag(ETagComputer.computeETag(bytes));
-                return objectService.saveObjectWithContent(
-                        active,
-                        Flux.just(DefaultDataBufferFactory.sharedInstance.wrap(bytes)),
-                        effectiveStorageClass)
-                    .flatMap(result -> {
-                        var saved = result.aggregate();
-                        if (!inlineTags.isEmpty() && saved instanceof ActiveS3Object) {
-                            // Persist inline tags from x-amz-tagging header
-                            return objectService.updateObjectTags(objectKey, inlineTags)
-                                .flatMap(r -> S3ResponseBuilder.ok(r.aggregate()));
-                        }
-                        return S3ResponseBuilder.ok(saved);
-                    });
+        var userMetadata = S3RequestExtractor.extractUserMetadata(request);
+        var uploadDigest = new UploadDigest();
+        var content = request.bodyToFlux(DataBuffer.class)
+            .doOnNext(uploadDigest::update);
+        var initialLength = request.headers().contentLength().orElse(0L);
+        var active = ActiveS3Object.create(
+                objectKey,
+                effectiveStorageClass,
+                userMetadata != null ? userMetadata.entries() : Map.of(),
+                S3RequestExtractor.extractEncryption(request),
+                S3RequestExtractor.extractChecksum(request),
+                initialLength);
+        return objectService.saveObjectWithContent(active, content, effectiveStorageClass)
+            .flatMap(result -> persistComputedUploadMeasurements(result.aggregate(), uploadDigest))
+            .flatMap(saved -> {
+                if (!inlineTags.isEmpty() && saved instanceof ActiveS3Object) {
+                    // Persist inline tags from x-amz-tagging header
+                    return objectService.updateObjectTags(objectKey, inlineTags)
+                        .flatMap(r -> S3ResponseBuilder.ok(r.aggregate()));
+                }
+                return S3ResponseBuilder.ok(saved);
             })
             .onErrorResume(BucketNotFoundException.class,
                 e -> S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"))
             .onErrorResume(Throwable.class,
                 e -> S3WebSupport.xmlError(HttpStatus.INTERNAL_SERVER_ERROR, "InternalError", e.getMessage()));
+    }
+
+    private Mono<S3Object> persistComputedUploadMeasurements(S3Object saved, UploadDigest uploadDigest) {
+        if (!(saved instanceof ActiveS3Object active)) {
+            return Mono.just(saved);
+        }
+        var checksum = active.checksum() != null ? active.checksum() : ObjectChecksum.of(Set.of());
+        var measured = ActiveS3Object.restoreActive(
+                active.key(),
+                active.storageClass(),
+                active.userMetadata(),
+                active.encryption(),
+                checksum,
+                uploadDigest.length(),
+                active.createdAt(),
+                active.domainEvents())
+            .withEtag(uploadDigest.etag())
+            .withObjectTags(active.objectTags());
+        return objectService.saveObject(measured)
+            .map(result -> result.aggregate());
+    }
+
+    private static MessageDigest md5Digest() {
+        try {
+            return MessageDigest.getInstance("MD5");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("MD5 algorithm unavailable", e);
+        }
+    }
+
+    private static String quoteHex(byte[] digest) {
+        return "\"" + ETagComputer.toHex(digest) + "\"";
+    }
+
+    private static final class UploadDigest {
+        private final MessageDigest digest = md5Digest();
+        private final AtomicLong length = new AtomicLong(0);
+
+        void update(DataBuffer buffer) {
+            length.addAndGet(buffer.readableByteCount());
+            try (DataBuffer.ByteBufferIterator iterator = buffer.readableByteBuffers()) {
+                while (iterator.hasNext()) {
+                    digest.update(iterator.next());
+                }
+            }
+        }
+
+        long length() {
+            return length.get();
+        }
+
+        String etag() {
+            return quoteHex(digest.digest());
+        }
     }
 
     // ─────────────────────────────────────────────────────
