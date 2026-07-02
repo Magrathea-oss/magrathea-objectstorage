@@ -39,6 +39,8 @@ import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -99,13 +101,58 @@ public class StorageEngineReactiveS3ObjectRepository
             var storeKey = storeKey(object.key().bucket(), object.key().key());
             boolean exists = storeByKey.containsKey(storeKey);
             S3Object clean = object.clearEvents();
-            storeByKey.put(storeKey, clean);
             long version = versionCounter.getAndIncrement();
             CommandResult<S3Object> result = exists
                 ? new CommandResult.Updated<>(clean, object.domainEvents(), version)
                 : new CommandResult.Created<>(clean, object.domainEvents(), version);
-            return Mono.just(result);
+            // The whole read-compose-write of the latest reference (and the in-memory
+            // view) runs inside one serialized per-key commit — no find/save window.
+            return referenceStore.commitLatest(
+                    object.key().bucket(), object.key().key(),
+                    current -> {
+                        if (current.isEmpty()) {
+                            // No committed content reference — metadata-only aggregate.
+                            storeByKey.put(storeKey, clean);
+                            return current;
+                        }
+                        var committed = current.get();
+                        if (!belongsToCommittedUpload(committed, clean)) {
+                            // This metadata save belongs to an upload that lost a
+                            // concurrent same-key race. Last writer wins: keep the
+                            // winner's self-consistent reference and in-memory view
+                            // untouched — never mix fields from different uploads.
+                            return current;
+                        }
+                        storeByKey.put(storeKey, clean);
+                        manifestByKey.put(storeKey, committed.manifestId());
+                        // Overlay this save's metadata while keeping the committed
+                        // (manifestId, versionId) pair together from ONE source —
+                        // never merged with a possibly-stale in-memory manifest.
+                        return Optional.of(new S3ObjectManifestReferenceStore.Reference(
+                            committed.bucket(),
+                            committed.key(),
+                            clean.storageClass(),
+                            clean.etag() != null ? clean.etag() : committed.etag(),
+                            clean.userMetadata(),
+                            clean.size(),
+                            committed.manifestId(),
+                            committed.versionId(),
+                            clean.createdAt()));
+                    })
+                .thenReturn(result);
         });
+    }
+
+    /**
+     * A metadata save may update the committed reference only when it provably belongs
+     * to the same upload as the committed content (ETag correlation). A save carrying a
+     * different ETag lost a concurrent same-key race and must not touch the winner.
+     */
+    private static boolean belongsToCommittedUpload(
+            S3ObjectManifestReferenceStore.Reference committed, S3Object object) {
+        return committed.etag() == null
+            || object.etag() == null
+            || committed.etag().equals(object.etag());
     }
 
     @Override
@@ -167,19 +214,30 @@ public class StorageEngineReactiveS3ObjectRepository
             checksumOpt,
             encryptionOpt);
 
-        // Use orchestrator to store content
-        return orchestrator.store(command, content)
-            .flatMap(storedObject -> {
-                var storeKey = storeKey(object.key().bucket(), object.key().key());
-                S3Object clean = objectWithEffectiveStorageClass(object, effectiveStorageClass);
-                storeByKey.put(storeKey, clean);
-                manifestByKey.put(storeKey, storedObject.manifestId());
-                long version = versionCounter.getAndIncrement();
-                CommandResult<S3Object> result =
-                    new CommandResult.Created<>(clean, object.domainEvents(), version);
-                return referenceStore.save(clean, storedObject.manifestId(), storedObject.versionId())
-                    .thenReturn(result);
-            });
+        // Use orchestrator to store content. The upload's own bytes are measured while
+        // streaming so the committed reference is composed entirely from THIS upload's
+        // result (versionId + manifestId + etag + size) — single-writer compose.
+        return Mono.defer(() -> {
+            UploadMeasurement measurement = new UploadMeasurement();
+            return orchestrator.store(command, content.doOnNext(measurement::update))
+                .flatMap(storedObject -> {
+                    var storeKey = storeKey(object.key().bucket(), object.key().key());
+                    S3Object committed =
+                        committedObject(object, effectiveStorageClass, measurement);
+                    long version = versionCounter.getAndIncrement();
+                    CommandResult<S3Object> result =
+                        new CommandResult.Created<>(committed, object.domainEvents(), version);
+                    return referenceStore.commitLatest(
+                            object.key().bucket(), object.key().key(),
+                            current -> {
+                                storeByKey.put(storeKey, committed);
+                                manifestByKey.put(storeKey, storedObject.manifestId());
+                                return Optional.of(S3ObjectManifestReferenceStore.Reference.from(
+                                    committed, storedObject.manifestId(), storedObject.versionId()));
+                            })
+                        .thenReturn(result);
+                });
+        });
     }
 
     @Override
@@ -196,21 +254,40 @@ public class StorageEngineReactiveS3ObjectRepository
             Optional.empty(),
             Optional.empty());
 
-        return orchestrator.store(command, content)
-            .flatMap(storedObject -> {
-                // Create an ActiveS3Object from the stored result
-                var activeObject = translator.translateBack(storedObject, null);
-                var storeKey = storeKey(
-                    activeObject.key().bucket(), activeObject.key().key());
-                storeByKey.put(storeKey, activeObject);
-                manifestByKey.put(storeKey, storedObject.manifestId());
-                long version = versionCounter.getAndIncrement();
-                CommandResult<S3Object> result =
-                    new CommandResult.Created<>(
-                        activeObject, activeObject.domainEvents(), version);
-                return referenceStore.save(activeObject, storedObject.manifestId(), storedObject.versionId())
-                    .thenReturn(result);
-            });
+        return Mono.defer(() -> {
+            UploadMeasurement measurement = new UploadMeasurement();
+            return orchestrator.store(command, content.doOnNext(measurement::update))
+                .flatMap(storedObject -> {
+                    // Create an ActiveS3Object from the stored result, completed with
+                    // the ETag and size measured from THIS upload's own bytes.
+                    var restored = translator.translateBack(storedObject, null);
+                    var committed = ActiveS3Object.restoreActive(
+                            restored.key(),
+                            restored.storageClass(),
+                            restored.userMetadata(),
+                            restored.encryption(),
+                            restored.checksum(),
+                            measurement.size(),
+                            restored.createdAt(),
+                            java.util.List.of())
+                        .withEtag(measurement.etag());
+                    var storeKey = storeKey(
+                        committed.key().bucket(), committed.key().key());
+                    long version = versionCounter.getAndIncrement();
+                    CommandResult<S3Object> result =
+                        new CommandResult.Created<>(
+                            committed, committed.domainEvents(), version);
+                    return referenceStore.commitLatest(
+                            committed.key().bucket(), committed.key().key(),
+                            current -> {
+                                storeByKey.put(storeKey, committed);
+                                manifestByKey.put(storeKey, storedObject.manifestId());
+                                return Optional.of(S3ObjectManifestReferenceStore.Reference.from(
+                                    committed, storedObject.manifestId(), storedObject.versionId()));
+                            })
+                        .thenReturn(result);
+                });
+        });
     }
 
     @Override
@@ -433,19 +510,59 @@ public class StorageEngineReactiveS3ObjectRepository
         return "STANDARD";
     }
 
-    private static S3Object objectWithEffectiveStorageClass(S3Object object, String effectiveStorageClass) {
-        if (effectiveStorageClass.equals(object.storageClass())) {
-            return object.clearEvents();
-        }
+    private static S3Object committedObject(
+            S3Object object, String effectiveStorageClass, UploadMeasurement measurement) {
         return ActiveS3Object.restoreActive(
-            object.key(),
-            effectiveStorageClass,
-            object.userMetadata(),
-            object.encryption(),
-            object.checksum(),
-            object.size(),
-            object.createdAt(),
-            java.util.List.of());
+                object.key(),
+                effectiveStorageClass,
+                object.userMetadata(),
+                object.encryption(),
+                object.checksum(),
+                measurement.size(),
+                object.createdAt(),
+                java.util.List.of())
+            .withEtag(measurement.etag());
+    }
+
+    /**
+     * Measures the ETag (MD5) and byte length of an upload's own content stream, so the
+     * committed reference is composed entirely from ONE upload's result and never needs
+     * to be patched later from possibly-stale state.
+     */
+    private static final class UploadMeasurement {
+        private final MessageDigest digest = md5();
+        private final AtomicLong size = new AtomicLong();
+
+        void update(DataBuffer buffer) {
+            size.addAndGet(buffer.readableByteCount());
+            try (DataBuffer.ByteBufferIterator iterator = buffer.readableByteBuffers()) {
+                while (iterator.hasNext()) {
+                    digest.update(iterator.next());
+                }
+            }
+        }
+
+        long size() {
+            return size.get();
+        }
+
+        String etag() {
+            byte[] bytes = digest.digest();
+            StringBuilder hex = new StringBuilder(bytes.length * 2 + 2).append('"');
+            for (byte b : bytes) {
+                hex.append(Character.forDigit((b >> 4) & 0xF, 16))
+                    .append(Character.forDigit(b & 0xF, 16));
+            }
+            return hex.append('"').toString();
+        }
+
+        private static MessageDigest md5() {
+            try {
+                return MessageDigest.getInstance("MD5");
+            } catch (NoSuchAlgorithmException e) {
+                throw new IllegalStateException("MD5 algorithm unavailable", e);
+            }
+        }
     }
 
     /**

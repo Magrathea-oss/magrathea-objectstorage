@@ -14,9 +14,10 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
+import java.nio.file.StandardCopyOption;
 import java.time.ZonedDateTime;
 import java.util.Base64;
 import java.util.List;
@@ -25,20 +26,35 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.UnaryOperator;
 
 /**
  * Internal filesystem index from S3 bucket/key to the latest storage-engine manifest.
  * This is repository-local durable state, not an external storage-engine API.
+ *
+ * <p>Concurrency contract: every mutation of the latest-reference record for a given
+ * bucket/key is serialized through a striped per-key lock (see {@link #commitLatest}).
+ * A committed reference is always written as one complete, self-consistent record
+ * (manifestId + versionId + metadata from a single upload) via a temp-file write
+ * followed by an atomic rename, so readers and crash recovery never observe a torn
+ * or partially written reference.</p>
  */
 final class S3ObjectManifestReferenceStore {
 
     private static final String LATEST_MARKER = "true";
+    private static final int LOCK_STRIPES = 64;
 
     private final Path referencesRoot;
+    private final ReentrantLock[] keyLocks;
 
     S3ObjectManifestReferenceStore(Path referencesRoot) {
         this.referencesRoot = java.util.Objects.requireNonNull(
             referencesRoot, "referencesRoot must not be null");
+        this.keyLocks = new ReentrantLock[LOCK_STRIPES];
+        for (int i = 0; i < LOCK_STRIPES; i++) {
+            keyLocks[i] = new ReentrantLock();
+        }
         try {
             Files.createDirectories(referencesRoot);
         } catch (IOException e) {
@@ -47,7 +63,40 @@ final class S3ObjectManifestReferenceStore {
     }
 
     Mono<Void> save(S3Object object, ManifestId manifestId, VersionId versionId) {
-        return Mono.fromRunnable(() -> writeReference(Reference.from(object, manifestId, versionId)))
+        return commitLatest(object.key().bucket(), object.key().key(),
+            current -> Optional.of(Reference.from(object, manifestId, versionId)));
+    }
+
+    /**
+     * Atomically reads, composes, and commits the latest reference for one bucket/key.
+     *
+     * <p>The whole read-compose-write cycle runs under the per-key lock, so concurrent
+     * same-key commits are serialized and can never interleave between the read and the
+     * write. Unrelated keys use independent lock stripes and are not serialized against
+     * each other. The mutation receives the currently committed reference (if any) and
+     * returns the reference to commit: returning a value equal to the current one skips
+     * the write, returning {@link Optional#empty()} removes the reference.</p>
+     */
+    Mono<Void> commitLatest(String bucket, String key,
+                            UnaryOperator<Optional<Reference>> mutation) {
+        return Mono.fromRunnable(() -> {
+                ReentrantLock lock = lockFor(bucket, key);
+                lock.lock();
+                try {
+                    Optional<Reference> current = readReference(bucket, key);
+                    Optional<Reference> next = mutation.apply(current);
+                    if (next.equals(current)) {
+                        return;
+                    }
+                    if (next.isEmpty()) {
+                        deleteReferenceFile(bucket, key);
+                    } else {
+                        writeReference(next.get());
+                    }
+                } finally {
+                    lock.unlock();
+                }
+            })
             .subscribeOn(Schedulers.boundedElastic())
             .then();
     }
@@ -64,26 +113,47 @@ final class S3ObjectManifestReferenceStore {
     }
 
     Mono<Void> delete(String bucket, String key) {
-        return Mono.fromRunnable(() -> {
-                try {
-                    Files.deleteIfExists(referencePath(bucket, key));
-                } catch (IOException e) {
-                    throw new UncheckedIOException("Failed to delete S3 object reference", e);
-                }
-            })
-            .subscribeOn(Schedulers.boundedElastic())
-            .then();
+        return commitLatest(bucket, key, current -> Optional.empty());
     }
 
+    private void deleteReferenceFile(String bucket, String key) {
+        try {
+            Files.deleteIfExists(referencePath(bucket, key));
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to delete S3 object reference", e);
+        }
+    }
+
+    /**
+     * Durable, crash-safe reference write: the record is written to a temp file in the
+     * same directory (same filesystem) and then atomically moved over the target, so a
+     * reader or a crash never observes a half-written reference.
+     */
     private void writeReference(Reference reference) {
         try {
             Path path = referencePath(reference.bucket(), reference.key());
             Files.createDirectories(path.getParent());
-            Files.writeString(path, serialize(reference),
-                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            Path temp = Files.createTempFile(
+                path.getParent(), path.getFileName().toString() + ".", ".tmp");
+            try {
+                Files.writeString(temp, serialize(reference));
+                try {
+                    Files.move(temp, path,
+                        StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+                } catch (AtomicMoveNotSupportedException e) {
+                    Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING);
+                }
+            } finally {
+                Files.deleteIfExists(temp);
+            }
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to save S3 object reference", e);
         }
+    }
+
+    private ReentrantLock lockFor(String bucket, String key) {
+        int hash = (bucket + "\u0000" + key).hashCode();
+        return keyLocks[Math.floorMod(hash, LOCK_STRIPES)];
     }
 
     private Optional<Reference> readReference(String bucket, String key) {
@@ -127,6 +197,9 @@ final class S3ObjectManifestReferenceStore {
         properties.setProperty("key", reference.key());
         if (reference.storageClass() != null) {
             properties.setProperty("storageClass", reference.storageClass());
+        }
+        if (reference.etag() != null) {
+            properties.setProperty("etag", reference.etag());
         }
         properties.setProperty("size", Long.toString(reference.size()));
         properties.setProperty("manifestId", reference.manifestId().value().toString());
@@ -173,6 +246,7 @@ final class S3ObjectManifestReferenceStore {
             required(properties, "bucket"),
             required(properties, "key"),
             properties.getProperty("storageClass"),
+            properties.getProperty("etag"),
             Map.copyOf(metadata),
             Long.parseLong(required(properties, "size")),
             ManifestId.of(UUID.fromString(required(properties, "manifestId"))),
@@ -203,6 +277,7 @@ final class S3ObjectManifestReferenceStore {
         String bucket,
         String key,
         String storageClass,
+        String etag,
         Map<String, String> userMetadata,
         long size,
         ManifestId manifestId,
@@ -214,6 +289,7 @@ final class S3ObjectManifestReferenceStore {
                 object.key().bucket(),
                 object.key().key(),
                 object.storageClass(),
+                object.etag(),
                 object.userMetadata(),
                 object.size(),
                 manifestId,
@@ -223,14 +299,15 @@ final class S3ObjectManifestReferenceStore {
 
         ActiveS3Object toS3Object() {
             return ActiveS3Object.restoreActive(
-                ObjectKey.of(bucket, key),
-                storageClass,
-                userMetadata,
-                null,
-                ObjectChecksum.of(Set.of()),
-                size,
-                createdAt,
-                List.of());
+                    ObjectKey.of(bucket, key),
+                    storageClass,
+                    userMetadata,
+                    null,
+                    ObjectChecksum.of(Set.of()),
+                    size,
+                    createdAt,
+                    List.of())
+                .withEtag(etag);
         }
     }
 }
