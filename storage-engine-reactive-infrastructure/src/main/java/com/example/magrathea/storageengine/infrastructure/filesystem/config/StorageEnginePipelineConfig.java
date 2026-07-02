@@ -25,6 +25,18 @@ import java.nio.file.Path;
  * All step implementations are NoOp (pass-through) in this phase.
  *
  * FixedWindowDedupStep is the real dedup implementation.
+ *
+ * <p>There is intentionally NO singleton {@code DeduplicationStep} bean declared here.
+ * Deduplication chunk size is a per-policy value carried by
+ * {@link com.example.magrathea.storageengine.domain.valueobject.DedupConfig#chunkSize()}.
+ * {@link DataProcessingPipelineFactory#build(com.example.magrathea.storageengine.domain.pipeline.DataProcessingSpec)}
+ * creates a fresh {@link com.example.magrathea.storageengine.infrastructure.pipeline.FixedWindowDedupStep}
+ * for every pipeline build, using the spec-level chunk size, so the singleton-bean approach
+ * would silently hardcode a single chunk size across all policies.
+ * When {@link com.example.magrathea.storageengine.application.port.ContentAddressIndex} is absent
+ * (e.g. non-storage-engine profiles or tests without a real cluster), the factory falls back to
+ * {@link com.example.magrathea.storageengine.infrastructure.pipeline.NoOpDeduplicationStep} automatically.
+ *
  * TODO: Replace remaining NoOp steps with real implementations (Zstd, AES-GCM, Reed-Solomon).
  * TODO (criticality 3): ECStripeUnit and PartUnit storage not yet implemented.
  * TODO (criticality 4): Cross-cutting cleanup on mid-pipeline failure not yet implemented.

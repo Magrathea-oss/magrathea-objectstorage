@@ -1,7 +1,6 @@
 package com.example.magrathea.storageengine.infrastructure.filesystem.config;
 
 import com.example.magrathea.storageengine.application.port.AlterationPort;
-import com.example.magrathea.storageengine.application.port.ChecksumPort;
 import com.example.magrathea.storageengine.application.port.ChunkStorePort;
 import com.example.magrathea.storageengine.application.port.ContentAddressIndex;
 import com.example.magrathea.storageengine.application.port.DataTransformPort;
@@ -22,7 +21,6 @@ import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemS
 import com.example.magrathea.storageengine.infrastructure.filesystem.PropertyControlledFileSystemWriteFaultInjector;
 import com.example.magrathea.storageengine.infrastructure.filesystem.NoOpAlterationPort;
 import com.example.magrathea.storageengine.infrastructure.filesystem.ReedSolomonECAdapter;
-import com.example.magrathea.storageengine.infrastructure.filesystem.Sha256ChecksumPort;
 import com.example.magrathea.storageengine.infrastructure.filesystem.SimpleReplicationAdapter;
 import com.example.magrathea.storageengine.infrastructure.filesystem.ZstdCompressionAdapter;
 import org.springframework.beans.factory.annotation.Value;
@@ -82,11 +80,6 @@ public class StorageEngineFilesystemConfig {
     @Bean
     public PersistencePlanner persistencePlanner() {
         return new PersistencePlanner();
-    }
-
-    @Bean
-    public ChecksumPort checksumPort() {
-        return new Sha256ChecksumPort();
     }
 
     @Bean
