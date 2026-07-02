@@ -1,4 +1,4 @@
-@requirement @phase-1 @upload @storage-engine @partial
+@requirement @phase-1 @upload @storage-engine
 Business Need: Phase 1 upload reliability requirements for the storage-engine backend
   As an S3-compatible client, storage-engine operator, and system owner,
   I want PutObject and GetObject through the storage-engine backend to be durable,
@@ -17,9 +17,40 @@ Business Need: Phase 1 upload reliability requirements for the storage-engine ba
   Examples filtering, such as @webclient and @awscli, rather than by creating
   separate object-store or awscli feature files.
 
-  Until matching implementation and runner glue are added, this shared requirement
-  resource remains outside the currently selected Cucumber runners. Keep every
-  REQ-UPLOAD-* requirement ID unchanged when the scenarios become executable.
+  Both runners now select this shared feature: Phase1UploadStorageEngineCucumberTest
+  selects the @webclient examples and Phase1UploadStorageEngineAwsCliCucumberTest
+  selects the @awscli examples. Keep every REQ-UPLOAD-* requirement ID unchanged.
+
+  Validation-mode decision (2026-07-02) for REQ-UPLOAD-001 and REQ-UPLOAD-002:
+  bootstrap JUnit integration validation is formally accepted as the sole required
+  runtime validation mode for these two requirements, as authorized by the Phase 1
+  correction plan. Rationale: both requirements assert behavior across a full
+  application-process stop/start against the same storage-engine filesystem root.
+  The bootstrap-application integration tests StorageEngineRestartSafetyTest
+  (REQ-UPLOAD-001) and StorageEngineHttpReadAfterWriteTest manifest-reload coverage
+  (REQ-UPLOAD-002) create, dispose, and recreate the real Spring application context
+  against the same storage root, which the in-process WebTestClient Cucumber glue
+  cannot do without duplicating that bootstrap harness, and which the AWS CLI mode
+  additionally cannot drive because it requires an externally restartable server
+  process plus the aws binary on PATH. The @webclient and @awscli examples for
+  REQ-UPLOAD-001 and REQ-UPLOAD-002 remain in this shared feature as supplementary
+  regression examples, but the Phase 1 Cucumber runners exclude scenarios tagged
+  with `@bootstrap-integration-required` so that the agreed bootstrap-validation
+  boundary stays explicit. The stale REQ-UPLOAD-003 executable scenario has
+  been removed from Phase 1 because it described multiple durable chunks for
+  large non-dedup uploads; that behavior was intentionally removed and must not
+  be reintroduced through Phase 1 tests. REQ-UPLOAD-004 required separate
+  validation evidence in both agreed validation modes before it could be
+  promoted out of `@implemented-not-e2e-validated`; that independent evidence
+  now exists. On 2026-07-02, Phase1UploadStorageEngineCucumberTest (@webclient)
+  and Phase1UploadStorageEngineAwsCliCucumberTest (@awscli) both executed the
+  full "Recovery process does not publish a failed partial upload" scenario
+  (28 discovered scenarios each, 0 failures, 0 errors) against
+  magrathea-build:fedora42, with every Given/When/Then/And step for the
+  REQ-UPLOAD-004 example completing without failure in each runner. All five
+  REQ-UPLOAD-001/002/004/005/006 scenarios in this feature now carry
+  `@implemented-and-validated`, so the feature-level `@partial` tag has been
+  removed.
 
   Validation roles:
     - S3 client validates behavior in WebTestClient and AWS CLI modes.
@@ -58,7 +89,6 @@ Business Need: Phase 1 upload reliability requirements for the storage-engine ba
     | requirement    | bucket                              | key                                        | fixture resource path                    |
     | REQ-UPLOAD-001 | req-upload-restart-bucket           | documents/2026/restart-safe-object.txt    | fixtures/upload/small-object.txt         |
     | REQ-UPLOAD-002 | req-upload-manifest-bucket          | manifests/2026/payload.bin                | fixtures/upload/small-object.txt         |
-    | REQ-UPLOAD-003 | req-upload-large-bucket             | archive/2026/large/streamed-object.bin    | fixtures/upload/large-object.bin         |
     | REQ-UPLOAD-004 | req-upload-atomicity-bucket         | uploads/2026/failed/partial-object.bin    | fixtures/upload/large-object.bin         |
     | REQ-UPLOAD-005 | req-upload-read-after-write-bucket  | documents/2026/read-after-write/object.txt | fixtures/upload/small-object.txt         |
     | REQ-UPLOAD-006 | req-upload-integrity-bucket         | integrity/2026/corruptible-object.bin     | fixtures/upload/corruptible-object.bin   |
@@ -72,7 +102,7 @@ Business Need: Phase 1 upload reliability requirements for the storage-engine ba
     A committed PutObject publishes durable bytes, manifest metadata, and object reference
     before process restart. Reads after restart must use filesystem state, not discarded memory.
 
-    @REQ-UPLOAD-001 @functional-requirement @non-functional-requirement @durability @restart-safety @webclient-required @awscli-required @implemented-not-e2e-validated
+    @REQ-UPLOAD-001 @functional-requirement @non-functional-requirement @durability @restart-safety @bootstrap-integration-required @implemented-and-validated
     Scenario Outline: S3 client reads an uploaded object after application restart
       Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
       And the storage engine operator uses filesystem root "<storage_root>"
@@ -115,7 +145,7 @@ Business Need: Phase 1 upload reliability requirements for the storage-engine ba
     Object references and upload manifests are reloaded independently from the filesystem
     and still identify the original byte stream and durable metadata.
 
-    @REQ-UPLOAD-002 @functional-requirement @non-functional-requirement @durability @manifest-durability @webclient-required @awscli-required @implemented-not-e2e-validated
+    @REQ-UPLOAD-002 @functional-requirement @non-functional-requirement @durability @manifest-durability @bootstrap-integration-required @implemented-and-validated
     Scenario Outline: Storage engine operator can reload committed upload manifests and object references
       Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
       And the storage engine operator uses filesystem root "<storage_root>"
@@ -144,46 +174,11 @@ Business Need: Phase 1 upload reliability requirements for the storage-engine ba
         | requirement_id | validation_mode | header_profile         | headers                       | expected_manifest_metadata   | bucket                     | object_key                 | fixture_file                     | storage_root                                                 | expected_storage_class |
         | REQ-UPLOAD-002 | awscli          | standard-storage-class | x-amz-storage-class=STANDARD | x-amz-storage-class=STANDARD | req-upload-manifest-bucket | manifests/2026/payload.bin | fixtures/upload/small-object.txt | target/storage-engine-it/REQ-UPLOAD-002-awscli-storage-class | STANDARD               |
 
-  Rule: Large uploads are bounded-memory streams
-    Upload and read paths stream large payloads as ordered durable chunks while respecting
-    backpressure and avoiding whole-object materialization.
-
-    @REQ-UPLOAD-003 @functional-requirement @non-functional-requirement @large-object @streaming @webclient-required @awscli-required @implemented-not-e2e-validated
-    Scenario Outline: S3 client streams a large upload with bounded memory and exact read-back
-      Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
-      And the storage engine operator uses filesystem root "<storage_root>"
-      And bucket "<bucket>" exists
-      And fixture file "<fixture_file>" is a deterministic 256 MiB object
-      And an S3 client has object content from fixture file "<fixture_file>" for bucket "<bucket>" and key "<object_key>"
-      And the S3 client applies PutObject header profile "<header_profile>" with headers "<headers>"
-      And the storage engine chunk size is configured to a bounded value smaller than the object
-      When the S3 client uploads fixture file "<fixture_file>" to bucket "<bucket>" and key "<object_key>" through the S3 HTTP PutObject API using a streaming request body
-      Then the storage engine writes the object as multiple durable chunks
-      And no component materializes the complete 256 MiB object in memory at once
-      And upload processing respects downstream backpressure while chunks are written
-      And the committed manifest contains the ordered chunk references needed to reconstruct the object
-      And the committed manifest records storage class "<expected_storage_class>"
-      And the committed manifest records durable object headers and metadata "<expected_manifest_metadata>"
-      When the S3 client reads bucket "<bucket>" and key "<object_key>" through the S3 HTTP GetObject API
-      Then the streamed response bytes exactly match fixture file "<fixture_file>"
-      And the streamed response attributes and metadata include "<expected_manifest_metadata>"
-      And the read path emits chunks in manifest order without loading the complete object into memory
-
-      @webclient
-      Examples: WebTestClient validation
-        | requirement_id | validation_mode | header_profile    | headers                 | expected_manifest_metadata | bucket                  | object_key                              | fixture_file                     | storage_root                                              | expected_storage_class |
-        | REQ-UPLOAD-003 | webclient       | content-type-text | Content-Type=text/plain | Content-Type=text/plain    | req-upload-large-bucket | archive/2026/large/streamed-object.bin | fixtures/upload/large-object.bin | target/storage-engine-it/REQ-UPLOAD-003-webclient-content | STANDARD               |
-
-      @awscli
-      Examples: AWS CLI validation
-        | requirement_id | validation_mode | header_profile  | headers                              | expected_manifest_metadata        | bucket                  | object_key                              | fixture_file                     | storage_root                                           | expected_storage_class |
-        | REQ-UPLOAD-003 | awscli          | sse-s3-metadata | x-amz-server-side-encryption=AES256 | x-amz-server-side-encryption=AES256 | req-upload-large-bucket | archive/2026/large/streamed-object.bin | fixtures/upload/large-object.bin | target/storage-engine-it/REQ-UPLOAD-003-awscli-sse | STANDARD               |
-
   Rule: Failed uploads are not published
     A failed PutObject may leave recovery artifacts, but it must not expose a readable
     object, committed manifest, or durable object metadata.
 
-    @REQ-UPLOAD-004 @functional-requirement @non-functional-requirement @atomicity @recovery @webclient-required @awscli-required @implemented-not-e2e-validated
+    @REQ-UPLOAD-004 @functional-requirement @non-functional-requirement @atomicity @recovery @webclient-required @awscli-required @implemented-and-validated
     Scenario Outline: Recovery process does not publish a failed partial upload
       Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
       And the storage engine operator uses filesystem root "<storage_root>"

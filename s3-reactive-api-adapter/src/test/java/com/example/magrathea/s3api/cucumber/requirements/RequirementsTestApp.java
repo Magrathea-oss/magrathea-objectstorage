@@ -25,6 +25,7 @@ import java.io.UncheckedIOException;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.time.Duration;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @SpringBootApplication
@@ -92,7 +93,27 @@ public class RequirementsTestApp {
         Path clusterRoot = (root == null || root.isBlank())
             ? Path.of(System.getProperty("java.io.tmpdir"), "magrathea-objectstorage", "storage-engine")
             : Path.of(root);
+        removeDanglingSymlink(clusterRoot);
         return new FileSystemStorageCluster(clusterRoot, nodeCount, faultInjector);
+    }
+
+    /**
+     * Test-environment hygiene: previous runner executions (possibly with a different
+     * workspace mount path) may leave {@code target/storage-engine-it/current} behind as a
+     * dangling symlink. {@code FileSystemStorageCluster} creates its directory layout with
+     * {@code Files.createDirectories}, which fails with {@code FileAlreadyExistsException}
+     * on a dangling symlink. Remove such stale links before instantiating the cluster so
+     * context (re)loads are deterministic regardless of leftover state.
+     */
+    private static void removeDanglingSymlink(Path path) {
+        try {
+            if (java.nio.file.Files.isSymbolicLink(path)
+                    && !java.nio.file.Files.exists(path)) {
+                java.nio.file.Files.delete(path);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to remove stale storage root symlink: " + path, e);
+        }
     }
 
     @Bean
@@ -106,6 +127,9 @@ public class RequirementsTestApp {
             .build();
         return WebTestClient.bindToRouterFunction(s3Routes)
             .handlerStrategies(strategies)
+            .configureClient()
+            .codecs(config -> config.defaultCodecs().maxInMemorySize(300 * 1024 * 1024))
+            .responseTimeout(Duration.ofMinutes(2))
             .build();
     }
 

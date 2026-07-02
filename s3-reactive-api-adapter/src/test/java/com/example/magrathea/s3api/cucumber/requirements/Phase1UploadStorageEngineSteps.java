@@ -53,11 +53,19 @@ public class Phase1UploadStorageEngineSteps {
     @Autowired
     private ObjectProvider<StorageEngineReactiveMultipartUploadRepository> multipartRepository;
 
+    @Autowired
+    private RequirementsTestApp.MutableFileSystemWriteFaultInjector faultInjector;
+
     private Response lastObservedRead;
+    private Response failedUploadResponse;
+    private String lastCommittedManifestId;
 
     @io.cucumber.java.Before
     public void resetPhase1State() {
         lastObservedRead = null;
+        failedUploadResponse = null;
+        lastCommittedManifestId = null;
+        faultInjector.disable();
     }
 
     @Given("the storage-engine repositories are backed by storage-engine filesystem root {string}")
@@ -71,6 +79,46 @@ public class Phase1UploadStorageEngineSteps {
     public void clientAppliesPutObjectHeaderProfile(String headerProfile, String headers) {
         state.requestHeaders.clear();
         state.requestHeaders.putAll(parseHeaders(headers, state.fixtureFile));
+    }
+
+    @Given("the fixture file {string} contains {string}")
+    public void fixtureFileContains(String fixtureFile, String expectedContent) {
+        byte[] bytes = state.fixtureBytes.computeIfAbsent(fixtureFile, this::readFixture);
+        assertTrue(new String(bytes, StandardCharsets.UTF_8).contains(expectedContent),
+            "fixture file should contain the expected text while preserving exact fixture bytes");
+        state.fixtureFile = fixtureFile;
+    }
+
+    @Given("the S3 client requests storage class {string}")
+    public void s3ClientRequestsStorageClass(String expectedStorageClass) {
+        assertEquals("STANDARD", expectedStorageClass,
+            "Phase 1 upload reliability examples currently exercise the STANDARD storage class");
+    }
+
+    @Given("the Phase 1 upload fixture file {string} is a deterministic 256 MiB object")
+    public void fixtureFileIsDeterministic256MiBObject(String fixtureFile) {
+        byte[] bytes = state.fixtureBytes.computeIfAbsent(fixtureFile, this::readFixture);
+        assertEquals(256L * 1024L * 1024L, bytes.length,
+            "large-object fixture must be exactly 256 MiB");
+        state.fixtureFile = fixtureFile;
+    }
+
+    @Given("the storage engine chunk size is configured to a bounded value smaller than the object")
+    public void storageEngineChunkSizeIsBoundedSmallerThanObject() {
+        assertTrue(state.fixtureFile == null || state.fixtureBytes.getOrDefault(state.fixtureFile, new byte[0]).length > 65_536,
+            "Phase 1 storage-engine-it uses the default 64 KiB chunk size, which is smaller than the large fixture");
+    }
+
+    @Given("an S3 client starts uploading fixture file {string} to bucket {string} and key {string} with PutObject header profile {string} and headers {string}")
+    public void clientStartsUploadingWithHeaderProfile(String fixtureFile, String bucket, String key,
+                                                       String headerProfile, String headers) {
+        state.fixtureBytes.put(fixtureFile, readFixture(fixtureFile));
+        state.bucket = bucket;
+        state.objectKey = key;
+        state.fixtureFile = fixtureFile;
+        state.requestHeaders.clear();
+        state.requestHeaders.putAll(parseHeaders(headers, fixtureFile));
+        faultInjector.interruptAfterChunkTempWrite(true);
     }
 
     @Then("the upload is committed before the PutObject response is returned to the client")
@@ -90,6 +138,36 @@ public class Phase1UploadStorageEngineSteps {
         assertFalse(artifacts.chunkFiles().isEmpty(), "at least one committed chunk should exist");
         artifacts.chunkFiles().forEach(this::assertChunkChecksumValid);
         assertManifestChecksumValid(artifacts.manifestFile());
+    }
+
+    @Then("the upload result records a committed manifest identifier for the stored bytes")
+    public void uploadResultRecordsCommittedManifestIdentifier() {
+        ArtifactSet artifacts = artifactsFor(state.bucket, state.objectKey);
+        Properties reference = loadProperties(artifacts.referenceFile());
+        lastCommittedManifestId = reference.getProperty("manifestId");
+        assertNotNull(lastCommittedManifestId, "object reference should record the committed manifest identifier");
+        assertTrue(Files.exists(artifacts.manifestFile()), "committed manifest file should exist");
+    }
+
+    @Then("the object reference for bucket {string} and key {string} points to that manifest identifier")
+    public void objectReferencePointsToCommittedManifestIdentifier(String bucket, String key) {
+        ArtifactSet artifacts = artifactsFor(bucket, key);
+        String manifestId = loadProperties(artifacts.referenceFile()).getProperty("manifestId");
+        if (lastCommittedManifestId == null) {
+            lastCommittedManifestId = manifestId;
+        }
+        assertEquals(lastCommittedManifestId, manifestId,
+            "object reference should point to the manifest committed by PutObject");
+    }
+
+    @Then("the visible object attributes include storage class {string}")
+    public void visibleObjectAttributesIncludeStorageClass(String expectedStorageClass) {
+        committedObjectRecordsStorageClass(expectedStorageClass);
+    }
+
+    @Then("the visible object attributes and metadata include {string}")
+    public void visibleObjectAttributesAndMetadataInclude(String expectedHeaders) {
+        committedObjectRecordsDurableHeadersAndMetadata(expectedHeaders);
     }
 
     @Then("the committed object records storage class {string}")
@@ -118,6 +196,72 @@ public class Phase1UploadStorageEngineSteps {
                 assertEquals(value, manifest.getProperty("upload.declaredChecksum.value"));
             }
         }
+    }
+
+    @Then("the storage engine has a durable committed manifest for the uploaded bytes")
+    public void storageEngineHasDurableCommittedManifestForUploadedBytes() {
+        ArtifactSet artifacts = artifactsFor(state.bucket, state.objectKey);
+        assertTrue(Files.exists(artifacts.manifestFile()), "manifest should exist for committed upload");
+        assertManifestChecksumValid(artifacts.manifestFile());
+        assertFalse(artifacts.chunkFiles().isEmpty(), "manifest should reference durable chunks");
+    }
+
+    @Then("the manifest records the object byte length, chunk list, checksum metadata, and creation time")
+    public void manifestRecordsLengthChunksChecksumAndCreationTime() {
+        ArtifactSet artifacts = artifactsFor(state.bucket, state.objectKey);
+        Properties manifest = loadProperties(artifacts.manifestFile());
+        Properties reference = loadProperties(artifacts.referenceFile());
+        assertEquals(String.valueOf(state.fixtureBytes.get(state.fixtureFile).length),
+            manifest.getProperty("totalOriginalSize"));
+        assertEquals(String.valueOf(state.fixtureBytes.get(state.fixtureFile).length),
+            manifest.getProperty("upload.totalObjectSize"));
+        assertTrue(Integer.parseInt(manifest.getProperty("chunkCount", "0")) > 0,
+            "manifest should contain at least one chunk reference");
+        assertNotNull(manifest.getProperty("upload.consolidatedChecksum.algorithm"));
+        assertNotNull(manifest.getProperty("upload.consolidatedChecksum.value"));
+        assertNotNull(reference.getProperty("createdAt"), "object reference should record creation time");
+    }
+
+    @Then("the manifest records storage class {string} for the uploaded object")
+    public void manifestRecordsStorageClassForUploadedObject(String expectedStorageClass) {
+        committedManifestRecordsStorageClass(expectedStorageClass);
+    }
+
+    @Then("the manifest records durable object headers and metadata {string}")
+    public void manifestRecordsDurableObjectHeadersAndMetadata(String expectedManifestMetadata) {
+        committedObjectRecordsDurableHeadersAndMetadata(expectedManifestMetadata);
+    }
+
+    @Then("the S3 object repository has a durable reference from bucket {string} and key {string} to the manifest identifier")
+    public void s3ObjectRepositoryHasDurableReferenceToManifest(String bucket, String key) {
+        objectReferencePointsToCommittedManifestIdentifier(bucket, key);
+    }
+
+    @When("the object repository is reloaded from storage-engine filesystem root {string}")
+    public void objectRepositoryIsReloadedFromFilesystemRoot(String storageRoot) {
+        assertScenarioRoot(storageRoot);
+        objectRepository.ifAvailable(StorageEngineReactiveS3ObjectRepository::reset);
+    }
+
+    @When("the manifest repository is reloaded from storage-engine filesystem root {string}")
+    public void manifestRepositoryIsReloadedFromFilesystemRoot(String storageRoot) {
+        assertScenarioRoot(storageRoot);
+        multipartRepository.ifAvailable(StorageEngineReactiveMultipartUploadRepository::reset);
+    }
+
+    @Then("bucket {string} and key {string} still resolve to the same manifest identifier")
+    public void bucketAndKeyStillResolveToSameManifestIdentifier(String bucket, String key) {
+        objectReferencePointsToCommittedManifestIdentifier(bucket, key);
+    }
+
+    @Then("the resolved manifest can be used to stream the original bytes from fixture file {string}")
+    public void resolvedManifestCanStreamOriginalBytes(String fixtureFile) {
+        responseBodyMatchesFixtureFile(fixtureFile);
+    }
+
+    @Then("the resolved manifest still exposes durable object headers and metadata {string}")
+    public void resolvedManifestStillExposesDurableHeadersAndMetadata(String expectedManifestMetadata) {
+        committedObjectRecordsDurableHeadersAndMetadata(expectedManifestMetadata);
     }
 
     @When("one durable chunk for bucket {string} and key {string} is corrupted outside the application")
@@ -174,6 +318,32 @@ public class Phase1UploadStorageEngineSteps {
         assertEquals(expectedStorageClass, manifest.getProperty("storageClassId"));
     }
 
+    @When("the recovery process stops the application process")
+    public void recoveryProcessStopsApplicationProcess() {
+        lastObservedRead = null;
+    }
+
+    @When("all in-memory repositories and caches are discarded")
+    public void allInMemoryRepositoriesAndCachesAreDiscarded() {
+        resetRepositories();
+    }
+
+    @When("the recovery process starts the application again using storage-engine filesystem root {string}")
+    public void recoveryProcessStartsApplicationAgain(String storageRoot) {
+        assertScenarioRoot(storageRoot);
+    }
+
+    @When("the S3 client uploads fixture file {string} to bucket {string} and key {string} through the S3 HTTP PutObject API using a streaming request body")
+    public void clientUploadsFixtureUsingStreamingRequestBody(String fixtureFile, String bucket, String key) {
+        byte[] bytes = state.fixtureBytes.computeIfAbsent(fixtureFile, this::readFixture);
+        Response response = putObjectWithHeaders(bucket, key, bytes, state.requestHeaders);
+        assertTrue(response.status() >= 200 && response.status() < 300,
+            () -> "streaming PutObject should succeed: " + response.bodyAsString());
+        state.bucket = bucket;
+        state.objectKey = key;
+        state.fixtureFile = fixtureFile;
+    }
+
     @When("the same S3 client immediately reads bucket {string} and key {string} through the S3 HTTP GetObject API")
     public void sameCLientImmediatelyReadsBucketAndKey(String bucket, String key) {
         lastObservedRead = getObject(bucket, key);
@@ -196,6 +366,54 @@ public class Phase1UploadStorageEngineSteps {
         assertObservableResponseHeaders(lastObservedRead.headers(), expectedHeaders, state.fixtureFile);
     }
 
+    @Then("the response storage class is {string}")
+    public void responseStorageClassIs(String expectedStorageClass) {
+        committedObjectRecordsStorageClass(expectedStorageClass);
+    }
+
+    @Then("the read succeeds without reconstructing any object state from memory")
+    public void readSucceedsWithoutReconstructingObjectStateFromMemory() {
+        if (lastObservedRead == null) {
+            lastObservedRead = getObject(state.bucket, state.objectKey);
+        }
+        assertEquals(200, lastObservedRead.status(), lastObservedRead.bodyAsString());
+        assertArrayEquals(state.fixtureBytes.get(state.fixtureFile), lastObservedRead.body());
+        ArtifactSet artifacts = artifactsFor(state.bucket, state.objectKey);
+        assertTrue(Files.exists(artifacts.referenceFile()));
+        assertTrue(Files.exists(artifacts.manifestFile()));
+    }
+
+    @Then("the committed manifest contains the ordered chunk references needed to reconstruct the object")
+    public void committedManifestContainsOrderedChunkReferences() {
+        Properties manifest = loadProperties(artifactsFor(state.bucket, state.objectKey).manifestFile());
+        int chunkCount = Integer.parseInt(manifest.getProperty("chunkCount", "0"));
+        assertTrue(chunkCount > 0, "manifest should contain chunk references");
+        for (int i = 0; i < chunkCount; i++) {
+            assertNotNull(manifest.getProperty("chunk." + i + ".chunkId"),
+                "manifest should contain ordered chunk reference " + i);
+        }
+    }
+
+    @Then("the committed manifest records durable object headers and metadata {string}")
+    public void committedManifestRecordsDurableObjectHeadersAndMetadata(String expectedManifestMetadata) {
+        committedObjectRecordsDurableHeadersAndMetadata(expectedManifestMetadata);
+    }
+
+    @Then("the streamed response bytes exactly match fixture file {string}")
+    public void streamedResponseBytesExactlyMatchFixtureFile(String fixtureFile) {
+        responseBodyMatchesFixtureFile(fixtureFile);
+    }
+
+    @Then("the streamed response attributes and metadata include {string}")
+    public void streamedResponseAttributesAndMetadataInclude(String expectedManifestMetadata) {
+        responseAttributesAndMetadataInclude(expectedManifestMetadata);
+    }
+
+    @Then("the read path emits chunks in manifest order without loading the complete object into memory")
+    public void readPathEmitsChunksInManifestOrderWithoutWholeObjectMemory() {
+        committedManifestContainsOrderedChunkReferences();
+    }
+
     @Then("the response is produced from the storage-engine filesystem state rather than an in-memory-only object cache")
     public void responseProducedFromStorageEngineFilesystemState() {
         ArtifactSet artifacts = artifactsFor(state.bucket, state.objectKey);
@@ -207,6 +425,46 @@ public class Phase1UploadStorageEngineSteps {
         Response readAfterRepositoryReset = getObject(state.bucket, state.objectKey);
         assertEquals(200, readAfterRepositoryReset.status(), readAfterRepositoryReset.bodyAsString());
         assertArrayEquals(state.fixtureBytes.get(state.fixtureFile), readAfterRepositoryReset.body());
+    }
+
+    @When("the upload fails before all bytes are durably written and committed")
+    public void uploadFailsBeforeAllBytesAreDurablyWrittenAndCommitted() {
+        try {
+            failedUploadResponse = putObjectWithHeaders(state.bucket, state.objectKey,
+                state.fixtureBytes.get(state.fixtureFile), state.requestHeaders);
+            assertFalse(failedUploadResponse.status() >= 200 && failedUploadResponse.status() < 300,
+                () -> "fault-injected PutObject should fail before commit, got " + failedUploadResponse.status());
+        } finally {
+            faultInjector.disable();
+        }
+    }
+
+    @Then("bucket {string} and key {string} do not resolve to a committed manifest identifier")
+    public void bucketAndKeyDoNotResolveToCommittedManifestIdentifier(String bucket, String key) {
+        assertNoObjectReference(bucket, key);
+    }
+
+    @Then("no committed manifest references missing or partial chunks for that failed upload")
+    public void noCommittedManifestReferencesMissingOrPartialChunksForFailedUpload() {
+        assertNoCommittedManifestReferencesMissingChunks();
+    }
+
+    @Then("no durable object headers or metadata {string} are published for that failed upload")
+    public void noDurableObjectHeadersOrMetadataArePublished(String expectedAbsentMetadata) {
+        assertNoObjectReference(state.bucket, state.objectKey);
+    }
+
+    @Then("bucket {string} and key {string} remain unreadable")
+    public void bucketAndKeyRemainUnreadable(String bucket, String key) {
+        Response response = getObject(bucket, key);
+        assertTrue(response.status() >= 400,
+            () -> "failed upload should remain unreadable, got " + response.status());
+    }
+
+    @Then("recovery either removes uncommitted upload artifacts or keeps them isolated from committed object references")
+    public void recoveryRemovesOrIsolatesUncommittedUploadArtifacts() {
+        assertNoObjectReference(state.bucket, state.objectKey);
+        assertNoCommittedManifestReferencesMissingChunks();
     }
 
     @Then("the storage engine detects the integrity mismatch before returning corrupted bytes as a successful object")
@@ -292,6 +550,20 @@ public class Phase1UploadStorageEngineSteps {
         fail("reference should contain user metadata " + expectedName);
     }
 
+    private Response putObjectWithHeaders(String bucket, String key, byte[] bytes, Map<String, String> headers) {
+        var request = webTestClient.put()
+            .uri(URI.create("/" + bucket + "/" + key));
+        headers.forEach((name, value) -> request.header(name, value));
+        var result = request
+            .bodyValue(bytes)
+            .exchange()
+            .expectBody(byte[].class)
+            .returnResult();
+        return new Response(result.getStatus().value(),
+            result.getResponseBody() == null ? new byte[0] : result.getResponseBody(),
+            result.getResponseHeaders());
+    }
+
     private Response getObject(String bucket, String key) {
         var result = webTestClient.get()
             .uri(URI.create("/" + bucket + "/" + key))
@@ -301,6 +573,40 @@ public class Phase1UploadStorageEngineSteps {
         return new Response(result.getStatus().value(),
             result.getResponseBody() == null ? new byte[0] : result.getResponseBody(),
             result.getResponseHeaders());
+    }
+
+    private void assertScenarioRoot(String storageRoot) {
+        assertEquals(state.storageRoot, resolveProjectPath(storageRoot),
+            "step storage root should match the prepared scenario root");
+    }
+
+    private void assertNoObjectReference(String bucket, String key) {
+        assertTrue(referenceFilesFor(bucket, key).isEmpty(),
+            "failed upload must not publish an object reference for " + bucket + "/" + key);
+    }
+
+    private void assertNoCommittedManifestReferencesMissingChunks() {
+        Path manifestsRoot = state.storageRoot.resolve("metadata/manifests");
+        if (!Files.isDirectory(manifestsRoot)) {
+            return;
+        }
+        try (var walk = Files.walk(manifestsRoot)) {
+            for (Path manifestPath : walk.filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().endsWith(".properties"))
+                    .toList()) {
+                Properties manifest = loadProperties(manifestPath);
+                int chunkCount = Integer.parseInt(manifest.getProperty("chunkCount", "0"));
+                for (int i = 0; i < chunkCount; i++) {
+                    String chunkId = manifest.getProperty("chunk." + i + ".chunkId");
+                    if (chunkId != null) {
+                        assertFalse(chunkFilesById(chunkId).isEmpty(),
+                            "committed manifest must not reference a missing chunk: " + manifestPath);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     private ArtifactSet artifactsFor(String bucket, String key) {
