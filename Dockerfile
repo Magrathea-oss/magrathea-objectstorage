@@ -9,7 +9,7 @@ ENV NODE_HOME=/opt/node
 ENV PATH="${NODE_HOME}/bin:${PATH}"
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl xz-utils ca-certificates libatomic1 \
+    && apt-get install -y --no-install-recommends curl xz-utils ca-certificates libatomic1 python3 \
     && curl -fsSL "${NODE_URL}" -o /tmp/node.tar.xz \
     && mkdir -p "${NODE_HOME}" \
     && tar -xJf /tmp/node.tar.xz -C "${NODE_HOME}" --strip-components=1 \
@@ -67,6 +67,15 @@ COPY object-store-reactive-infrastructure/src ./object-store-reactive-infrastruc
 COPY object-store-reactive-repository-storage-engine-infrastructure/src ./object-store-reactive-repository-storage-engine-infrastructure/src/
 COPY s3-reactive-api-adapter/src ./s3-reactive-api-adapter/src/
 COPY bootstrap-application/src ./bootstrap-application/src/
+
+# Gherkin requirements appendix quality gate and deterministic regeneration.
+# 1) --check fails the image build if the committed ARC42 appendix is stale
+#    relative to the shared requirement feature files (Docker quality gate).
+# 2) The generator is then re-run so the documentation assets below are always
+#    built from a deterministically regenerated appendix, not host-generated state.
+COPY scripts/generate-gherkin-requirements-appendix.py ./scripts/generate-gherkin-requirements-appendix.py
+RUN python3 scripts/generate-gherkin-requirements-appendix.py --check && \
+    python3 scripts/generate-gherkin-requirements-appendix.py
 
 # Regenerate web documentation assets from source docs inside the builder.
 # This intentionally does not copy generated bootstrap static resources from the host context.
