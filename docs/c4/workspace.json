@@ -1362,7 +1362,7 @@
           "tags" : "Element,Component",
           "technology" : "Java 21 domain"
         }, {
-          "description" : "Reactive ports, catalogs, and repository interfaces used by the Storage Engine application: StoragePolicyCatalog, StorageDeviceCatalog, DiskSetCatalog, StoredObjectRepository, ObjectManifestRepository, ContentAddressIndex, ChecksumPort, DataTransformPort, AlterationPort, ChunkStorePort, and ECOutcome.",
+          "description" : "Reactive ports, catalogs, and repository interfaces used by the Storage Engine application: StoragePolicyCatalog, StorageDeviceCatalog, DiskSetCatalog, StoredObjectRepository, ObjectManifestRepository, ContentAddressIndex, DataTransformPort, AlterationPort, ChunkStorePort, and ECOutcome. SHA-256 checksums are computed directly inside pipeline/filesystem components without a dedicated checksum abstraction.",
           "documentation" : { },
           "id" : "46",
           "name" : "storage-engine-reactive-repository-application",
@@ -1405,7 +1405,7 @@
           "tags" : "Element,Component",
           "technology" : "Spring @Service, Reactor"
         }, {
-          "description" : "Filesystem and YAML adapters/configuration: FileSystemStorageCluster, FileSystemStorageNode, FileSystemVirtualDeviceMapper, FileSystemContentAddressIndex, FileSystemManifestRepository, FileSystemStoredObjectRepository, YAML policy/device/disk-set catalogs, checksum/compression/encryption/EC/replication adapters, and FaultInjectingStorageCluster chaos decorator. MINIO_STANDARD YAML enables EC (4 data / 2 parity) and disables dedup; current C4 docs do not claim verified physical EC shard placement.",
+          "description" : "Filesystem and YAML adapters/configuration: FileSystemStorageCluster, FileSystemStorageNode, FileSystemVirtualDeviceMapper, FileSystemContentAddressIndex, FileSystemManifestRepository, FileSystemStoredObjectRepository, YAML policy/device/disk-set catalogs, compression/encryption/EC/replication adapters, direct SHA-256 calculation in filesystem/pipeline components, and FaultInjectingStorageCluster chaos decorator. MINIO_STANDARD YAML enables EC (4 data / 2 parity) and disables dedup; current C4 docs do not claim verified physical EC shard placement.",
           "documentation" : { },
           "id" : "48",
           "name" : "storage-engine-reactive-infrastructure",
