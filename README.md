@@ -244,6 +244,8 @@ Phases A–F route mapping is recorded in [ADR 0012](docs/adr/0012-phase-f-advan
 | Artifact | Location |
 |---|---|
 | Implementation plan | [`PLAN.md`](PLAN.md) |
+| Positioning & competitive analysis | [`docs/positioning.md`](docs/positioning.md) |
+| Public roadmap | [`docs/roadmap.md`](docs/roadmap.md) |
 | ARC42 architecture docs | [`docs/arc42/`](docs/arc42/) |
 | ADRs | [`docs/adr/`](docs/adr/) |
 | C4 diagrams | [`docs/c4/`](docs/c4/) |

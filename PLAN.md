@@ -516,7 +516,7 @@ Market-window note (factual): MinIO removed features from its community console,
 | Expected outputs | MIT `LICENSE` file at the repository root; licensing ADR recording the owner decision; `docs/positioning.md` naming the four differentiators (YAML policy-driven storage classes, complete admin panel, WebDAV+SMB gateway combination, executable Gherkin requirements as living compliance evidence) vs MinIO/Ceph RGW/Garage/SeaweedFS plus the government/military positioning (self-contained, air-gapped, legacy protocol paths, PKI-suite integration); public roadmap derived from this plan. |
 | Acceptance gates | `LICENSE` present (closes the Section G stale link); ADR accepted; positioning stays factual — no FUD; roadmap makes no claims beyond this plan's honest statuses. |
 | Prerequisites | None — immediate. |
-| Status | `@partial` — MIT `LICENSE` at the repository root and licensing ADR (`docs/adr/0019-adopt-the-mit-license.md`, Accepted) delivered 2026-07-03; `docs/positioning.md` and the public roadmap remain open. |
+| Status | `@partial` — MIT `LICENSE` at the repository root and licensing ADR (`docs/adr/0019-adopt-the-mit-license.md`, Accepted) delivered 2026-07-03; `docs/positioning.md` and `docs/roadmap.md` published 2026-07-03. |
 
 ### KA-2 — Ecosystem Conformance
 
@@ -585,7 +585,7 @@ Market-window note (factual): MinIO removed features from its community console,
 
 | Order | Phase | Start condition | Status |
 |---|---|---|---|
-| 1 | KA-1 Positioning & licensing | Immediate | `@partial` (LICENSE + ADR done 2026-07-03; positioning/roadmap open) |
+| 1 | KA-1 Positioning & licensing | Immediate | `@partial` (LICENSE + ADR done 2026-07-03; positioning/roadmap published 2026-07-03) |
 | 2 | KA-2 Ecosystem conformance | After minimal EP-1 (SigV4) | `@absent` |
 | 3 | KA-3 Data-lake readiness & S3 Tables | After EP-1 + EP-3 | `@absent` |
 | 4 | KA-4 Eventing, tiering, multi-site, federation | After EP-1/EP-2/EP-4; multi-site after EP-10 | `@absent` |
@@ -594,7 +594,7 @@ Market-window note (factual): MinIO removed features from its community console,
 
 ### Definition of Killer App (checklist — all unchecked)
 
-- [ ] KA-1: MIT `LICENSE` and positioning published. (LICENSE + licensing ADR done 2026-07-03; positioning not yet published.)
+- [x] KA-1: MIT `LICENSE` and positioning published. (LICENSE + licensing ADR done 2026-07-03; positioning.md and roadmap.md published 2026-07-03.)
 - [ ] KA-2: s3-tests pass-rate published with honest known-failures.
 - [ ] KA-3: Iceberg/Spark validated (conditional PUT + presigned URLs working).
 - [ ] KA-3: S3 Tables adapter + table-store BC delivering namespaces/tables.
