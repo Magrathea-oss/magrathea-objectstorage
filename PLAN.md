@@ -19,6 +19,7 @@ This is the **single authoritative evidence table** for current test counts. Old
 | PA-1 upload runners | `Phase1UploadStorageEngineCucumberTest` + `Phase1UploadStorageEngineAwsCliCucumberTest`: **28 scenarios discovered / 0 failures per class** (non-selected scenarios excluded by tag filter) |
 | PA-2 AWS CLI same-key stress | REQ-FS-006 same-key stress re-validation: **6/6 fresh-JVM runs passed** |
 | Coverage | JaCoCo is the coverage baseline; current per-module numbers live in [`docs/test-report.md`](docs/test-report.md) — not embedded here to avoid staleness |
+| S3 route inventory (2026-07-02) | ~95 operations mapped by the S3 router; 64 handler methods in `S3BucketConfigHandler` alone. **Inventory evidence only — explicitly NOT completion evidence** (per ADR 0018, mapped ≠ implemented). |
 
 ## Post-Audit Production Readiness Plan (PA-1 .. PA-6)
 
@@ -143,6 +144,7 @@ Remaining gaps:
 - **Write path:** only `S3MultipartHandler.uploadPart` still uses `DataBufferUtils.join`. `S3ObjectOperationsHandler.putObject` (single-pass `UploadDigest` tee) and `FixedWindowDedupStep` (incremental windows) were fixed and are guarded by the static architecture test `ReactiveUploadStreamingArchitectureTest` (REQ-PIPELINE-007/008).
 - **Read path (newly identified, planner-verified):** `S3ObjectOperationsHandler.getObject` calls `oc.content().collectList()` for **both** range and non-range requests, materializing the whole object in memory on read. Open reactive-streaming defect — tracked as EP-3. Not claimed fixed.
 - Multipart part-body persistence and final object assembly remain incomplete (part bytes are currently discarded) — EP-3.
+- **Handler-local state in the web adapter (planner-verified 2026-07-02):** `S3BucketConfigHandler` (lines 124–131) holds a strategy `registry` map plus **6 `ConcurrentHashMap`s directly in the WEB ADAPTER** for abacConfigs, objectLockConfigs, metadataConfigs, metadataTableConfigs, inventoryTableConfigs, and journalTableConfigs. This is a layering violation (state in the HTTP adapter, not behind repository ports) and a durability gap even worse than EP-2's repository-level maps. Open item; remediation scoped into EP-2 and the Ancillary S3 API Requirements Backlog.
 - Broader chunk identity consistency, dedup duplicate-hit short-circuit, and complete admin catalog-backed error semantics remain open (see CC-6).
 
 ### E. Storage-engine/MINIO_STANDARD/configuration ✅ Bounded first pass completed
@@ -173,7 +175,7 @@ Done: JaCoCo documented as baseline (Clover optional/legacy); evidence-based `do
 | Affected modules/files | `README.md`, `PLAN.md`, `docs/arc42/**`, `docs/adr/**`, `docs/c4/**`, `docs/test-report.md`, `docs/api-coverage.md`, `LICENSE` |
 | Acceptance gates | No implemented-status overclaims; C4/ARC42 names match code; linked docs exist; ADR statuses current and in English |
 
-Done: S3-only/admin contradiction corrected; storage-engine runtime claims downgraded then re-verified; JaCoCo baseline wording. Remaining: C4 diagram refresh for current routers/admin API; ADR freshness sweep; residual stale links.
+Done: S3-only/admin contradiction corrected; storage-engine runtime claims downgraded then re-verified; JaCoCo baseline wording. Remaining: C4 diagram refresh for current routers/admin API; ADR freshness sweep; residual stale links; **`docs/api-coverage.md` does not exist (verified 2026-07-02)** despite being referenced here and required by the S3 Semantic Reporting Table Template — the S3-P0 semantic inventory was never completed; closed by the generated-matrix task in the Ancillary S3 API Requirements Backlog.
 
 ### H. Web/UI planning
 
@@ -225,6 +227,10 @@ This section implements [ADR 0018](docs/adr/0018-course-correction-classify-s3-a
 | Replication/lifecycle/notification execution | S3-P4 | Distinguish config storage from executing background behaviors. | Execution needs integration tests proving side effects; otherwise config-only/stubbed. |
 | Advanced/specialized APIs (`SelectObjectContent`, `RestoreObject`, torrent, Object Lambda, directory buckets/sessions) | S3-P4 / separate scope | Likely unsupported or separate scope unless implemented. | Documented unsupported/not-implemented responses or explicit scenarios with deviations. |
 | Admin/storage-engine integration APIs | S3-P0..P4 | Not AWS S3 APIs; must not become a parallel object API. Read-only catalogs + validation today; backend status planned. | Admin API tests prove catalog/validation behavior; docs keep admin APIs separate from S3 coverage. |
+| Batch object operations: `DeleteObjects` | S3-P1/S3-P2 | Multi-delete semantics: per-key success/error reporting, quiet mode, partial-failure result document. Mapped and nominally working today but previously unplanned. | Semantic scenarios cover mixed success/error batches, quiet mode, and per-key error entries in both runner modes. |
+| Rename: `RenameObject` (`x-amz-rename-destination`) | S3-P4 / explicit-extension scope | Non-core-AWS general-purpose S3 (S3 Express-derived). Requires a keep/reclassify/remove decision plus documented semantics (copy+delete today). | Decision recorded (ADR or matrix note); if kept, semantics documented and tested; if removed, route retired. |
+| S3 Metadata tables (bucket metadata configuration, metadata table, inventory table, journal table configurations) | S3-P4 | Currently handler-local `ConcurrentHashMap` state in `S3BucketConfigHandler` (see section D critical finding). Classify `@placeholder` until repository-backed; **no background table generation may ever be claimed without jobs.** | Config CRUD moves behind repository ports; status stays `@placeholder`/`@config-only` until then; background generation requires tested jobs. |
+| Non-standard extensions: bucket ABAC (`getBucketAbac`/`putBucketAbac`), `updateObjectEncryption`, `ListBuckets` JSON | Explicit decision | Each must be (i) reclassified as a documented Magrathea extension with its own requirements, (ii) hidden behind a feature flag, or (iii) removed. They must not silently masquerade as AWS S3 APIs. | Per-operation decision recorded; extension docs/flag/removal implemented and tested accordingly. |
 
 ### Required S3 Semantic Reporting Table Template
 
@@ -236,11 +242,30 @@ This section implements [ADR 0018](docs/adr/0018-course-correction-classify-s3-a
 
 | Priority | Correction focus | Status / gate |
 |---|---|---|
-| S3-P0 | Replace `111/111` claims with a semantic matrix; inventory all operations. | ✅ Documentation truth reset done 2026-06-12; full per-operation semantic inventory still pending a dedicated java-tester pass. |
+| S3-P0 | Replace `111/111` claims with a semantic matrix; inventory all operations. | ⚠️ Documentation truth reset done 2026-06-12; **`docs/api-coverage.md` is missing (verified 2026-07-02)** and the semantic inventory remains open — closed by the generated `docs/api-coverage.md` matrix task in the Ancillary S3 API Requirements Backlog. |
 | S3-P1 | Object CRUD + bucket baseline against both backends. | ⚠️ First AWS CLI CRUD/bucket increments complete (CC-9); metadata/checksum/copy semantics, fuller list semantics, and storage-engine scenarios remain. |
 | S3-P2 | Multipart + object metadata/tagging/ACL persistence. | Open; multipart part persistence/assembly is EP-3. |
 | S3-P3 | Bucket configuration statefulness; versioning/delete markers. | Open. |
 | S3-P4 | Authorization/enforcement/background jobs/advanced APIs. | Open; authorization/enforcement is EP-1. |
+
+### Ancillary S3 API Requirements Backlog (planned)
+
+Planner-verified 2026-07-02: no requirement feature file covers the ancillary bucket-configuration families — only phase-1..6 requirement features exist, and phase-5 REQ-S3-001..007 covers ETag/multipart/Range/conditional/copy/tagging/unsupported-classification only. The legacy `object-store/bucket-config.feature` contains 148 status-code-only scenarios (protocol-smoke class per AGENTS.md A.5) that are **not** tagged `@protocol-smoke`.
+
+Planned requirement feature file: **`phase-7-s3-ancillary-config.feature`** — `Business Need`, shared WebTestClient + AWS CLI validation modes per INV-2, requirement IDs **REQ-S3-CFG-\***, one `Rule` per family: CORS, policy, encryption-config, lifecycle-config, logging, website, notification, replication-config, requestPayment, ownershipControls, publicAccessBlock, accelerate, analytics/inventory/metrics/intelligentTiering, metadata tables, ABAC-or-removal, object-lock config.
+
+Honest status at authoring time (no status may be invented):
+
+- `@config-only` — families persisted through `ReactiveBucketService`/bucket repository.
+- `@placeholder` — the 6 handler-local families held in `S3BucketConfigHandler` `ConcurrentHashMap`s (ABAC, object-lock config, metadata config, metadata-table, inventory-table, journal-table).
+- `@not-implemented` — all enforcement/background behavior: CORS enforcement, lifecycle execution, replication execution, notification delivery, website serving, logging delivery, analytics/inventory generation.
+
+Task list:
+
+- [ ] Write `phase-7-s3-ancillary-config.feature` per the structure above (`java-tester`).
+- [ ] Tag the 148 legacy `bucket-config.feature` status-code scenarios `@protocol-smoke` (`java-tester`).
+- [ ] Move the 6 handler-local config families behind repository ports (`java-infra-coder`; feeds EP-2).
+- [ ] Generate `docs/api-coverage.md` as a machine-generated semantic matrix using the Required S3 Semantic Reporting Table Template (pattern: the Gherkin appendix generator), wired into the same freshness-check discipline. Closes the open S3-P0 semantic inventory.
 
 ### S3 Semantic Acceptance Criteria (summary)
 
@@ -288,11 +313,11 @@ This section defines the path from "validated prototype with honest gaps" to an 
 
 | Field | Plan |
 |---|---|
-| Focus | Close the in-memory metadata gap (see the qualified checklist items in CC below): bucket registry (`StorageEngineReactiveBucketRepository`), multipart upload state (`StorageEngineReactiveMultipartUploadRepository`), and per-object configuration metadata (ACL/legal hold/lock config/retention/encryption/restore maps in `StorageEngineReactiveS3ObjectRepository` lines 66–77) are still in-memory `ConcurrentHashMap` state even in storage-engine mode and are lost on restart. |
+| Focus | Close the in-memory metadata gap (see the qualified checklist items in CC below): bucket registry (`StorageEngineReactiveBucketRepository`), multipart upload state (`StorageEngineReactiveMultipartUploadRepository`), and per-object configuration metadata (ACL/legal hold/lock config/retention/encryption/restore maps in `StorageEngineReactiveS3ObjectRepository` lines 66–77) are still in-memory `ConcurrentHashMap` state even in storage-engine mode and are lost on restart. **Extended scope (2026-07-02):** the 6 handler-local bucket-config families in `S3BucketConfigHandler` (ABAC, object-lock config, metadata config, metadata-table, inventory-table, journal-table — see section D) and bucket configuration state generally must move behind repository ports AND become durable in storage-engine mode. |
 | Owner agents | `java-infra-coder` primary; `java-domain-coder`; `java-tester` |
 | Requirement feature file | `phase-ep2-metadata-durability.feature` |
 | Key requirement IDs | REQ-DUR-* |
-| Expected outputs | Durable bucket registry, durable multipart upload state, durable per-object configuration metadata (ACL, tags where not already durable, object lock, retention, legal hold, encryption config, restore state) in storage-engine mode. |
+| Expected outputs | Durable bucket registry, durable multipart upload state, durable per-object configuration metadata (ACL, tags where not already durable, object lock, retention, legal hold, encryption config, restore state) in storage-engine mode; the 6 handler-local bucket-config families relocated behind repository ports and made durable, plus durable bucket configuration state generally. |
 | Acceptance gates | Restart-safety Cucumber scenarios per state family using the bootstrap restart harness pattern of REQ-UPLOAD-001/002; state survives full process stop/start. |
 | Status | `@partial` (object bytes + manifests + object references are durable; the families above are not) |
 
