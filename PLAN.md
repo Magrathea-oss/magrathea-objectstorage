@@ -323,7 +323,7 @@ KA dependencies: KA-2 (Ceph s3-tests requires SigV4), KA-3 (presigned URLs), and
 | Key requirement IDs | REQ-DUR-* |
 | Expected outputs | Durable bucket registry, durable multipart upload state, durable per-object configuration metadata (ACL, tags where not already durable, object lock, retention, legal hold, encryption config, restore state) in storage-engine mode; the 6 handler-local bucket-config families relocated behind repository ports and made durable, plus durable bucket configuration state generally. |
 | Acceptance gates | Restart-safety Cucumber scenarios per state family using the bootstrap restart harness pattern of REQ-UPLOAD-001/002; state survives full process stop/start. |
-| Status | `@partial` (object bytes + manifests + object references are durable; the families above are not) |
+| Status | `@partial` — **major progress 2026-07-03**: bucket registry (full `BucketConfig` document), multipart upload state (upload id + recorded parts), and per-object configuration (legal hold, lock config, retention, encryption, restore) are now durable JSON documents under `metadata/buckets`, `metadata/multipart-uploads`, `metadata/object-config` with crash-safe atomic commits (`BucketStore`, `MultipartUploadStateStore`, `ObjectConfigMetadataStore` + shared `DurableJson`). Validated by `MetadataDurabilityRestartTest` (6 restart-simulation unit tests) and the upgraded `StorageEngineRestartSafetyTest` (real context restart: HeadBucket 200, ListBuckets includes bucket, re-create → 409). REQ-DUR-001 `@implemented-and-validated`; REQ-DUR-002/003 core families `@implemented-not-e2e-validated`. **Open:** object tags + ACL durability (`@partial` — stored on the aggregate, not in the durable reference), the 6 handler-local `S3BucketConfigHandler` families (`@config-only`), the combined REQ-DUR-005 scenario, and Cucumber runner wiring for the EP-2 feature. Test-glue restart semantics split: `reset()` (wipe) vs `reloadFromDisk()` (restart simulation). |
 
 ### EP-3 — Reactive Streaming Completion (BLOCKER)
 
@@ -471,7 +471,7 @@ Owner rule (2026-07-02): any gRPC used by the SMB/VFS gateway follows the same r
 
 | Order | Phase | Priority | Status |
 |---|---|---|---|
-| 1 | EP-2 Metadata durability | Blocker | `@partial` |
+| 1 | EP-2 Metadata durability | Blocker | `@partial` (registry/multipart/object-config durable; tags/ACL + 6 handler-local families open) |
 | 2 | EP-3 Reactive streaming completion | Blocker | `@partial` |
 | 3 | EP-1 Security & identity | Blocker | `@absent` |
 | 4 | EP-4 Space management & data hygiene | High | `@absent` |

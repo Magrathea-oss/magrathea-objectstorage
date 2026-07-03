@@ -18,8 +18,8 @@ Generated from `s3-reactive-api-adapter/src/test/features/requirements` using `p
 
 === Summary
 
-* Feature files scanned: 6
-* Scenarios discovered: 66
+* Feature files scanned: 7
+* Scenarios discovered: 86
 * Protocol-smoke scenarios: 0
 
 ==== Status tag counts
@@ -27,10 +27,12 @@ Generated from `s3-reactive-api-adapter/src/test/features/requirements` using `p
 [cols="1,1",options="header"]
 |===
 |Tag |Scenario count
-|`@config-only` |1
-|`@implemented-and-validated` |41
-|`@implemented-not-e2e-validated` |17
+|`@absent` |1
+|`@config-only` |6
+|`@implemented-and-validated` |42
+|`@implemented-not-e2e-validated` |28
 |`@not-implemented` |12
+|`@partial` |2
 |===
 
 ==== Validation mode tag counts
@@ -39,7 +41,7 @@ Generated from `s3-reactive-api-adapter/src/test/features/requirements` using `p
 |===
 |Tag |Scenario count
 |`@awscli-required` |19
-|`@bootstrap-integration-required` |2
+|`@bootstrap-integration-required` |3
 |`@filesystem-inspection-required` |1
 |`@log-inspection-required` |3
 |`@metrics-inspection-required` |3
@@ -47,7 +49,7 @@ Generated from `s3-reactive-api-adapter/src/test/features/requirements` using `p
 |`@static-architecture-required` |2
 |`@tracing-inspection-required` |2
 |`@webclient-required` |45
-|`unknown/not-tagged` |15
+|`unknown/not-tagged` |34
 |===
 
 ==== Classification tag counts
@@ -55,8 +57,8 @@ Generated from `s3-reactive-api-adapter/src/test/features/requirements` using `p
 [cols="1,1",options="header"]
 |===
 |Tag |Scenario count
-|`@functional-requirement` |60
-|`@non-functional-requirement` |50
+|`@functional-requirement` |80
+|`@non-functional-requirement` |60
 |===
 
 === Scenarios by Feature and Requirement ID
@@ -3204,4 +3206,706 @@ production readiness. Completion must not be inferred from route inventories, pl
   And any future status "@implemented-not-e2e-validated" is allowed only for behavior implemented in production code without full multi-node end-to-end evidence
   And the reports do not mark distributed readiness as complete or "@implemented-and-validated"
   And the reports distinguish modeled planner behavior from distributed-production readiness
+----
+
+==== s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature
+
+* Feature title: Business Need: EP-2 Complete Metadata Durability
+* Feature tags: `@requirement`, `@phase-ep2`, `@metadata-durability`, `@storage-engine`
+* Feature description:
++
+----
+All S3-visible metadata families — the bucket registry, multipart upload state,
+per-object configuration, and bucket configuration families — must survive a full
+process stop and start when the storage-engine backend is active. The in-memory
+(single-node) profile is explicitly exempt: it does not claim restart durability.
+Durable state lives under the storage-engine filesystem root:
+bucket registry documents under "metadata/buckets", multipart upload sessions under
+"metadata/multipart-uploads", and per-object configuration documents under
+"metadata/object-config". Every commit is crash-safe (temp file + atomic rename).
+----
+
+===== REQ-DUR-001
+
+====== Scenario: Bucket registry survives restart in storage-engine mode
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:18`
+|Rule |The bucket registry must survive restart in storage-engine mode
+|Requirement ID(s) |`REQ-DUR-001`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@durability`, `@restart-safety`
+|Validation mode tags |`@bootstrap-integration-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@REQ-DUR-001`, `@functional-requirement`, `@non-functional-requirement`, `@durability`, `@restart-safety`, `@bootstrap-integration-required`, `@implemented-and-validated`
+|===
+
+.Rule description
+----
+Buckets created through the S3 API, including their full configuration document,
+are reloaded from the filesystem when the process restarts.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-001-bucket-registry"
+  And bucket "ep2-bucket-registry-test" is created through the S3 CreateBucket API
+  When the application process is stopped and started again with the same filesystem root
+  Then a HeadBucket request for bucket "ep2-bucket-registry-test" returns HTTP 200
+  And the ListBuckets response includes bucket "ep2-bucket-registry-test"
+  And re-creating bucket "ep2-bucket-registry-test" is rejected because the bucket already exists
+----
+
+====== Scenario: In-memory single-node mode is exempt from bucket registry durability
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:27`
+|Rule |The bucket registry must survive restart in storage-engine mode
+|Requirement ID(s) |`REQ-DUR-001`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@in-memory-exemption`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-not-e2e-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@REQ-DUR-001`, `@functional-requirement`, `@in-memory-exemption`, `@implemented-not-e2e-validated`
+|===
+
+.Rule description
+----
+Buckets created through the S3 API, including their full configuration document,
+are reloaded from the filesystem when the process restarts.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the in-memory single-node profile is active
+  And bucket "ep2-memory-exempt-test" is created through the S3 CreateBucket API
+  When the application process is stopped and started again
+  Then a HeadBucket request for bucket "ep2-memory-exempt-test" returns HTTP 404
+  And the ListBuckets response does not include bucket "ep2-memory-exempt-test"
+----
+
+===== REQ-DUR-002
+
+====== Scenario: Multipart upload state survives restart in storage-engine mode
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:40`
+|Rule |Multipart upload state must survive restart in storage-engine mode
+|Requirement ID(s) |`REQ-DUR-002`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@durability`, `@restart-safety`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-not-e2e-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@REQ-DUR-002`, `@functional-requirement`, `@non-functional-requirement`, `@durability`, `@restart-safety`, `@implemented-not-e2e-validated`
+|===
+
+.Rule description
+----
+The upload id, bucket, key, initiated timestamp and every recorded part
+(part number, ETag, size) are reloaded from the filesystem after a restart,
+so in-progress uploads can be listed and aborted after recovery.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-002-multipart-state"
+  And a multipart upload is initiated for bucket "ep2-mpu-durability-test" and key "backups/2026-07/large-file.dat" with the upload ID recorded
+  And part number 1 is uploaded and its ETag and size are recorded in the upload session
+  When the application process is stopped and started again with the same filesystem root
+  Then listing multipart uploads for bucket "ep2-mpu-durability-test" includes the recorded upload ID
+  And the recorded upload ID can be used to abort the multipart upload
+  And after the abort, listing multipart uploads for bucket "ep2-mpu-durability-test" does not include the recorded upload ID
+----
+
+====== Scenario: In-memory single-node mode is exempt from multipart durability
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:50`
+|Rule |Multipart upload state must survive restart in storage-engine mode
+|Requirement ID(s) |`REQ-DUR-002`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@in-memory-exemption`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-not-e2e-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@REQ-DUR-002`, `@functional-requirement`, `@in-memory-exemption`, `@implemented-not-e2e-validated`
+|===
+
+.Rule description
+----
+The upload id, bucket, key, initiated timestamp and every recorded part
+(part number, ETag, size) are reloaded from the filesystem after a restart,
+so in-progress uploads can be listed and aborted after recovery.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the in-memory single-node profile is active
+  And a multipart upload is initiated for bucket "ep2-mpu-memory-test" with the upload ID recorded
+  When the application process is stopped and started again
+  Then listing multipart uploads for bucket "ep2-mpu-memory-test" does not include the recorded upload ID
+----
+
+===== REQ-DUR-003
+
+====== Scenario: Object legal hold survives restart in storage-engine mode
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:62`
+|Rule |Per-object configuration metadata must survive restart in storage-engine mode
+|Requirement ID(s) |`REQ-DUR-003`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@durability`, `@restart-safety`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-not-e2e-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@REQ-DUR-003`, `@functional-requirement`, `@non-functional-requirement`, `@durability`, `@restart-safety`, `@implemented-not-e2e-validated`
+|===
+
+.Rule description
+----
+Legal hold, object lock configuration, retention period, object-level encryption
+configuration and restore state for one bucket/key are committed together as one
+durable, self-consistent document under "metadata/object-config".
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-003-legal-hold"
+  And an object exists at bucket "ep2-obj-meta-test" and key "records/case-4711/legal-hold.dat"
+  And the object has legal hold status "ON"
+  When the application process is stopped and started again with the same filesystem root
+  Then GetObjectLegalHold for key "records/case-4711/legal-hold.dat" returns status "ON"
+----
+
+====== Scenario: Object lock configuration survives restart in storage-engine mode
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:70`
+|Rule |Per-object configuration metadata must survive restart in storage-engine mode
+|Requirement ID(s) |`REQ-DUR-003`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@durability`, `@restart-safety`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-not-e2e-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@REQ-DUR-003`, `@functional-requirement`, `@non-functional-requirement`, `@durability`, `@restart-safety`, `@implemented-not-e2e-validated`
+|===
+
+.Rule description
+----
+Legal hold, object lock configuration, retention period, object-level encryption
+configuration and restore state for one bucket/key are committed together as one
+durable, self-consistent document under "metadata/object-config".
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-003-lock-config"
+  And an object exists at bucket "ep2-obj-meta-test" and key "records/case-4711/locked-file.doc"
+  And the object has lock configuration with mode "COMPLIANCE" and a retention period of 60 days
+  When the application process is stopped and started again with the same filesystem root
+  Then GetObjectLockConfiguration for key "records/case-4711/locked-file.doc" returns mode "COMPLIANCE" and a retention period of 60 days
+----
+
+====== Scenario: Object retention period survives restart in storage-engine mode
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:78`
+|Rule |Per-object configuration metadata must survive restart in storage-engine mode
+|Requirement ID(s) |`REQ-DUR-003`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@durability`, `@restart-safety`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-not-e2e-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@REQ-DUR-003`, `@functional-requirement`, `@non-functional-requirement`, `@durability`, `@restart-safety`, `@implemented-not-e2e-validated`
+|===
+
+.Rule description
+----
+Legal hold, object lock configuration, retention period, object-level encryption
+configuration and restore state for one bucket/key are committed together as one
+durable, self-consistent document under "metadata/object-config".
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-003-retention"
+  And an object exists at bucket "ep2-obj-meta-test" and key "records/case-4711/retained.log"
+  And the object has a retention period of 365 days
+  When the application process is stopped and started again with the same filesystem root
+  Then GetObjectRetention for key "records/case-4711/retained.log" returns a retention period of 365 days
+----
+
+====== Scenario: Object encryption configuration survives restart in storage-engine mode
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:86`
+|Rule |Per-object configuration metadata must survive restart in storage-engine mode
+|Requirement ID(s) |`REQ-DUR-003`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@durability`, `@restart-safety`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-not-e2e-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@REQ-DUR-003`, `@functional-requirement`, `@non-functional-requirement`, `@durability`, `@restart-safety`, `@implemented-not-e2e-validated`
+|===
+
+.Rule description
+----
+Legal hold, object lock configuration, retention period, object-level encryption
+configuration and restore state for one bucket/key are committed together as one
+durable, self-consistent document under "metadata/object-config".
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-003-encryption"
+  And an object exists at bucket "ep2-obj-meta-test" and key "records/case-4711/encrypted.bin"
+  And the object has server-side encryption configuration with algorithm "AES256"
+  When the application process is stopped and started again with the same filesystem root
+  Then the object encryption configuration for key "records/case-4711/encrypted.bin" returns algorithm "AES256"
+----
+
+====== Scenario: Object restore state survives restart in storage-engine mode
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:94`
+|Rule |Per-object configuration metadata must survive restart in storage-engine mode
+|Requirement ID(s) |`REQ-DUR-003`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@durability`, `@restart-safety`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-not-e2e-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@REQ-DUR-003`, `@functional-requirement`, `@non-functional-requirement`, `@durability`, `@restart-safety`, `@implemented-not-e2e-validated`
+|===
+
+.Rule description
+----
+Legal hold, object lock configuration, retention period, object-level encryption
+configuration and restore state for one bucket/key are committed together as one
+durable, self-consistent document under "metadata/object-config".
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-003-restore"
+  And an object exists at bucket "ep2-obj-meta-test" and key "archives/2026/restored.zip"
+  And the object has restore state requested at "2026-07-02T09:10:00Z" expiring at "2026-07-09T09:10:00Z" with tier "STANDARD"
+  When the application process is stopped and started again with the same filesystem root
+  Then the object restore state for key "archives/2026/restored.zip" returns the recorded request and expiry timestamps
+----
+
+====== Scenario: Object tags survive restart in storage-engine mode
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:102`
+|Rule |Per-object configuration metadata must survive restart in storage-engine mode
+|Requirement ID(s) |`REQ-DUR-003`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@durability`, `@restart-safety`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@partial`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@REQ-DUR-003`, `@functional-requirement`, `@durability`, `@restart-safety`, `@partial`
+|===
+
+.Rule description
+----
+Legal hold, object lock configuration, retention period, object-level encryption
+configuration and restore state for one bucket/key are committed together as one
+durable, self-consistent document under "metadata/object-config".
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-003-tags"
+  And an object exists at bucket "ep2-obj-meta-test" and key "documents/tags-doc.pdf"
+  And the object has tags "Project=Alpha" and "Version=2"
+  When the application process is stopped and started again with the same filesystem root
+  Then GetObjectTagging for key "documents/tags-doc.pdf" returns tags "Project=Alpha" and "Version=2"
+----
+
+====== Scenario: Object ACL survives restart in storage-engine mode
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:110`
+|Rule |Per-object configuration metadata must survive restart in storage-engine mode
+|Requirement ID(s) |`REQ-DUR-003`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@durability`, `@restart-safety`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@partial`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@REQ-DUR-003`, `@functional-requirement`, `@durability`, `@restart-safety`, `@partial`
+|===
+
+.Rule description
+----
+Legal hold, object lock configuration, retention period, object-level encryption
+configuration and restore state for one bucket/key are committed together as one
+durable, self-consistent document under "metadata/object-config".
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-003-acl"
+  And an object exists at bucket "ep2-obj-meta-test" and key "documents/acl-file.txt"
+  And the object has an ACL grant "FULL_CONTROL" for user "admin"
+  When the application process is stopped and started again with the same filesystem root
+  Then GetObjectAcl for key "documents/acl-file.txt" returns grant "FULL_CONTROL" for user "admin"
+----
+
+====== Scenario: In-memory single-node mode is exempt from per-object metadata durability
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:118`
+|Rule |Per-object configuration metadata must survive restart in storage-engine mode
+|Requirement ID(s) |`REQ-DUR-003`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@in-memory-exemption`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-not-e2e-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@REQ-DUR-003`, `@functional-requirement`, `@in-memory-exemption`, `@implemented-not-e2e-validated`
+|===
+
+.Rule description
+----
+Legal hold, object lock configuration, retention period, object-level encryption
+configuration and restore state for one bucket/key are committed together as one
+durable, self-consistent document under "metadata/object-config".
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the in-memory single-node profile is active
+  And an object exists at bucket "ep2-obj-meta-mem-test" and key "mem-only.txt"
+  And the object has tags "Env=test"
+  When the application process is stopped and started again
+  Then GetObjectTagging for key "mem-only.txt" returns no tags or reports the object as absent
+----
+
+===== REQ-DUR-004
+
+====== Scenario: Bucket CORS configuration survives restart
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:133`
+|Rule |Bucket configuration families stored on the bucket aggregate must survive restart
+|Requirement ID(s) |`REQ-DUR-004`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@durability`, `@restart-safety`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-not-e2e-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@REQ-DUR-004`, `@functional-requirement`, `@non-functional-requirement`, `@durability`, `@restart-safety`, `@implemented-not-e2e-validated`
+|===
+
+.Rule description
+----
+Configuration families persisted through the bucket repository (the full BucketConfig
+document: CORS, policy, lifecycle, logging, website, notification, replication,
+request-payment, ownership controls, public access block, accelerate, analytics,
+inventory, metrics, intelligent tiering, encryption, ABAC, metadata and
+metadata-table configuration) are part of the durable bucket registry document.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-cors"
+  And bucket "ep2-bucket-config-test" has a CORS rule allowing origin "https://app.example.com" with methods "GET,PUT"
+  When the application process is stopped and started again with the same filesystem root
+  Then GetBucketCors for bucket "ep2-bucket-config-test" includes the rule allowing origin "https://app.example.com"
+----
+
+====== Scenario: Bucket notification configuration survives restart
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:140`
+|Rule |Bucket configuration families stored on the bucket aggregate must survive restart
+|Requirement ID(s) |`REQ-DUR-004`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@durability`, `@restart-safety`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-not-e2e-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@REQ-DUR-004`, `@functional-requirement`, `@non-functional-requirement`, `@durability`, `@restart-safety`, `@implemented-not-e2e-validated`
+|===
+
+.Rule description
+----
+Configuration families persisted through the bucket repository (the full BucketConfig
+document: CORS, policy, lifecycle, logging, website, notification, replication,
+request-payment, ownership controls, public access block, accelerate, analytics,
+inventory, metrics, intelligent tiering, encryption, ABAC, metadata and
+metadata-table configuration) are part of the durable bucket registry document.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-notification"
+  And bucket "ep2-bucket-config-test" has a notification configuration with topic destination "arn:aws:sns:eu-west-1:000000000000:ep2-topic"
+  When the application process is stopped and started again with the same filesystem root
+  Then GetBucketNotificationConfiguration for bucket "ep2-bucket-config-test" returns the topic destination "arn:aws:sns:eu-west-1:000000000000:ep2-topic"
+----
+
+====== Scenario: Bucket ABAC configuration survives restart
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:155`
+|Rule |Handler-local bucket configuration families must move behind durable repository ports
+|Requirement ID(s) |`REQ-DUR-004`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@durability`, `@restart-safety`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@config-only`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@REQ-DUR-004`, `@functional-requirement`, `@durability`, `@restart-safety`, `@config-only`
+|===
+
+.Rule description
+----
+Six families are still held in handler-local in-memory maps inside
+S3BucketConfigHandler (ABAC routing, bucket object-lock configuration, metadata
+configuration, metadata-table, inventory-table and journal-table configuration).
+They accept and return configuration but do not survive a restart and bypass the
+repository layer. EP-2 requires moving them behind the bucket repository ports so
+they join the durable bucket registry document.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-abac"
+  And bucket "ep2-bucket-config-test" has an ABAC rule granting "s3:GetObject" when attribute "role" equals "admin"
+  When the application process is stopped and started again with the same filesystem root
+  Then the bucket ABAC configuration for "ep2-bucket-config-test" includes the rule granting "s3:GetObject"
+----
+
+====== Scenario: Bucket object-lock configuration survives restart
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:162`
+|Rule |Handler-local bucket configuration families must move behind durable repository ports
+|Requirement ID(s) |`REQ-DUR-004`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@durability`, `@restart-safety`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@config-only`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@REQ-DUR-004`, `@functional-requirement`, `@durability`, `@restart-safety`, `@config-only`
+|===
+
+.Rule description
+----
+Six families are still held in handler-local in-memory maps inside
+S3BucketConfigHandler (ABAC routing, bucket object-lock configuration, metadata
+configuration, metadata-table, inventory-table and journal-table configuration).
+They accept and return configuration but do not survive a restart and bypass the
+repository layer. EP-2 requires moving them behind the bucket repository ports so
+they join the durable bucket registry document.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-object-lock"
+  And bucket "ep2-bucket-config-test" has an object-lock configuration with retention mode "GOVERNANCE" and a period of 30 days
+  When the application process is stopped and started again with the same filesystem root
+  Then GetObjectLockConfiguration for bucket "ep2-bucket-config-test" returns retention mode "GOVERNANCE"
+----
+
+====== Scenario: Bucket metadata-table configuration survives restart
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:169`
+|Rule |Handler-local bucket configuration families must move behind durable repository ports
+|Requirement ID(s) |`REQ-DUR-004`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@durability`, `@restart-safety`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@config-only`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@REQ-DUR-004`, `@functional-requirement`, `@durability`, `@restart-safety`, `@config-only`
+|===
+
+.Rule description
+----
+Six families are still held in handler-local in-memory maps inside
+S3BucketConfigHandler (ABAC routing, bucket object-lock configuration, metadata
+configuration, metadata-table, inventory-table and journal-table configuration).
+They accept and return configuration but do not survive a restart and bypass the
+repository layer. EP-2 requires moving them behind the bucket repository ports so
+they join the durable bucket registry document.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-metadata-table"
+  And bucket "ep2-bucket-config-test" has a metadata-table configuration with table name "ep2-metadata-table"
+  When the application process is stopped and started again with the same filesystem root
+  Then the metadata-table configuration for bucket "ep2-bucket-config-test" returns table name "ep2-metadata-table"
+----
+
+====== Scenario: Bucket inventory-table configuration survives restart
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:176`
+|Rule |Handler-local bucket configuration families must move behind durable repository ports
+|Requirement ID(s) |`REQ-DUR-004`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@durability`, `@restart-safety`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@config-only`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@REQ-DUR-004`, `@functional-requirement`, `@durability`, `@restart-safety`, `@config-only`
+|===
+
+.Rule description
+----
+Six families are still held in handler-local in-memory maps inside
+S3BucketConfigHandler (ABAC routing, bucket object-lock configuration, metadata
+configuration, metadata-table, inventory-table and journal-table configuration).
+They accept and return configuration but do not survive a restart and bypass the
+repository layer. EP-2 requires moving them behind the bucket repository ports so
+they join the durable bucket registry document.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-inventory-table"
+  And bucket "ep2-bucket-config-test" has an inventory-table configuration with table name "ep2-inventory-table"
+  When the application process is stopped and started again with the same filesystem root
+  Then the inventory-table configuration for bucket "ep2-bucket-config-test" returns table name "ep2-inventory-table"
+----
+
+====== Scenario: Bucket journal-table configuration survives restart
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:183`
+|Rule |Handler-local bucket configuration families must move behind durable repository ports
+|Requirement ID(s) |`REQ-DUR-004`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@durability`, `@restart-safety`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@config-only`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@REQ-DUR-004`, `@functional-requirement`, `@durability`, `@restart-safety`, `@config-only`
+|===
+
+.Rule description
+----
+Six families are still held in handler-local in-memory maps inside
+S3BucketConfigHandler (ABAC routing, bucket object-lock configuration, metadata
+configuration, metadata-table, inventory-table and journal-table configuration).
+They accept and return configuration but do not survive a restart and bypass the
+repository layer. EP-2 requires moving them behind the bucket repository ports so
+they join the durable bucket registry document.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-journal-table"
+  And bucket "ep2-bucket-config-test" has a journal-table configuration with table name "ep2-journal-table"
+  When the application process is stopped and started again with the same filesystem root
+  Then the journal-table configuration for bucket "ep2-bucket-config-test" returns table name "ep2-journal-table"
+----
+
+===== REQ-DUR-005
+
+====== Scenario: All EP-2 metadata families survive one combined restart
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:194`
+|Rule |A combined restart scenario proves that no metadata family is silently lost
+|Requirement ID(s) |`REQ-DUR-005`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@durability`, `@restart-safety`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@absent`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@REQ-DUR-005`, `@functional-requirement`, `@non-functional-requirement`, `@durability`, `@restart-safety`, `@absent`
+|===
+
+.Rule description
+----
+One scenario exercises the bucket registry, per-object metadata and multipart
+state together across a single restart of the same filesystem root.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-005-combined"
+  And bucket "ep2-combined-test" is created through the S3 CreateBucket API
+  And an object exists at bucket "ep2-combined-test" and key "combined/object.bin" with tags "Env=prod" and an ACL grant "FULL_CONTROL" for user "admin"
+  And a multipart upload is initiated for bucket "ep2-combined-test" and key "combined/large.bin" with the upload ID recorded
+  When the application process is stopped and started again with the same filesystem root
+  Then a HeadBucket request for bucket "ep2-combined-test" returns HTTP 200
+  And GetObjectTagging for key "combined/object.bin" returns tags "Env=prod"
+  And GetObjectAcl for key "combined/object.bin" returns grant "FULL_CONTROL" for user "admin"
+  And listing multipart uploads for bucket "ep2-combined-test" includes the recorded upload ID
 ----
