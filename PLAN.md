@@ -7,6 +7,7 @@ Two phase numbering schemes exist in this plan and are kept deliberately distinc
 - **PA-1 .. PA-6** — Post-Audit Production Readiness phases (upload reliability, filesystem reliability, reactive pipeline, observability, S3 semantics, distributed readiness).
 - **CC-0 .. CC-10** — Course Correction phases from ADR 0016 (storage-engine configuration, MINIO_STANDARD, backend wiring, admin API, Cucumber parity, quality gates).
 - **EP-0 .. EP-11** — Enterprise Production Readiness phases (new; see the dedicated section below).
+- **KA-1 .. KA-6** — Killer-App Track phases (market leadership on top of EP; see the dedicated section below).
 
 ## Current Baseline Evidence (2026-07-02)
 
@@ -175,7 +176,7 @@ Done: JaCoCo documented as baseline (Clover optional/legacy); evidence-based `do
 | Affected modules/files | `README.md`, `PLAN.md`, `docs/arc42/**`, `docs/adr/**`, `docs/c4/**`, `docs/test-report.md`, `docs/api-coverage.md`, `LICENSE` |
 | Acceptance gates | No implemented-status overclaims; C4/ARC42 names match code; linked docs exist; ADR statuses current and in English |
 
-Done: S3-only/admin contradiction corrected; storage-engine runtime claims downgraded then re-verified; JaCoCo baseline wording. Remaining: C4 diagram refresh for current routers/admin API; ADR freshness sweep; residual stale links; **`docs/api-coverage.md` does not exist (verified 2026-07-02)** despite being referenced here and required by the S3 Semantic Reporting Table Template — the S3-P0 semantic inventory was never completed; closed by the generated-matrix task in the Ancillary S3 API Requirements Backlog.
+Done: S3-only/admin contradiction corrected; storage-engine runtime claims downgraded then re-verified; JaCoCo baseline wording. Remaining: C4 diagram refresh for current routers/admin API; ADR freshness sweep; residual stale links; **`LICENSE` resolved (2026-07-03)** — the MIT `LICENSE` now exists at the repository root together with the licensing ADR (`docs/adr/0019-adopt-the-mit-license.md`), delivered by KA-1; **`docs/api-coverage.md` does not exist (verified 2026-07-02)** despite being referenced here and required by the S3 Semantic Reporting Table Template — the S3-P0 semantic inventory was never completed; closed by the generated-matrix task in the Ancillary S3 API Requirements Backlog.
 
 ### H. Web/UI planning
 
@@ -229,7 +230,7 @@ This section implements [ADR 0018](docs/adr/0018-course-correction-classify-s3-a
 | Admin/storage-engine integration APIs | S3-P0..P4 | Not AWS S3 APIs; must not become a parallel object API. Read-only catalogs + validation today; backend status planned. | Admin API tests prove catalog/validation behavior; docs keep admin APIs separate from S3 coverage. |
 | Batch object operations: `DeleteObjects` | S3-P1/S3-P2 | Multi-delete semantics: per-key success/error reporting, quiet mode, partial-failure result document. Mapped and nominally working today but previously unplanned. | Semantic scenarios cover mixed success/error batches, quiet mode, and per-key error entries in both runner modes. |
 | Rename: `RenameObject` (`x-amz-rename-destination`) | S3-P4 / explicit-extension scope | Non-core-AWS general-purpose S3 (S3 Express-derived). Requires a keep/reclassify/remove decision plus documented semantics (copy+delete today). | Decision recorded (ADR or matrix note); if kept, semantics documented and tested; if removed, route retired. |
-| S3 Metadata tables (bucket metadata configuration, metadata table, inventory table, journal table configurations) | S3-P4 | Currently handler-local `ConcurrentHashMap` state in `S3BucketConfigHandler` (see section D critical finding). Classify `@placeholder` until repository-backed; **no background table generation may ever be claimed without jobs.** | Config CRUD moves behind repository ports; status stays `@placeholder`/`@config-only` until then; background generation requires tested jobs. |
+| S3 Metadata tables (bucket metadata configuration, metadata table, inventory table, journal table configurations) | S3-P4 | Currently handler-local `ConcurrentHashMap` state in `S3BucketConfigHandler` (see section D critical finding). Classify `@placeholder` until repository-backed; **no background table generation may ever be claimed without jobs.** Planned real usage per KA-3(e): S3 Metadata configuration on general-purpose buckets emitting into table buckets — becomes the S3 Metadata bridge once the table-store BC exists. | Config CRUD moves behind repository ports; status stays `@placeholder`/`@config-only` until then; background generation requires tested jobs. |
 | Non-standard extensions: bucket ABAC (`getBucketAbac`/`putBucketAbac`), `updateObjectEncryption`, `ListBuckets` JSON | Explicit decision | Each must be (i) reclassified as a documented Magrathea extension with its own requirements, (ii) hidden behind a feature flag, or (iii) removed. They must not silently masquerade as AWS S3 APIs. | Per-operation decision recorded; extension docs/flag/removal implemented and tested accordingly. |
 
 ### Required S3 Semantic Reporting Table Template
@@ -257,7 +258,7 @@ Planned requirement feature file: **`phase-7-s3-ancillary-config.feature`** — 
 Honest status at authoring time (no status may be invented):
 
 - `@config-only` — families persisted through `ReactiveBucketService`/bucket repository.
-- `@placeholder` — the 6 handler-local families held in `S3BucketConfigHandler` `ConcurrentHashMap`s (ABAC, object-lock config, metadata config, metadata-table, inventory-table, journal-table).
+- `@placeholder` — the 6 handler-local families held in `S3BucketConfigHandler` `ConcurrentHashMap`s (ABAC, object-lock config, metadata config, metadata-table, inventory-table, journal-table). The metadata/metadata-table/inventory-table/journal-table families are planned for real S3 Metadata usage bridging into the table-store BC — see KA-3(e).
 - `@not-implemented` — all enforcement/background behavior: CORS enforcement, lifecycle execution, replication execution, notification delivery, website serving, logging delivery, analytics/inventory generation.
 
 Task list:
@@ -285,6 +286,7 @@ This section defines the path from "validated prototype with honest gaps" to an 
 - **INV-2 — Cucumber-first requirements.** Every EP phase MUST begin by writing/refreshing shared Gherkin requirement features (per AGENTS.md): requirement IDs, functional/non-functional tags, honest status tags, and WebTestClient + AWS CLI (or protocol-appropriate CLI) validation modes reusing the same shared feature text.
 - **INV-3 — Admin panel is a first-class product deliverable.** A COMPLETE admin panel (not just read-only catalogs) is in scope — but it must never become an alternate object API (AGENTS.md B.3).
 - **INV-4 — S3 is the internal core.** Any additional protocol facade (WebDAV, SMB, future protocols) is an optional external adapter that MUST delegate to the same reactive object-store application services (`ReactiveObjectService` and friends) — internally everything remains S3. No facade or internal transport (including gRPC) may talk to the storage engine directly, introduce a parallel persistence path, or become an alternate public object API.
+- **INV-5 — Self-contained by default, Maven-executable.** Every capability that can integrate external infrastructure (Kafka/NATS, Prometheus/Grafana, Elasticsearch, external KMS, LDAP/AD/Kerberos KDC, external CA) MUST ship a simplified built-in backend (embedded event-delivery log, built-in metrics view in the admin panel, file-based audit store, local key store, local CA fallback) so the functionality is fully demonstrable without external infrastructure; external adapters are optional plugins. All gates, validations, and benchmarks must be executable via Maven wherever possible (containerized steps invoked from Maven), supporting air-gapped/offline installation — a hard requirement for the government/military target.
 
 ### EP-0 — Governance: Definition of Production Ready (PRIORITY: foundation)
 
@@ -308,6 +310,8 @@ This section defines the path from "validated prototype with honest gaps" to an 
 | Expected outputs | AWS SigV4 request authentication; durable credential/access-key store; deny-by-default authorization with bucket policy/ACL evaluation; audit logging of requests; real SSE (currently metadata-only) with pluggable key management; TLS deployment guidance. |
 | Acceptance gates | Unauthenticated/incorrectly signed requests rejected; deny-by-default proven by tests; ACL/policy enforcement validated in both runner modes; audit events observable; SSE round-trip proven at rest, not just headers. |
 | Status | `@absent` |
+
+KA dependencies: KA-2 (Ceph s3-tests requires SigV4), KA-3 (presigned URLs), and KA-4 (identity federation incl. Kerberos) all depend on EP-1 — this raises EP-1's practical priority; identity work lands in the planned identity-access bounded context (see Bounded Context Evolution under the Killer-App Track).
 
 ### EP-2 — Complete Metadata Durability (BLOCKER)
 
@@ -417,6 +421,8 @@ Binding EP-9 constraints:
 5. An ADR must be written at phase start covering the protocol subset (locking/LOCK-UNLOCK likely `@not-implemented` initially, versioning mapping, auth reuse from EP-1).
 6. `webdav-api-adapter` is listed as PLANNED in the module map below.
 
+Owner rule (2026-07-02): the WebDAV adapter sets the pattern for optional facades — any gRPC used by the SMB/VFS gateway (EP-11) follows the same rules: optional relative to the project, internal-only, thin delegation (INV-4). The EP-10 cluster gRPC is different in nature: it exists to synchronize nodes and is part of the cluster core (still internal-only).
+
 ### EP-10 — S3 Cluster (Multi-Node) (HIGH)
 
 | Field | Plan |
@@ -459,6 +465,8 @@ EP-11 backend decision — a C module inside `smbd` cannot call the Java applica
 - **(b) VFS module → dedicated INTERNAL gRPC protocol-gateway** (grpc C-core client → a thin Java gRPC adapter that delegates exclusively to `ReactiveObjectService`/`ReactiveBucketService`): binary framing + streaming reads/writes suit file I/O, much cheaper for SMB's chatty metadata ops; cost: a new internal API surface that must be governed exactly like the cluster transport — internal only, thin delegation, never a parallel public object API, disabled unless the SMB gateway is enabled.
 - The ADR may also **combine them** (metadata via gRPC, bulk data via S3) — recorded as an option.
 
+Owner rule (2026-07-02): any gRPC used by the SMB/VFS gateway follows the same rules as WebDAV — optional relative to the project, internal-only, thin delegation (INV-4); the EP-10 cluster gRPC is different in nature: it exists to synchronize nodes and is part of the cluster core (still internal-only).
+
 ### EP Priority and Sequence
 
 | Order | Phase | Priority | Status |
@@ -491,6 +499,120 @@ EP-0 governance applies continuously from the start.
 - [ ] EP-10: cluster behavior (membership, quorum, failover, healing, rebalance) validated by multi-node e2e scenarios; no distributed claims beyond validated scope.
 - [ ] EP-11 (optional): SMB gateway, if built, meets all binding constraints including the internal-only gateway rule.
 - [ ] All claims above are backed by evidence per the Baseline Evidence discipline; no status inferred from route inventories or smoke checks.
+
+## Killer-App Track (KA-1 .. KA-6)
+
+The EP track makes Magrathea production-ready; the KA track makes it the killer app among S3-compatible object stores (MinIO, Ceph RGW, Garage, SeaweedFS). KA phases attach to EP prerequisites and never bypass INV-1..INV-5 or the evidence discipline. All KA capabilities start `@absent` — **no completion claims are made here**. Owner-decided target audiences: enterprise, single user, AND government/military — legacy integration paths are first-class. A second Magrathea-suite project will be PKI; its integration point is planned in the Bounded Context Evolution subsection below.
+
+Market-window note (factual): MinIO removed features from its community console, and its AGPL license creates adoption friction for some organizations; Magrathea's MIT license (KA-1) and complete admin panel (EP-7/INV-3) target that window. Embryonic differentiators already present: YAML policy-driven storage classes; the complete admin panel; the unique WebDAV (EP-9) + SMB (EP-11) gateway combination; executable Gherkin requirements as living compliance evidence.
+
+### KA-1 — Positioning & Licensing (IMMEDIATE, low cost)
+
+| Field | Plan |
+|---|---|
+| Focus | Public positioning and licensing. **OWNER DECISION: the license is MIT.** |
+| Owner agents | `documenter`, `java-planner` |
+| Requirement feature file | n/a (documentation/governance) |
+| Expected outputs | MIT `LICENSE` file at the repository root; licensing ADR recording the owner decision; `docs/positioning.md` naming the four differentiators (YAML policy-driven storage classes, complete admin panel, WebDAV+SMB gateway combination, executable Gherkin requirements as living compliance evidence) vs MinIO/Ceph RGW/Garage/SeaweedFS plus the government/military positioning (self-contained, air-gapped, legacy protocol paths, PKI-suite integration); public roadmap derived from this plan. |
+| Acceptance gates | `LICENSE` present (closes the Section G stale link); ADR accepted; positioning stays factual — no FUD; roadmap makes no claims beyond this plan's honest statuses. |
+| Prerequisites | None — immediate. |
+| Status | `@partial` — MIT `LICENSE` at the repository root and licensing ADR (`docs/adr/0019-adopt-the-mit-license.md`, Accepted) delivered 2026-07-03; `docs/positioning.md` and the public roadmap remain open. |
+
+### KA-2 — Ecosystem Conformance
+
+| Field | Plan |
+|---|---|
+| Focus | Prove compatibility with the existing S3 ecosystem — **owner decision: the tool must work first with existing tools** before any own tooling is built (see KA-5). |
+| Owner agents | `java-tester` primary; `java-infra-coder`, `java-scaffolder` |
+| Requirement feature file | `phase-ka2-ecosystem-conformance.feature` |
+| Key requirement IDs | REQ-COMPAT-* |
+| Expected outputs | Ceph s3-tests wired as a recurring Maven-invoked containerized compatibility gate with honestly tagged known-failures (the pass-rate matrix becomes public evidence, feeding KA-6); SDK/tool matrix (boto3, aws-sdk-java/go/js, rclone, s3cmd, mc) as executable scenarios where feasible; full checksum matrix (CRC32/CRC32C/SHA-1/SHA-256/CRC64NVME — new AWS SDKs default to CRC64NVME). |
+| Acceptance gates | s3-tests gate runs via Maven (containerized per INV-5); known-failures explicitly tagged, never hidden; checksum matrix validated in both runner modes; no compatibility claim without an executed gate. |
+| Prerequisites | Minimal EP-1 — s3-tests requires SigV4 (raises EP-1 priority). |
+| Status | `@absent` |
+
+### KA-3 — Data-Lake Readiness & S3 Tables (HIGH VALUE)
+
+| Field | Plan |
+|---|---|
+| Focus | (a) Conditional writes on PUT: `If-None-Match: *`/`If-Match` on `PutObject` and `CompleteMultipartUpload` — the Apache Iceberg commit primitive (AWS added it 2024). Planner-verified absent (2026-07-02): `S3ObjectOperationsHandler.evaluateConditionals` runs only on GET/HEAD; `putObject` never calls it. (b) Presigned URLs (GET/PUT, `X-Amz-Expires` validation) — absent today (only header names in `S3Header`); depends on EP-1 SigV4. (c) Validated Iceberg/Spark/Trino workloads as executable scenarios. |
+| S3 Tables decision (owner + planner) | S3 Tables IS a killer feature and gets a SEPARATE adapter: a new `s3tables-api-adapter` module distinct from `s3-reactive-api-adapter`/`S3PathRouter` (in AWS, S3 Tables is a separate API surface: table buckets, namespaces, tables, maintenance policies), backed by a NEW `table-store` bounded context (see Bounded Context Evolution below). It stays inside this repository as modules, not a separate project, because it reuses the object-store/storage-engine planes; revisit only if it outgrows the repo. |
+| S3 Metadata bridge | The already-mapped bucket "metadata table configuration" routes belong to S3 METADATA (configuration on general-purpose buckets that emits into table buckets) and are planned for that real usage: they stay in the Ancillary S3 API Requirements Backlog as `@placeholder` until the table-store BC exists, then become the S3 Metadata bridge. |
+| Owner agents | `java-domain-coder`, `java-infra-coder`, `java-scaffolder`, `java-tester` |
+| Requirement feature file | `phase-ka3-datalake.feature` |
+| Key requirement IDs | REQ-LAKE-*, REQ-TABLES-* |
+| Acceptance gates | Conditional PUT/CompleteMultipartUpload semantics validated in both runner modes; presigned GET/PUT round-trips incl. expiry rejection; Iceberg/Spark/Trino scenarios pass against the storage-engine backend; table-store behavior proven through the separate adapter, never through object-store shortcuts. |
+| Prerequisites | EP-1 (SigV4 for presigned URLs), EP-3 (streaming). |
+| Status | `@absent` |
+
+### KA-4 — Eventing, Tiering, Multi-Site, Federation (ENTERPRISE/GOV SELLERS)
+
+| Field | Plan |
+|---|---|
+| Focus | Real notification delivery per INV-5: built-in embedded delivery backend FIRST (durable local event log + webhook dispatch, visible in the admin panel), then optional Kafka/NATS adapters as plugins — notifications are currently `@config-only` with no delivery mechanism (planner-verified: no webhook/Kafka/NATS code exists). Lifecycle execution (transitions/expiry) and cold-tier/remote-S3 tiering. Cross-cluster async multi-site replication (beyond EP-10 intra-cluster). Identity federation extending EP-1: OIDC + LDAP/AD + Kerberos/SPNEGO — **owner decision: Kerberos is required for legacy government/military environments**; PKINIT ties into the Magrathea PKI suite project. Built-in backends per INV-5: local credential store first; external IdP/KDC as optional adapters. WORM/Object Lock compliance-certification path (SEC 17a-4 style) building on object-lock metadata. |
+| Owner agents | `java-domain-coder`, `java-infra-coder`, `java-tester`, `documenter` (ADRs) |
+| Requirement feature file | `phase-ka4-eventing-tiering-federation.feature` |
+| Key requirement IDs | REQ-EVENT-*, REQ-TIER-*, REQ-MULTISITE-*, REQ-FED-* |
+| Acceptance gates | Delivery proven end to end through the built-in backend before any external-adapter claim; lifecycle/tiering side effects tested (config storage is never claimed as execution); multi-site validated by multi-cluster e2e; federation validated incl. at least one legacy-path (Kerberos) e2e. |
+| Prerequisites | EP-1, EP-2, EP-4; EP-10 for multi-site replication. |
+| Status | `@absent` (notifications `@config-only` today) |
+
+### KA-5 — Distribution (OWNER-DECIDED PRIORITY ORDER)
+
+| Field | Plan |
+|---|---|
+| Focus | (1) **SINGLE BINARY / self-contained artifact (top priority):** ADR evaluating GraalVM native-image vs jlink+CDS vs self-contained fat-jar, with honest trade-offs (native-image vs reflection/Netty/WebFlux); air-gapped offline install bundle; Maven-built. (2) **Grafana dashboards (second):** per INV-5 the built-in admin-panel metrics view comes first; Prometheus endpoint + shipped dashboards are optional integration. (3) **Own CLI (VERY LOW priority):** the tool must work first with aws cli/mc/rclone (KA-2); a `magrathea-cli` is a later convenience, decision-gated. (4) **Helm/operator (VERY LOW priority):** plain container + compose + documented K8s manifests suffice initially; Helm chart later, operator only if demand proves it. |
+| Owner agents | `java-scaffolder`, `java-infra-coder`, `documenter` (ADR), `java-tester` |
+| Requirement feature file | `phase-ka5-distribution.feature` (where executable; ADR-first for the single-binary decision) |
+| Key requirement IDs | REQ-PKG-* |
+| Acceptance gates | Self-contained artifact built by Maven and installable air-gapped; built-in admin-panel metrics view precedes external dashboards; CLI and Helm/operator items stay decision-gated backlog until demand evidence exists. |
+| Prerequisites | EP-5 (CI); the single-binary ADR can start earlier. |
+| Status | `@absent` |
+
+### KA-6 — Public Proof
+
+| Field | Plan |
+|---|---|
+| Focus | Reproducible benchmark harness (MinIO warp and/or COSBench) Maven-invoked with pinned hardware/software manifests, vs MinIO/Garage/SeaweedFS; publish the s3-tests pass-rate matrix from KA-2; conformance/compatibility docs page. **Absolute rule: published numbers follow the evidence discipline — methodology published, no cherry-picking.** |
+| Owner agents | `java-tester`, `documenter` |
+| Requirement feature file | `phase-ka6-public-proof.feature` (where executable; benchmark methodology documented otherwise) |
+| Key requirement IDs | REQ-PROOF-* (non-functional) |
+| Acceptance gates | Benchmarks reproducible from pinned manifests via Maven; pass-rate matrix published with honestly tagged known-failures; no number is published without its methodology. |
+| Prerequisites | EP-6, KA-2. |
+| Status | `@absent` |
+
+### KA Priority and Sequence
+
+| Order | Phase | Start condition | Status |
+|---|---|---|---|
+| 1 | KA-1 Positioning & licensing | Immediate | `@partial` (LICENSE + ADR done 2026-07-03; positioning/roadmap open) |
+| 2 | KA-2 Ecosystem conformance | After minimal EP-1 (SigV4) | `@absent` |
+| 3 | KA-3 Data-lake readiness & S3 Tables | After EP-1 + EP-3 | `@absent` |
+| 4 | KA-4 Eventing, tiering, multi-site, federation | After EP-1/EP-2/EP-4; multi-site after EP-10 | `@absent` |
+| 5 | KA-5 Distribution | After EP-5 (single-binary ADR may start earlier) | `@absent` |
+| 6 | KA-6 Public proof | Last; after EP-6 + KA-2 | `@absent` |
+
+### Definition of Killer App (checklist — all unchecked)
+
+- [ ] KA-1: MIT `LICENSE` and positioning published. (LICENSE + licensing ADR done 2026-07-03; positioning not yet published.)
+- [ ] KA-2: s3-tests pass-rate published with honest known-failures.
+- [ ] KA-3: Iceberg/Spark validated (conditional PUT + presigned URLs working).
+- [ ] KA-3: S3 Tables adapter + table-store BC delivering namespaces/tables.
+- [ ] KA-4: notification delivery (built-in backend) + lifecycle execution + multi-site validated.
+- [ ] KA-4: OIDC + LDAP + Kerberos federation validated incl. at least one legacy-path e2e.
+- [ ] KA-5: single-binary distribution shipped and air-gap installable.
+- [ ] KA-6: public reproducible benchmarks published.
+
+### Bounded Context Evolution (planned)
+
+Planner assessment (2026-07-02): three new bounded contexts plus one integration point are warranted. All entries are PLANNED / `@absent`.
+
+1. **identity-access BC** (EP-1/KA-4): credentials, access keys, policies, STS, OIDC/LDAP/Kerberos federation, audit trail. Own domain/application/infrastructure modules; the S3 adapter consumes it via ports; it must not live inside object-store.
+2. **table-store BC** (KA-3): table buckets, namespaces, tables, Iceberg metadata, maintenance policies; exposed by the separate `s3tables-api-adapter`; persists through the storage-engine plane; the S3 Metadata bucket routes bridge into it.
+3. **event-delivery BC** (KA-4): durable embedded event log + dispatchers (webhook built-in; Kafka/NATS optional plugins per INV-5); consumed by object-store domain events.
+4. **PKI integration point** (Magrathea suite): a certificate-provisioning port (node mTLS for EP-10, TLS server certificates, Kerberos/PKINIT credentials) with a simplified local-CA fallback per INV-5; the real backend will be the separate Magrathea PKI project. No PKI implementation in this repo beyond the port + fallback.
+
+Planned module map additions (naming may consolidate at scaffolding time): `identity-access-domain`/`identity-access-application`/`identity-access-infrastructure`; `table-store-domain`/`table-store-application`/`table-store-infrastructure`; `s3tables-api-adapter`; event-delivery modules; the PKI certificate-provisioning port lives in the identity-access application module with the local-CA fallback in its infrastructure module. These entries are mirrored in the Maven module map below.
 
 ## Course Correction Plan — Storage Engine Configuration and MINIO_STANDARD (CC-0 .. CC-10)
 
@@ -597,6 +719,9 @@ Phase CC-10 quality gates were completed 2026-06-12 (HEAD `351d088`): `mvn valid
 | Split-brain / consistency overclaims in cluster mode | Data loss or false durability/availability claims under partitions | EP-8 ADR consistency model; quorum tests; fault-injection scenarios before any claim | `java-domain-coder`, `java-tester` |
 | C module memory safety and Samba version coupling | `vfs_magrathea` crashes `smbd` or breaks across Samba releases | C workflow ownership; sanitizers (ASan/UBSan) in the C CI; pinned Samba versions in containerized builds | C workflow agents, `documenter` |
 | Reactive backpressure loss across gRPC hops | Unbounded buffering between nodes or gateway violates INV-1 | Reactive gRPC bindings requirement; static architecture tests per INV-1 | `java-infra-coder`, `java-tester` |
+| Killer-app claims outpacing evidence | Marketing/docs claim market leadership without published proof, destroying credibility | KA-6 evidence rule: methodology published, no cherry-picking; all KA statuses remain evidence-based per the Baseline Evidence discipline | `documenter`, `java-planner` |
+| External-infrastructure dependency creep | Capabilities become undemonstrable without Kafka/Prometheus/LDAP/external KMS etc., breaking air-gapped installs | INV-5: simplified built-in backends first; every external adapter is an optional plugin; Maven-executable gates | `java-infra-coder`, `documenter` |
+| Government/military legacy-path complexity (Kerberos, air-gap, FIPS-style constraints) | Federation/legacy paths stall delivery or compromise the core architecture | identity-access BC isolation; INV-5 offline installs; PKI-suite integration port with local-CA fallback; evaluate FIPS-compliant crypto providers in the EP-1/KA-4 ADRs | `java-domain-coder`, `java-infra-coder` |
 
 ---
 
@@ -613,6 +738,14 @@ magrathea-objectstorage/
 ├── storage-engine-cluster-grpc-infrastructure/ # PLANNED — internal gRPC transport adapters, protobuf contracts (EP-10)
 ├── smb-vfs-module/                             # PLANNED — Samba VFS C module (non-Maven, container build; EP-11)
 ├── object-gateway-grpc-adapter/                # PLANNED — optional internal gRPC gateway (EP-11, decision-gated)
+├── s3tables-api-adapter/                       # PLANNED — separate S3 Tables API surface: table buckets, namespaces, tables (KA-3)
+├── identity-access-domain/                     # PLANNED — identity-access BC: credentials, policies, STS, federation (EP-1/KA-4)
+├── identity-access-application/                # PLANNED — identity-access services/ports incl. PKI certificate-provisioning port (EP-1/KA-4)
+├── identity-access-infrastructure/             # PLANNED — credential store, IdP/KDC adapters, local-CA fallback per INV-5 (EP-1/KA-4)
+├── table-store-domain/                         # PLANNED — table-store BC: namespaces, tables, Iceberg metadata (KA-3)
+├── table-store-application/                    # PLANNED — table-store services and ports (KA-3)
+├── table-store-infrastructure/                 # PLANNED — table-store persistence via the storage-engine plane (KA-3)
+├── event-delivery-*/                           # PLANNED — event-delivery BC: embedded event log + dispatchers (KA-4; naming consolidates at scaffolding)
 ├── admin-api-adapter/                          # Admin/configuration API adapter
 ├── object-store-domain/                        # Pure S3 domain: aggregates, value objects, domain events
 ├── object-store-reactive-repository-application/ # Reactive CQS repository interfaces
