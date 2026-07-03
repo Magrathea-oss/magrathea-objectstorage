@@ -39,6 +39,12 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- JSON persistence for durable metadata (bucket registry, multipart state, object config) -->
+        <dependency>
+            <groupId>tools.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
         <!-- Reactive core -->
         <dependency>
             <groupId>io.projectreactor</groupId>

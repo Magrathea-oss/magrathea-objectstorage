@@ -69,12 +69,8 @@ public class StorageEngineReactiveS3ObjectRepository
     private static final DefaultDataBufferFactory DATA_BUFFER_FACTORY =
         new DefaultDataBufferFactory();
 
-    // Separate maps for Phase F data
-    private final Map<String, LegalHold> legalHoldByKey = new ConcurrentHashMap<>();
-    private final Map<String, EncryptionConfiguration> encryptionByKey = new ConcurrentHashMap<>();
-    private final Map<String, ObjectLockConfiguration> lockConfigByKey = new ConcurrentHashMap<>();
-    private final Map<String, ObjectLockConfiguration.RetentionPeriod> retentionByKey = new ConcurrentHashMap<>();
-    private final Map<String, RestoreConfiguration> restoreByKey = new ConcurrentHashMap<>();
+    // Durable per-object configuration (legal hold, encryption, lock, retention, restore)
+    private final ObjectConfigMetadataStore objectConfigStore;
 
     public StorageEngineReactiveS3ObjectRepository(
             ObjectStoreToStorageEngineTranslator translator,
@@ -89,8 +85,11 @@ public class StorageEngineReactiveS3ObjectRepository
             @Value("${storage.engine.filesystem.root:}") String storageRoot) {
         this.translator = translator;
         this.orchestrator = orchestrator;
+        Path metadataRoot = resolveStorageRoot(storageRoot).resolve("metadata");
         this.referenceStore = new S3ObjectManifestReferenceStore(
-            resolveStorageRoot(storageRoot).resolve("metadata").resolve("s3-object-references"));
+            metadataRoot.resolve("s3-object-references"));
+        this.objectConfigStore = new ObjectConfigMetadataStore(
+            metadataRoot.resolve("object-config"));
     }
 
     // ── Aggregate operations ──
@@ -169,6 +168,9 @@ public class StorageEngineReactiveS3ObjectRepository
             return Mono.just(new CommandResult.Deleted<>(removed, object.domainEvents(), version));
         }).flatMap(result -> referenceStore
             .delete(object.key().bucket(), object.key().key())
+            .then(Mono.fromRunnable(() ->
+                objectConfigStore.delete(object.key().bucket(), object.key().key()))
+                .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()))
             .thenReturn(result));
     }
 
@@ -318,27 +320,24 @@ public class StorageEngineReactiveS3ObjectRepository
     @Override
     public Mono<LegalHold> findLegalHold(String bucketName,
                                           com.example.magrathea.objectstore.domain.valueobject.ObjectKey key) {
-        return Mono.defer(() -> Mono.justOrEmpty(
-            legalHoldByKey.get(storeKey(bucketName, key))
-        ));
+        return findObjectConfig(bucketName, key)
+            .flatMap(config -> Mono.justOrEmpty(config.legalHold()));
     }
 
     @Override
     public Mono<ObjectLockConfiguration> findObjectLockConfiguration(
             String bucketName,
             com.example.magrathea.objectstore.domain.valueobject.ObjectKey key) {
-        return Mono.defer(() -> Mono.justOrEmpty(
-            lockConfigByKey.get(storeKey(bucketName, key))
-        ));
+        return findObjectConfig(bucketName, key)
+            .flatMap(config -> Mono.justOrEmpty(config.lockConfiguration()));
     }
 
     @Override
     public Mono<ObjectLockConfiguration.RetentionPeriod> findRetention(
             String bucketName,
             com.example.magrathea.objectstore.domain.valueobject.ObjectKey key) {
-        return Mono.defer(() -> Mono.justOrEmpty(
-            retentionByKey.get(storeKey(bucketName, key))
-        ));
+        return findObjectConfig(bucketName, key)
+            .flatMap(config -> Mono.justOrEmpty(config.retention()));
     }
 
     @Override
@@ -360,8 +359,7 @@ public class StorageEngineReactiveS3ObjectRepository
     public Mono<Void> saveLegalHold(String bucketName,
                                      com.example.magrathea.objectstore.domain.valueobject.ObjectKey key,
                                      LegalHold hold) {
-        legalHoldByKey.put(storeKey(bucketName, key), hold);
-        return Mono.empty();
+        return updateObjectConfig(bucketName, key, config -> config.withLegalHold(hold));
     }
 
     @Override
@@ -369,8 +367,7 @@ public class StorageEngineReactiveS3ObjectRepository
             String bucketName,
             com.example.magrathea.objectstore.domain.valueobject.ObjectKey key,
             ObjectLockConfiguration config) {
-        lockConfigByKey.put(storeKey(bucketName, key), config);
-        return Mono.empty();
+        return updateObjectConfig(bucketName, key, doc -> doc.withLockConfiguration(config));
     }
 
     @Override
@@ -378,24 +375,39 @@ public class StorageEngineReactiveS3ObjectRepository
             String bucketName,
             com.example.magrathea.objectstore.domain.valueobject.ObjectKey key,
             ObjectLockConfiguration.RetentionPeriod retention) {
-        retentionByKey.put(storeKey(bucketName, key), retention);
-        return Mono.empty();
+        return updateObjectConfig(bucketName, key, config -> config.withRetention(retention));
     }
 
     @Override
     public Mono<Void> saveRestore(String bucketName,
                                    com.example.magrathea.objectstore.domain.valueobject.ObjectKey key,
                                    RestoreConfiguration config) {
-        restoreByKey.put(storeKey(bucketName, key), config);
-        return Mono.empty();
+        return updateObjectConfig(bucketName, key, doc -> doc.withRestore(config));
     }
 
     @Override
     public Mono<Void> saveEncryption(String bucketName,
                                       com.example.magrathea.objectstore.domain.valueobject.ObjectKey key,
                                       EncryptionConfiguration encryption) {
-        encryptionByKey.put(storeKey(bucketName, key), encryption);
-        return Mono.empty();
+        return updateObjectConfig(bucketName, key, config -> config.withEncryption(encryption));
+    }
+
+    private Mono<ObjectConfigMetadataStore.StoredObjectConfig> findObjectConfig(
+            String bucketName,
+            com.example.magrathea.objectstore.domain.valueobject.ObjectKey key) {
+        return Mono.fromCallable(() -> objectConfigStore.find(bucketName, key.key()))
+            .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
+            .flatMap(Mono::justOrEmpty);
+    }
+
+    private Mono<Void> updateObjectConfig(
+            String bucketName,
+            com.example.magrathea.objectstore.domain.valueobject.ObjectKey key,
+            java.util.function.UnaryOperator<ObjectConfigMetadataStore.StoredObjectConfig> mutation) {
+        return Mono.fromRunnable(() ->
+                objectConfigStore.update(bucketName, key.key(), mutation))
+            .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
+            .then();
     }
 
     @Override
@@ -572,10 +584,17 @@ public class StorageEngineReactiveS3ObjectRepository
         storeByKey.clear();
         manifestByKey.clear();
         versionCounter.set(1);
-        legalHoldByKey.clear();
-        encryptionByKey.clear();
-        lockConfigByKey.clear();
-        retentionByKey.clear();
-        restoreByKey.clear();
+        objectConfigStore.wipe();
+    }
+
+    /**
+     * Restart simulation (for testing) — discards all in-memory caches while
+     * keeping every durable file (object references and per-object config), so
+     * subsequent reads must reload state from the filesystem exactly like a
+     * process restart would.
+     */
+    public void reloadFromDisk() {
+        storeByKey.clear();
+        manifestByKey.clear();
     }
 }
