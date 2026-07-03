@@ -6,7 +6,7 @@ Two phase numbering schemes exist in this plan and are kept deliberately distinc
 
 - **PA-1 .. PA-6** — Post-Audit Production Readiness phases (upload reliability, filesystem reliability, reactive pipeline, observability, S3 semantics, distributed readiness).
 - **CC-0 .. CC-10** — Course Correction phases from ADR 0016 (storage-engine configuration, MINIO_STANDARD, backend wiring, admin API, Cucumber parity, quality gates).
-- **EP-0 .. EP-9** — Enterprise Production Readiness phases (new; see the dedicated section below).
+- **EP-0 .. EP-11** — Enterprise Production Readiness phases (new; see the dedicated section below).
 
 ## Current Baseline Evidence (2026-07-02)
 
@@ -78,7 +78,7 @@ Completed scope (condensed): durable object metadata and key→manifest mapping 
 |---|---|
 | Focus | Design and verify behavior needed before claiming distributed storage readiness. |
 | Current status | `@implemented-not-e2e-validated` for the modeled domain scope: deterministic failure-domain placement, health-aware membership decisions, quorum decisions, anti-entropy/healing plans, rebalance plans, readiness classification (REQ-DIST-001..006) — all pure domain under `storage-engine-domain/.../distributed`, unit validated (module gate 164/164). |
-| Remaining gaps | No real networked membership, replication execution, healing/rebalance job runners, durable multi-node manifest publication, or multi-node e2e validation. Distributed production readiness is not claimed. The single-node-HA vs distributed decision is EP-8. |
+| Remaining gaps | No real networked membership, replication execution, healing/rebalance job runners, durable multi-node manifest publication, or multi-node e2e validation. Distributed production readiness is not claimed. The HA question is decided (real multi-node cluster); *how* is the EP-8 ADR. PA-6's modeled domain is the foundation for EP-10 execution work; PA-6 stays honest as modeled-only until EP-10 delivers networked evidence. |
 
 ## Gherkin Requirements and ARC42 Appendix
 
@@ -275,7 +275,7 @@ Task list:
 - Background behavior (lifecycle, replication, notifications, analytics, tiering, restore) is not claimed without a tested background mechanism.
 - Final completion claims are family-based and evidence-based, never route-count-based.
 
-## Enterprise Production Readiness Plan (EP-0 .. EP-9)
+## Enterprise Production Readiness Plan (EP-0 .. EP-11)
 
 This section defines the path from "validated prototype with honest gaps" to an enterprise-deployable object store. All EP phases start as `@absent` or `@partial` — **no completion claims are made here**.
 
@@ -284,7 +284,7 @@ This section defines the path from "validated prototype with honest gaps" to an 
 - **INV-1 — Reactive-first.** Every new production path must remain reactive/non-blocking end to end: Reactor, bounded memory, no `DataBufferUtils.join` or whole-body materialization, blocking I/O only on `boundedElastic`. Static architecture tests (pattern: `ReactiveUploadStreamingArchitectureTest`) must guard each newly fixed path.
 - **INV-2 — Cucumber-first requirements.** Every EP phase MUST begin by writing/refreshing shared Gherkin requirement features (per AGENTS.md): requirement IDs, functional/non-functional tags, honest status tags, and WebTestClient + AWS CLI (or protocol-appropriate CLI) validation modes reusing the same shared feature text.
 - **INV-3 — Admin panel is a first-class product deliverable.** A COMPLETE admin panel (not just read-only catalogs) is in scope — but it must never become an alternate object API (AGENTS.md B.3).
-- **INV-4 — S3 is the internal core.** Any additional protocol adapter (WebDAV first) is an optional external facade that MUST delegate to the same reactive object-store application services (`ReactiveObjectService` and friends). Internally everything remains S3 semantics; no protocol adapter may talk to the storage engine directly or introduce a parallel persistence path.
+- **INV-4 — S3 is the internal core.** Any additional protocol facade (WebDAV, SMB, future protocols) is an optional external adapter that MUST delegate to the same reactive object-store application services (`ReactiveObjectService` and friends) — internally everything remains S3. No facade or internal transport (including gRPC) may talk to the storage engine directly, introduce a parallel persistence path, or become an alternate public object API.
 
 ### EP-0 — Governance: Definition of Production Ready (PRIORITY: foundation)
 
@@ -292,7 +292,7 @@ This section defines the path from "validated prototype with honest gaps" to an 
 |---|---|
 | Focus | Single measurable exit checklist aggregating all EP gates; evidence-based reporting rules. |
 | Owner agents | `java-planner` + `documenter` |
-| Requirement feature file | n/a (governance; gates aggregate from EP-1..EP-9 feature files) |
+| Requirement feature file | n/a (governance; gates aggregate from EP-1..EP-11 feature files) |
 | Expected outputs | Definition of Production Ready checklist (below) maintained in this plan; reporting rules binding all EP phases to the Baseline Evidence discipline. |
 | Acceptance gates | No "production-ready" claim anywhere until all **Blocker** EP phases are `@implemented-and-validated`. |
 | Status | `@absent` (checklist seeded below, unchecked) |
@@ -381,16 +381,18 @@ This section defines the path from "validated prototype with honest gaps" to an 
 | Acceptance gates | Admin API contract tests pass; UI validated by frontend-tester; panel remains admin/config/status only — never an alternate object CRUD API (AGENTS.md B.3). |
 | Status | `@partial` (backend read-only catalogs done; UI `@absent`) |
 
-### EP-8 — HA Decision & Supply Chain (MEDIUM)
+### EP-8 — Cluster Architecture ADR & Supply Chain (MEDIUM)
+
+The product owner has decided the deployment target: a **real multi-node S3 cluster**. The EP-8 ADR no longer decides *whether* to go distributed but *how*. EP-8 is a hard prerequisite of EP-10.
 
 | Field | Plan |
 |---|---|
-| Focus | Decide the enterprise deployment target and harden the supply chain. |
+| Focus | Cluster architecture ADR (how, not whether) plus supply-chain hardening (scope unchanged). |
 | Owner agents | `documenter` (ADR), `java-scaffolder`, `java-tester` |
 | Requirement feature file | `phase-ep8-supply-chain.feature` (where executable) |
 | Key requirement IDs | REQ-HA-*, REQ-SUPPLY-* |
-| Expected outputs | Explicit ADR deciding: single-node with HA (active/passive on shared storage) vs real distributed (which would activate PA-6 execution work); SBOM generation; dependency CVE scanning; container image hardening (non-root); license compliance report. |
-| Acceptance gates | ADR accepted; SBOM/CVE scan/image hardening wired into the EP-5 pipeline; license report generated. |
+| Expected outputs | ADR deciding: inter-node transport (see the gRPC evaluation under EP-10); membership/discovery model (static seed list first vs gossip); metadata consistency model (e.g. quorum reads/writes per PA-6 `QuorumPolicy` vs consensus/Raft for the bucket/reference metadata plane); failure-domain topology mapping onto the existing storage-device/disk-set YAML catalogs. Supply chain unchanged: SBOM generation; dependency CVE scanning; container image hardening (non-root); license compliance report. |
+| Acceptance gates | ADR accepted (gates EP-10 start); SBOM/CVE scan/image hardening wired into the EP-5 pipeline; license report generated. |
 | Status | `@absent` |
 
 ### EP-9 — WebDAV API Adapter (FUTURE, OPTIONAL)
@@ -415,6 +417,48 @@ Binding EP-9 constraints:
 5. An ADR must be written at phase start covering the protocol subset (locking/LOCK-UNLOCK likely `@not-implemented` initially, versioning mapping, auth reuse from EP-1).
 6. `webdav-api-adapter` is listed as PLANNED in the module map below.
 
+### EP-10 — S3 Cluster (Multi-Node) (HIGH)
+
+| Field | Plan |
+|---|---|
+| Focus | Evolve from single instance to a real multi-node S3 cluster: turn the PA-6 modeled domain (`DistributedPlacementPlanner`, `QuorumPolicy`, `AntiEntropyPlanner`, `RebalancePlanner`, `DistributedReadinessReporter` — already unit-validated) into executed networked behavior: node membership + health, replica/EC-shard placement across failure domains, quorum writes/reads, manifest/metadata replication, anti-entropy healing execution, rebalance execution. |
+| Owner agents | `java-domain-coder` (consistency/placement semantics), `java-infra-coder` (gRPC transport, membership), `java-scaffolder` (modules/protobuf build), `java-tester` (multi-node Cucumber harness) |
+| Requirement feature file | `phase-ep10-s3-cluster.feature` |
+| Key requirement IDs | REQ-CLUSTER-* (`Ability` for internals: membership, replication, quorum, healing, rebalance; `Business Need` for externally observable cluster behavior: S3 write on node A / read on node B, node-failure read availability) |
+| Validation modes | Multi-node e2e via docker-compose/Testcontainers (2–4 nodes) + AWS CLI against the cluster endpoint; fault-injection scenarios (node kill during PUT, quorum loss, partition) as Cucumber scenarios; INV-2 applies. |
+| Planned modules | PLANNED in the module map: `storage-engine-cluster-application` (ports: membership, replica transport, sync); `storage-engine-cluster-grpc-infrastructure` (internal gRPC transport adapters, protobuf contracts). |
+| Prerequisites | EP-2 (durable metadata — replicating in-memory maps is meaningless), EP-3 (streaming), EP-1 (mTLS/identity for nodes), EP-8 ADR accepted. |
+| Acceptance gates | Cluster behavior proven only by multi-node e2e + fault-injection scenarios; no distributed claims beyond validated scope. |
+| Status | `@absent` |
+
+Inter-node transport — gRPC evaluation (input to the EP-8 ADR):
+
+- **PRO gRPC:** HTTP/2 multiplexing; client/server/bidirectional streaming fits chunk and EC-shard transfer; typed protobuf contracts with schema evolution; built-in deadlines/retries/keepalive; mTLS for node-to-node authentication (ties into EP-1); mature Java ecosystem.
+- **CONSTRAINT (INV-1):** must use reactive bindings (e.g. reactor-grpc style) so Reactor backpressure propagates across the wire; no blocking stubs on event loops.
+- **Alternatives the ADR must compare:** RSocket (native reactive backpressure semantics); plain HTTP/2 between nodes (reuses the existing stack).
+- **BOUNDARY RULE:** the inter-node gRPC API is INTERNAL ONLY — a cluster transport, never a public object API; it must not bypass the storage-engine ACL or become a third external facade. Same governance as AGENTS.md B.3.
+
+### EP-11 — SMB Gateway: Samba VFS C Module (FUTURE, OPTIONAL)
+
+| Field | Plan |
+|---|---|
+| Focus | Expose Magrathea shares via SMB by implementing a Samba VFS module in C (`vfs_magrathea`) loaded by `smbd`, mapping SMB file operations onto object-store semantics — same product constraints as WebDAV (EP-9): optional, disabled by default, internally everything remains S3. |
+| Owner agents | C development is NOT owned by the Java workflow — requires the C workflow/agents (`c-development` workflow, `c-coder`/native agents in the multi-agent skill), exactly like the frontend handoff for EP-7. The Java workflow owns: the optional internal gateway adapter (if option b), contracts, and requirement features. |
+| Requirement feature file | `phase-ep11-smb-gateway.feature` |
+| Key requirement IDs | REQ-SMB-* (`Business Need`, `@smb-gateway` tag) |
+| Validation modes | `smbclient` CLI runner against a containerized `smbd`+module plus S3-side state inspection through the S3 API; C module unit tests (e.g. cmocka) owned by the C workflow; INV-2 applies with protocol-appropriate runners. |
+| Mapping sketch | SMB share → bucket (or bucket+prefix); files → objects; directories → key prefixes (no real hierarchy — same approach as WebDAV collections); SMB attributes beyond S3 semantics → S3 user metadata or rejected; locking/oplocks likely `@not-implemented` initially and documented. |
+| Planned artifacts | PLANNED in the module map: `smb-vfs-module/` (C, Samba VFS, own build — CMake/autotools in container); optionally `object-gateway-grpc-adapter` (internal, decision-gated by the EP-11 start ADR). |
+| Prerequisites | EP-1 (auth/credentials for the gateway), EP-3 (streaming read path). Independent of EP-10 (works single-node). |
+| Acceptance gates | All binding constraints below met, including the internal-only gateway rule; INV-4 preserved by whichever backend the ADR selects. |
+| Status | `@absent` |
+
+EP-11 backend decision — a C module inside `smbd` cannot call the Java application services in-process, so a network boundary is mandatory. The EP-11 start ADR must choose between two backends, both preserving INV-4, decided at phase start with measurements:
+
+- **(a) VFS module → local S3 HTTP API (libcurl + SigV4):** zero new API surface, INV-4 literally preserved; costs: SigV4 signing in C, XML overhead, SMB metadata chattiness (getattr/stat storms) over HTTP+XML.
+- **(b) VFS module → dedicated INTERNAL gRPC protocol-gateway** (grpc C-core client → a thin Java gRPC adapter that delegates exclusively to `ReactiveObjectService`/`ReactiveBucketService`): binary framing + streaming reads/writes suit file I/O, much cheaper for SMB's chatty metadata ops; cost: a new internal API surface that must be governed exactly like the cluster transport — internal only, thin delegation, never a parallel public object API, disabled unless the SMB gateway is enabled.
+- The ADR may also **combine them** (metadata via gRPC, bulk data via S3) — recorded as an option.
+
 ### EP Priority and Sequence
 
 | Order | Phase | Priority | Status |
@@ -427,7 +471,9 @@ Binding EP-9 constraints:
 | 6 | EP-6 Performance & capacity | High | `@absent` |
 | 7 | EP-7 Complete admin panel (backend contracts may proceed in parallel with EP-1..EP-6) | High | `@partial` |
 | 8 | EP-8 HA decision & supply chain | Medium | `@absent` |
-| 9 | EP-9 WebDAV adapter (optional; after EP-1 and EP-3) | Future | `@absent` |
+| 9 | EP-10 S3 cluster (multi-node; after the EP-8 ADR is accepted) | High | `@absent` |
+| 10 | EP-11 SMB gateway (optional; after EP-1 and EP-3; independent of EP-10) | Future | `@absent` |
+| 11 | EP-9 WebDAV adapter (optional; any time after EP-1 and EP-3) | Future | `@absent` |
 
 EP-0 governance applies continuously from the start.
 
@@ -440,8 +486,10 @@ EP-0 governance applies continuously from the start.
 - [ ] EP-5: CI pipeline green on full gate + appendix check + docker build; backup/restore and DR rehearsed; probes/shutdown validated.
 - [ ] EP-6: load/soak limits documented and reproducibly validated.
 - [ ] EP-7: complete admin panel delivered and validated; panel is not an alternate object API.
-- [ ] EP-8: HA target ADR accepted; SBOM/CVE/image hardening/license gates wired into CI.
+- [ ] EP-8: cluster architecture ADR (transport, membership, consistency model, failure-domain topology) accepted; SBOM/CVE/image hardening/license gates wired into CI.
 - [ ] EP-9 (optional): WebDAV adapter, if built, meets all binding constraints.
+- [ ] EP-10: cluster behavior (membership, quorum, failover, healing, rebalance) validated by multi-node e2e scenarios; no distributed claims beyond validated scope.
+- [ ] EP-11 (optional): SMB gateway, if built, meets all binding constraints including the internal-only gateway rule.
 - [ ] All claims above are backed by evidence per the Baseline Evidence discipline; no status inferred from route inventories or smoke checks.
 
 ## Course Correction Plan — Storage Engine Configuration and MINIO_STANDARD (CC-0 .. CC-10)
@@ -545,6 +593,10 @@ Phase CC-10 quality gates were completed 2026-06-12 (HEAD `351d088`): `mvn valid
 | Admin panel drifting into an alternate object API | Admin API/UI grows object CRUD semantics, violating the storage-engine boundary | AGENTS.md B.3 gate enforced in every EP-7 review; admin-side S3 diagnostics must call the S3 API | `documenter`, `java-infra-coder` |
 | Unauthenticated exposure until EP-1 lands | The S3 API accepts anonymous requests today; exposure to untrusted networks means full data compromise | The service **must not be exposed to untrusted networks** until EP-1 is `@implemented-and-validated`; document this in deployment guidance | `documenter`, `java-infra-coder` |
 | In-memory metadata loss on restart until EP-2 lands | Buckets, multipart state, and per-object configuration metadata are lost on restart even in storage-engine mode | EP-2 is first in the EP sequence; restart-safety scenarios per state family; no durability claims for these families until validated | `java-infra-coder`, `java-tester` |
+| Internal gRPC surfaces drifting into a parallel public object API | Cluster transport (EP-10) or protocol gateway (EP-11) becomes an alternate object API bypassing the S3 facade | **INV-4** governance; internal-only network exposure; adapter/transport reviews reject public object semantics | `documenter`, `java-infra-coder` |
+| Split-brain / consistency overclaims in cluster mode | Data loss or false durability/availability claims under partitions | EP-8 ADR consistency model; quorum tests; fault-injection scenarios before any claim | `java-domain-coder`, `java-tester` |
+| C module memory safety and Samba version coupling | `vfs_magrathea` crashes `smbd` or breaks across Samba releases | C workflow ownership; sanitizers (ASan/UBSan) in the C CI; pinned Samba versions in containerized builds | C workflow agents, `documenter` |
+| Reactive backpressure loss across gRPC hops | Unbounded buffering between nodes or gateway violates INV-1 | Reactive gRPC bindings requirement; static architecture tests per INV-1 | `java-infra-coder`, `java-tester` |
 
 ---
 
@@ -557,6 +609,10 @@ magrathea-objectstorage/
 ├── pom.xml
 ├── s3-reactive-api-adapter/                    # Pluggable S3 HTTP adapter (RouterFunction, XML, Cucumber tests)
 ├── webdav-api-adapter/                         # PLANNED — optional WebDAV protocol adapter (EP-9)
+├── storage-engine-cluster-application/         # PLANNED — cluster ports: membership, replica transport, sync (EP-10)
+├── storage-engine-cluster-grpc-infrastructure/ # PLANNED — internal gRPC transport adapters, protobuf contracts (EP-10)
+├── smb-vfs-module/                             # PLANNED — Samba VFS C module (non-Maven, container build; EP-11)
+├── object-gateway-grpc-adapter/                # PLANNED — optional internal gRPC gateway (EP-11, decision-gated)
 ├── admin-api-adapter/                          # Admin/configuration API adapter
 ├── object-store-domain/                        # Pure S3 domain: aggregates, value objects, domain events
 ├── object-store-reactive-repository-application/ # Reactive CQS repository interfaces
