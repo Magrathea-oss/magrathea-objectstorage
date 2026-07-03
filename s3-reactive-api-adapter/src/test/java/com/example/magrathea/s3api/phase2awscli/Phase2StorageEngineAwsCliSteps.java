@@ -427,9 +427,13 @@ public class Phase2StorageEngineAwsCliSteps {
     }
 
     private void resetRepositories() {
-        bucketRepository.ifAvailable(StorageEngineReactiveBucketRepository::reset);
-        objectRepository.ifAvailable(StorageEngineReactiveS3ObjectRepository::reset);
-        multipartRepository.ifAvailable(StorageEngineReactiveMultipartUploadRepository::reset);
+        // Bucket registry, object references and multipart state are durable on the
+        // storage-engine filesystem (EP-2). After the symlink swap to a fresh scenario
+        // root, reloading from disk yields a clean, empty repository view without
+        // destroying durable state from the scenario itself.
+        bucketRepository.ifAvailable(StorageEngineReactiveBucketRepository::reloadFromDisk);
+        objectRepository.ifAvailable(StorageEngineReactiveS3ObjectRepository::reloadFromDisk);
+        multipartRepository.ifAvailable(StorageEngineReactiveMultipartUploadRepository::reloadFromDisk);
         bucketConfigHandler.ifAvailable(S3BucketConfigHandler::resetInMemoryConfigurations);
     }
 

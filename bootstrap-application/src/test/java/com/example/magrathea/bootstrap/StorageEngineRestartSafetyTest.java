@@ -109,13 +109,34 @@ class StorageEngineRestartSafetyTest {
                 .baseUrl("http://127.0.0.1:" + secondPort)
                 .build();
 
-            // Bucket namespace is not persisted across restarts; re-create it so
-            // the service layer can resolve bucket -> object references from the
-            // durable filesystem manifest store.
-            secondClient.put()
+            // EP-2 (REQ-DUR-001): the bucket registry is durable. The bucket created
+            // by the first context must already exist in the second context without
+            // re-creation.
+            secondClient.head()
                 .uri("/" + BUCKET)
                 .exchange()
                 .expectStatus().isOk();
+
+            String listBucketsBody = secondClient.get()
+                .uri("/")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .returnResult()
+                .getResponseBody();
+            assertThat(listBucketsBody)
+                .as("ListBuckets must include the bucket reloaded from the durable registry")
+                .contains(BUCKET);
+
+            // Re-creating the surviving bucket must be rejected as already existing.
+            secondClient.put()
+                .uri("/" + BUCKET)
+                .exchange()
+                .expectStatus().value(status ->
+                    assertThat(status)
+                        .as("bucket registry must survive the restart, so re-creating "
+                            + "the same bucket is a conflict")
+                        .isEqualTo(409));
 
             String recovered = drain(secondClient.get()
                 .uri("/" + BUCKET + "/" + OBJECT_KEY)

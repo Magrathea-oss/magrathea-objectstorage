@@ -334,7 +334,7 @@ public class Phase1UploadStorageEngineAwsCliSteps {
 
     @When("all in-memory repositories and caches are discarded")
     public void allInMemoryRepositoriesAndCachesAreDiscarded() {
-        bucketRepository.ifAvailable(StorageEngineReactiveBucketRepository::reset);
+        // Restart simulation: caches are dropped, durable filesystem state is kept.
         resetRepositories();
     }
 
@@ -668,14 +668,14 @@ public class Phase1UploadStorageEngineAwsCliSteps {
     }
 
     private void resetRepositories() {
-        // Do NOT reset bucketRepository — the bucket is in-memory only with no filesystem
-        // persistence counterpart. Resetting it would cause NoSuchBucket errors on any
-        // subsequent S3 API call in the same scenario (e.g. the GET in
-        // responseProducedFromStorageEngineFilesystemState). Only reset the object and
-        // multipart repositories so that the read path must reload object state from the
-        // durable filesystem rather than an in-memory cache.
-        objectRepository.ifAvailable(StorageEngineReactiveS3ObjectRepository::reset);
-        multipartRepository.ifAvailable(StorageEngineReactiveMultipartUploadRepository::reset);
+        // Bucket registry, object references and multipart state are durable on the
+        // storage-engine filesystem (EP-2). Discard every in-memory cache and reload
+        // state from the currently configured storage root: after a symlink swap this
+        // yields a clean, empty view; within a scenario it forces the read path to
+        // reload state from the durable filesystem rather than an in-memory cache.
+        bucketRepository.ifAvailable(StorageEngineReactiveBucketRepository::reloadFromDisk);
+        objectRepository.ifAvailable(StorageEngineReactiveS3ObjectRepository::reloadFromDisk);
+        multipartRepository.ifAvailable(StorageEngineReactiveMultipartUploadRepository::reloadFromDisk);
     }
 
     private void cleanAndLinkStorageRoot(Path scenarioRoot) {

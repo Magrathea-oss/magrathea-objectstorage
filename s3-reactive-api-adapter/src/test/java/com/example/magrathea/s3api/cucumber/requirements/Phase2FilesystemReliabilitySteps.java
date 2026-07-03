@@ -777,9 +777,14 @@ public class Phase2FilesystemReliabilitySteps {
     }
 
     private void resetRepositories() {
-        bucketRepository.ifAvailable(StorageEngineReactiveBucketRepository::reset);
-        objectRepository.ifAvailable(StorageEngineReactiveS3ObjectRepository::reset);
-        multipartRepository.ifAvailable(StorageEngineReactiveMultipartUploadRepository::reset);
+        // Bucket registry, object references and multipart state are durable on the
+        // storage-engine filesystem (EP-2). Discarding caches and reloading from the
+        // configured storage root is both the clean-setup behavior (after a symlink
+        // swap to a fresh root) and the restart-simulation behavior (durable files
+        // are kept and must be re-read from disk).
+        bucketRepository.ifAvailable(StorageEngineReactiveBucketRepository::reloadFromDisk);
+        objectRepository.ifAvailable(StorageEngineReactiveS3ObjectRepository::reloadFromDisk);
+        multipartRepository.ifAvailable(StorageEngineReactiveMultipartUploadRepository::reloadFromDisk);
     }
 
     private void cleanScenarioRootAndPointConfiguredSymlink(Path scenarioRoot) {

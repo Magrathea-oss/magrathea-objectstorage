@@ -240,13 +240,13 @@ public class Phase1UploadStorageEngineSteps {
     @When("the object repository is reloaded from storage-engine filesystem root {string}")
     public void objectRepositoryIsReloadedFromFilesystemRoot(String storageRoot) {
         assertScenarioRoot(storageRoot);
-        objectRepository.ifAvailable(StorageEngineReactiveS3ObjectRepository::reset);
+        objectRepository.ifAvailable(StorageEngineReactiveS3ObjectRepository::reloadFromDisk);
     }
 
     @When("the manifest repository is reloaded from storage-engine filesystem root {string}")
     public void manifestRepositoryIsReloadedFromFilesystemRoot(String storageRoot) {
         assertScenarioRoot(storageRoot);
-        multipartRepository.ifAvailable(StorageEngineReactiveMultipartUploadRepository::reset);
+        multipartRepository.ifAvailable(StorageEngineReactiveMultipartUploadRepository::reloadFromDisk);
     }
 
     @Then("bucket {string} and key {string} still resolve to the same manifest identifier")
@@ -684,9 +684,14 @@ public class Phase1UploadStorageEngineSteps {
     }
 
     private void resetRepositories() {
-        bucketRepository.ifAvailable(StorageEngineReactiveBucketRepository::reset);
-        objectRepository.ifAvailable(StorageEngineReactiveS3ObjectRepository::reset);
-        multipartRepository.ifAvailable(StorageEngineReactiveMultipartUploadRepository::reset);
+        // Bucket registry, object references and multipart state are durable on the
+        // storage-engine filesystem (EP-2). Discard every in-memory cache and reload
+        // state from the currently configured storage root: after a symlink swap this
+        // yields a clean, empty view; within a scenario it simulates a process restart
+        // that keeps the durable filesystem state.
+        bucketRepository.ifAvailable(StorageEngineReactiveBucketRepository::reloadFromDisk);
+        objectRepository.ifAvailable(StorageEngineReactiveS3ObjectRepository::reloadFromDisk);
+        multipartRepository.ifAvailable(StorageEngineReactiveMultipartUploadRepository::reloadFromDisk);
     }
 
     private void cleanScenarioRootAndPointConfiguredSymlink(Path scenarioRoot) {
