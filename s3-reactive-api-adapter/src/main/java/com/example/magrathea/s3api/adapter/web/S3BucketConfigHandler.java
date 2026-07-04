@@ -3,8 +3,11 @@ package com.example.magrathea.s3api.adapter.web;
 import com.example.magrathea.objectstore.domain.aggregate.Bucket;
 import com.example.magrathea.objectstore.domain.valueobject.BucketAccelerateConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.BucketAnalyticsConfiguration;
+import com.example.magrathea.objectstore.domain.valueobject.AbacConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.BucketConfig;
 import com.example.magrathea.objectstore.domain.valueobject.BucketEncryptionConfiguration;
+import com.example.magrathea.objectstore.domain.valueobject.BucketMetadataConfiguration;
+import com.example.magrathea.objectstore.domain.valueobject.BucketMetadataTableConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.BucketIntelligentTieringConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.BucketInventoryConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.BucketInventoryTableConfiguration;
@@ -77,7 +80,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -126,38 +128,22 @@ public class S3BucketConfigHandler {
     private final ReactiveBucketService bucketService;
     private final Map<ConfigType, ConfigStrategy<?>> registry;
 
-    // Durable-on-aggregate config families (object-lock, inventory-table, journal-table)
-    // are persisted through the bucket aggregate via ReactiveBucketService.updateBucket
-    // and therefore survive restart in storage-engine mode (EP-2). The remaining
-    // handler-local maps below are still in-memory only (@config-only).
-    private final Map<String, List<AbacConfigEntry>> abacConfigs = new ConcurrentHashMap<>();
-    private final Map<String, MetadataConfigEntry> metadataConfigs = new ConcurrentHashMap<>();
-    private final Map<String, MetadataTableConfigEntry> metadataTableConfigs = new ConcurrentHashMap<>();
-
-    private record AbacConfigEntry(String id, String principal, String resource, String action,
-                                    List<AbacCondition> conditions) {
-        private record AbacCondition(String tag, String value) {}
-    }
-    private record MetadataConfigEntry(List<MetadataConfigRule> rules) {
-        private record MetadataConfigRule(String id, String status,
-                                           String metadataResourceType,
-                                           String metadataResourceSubtype) {}
-    }
-    private record MetadataTableConfigEntry(List<MetadataTableConfigRule> rules) {
-        private record MetadataTableConfigRule(String id, String status,
-                                                String metadataTableName,
-                                                String metadataTableDatabase) {}
-    }
+    // EP-2: every bucket configuration family is now persisted on the Bucket aggregate
+    // (durable via BucketStore in storage-engine mode). No handler-local config state
+    // remains in the web adapter.
 
     public S3BucketConfigHandler(ReactiveBucketService bucketService) {
         this.bucketService = bucketService;
         this.registry = buildRegistry();
     }
 
+    /**
+     * Retained for test-glue compatibility. All bucket configuration families now live
+     * on the durable Bucket aggregate, so there is no handler-local state to reset;
+     * repository reset/reload handles configuration state.
+     */
     public void resetInMemoryConfigurations() {
-        abacConfigs.clear();
-        metadataConfigs.clear();
-        metadataTableConfigs.clear();
+        // no-op: configuration state is held on the Bucket aggregate
     }
 
     // ─────────────────────────────────────────────────────
@@ -829,15 +815,15 @@ public class S3BucketConfigHandler {
 
     public Mono<ServerResponse> getBucketAbac(ServerRequest request) {
         return findBucket(request, bucket -> {
-            var entries = abacConfigs.get(bucket.name());
-            if (entries == null || entries.isEmpty()) {
+            var config = bucketConfig(bucket, BucketConfig::getAbacConfiguration).orElse(null);
+            if (config == null || config.rules().isEmpty()) {
                 return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchAbacConfiguration",
                     "The ABAC configuration does not exist");
             }
-            var rules = entries.stream()
-                .map(entry -> new AbacConfigurationQuery.AbacRuleEntry(
-                    entry.id(), entry.principal(), entry.resource(), entry.action(),
-                    entry.conditions().stream()
+            var rules = config.rules().stream()
+                .map(rule -> new AbacConfigurationQuery.AbacRuleEntry(
+                    rule.id(), rule.principal(), rule.resource(), rule.action(),
+                    rule.conditions().stream()
                         .map(condition -> new AbacConfigurationQuery.ConditionEntry(condition.tag(), condition.value()))
                         .toList()))
                 .toList();
@@ -850,17 +836,17 @@ public class S3BucketConfigHandler {
     public Mono<ServerResponse> putBucketAbac(ServerRequest request) {
         return findBucket(request, bucket -> request.bodyToMono(AbacConfigurationCommand.class)
             .flatMap(command -> {
-                var entries = command.rules().stream()
-                    .map(rule -> new AbacConfigEntry(
+                var rules = command.rules().stream()
+                    .map(rule -> AbacConfiguration.AbacRule.of(
                         rule.id(), rule.principal(), rule.resource(), rule.action(),
                         rule.conditions() != null
                             ? rule.conditions().stream()
-                                .map(condition -> new AbacConfigEntry.AbacCondition(condition.tag(), condition.value()))
+                                .map(condition -> AbacConfiguration.Condition.of(condition.tag(), condition.value()))
                                 .toList()
                             : List.of()))
                     .toList();
-                abacConfigs.put(bucket.name(), entries);
-                return ServerResponse.ok().build();
+                return bucketService.updateBucket(bucket.withAbacConfiguration(AbacConfiguration.of(rules)))
+                    .then(ServerResponse.ok().build());
             })
             .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "InvalidRequest",
                 "Missing ABAC configuration body")));
@@ -916,12 +902,12 @@ public class S3BucketConfigHandler {
 
     public Mono<ServerResponse> getBucketMetadataConfiguration(ServerRequest request) {
         return findBucket(request, bucket -> {
-            var entry = metadataConfigs.get(bucket.name());
-            if (entry == null || entry.rules() == null || entry.rules().isEmpty()) {
+            var config = bucketConfig(bucket, BucketConfig::getMetadataConfiguration).orElse(null);
+            if (config == null || config.rules().isEmpty()) {
                 return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchMetadataConfiguration",
                     "The metadata configuration does not exist");
             }
-            var rules = entry.rules().stream()
+            var rules = config.rules().stream()
                 .map(rule -> new MetadataConfigurationQuery.MetadataRuleEntry(
                     rule.id(), rule.status(), rule.metadataResourceType(), rule.metadataResourceSubtype()))
                 .toList();
@@ -935,21 +921,21 @@ public class S3BucketConfigHandler {
         return findBucket(request, bucket -> request.bodyToMono(MetadataConfigurationCommand.class)
             .flatMap(command -> {
                 var rules = command.rules().stream()
-                    .map(rule -> new MetadataConfigEntry.MetadataConfigRule(
+                    .map(rule -> BucketMetadataConfiguration.MetadataRule.of(
                         rule.id(), rule.status(), rule.metadataResourceType(), rule.metadataResourceSubtype()))
                     .toList();
-                metadataConfigs.put(bucket.name(), new MetadataConfigEntry(rules));
-                return ServerResponse.ok().build();
+                return bucketService.updateBucket(
+                        bucket.withMetadataConfiguration(BucketMetadataConfiguration.of(rules)))
+                    .then(ServerResponse.ok().build());
             })
             .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "InvalidRequest",
                 "Missing metadata configuration body")));
     }
 
     public Mono<ServerResponse> deleteBucketMetadataConfiguration(ServerRequest request) {
-        return findBucket(request, bucket -> {
-            metadataConfigs.remove(bucket.name());
-            return ServerResponse.noContent().build();
-        });
+        return findBucket(request, bucket ->
+            bucketService.updateBucket(bucket.withMetadataConfiguration(BucketMetadataConfiguration.empty()))
+                .then(ServerResponse.noContent().build()));
     }
 
     // ─────────────────────────────────────────────────────
@@ -958,12 +944,12 @@ public class S3BucketConfigHandler {
 
     public Mono<ServerResponse> getBucketMetadataTableConfiguration(ServerRequest request) {
         return findBucket(request, bucket -> {
-            var entry = metadataTableConfigs.get(bucket.name());
-            if (entry == null || entry.rules() == null || entry.rules().isEmpty()) {
+            var config = bucketConfig(bucket, BucketConfig::getMetadataTableConfiguration).orElse(null);
+            if (config == null || config.rules().isEmpty()) {
                 return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchMetadataTableConfiguration",
                     "The metadata table configuration does not exist");
             }
-            var rules = entry.rules().stream()
+            var rules = config.rules().stream()
                 .map(rule -> new MetadataTableConfigurationQuery.MetadataTableRuleEntry(
                     rule.id(), rule.status(), rule.metadataTableName(), rule.metadataTableDatabase()))
                 .toList();
@@ -977,21 +963,21 @@ public class S3BucketConfigHandler {
         return findBucket(request, bucket -> request.bodyToMono(MetadataTableConfigurationCommand.class)
             .flatMap(command -> {
                 var rules = command.rules().stream()
-                    .map(rule -> new MetadataTableConfigEntry.MetadataTableConfigRule(
+                    .map(rule -> BucketMetadataTableConfiguration.MetadataTableRule.of(
                         rule.id(), rule.status(), rule.metadataTableName(), rule.metadataTableDatabase()))
                     .toList();
-                metadataTableConfigs.put(bucket.name(), new MetadataTableConfigEntry(rules));
-                return ServerResponse.ok().build();
+                return bucketService.updateBucket(
+                        bucket.withMetadataTableConfiguration(BucketMetadataTableConfiguration.of(rules)))
+                    .then(ServerResponse.ok().build());
             })
             .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "InvalidRequest",
                 "Missing metadata table configuration body")));
     }
 
     public Mono<ServerResponse> deleteBucketMetadataTableConfiguration(ServerRequest request) {
-        return findBucket(request, bucket -> {
-            metadataTableConfigs.remove(bucket.name());
-            return ServerResponse.noContent().build();
-        });
+        return findBucket(request, bucket ->
+            bucketService.updateBucket(bucket.withMetadataTableConfiguration(BucketMetadataTableConfiguration.empty()))
+                .then(ServerResponse.noContent().build()));
     }
 
     // ─────────────────────────────────────────────────────

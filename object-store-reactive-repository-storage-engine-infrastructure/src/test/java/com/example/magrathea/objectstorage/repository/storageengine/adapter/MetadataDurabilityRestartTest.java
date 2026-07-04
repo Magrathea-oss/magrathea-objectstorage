@@ -6,6 +6,8 @@ import com.example.magrathea.objectstore.domain.valueobject.AbacConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.BucketConfig;
 import com.example.magrathea.objectstore.domain.valueobject.CorsConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.BucketInventoryTableConfiguration;
+import com.example.magrathea.objectstore.domain.valueobject.BucketMetadataConfiguration;
+import com.example.magrathea.objectstore.domain.valueobject.BucketMetadataTableConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.BucketJournalTableConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.BucketObjectLockConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.EncryptionAlgorithm;
@@ -63,7 +65,9 @@ class MetadataDurabilityRestartTest {
                 List.of("ETag"),
                 "cors-rule-1")));
             var abac = AbacConfiguration.of(List.of(
-                AbacConfiguration.AbacRule.of("department", "equals", "engineering", "allow")));
+                AbacConfiguration.AbacRule.of("rule-1", "user/admin", "arn:aws:s3:::durable-reports/*",
+                    "s3:GetObject",
+                    List.of(AbacConfiguration.Condition.of("role", "admin")))));
             var config = BucketConfig.EMPTY
                 .withCorsConfiguration(cors)
                 .withAbacConfiguration(abac);
@@ -119,7 +123,13 @@ class MetadataDurabilityRestartTest {
                 .withInventoryTableConfiguration(
                     BucketInventoryTableConfiguration.of("inv-1", "Parquet", "Daily", true))
                 .withJournalTableConfiguration(
-                    BucketJournalTableConfiguration.of("jrn-1", "Parquet", "Hourly", true));
+                    BucketJournalTableConfiguration.of("jrn-1", "Parquet", "Hourly", true))
+                .withMetadataConfiguration(BucketMetadataConfiguration.of(List.of(
+                    BucketMetadataConfiguration.MetadataRule.of(
+                        "md-1", "Enabled", "OBJECT", "TAGS"))))
+                .withMetadataTableConfiguration(BucketMetadataTableConfiguration.of(List.of(
+                    BucketMetadataTableConfiguration.MetadataTableRule.of(
+                        "mdt-1", "Enabled", "ep2-metadata-table", "analytics-db"))));
             store.save(Bucket.restore(
                 Bucket.Id.of("bucket-id-config"), "ep2-bucket-config-test",
                 Region.US_EAST_1, StorageClass.STANDARD, false, false, false, config));
@@ -137,6 +147,12 @@ class MetadataDurabilityRestartTest {
                 "journal-table configuration must survive restart");
             assertEquals("Hourly",
                 reloaded.getJournalTableConfiguration().orElseThrow().scheduleFrequency());
+            assertEquals("md-1",
+                reloaded.getMetadataConfiguration().orElseThrow().rules().get(0).id(),
+                "metadata configuration must survive restart");
+            assertEquals("ep2-metadata-table",
+                reloaded.getMetadataTableConfiguration().orElseThrow().rules().get(0).metadataTableName(),
+                "metadata-table configuration must survive restart");
         }
     }
 

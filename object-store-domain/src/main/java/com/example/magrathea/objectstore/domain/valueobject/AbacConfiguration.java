@@ -2,15 +2,15 @@ package com.example.magrathea.objectstore.domain.valueobject;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 /**
- * AbacConfiguration — a value object representing attribute-based access control rules for a bucket.
+ * AbacConfiguration — attribute-based access control rules for a bucket.
  * <p>
- * ABAC (Attribute-Based Access Control) allows fine-grained access control based on
- * object tags and attributes. Each rule defines a condition that must be satisfied
- * for access to be granted.
+ * Each rule grants an {@code action} to a {@code principal} on a {@code resource},
+ * optionally gated by tag-based {@link Condition}s. This mirrors the shape exposed by
+ * the S3-compatible bucket ABAC configuration API so that the aggregate can persist and
+ * return exactly what the API accepts.
  * </p>
  * Pure domain — NO framework dependencies.
  */
@@ -23,16 +23,10 @@ public record AbacConfiguration(
         rules = List.copyOf(rules);
     }
 
-    /**
-     * Factory method — create from a list of rules.
-     */
     public static AbacConfiguration of(List<AbacRule> rules) {
         return new AbacConfiguration(rules);
     }
 
-    /**
-     * Factory method — empty configuration (no rules).
-     */
     public static AbacConfiguration empty() {
         return new AbacConfiguration(List.of());
     }
@@ -42,31 +36,36 @@ public record AbacConfiguration(
     }
 
     /**
-     * An individual ABAC rule — maps an attribute condition to an action.
+     * An individual ABAC rule: grant {@code action} to {@code principal} on
+     * {@code resource}, gated by optional tag conditions.
      */
     public record AbacRule(
-        String attribute,
-        String operator,
-        String value,
-        String action
+        String id,
+        String principal,
+        String resource,
+        String action,
+        List<Condition> conditions
     ) {
 
         public AbacRule {
-            Objects.requireNonNull(attribute);
-            Objects.requireNonNull(operator);
-            Objects.requireNonNull(value);
             Objects.requireNonNull(action);
-            if (attribute.isBlank()) throw new IllegalArgumentException("attribute must not be blank");
-            if (operator.isBlank()) throw new IllegalArgumentException("operator must not be blank");
-            if (value.isBlank()) throw new IllegalArgumentException("value must not be blank");
-            if (action.isBlank()) throw new IllegalArgumentException("action must not be blank");
+            conditions = conditions == null ? List.of() : List.copyOf(conditions);
         }
 
-        /**
-         * Factory method.
-         */
-        public static AbacRule of(String attribute, String operator, String value, String action) {
-            return new AbacRule(attribute, operator, value, action);
+        public static AbacRule of(String id, String principal, String resource, String action,
+                                  List<Condition> conditions) {
+            return new AbacRule(id, principal, resource, action, conditions);
+        }
+
+        public List<Condition> conditions() {
+            return Collections.unmodifiableList(conditions);
+        }
+    }
+
+    /** A tag-based condition: {@code tag} must equal {@code value}. */
+    public record Condition(String tag, String value) {
+        public static Condition of(String tag, String value) {
+            return new Condition(tag, value);
         }
     }
 }

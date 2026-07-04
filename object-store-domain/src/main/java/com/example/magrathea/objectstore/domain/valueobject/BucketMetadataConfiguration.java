@@ -5,60 +5,45 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * BucketMetadataConfiguration — a value object for bucket metadata key definitions.
+ * BucketMetadataConfiguration — bucket metadata configuration rules.
  * <p>
- * Defines metadata keys and their types (e.g., dimension, timestamp) for S3 object metadata.
- * Used by CreateBucketMetadataConfiguration, GetBucketMetadataConfiguration, etc.
+ * Each rule declares a metadata resource type/subtype and its status, mirroring the
+ * shape exposed by the S3-compatible bucket metadata configuration API so that the
+ * aggregate can persist and return exactly what the API accepts.
  * </p>
  * Pure domain — NO framework dependencies.
  */
 public record BucketMetadataConfiguration(
-    List<MetadataKeyDefinition> keys
+    List<MetadataRule> rules
 ) {
 
     public BucketMetadataConfiguration {
-        Objects.requireNonNull(keys);
-        keys = List.copyOf(keys);
+        Objects.requireNonNull(rules);
+        rules = List.copyOf(rules);
     }
 
-    /**
-     * Factory method — create from a list of key definitions.
-     */
-    public static BucketMetadataConfiguration of(List<MetadataKeyDefinition> keys) {
-        return new BucketMetadataConfiguration(keys);
+    public static BucketMetadataConfiguration of(List<MetadataRule> rules) {
+        return new BucketMetadataConfiguration(rules);
     }
 
-    /**
-     * Factory method — empty configuration.
-     */
     public static BucketMetadataConfiguration empty() {
         return new BucketMetadataConfiguration(List.of());
     }
 
-    public List<MetadataKeyDefinition> keys() {
-        return Collections.unmodifiableList(keys);
+    public List<MetadataRule> rules() {
+        return Collections.unmodifiableList(rules);
     }
 
-    /**
-     * A single metadata key definition.
-     */
-    public record MetadataKeyDefinition(
-        String key,
-        String type
+    /** A single metadata configuration rule. */
+    public record MetadataRule(
+        String id,
+        String status,
+        String metadataResourceType,
+        String metadataResourceSubtype
     ) {
-
-        public MetadataKeyDefinition {
-            Objects.requireNonNull(key);
-            Objects.requireNonNull(type);
-            if (key.isBlank()) throw new IllegalArgumentException("key must not be blank");
-            if (type.isBlank()) throw new IllegalArgumentException("type must not be blank");
-        }
-
-        /**
-         * Factory method.
-         */
-        public static MetadataKeyDefinition of(String key, String type) {
-            return new MetadataKeyDefinition(key, type);
+        public static MetadataRule of(String id, String status,
+                                      String metadataResourceType, String metadataResourceSubtype) {
+            return new MetadataRule(id, status, metadataResourceType, metadataResourceSubtype);
         }
     }
 }

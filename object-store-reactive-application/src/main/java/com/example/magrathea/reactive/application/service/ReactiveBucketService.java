@@ -4,8 +4,6 @@ import com.example.magrathea.objectstore.domain.aggregate.Bucket;
 import com.example.magrathea.objectstore.domain.valueobject.AbacConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.BucketMetadataConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.BucketMetadataTableConfiguration;
-import com.example.magrathea.objectstore.domain.valueobject.BucketMetadataTableConfiguration.InventoryTableConfiguration;
-import com.example.magrathea.objectstore.domain.valueobject.BucketMetadataTableConfiguration.JournalTableConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.SessionToken;
 import com.example.magrathea.objectstore.reactive.repository.application.BucketCommandRepository;
 import com.example.magrathea.objectstore.reactive.repository.application.BucketQueryRepository;
@@ -116,39 +114,7 @@ public class ReactiveBucketService {
      * Delete bucket metadata table configuration.
      */
     public Mono<Void> deleteBucketMetadataTableConfiguration(String bucketName) {
-        return commandRepository.saveMetadataTableConfiguration(bucketName, BucketMetadataTableConfiguration.basic("default-table", java.util.List.of("default-key")));
-    }
-
-    /**
-     * Update the inventory table configuration within a bucket's metadata table configuration.
-     */
-    public Mono<Void> updateBucketMetadataInventoryTableConfiguration(String bucketName, InventoryTableConfiguration inventoryConfig) {
-        return queryRepository.findMetadataTableConfiguration(bucketName)
-            .flatMap(current -> {
-                var updated = current.withInventoryConfiguration(inventoryConfig);
-                return commandRepository.saveMetadataTableConfiguration(bucketName, updated);
-            })
-            .switchIfEmpty(Mono.defer(() -> {
-                var basic = BucketMetadataTableConfiguration.basic("default-table", java.util.List.of("default-key"));
-                var updated = basic.withInventoryConfiguration(inventoryConfig);
-                return commandRepository.saveMetadataTableConfiguration(bucketName, updated);
-            }));
-    }
-
-    /**
-     * Update the journal table configuration within a bucket's metadata table configuration.
-     */
-    public Mono<Void> updateBucketMetadataJournalTableConfiguration(String bucketName, JournalTableConfiguration journalConfig) {
-        return queryRepository.findMetadataTableConfiguration(bucketName)
-            .flatMap(current -> {
-                var updated = current.withJournalConfiguration(journalConfig);
-                return commandRepository.saveMetadataTableConfiguration(bucketName, updated);
-            })
-            .switchIfEmpty(Mono.defer(() -> {
-                var basic = BucketMetadataTableConfiguration.basic("default-table", java.util.List.of("default-key"));
-                var updated = basic.withJournalConfiguration(journalConfig);
-                return commandRepository.saveMetadataTableConfiguration(bucketName, updated);
-            }));
+        return commandRepository.saveMetadataTableConfiguration(bucketName, BucketMetadataTableConfiguration.empty());
     }
 
     // ── Phase F: Directory buckets ──
