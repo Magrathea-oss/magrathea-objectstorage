@@ -143,13 +143,33 @@ Business Need: EP-2 Complete Metadata Durability
       When the application process is stopped and started again with the same filesystem root
       Then GetBucketNotificationConfiguration for bucket "ep2-bucket-config-test" returns the topic destination "arn:aws:sns:eu-west-1:000000000000:ep2-topic"
 
-  Rule: Handler-local bucket configuration families must move behind durable repository ports
-    Six families are still held in handler-local in-memory maps inside
-    S3BucketConfigHandler (ABAC routing, bucket object-lock configuration, metadata
-    configuration, metadata-table, inventory-table and journal-table configuration).
-    They accept and return configuration but do not survive a restart and bypass the
-    repository layer. EP-2 requires moving them behind the bucket repository ports so
-    they join the durable bucket registry document.
+    @REQ-DUR-004 @functional-requirement @non-functional-requirement @durability @restart-safety @implemented-not-e2e-validated
+    Scenario: Bucket object-lock configuration survives restart
+      Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-object-lock"
+      And bucket "ep2-bucket-config-test" has an object-lock configuration with retention mode "GOVERNANCE" and a period of 30 days
+      When the application process is stopped and started again with the same filesystem root
+      Then GetObjectLockConfiguration for bucket "ep2-bucket-config-test" returns retention mode "GOVERNANCE" and a period of 30 days
+
+    @REQ-DUR-004 @functional-requirement @non-functional-requirement @durability @restart-safety @implemented-not-e2e-validated
+    Scenario: Bucket inventory-table configuration survives restart
+      Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-inventory-table"
+      And bucket "ep2-bucket-config-test" has an inventory-table configuration with id "ep2-inventory-table" format "Parquet" and schedule "Daily"
+      When the application process is stopped and started again with the same filesystem root
+      Then the inventory-table configuration for bucket "ep2-bucket-config-test" returns id "ep2-inventory-table"
+
+    @REQ-DUR-004 @functional-requirement @non-functional-requirement @durability @restart-safety @implemented-not-e2e-validated
+    Scenario: Bucket journal-table configuration survives restart
+      Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-journal-table"
+      And bucket "ep2-bucket-config-test" has a journal-table configuration with id "ep2-journal-table" format "Parquet" and schedule "Hourly"
+      When the application process is stopped and started again with the same filesystem root
+      Then the journal-table configuration for bucket "ep2-bucket-config-test" returns id "ep2-journal-table"
+
+  Rule: Remaining handler-local bucket configuration families must move behind durable repository ports
+    ABAC routing, bucket metadata configuration and the metadata-table configuration are
+    still held in handler-local in-memory maps inside S3BucketConfigHandler. They accept
+    and return configuration but do not survive a restart and bypass the repository layer.
+    EP-2 requires moving them onto the bucket aggregate (as object-lock, inventory-table
+    and journal-table already were) so they join the durable bucket registry document.
 
     @REQ-DUR-004 @functional-requirement @durability @restart-safety @config-only
     Scenario: Bucket ABAC configuration survives restart
@@ -159,32 +179,11 @@ Business Need: EP-2 Complete Metadata Durability
       Then the bucket ABAC configuration for "ep2-bucket-config-test" includes the rule granting "s3:GetObject"
 
     @REQ-DUR-004 @functional-requirement @durability @restart-safety @config-only
-    Scenario: Bucket object-lock configuration survives restart
-      Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-object-lock"
-      And bucket "ep2-bucket-config-test" has an object-lock configuration with retention mode "GOVERNANCE" and a period of 30 days
-      When the application process is stopped and started again with the same filesystem root
-      Then GetObjectLockConfiguration for bucket "ep2-bucket-config-test" returns retention mode "GOVERNANCE"
-
-    @REQ-DUR-004 @functional-requirement @durability @restart-safety @config-only
     Scenario: Bucket metadata-table configuration survives restart
       Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-metadata-table"
       And bucket "ep2-bucket-config-test" has a metadata-table configuration with table name "ep2-metadata-table"
       When the application process is stopped and started again with the same filesystem root
       Then the metadata-table configuration for bucket "ep2-bucket-config-test" returns table name "ep2-metadata-table"
-
-    @REQ-DUR-004 @functional-requirement @durability @restart-safety @config-only
-    Scenario: Bucket inventory-table configuration survives restart
-      Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-inventory-table"
-      And bucket "ep2-bucket-config-test" has an inventory-table configuration with table name "ep2-inventory-table"
-      When the application process is stopped and started again with the same filesystem root
-      Then the inventory-table configuration for bucket "ep2-bucket-config-test" returns table name "ep2-inventory-table"
-
-    @REQ-DUR-004 @functional-requirement @durability @restart-safety @config-only
-    Scenario: Bucket journal-table configuration survives restart
-      Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-journal-table"
-      And bucket "ep2-bucket-config-test" has a journal-table configuration with table name "ep2-journal-table"
-      When the application process is stopped and started again with the same filesystem root
-      Then the journal-table configuration for bucket "ep2-bucket-config-test" returns table name "ep2-journal-table"
 
   Rule: A combined restart scenario proves that no metadata family is silently lost
     One scenario exercises the bucket registry, per-object metadata and multipart

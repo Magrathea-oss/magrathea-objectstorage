@@ -28,9 +28,9 @@ Generated from `s3-reactive-api-adapter/src/test/features/requirements` using `p
 |===
 |Tag |Scenario count
 |`@absent` |1
-|`@config-only` |6
+|`@config-only` |3
 |`@implemented-and-validated` |42
-|`@implemented-not-e2e-validated` |28
+|`@implemented-not-e2e-validated` |31
 |`@not-implemented` |12
 |`@partial` |2
 |===
@@ -58,7 +58,7 @@ Generated from `s3-reactive-api-adapter/src/test/features/requirements` using `p
 |===
 |Tag |Scenario count
 |`@functional-requirement` |80
-|`@non-functional-requirement` |60
+|`@non-functional-requirement` |63
 |===
 
 === Scenarios by Feature and Requirement ID
@@ -3697,13 +3697,115 @@ metadata-table configuration) are part of the durable bucket registry document.
   Then GetBucketNotificationConfiguration for bucket "ep2-bucket-config-test" returns the topic destination "arn:aws:sns:eu-west-1:000000000000:ep2-topic"
 ----
 
+====== Scenario: Bucket object-lock configuration survives restart
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:147`
+|Rule |Bucket configuration families stored on the bucket aggregate must survive restart
+|Requirement ID(s) |`REQ-DUR-004`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@durability`, `@restart-safety`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-not-e2e-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@REQ-DUR-004`, `@functional-requirement`, `@non-functional-requirement`, `@durability`, `@restart-safety`, `@implemented-not-e2e-validated`
+|===
+
+.Rule description
+----
+Configuration families persisted through the bucket repository (the full BucketConfig
+document: CORS, policy, lifecycle, logging, website, notification, replication,
+request-payment, ownership controls, public access block, accelerate, analytics,
+inventory, metrics, intelligent tiering, encryption, ABAC, metadata and
+metadata-table configuration) are part of the durable bucket registry document.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-object-lock"
+  And bucket "ep2-bucket-config-test" has an object-lock configuration with retention mode "GOVERNANCE" and a period of 30 days
+  When the application process is stopped and started again with the same filesystem root
+  Then GetObjectLockConfiguration for bucket "ep2-bucket-config-test" returns retention mode "GOVERNANCE" and a period of 30 days
+----
+
+====== Scenario: Bucket inventory-table configuration survives restart
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:154`
+|Rule |Bucket configuration families stored on the bucket aggregate must survive restart
+|Requirement ID(s) |`REQ-DUR-004`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@durability`, `@restart-safety`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-not-e2e-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@REQ-DUR-004`, `@functional-requirement`, `@non-functional-requirement`, `@durability`, `@restart-safety`, `@implemented-not-e2e-validated`
+|===
+
+.Rule description
+----
+Configuration families persisted through the bucket repository (the full BucketConfig
+document: CORS, policy, lifecycle, logging, website, notification, replication,
+request-payment, ownership controls, public access block, accelerate, analytics,
+inventory, metrics, intelligent tiering, encryption, ABAC, metadata and
+metadata-table configuration) are part of the durable bucket registry document.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-inventory-table"
+  And bucket "ep2-bucket-config-test" has an inventory-table configuration with id "ep2-inventory-table" format "Parquet" and schedule "Daily"
+  When the application process is stopped and started again with the same filesystem root
+  Then the inventory-table configuration for bucket "ep2-bucket-config-test" returns id "ep2-inventory-table"
+----
+
+====== Scenario: Bucket journal-table configuration survives restart
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:161`
+|Rule |Bucket configuration families stored on the bucket aggregate must survive restart
+|Requirement ID(s) |`REQ-DUR-004`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@durability`, `@restart-safety`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-not-e2e-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@REQ-DUR-004`, `@functional-requirement`, `@non-functional-requirement`, `@durability`, `@restart-safety`, `@implemented-not-e2e-validated`
+|===
+
+.Rule description
+----
+Configuration families persisted through the bucket repository (the full BucketConfig
+document: CORS, policy, lifecycle, logging, website, notification, replication,
+request-payment, ownership controls, public access block, accelerate, analytics,
+inventory, metrics, intelligent tiering, encryption, ABAC, metadata and
+metadata-table configuration) are part of the durable bucket registry document.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-journal-table"
+  And bucket "ep2-bucket-config-test" has a journal-table configuration with id "ep2-journal-table" format "Parquet" and schedule "Hourly"
+  When the application process is stopped and started again with the same filesystem root
+  Then the journal-table configuration for bucket "ep2-bucket-config-test" returns id "ep2-journal-table"
+----
+
 ====== Scenario: Bucket ABAC configuration survives restart
 
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:155`
-|Rule |Handler-local bucket configuration families must move behind durable repository ports
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:175`
+|Rule |Remaining handler-local bucket configuration families must move behind durable repository ports
 |Requirement ID(s) |`REQ-DUR-004`
 |Classification |`@functional-requirement`
 |Capability area tags |`@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@durability`, `@restart-safety`
@@ -3715,12 +3817,11 @@ metadata-table configuration) are part of the durable bucket registry document.
 
 .Rule description
 ----
-Six families are still held in handler-local in-memory maps inside
-S3BucketConfigHandler (ABAC routing, bucket object-lock configuration, metadata
-configuration, metadata-table, inventory-table and journal-table configuration).
-They accept and return configuration but do not survive a restart and bypass the
-repository layer. EP-2 requires moving them behind the bucket repository ports so
-they join the durable bucket registry document.
+ABAC routing, bucket metadata configuration and the metadata-table configuration are
+still held in handler-local in-memory maps inside S3BucketConfigHandler. They accept
+and return configuration but do not survive a restart and bypass the repository layer.
+EP-2 requires moving them onto the bucket aggregate (as object-lock, inventory-table
+and journal-table already were) so they join the durable bucket registry document.
 ----
 
 .Gherkin steps
@@ -3732,48 +3833,13 @@ they join the durable bucket registry document.
   Then the bucket ABAC configuration for "ep2-bucket-config-test" includes the rule granting "s3:GetObject"
 ----
 
-====== Scenario: Bucket object-lock configuration survives restart
-
-[cols="1h,3",options="header"]
-|===
-|Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:162`
-|Rule |Handler-local bucket configuration families must move behind durable repository ports
-|Requirement ID(s) |`REQ-DUR-004`
-|Classification |`@functional-requirement`
-|Capability area tags |`@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@durability`, `@restart-safety`
-|Validation mode tags |unknown/not-tagged
-|Declared/validated status |`@config-only`
-|Protocol smoke |`no`
-|All tags |`@requirement`, `@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@REQ-DUR-004`, `@functional-requirement`, `@durability`, `@restart-safety`, `@config-only`
-|===
-
-.Rule description
-----
-Six families are still held in handler-local in-memory maps inside
-S3BucketConfigHandler (ABAC routing, bucket object-lock configuration, metadata
-configuration, metadata-table, inventory-table and journal-table configuration).
-They accept and return configuration but do not survive a restart and bypass the
-repository layer. EP-2 requires moving them behind the bucket repository ports so
-they join the durable bucket registry document.
-----
-
-.Gherkin steps
-[source,gherkin]
-----
-  Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-object-lock"
-  And bucket "ep2-bucket-config-test" has an object-lock configuration with retention mode "GOVERNANCE" and a period of 30 days
-  When the application process is stopped and started again with the same filesystem root
-  Then GetObjectLockConfiguration for bucket "ep2-bucket-config-test" returns retention mode "GOVERNANCE"
-----
-
 ====== Scenario: Bucket metadata-table configuration survives restart
 
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:169`
-|Rule |Handler-local bucket configuration families must move behind durable repository ports
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:182`
+|Rule |Remaining handler-local bucket configuration families must move behind durable repository ports
 |Requirement ID(s) |`REQ-DUR-004`
 |Classification |`@functional-requirement`
 |Capability area tags |`@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@durability`, `@restart-safety`
@@ -3785,12 +3851,11 @@ they join the durable bucket registry document.
 
 .Rule description
 ----
-Six families are still held in handler-local in-memory maps inside
-S3BucketConfigHandler (ABAC routing, bucket object-lock configuration, metadata
-configuration, metadata-table, inventory-table and journal-table configuration).
-They accept and return configuration but do not survive a restart and bypass the
-repository layer. EP-2 requires moving them behind the bucket repository ports so
-they join the durable bucket registry document.
+ABAC routing, bucket metadata configuration and the metadata-table configuration are
+still held in handler-local in-memory maps inside S3BucketConfigHandler. They accept
+and return configuration but do not survive a restart and bypass the repository layer.
+EP-2 requires moving them onto the bucket aggregate (as object-lock, inventory-table
+and journal-table already were) so they join the durable bucket registry document.
 ----
 
 .Gherkin steps
@@ -3802,76 +3867,6 @@ they join the durable bucket registry document.
   Then the metadata-table configuration for bucket "ep2-bucket-config-test" returns table name "ep2-metadata-table"
 ----
 
-====== Scenario: Bucket inventory-table configuration survives restart
-
-[cols="1h,3",options="header"]
-|===
-|Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:176`
-|Rule |Handler-local bucket configuration families must move behind durable repository ports
-|Requirement ID(s) |`REQ-DUR-004`
-|Classification |`@functional-requirement`
-|Capability area tags |`@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@durability`, `@restart-safety`
-|Validation mode tags |unknown/not-tagged
-|Declared/validated status |`@config-only`
-|Protocol smoke |`no`
-|All tags |`@requirement`, `@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@REQ-DUR-004`, `@functional-requirement`, `@durability`, `@restart-safety`, `@config-only`
-|===
-
-.Rule description
-----
-Six families are still held in handler-local in-memory maps inside
-S3BucketConfigHandler (ABAC routing, bucket object-lock configuration, metadata
-configuration, metadata-table, inventory-table and journal-table configuration).
-They accept and return configuration but do not survive a restart and bypass the
-repository layer. EP-2 requires moving them behind the bucket repository ports so
-they join the durable bucket registry document.
-----
-
-.Gherkin steps
-[source,gherkin]
-----
-  Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-inventory-table"
-  And bucket "ep2-bucket-config-test" has an inventory-table configuration with table name "ep2-inventory-table"
-  When the application process is stopped and started again with the same filesystem root
-  Then the inventory-table configuration for bucket "ep2-bucket-config-test" returns table name "ep2-inventory-table"
-----
-
-====== Scenario: Bucket journal-table configuration survives restart
-
-[cols="1h,3",options="header"]
-|===
-|Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:183`
-|Rule |Handler-local bucket configuration families must move behind durable repository ports
-|Requirement ID(s) |`REQ-DUR-004`
-|Classification |`@functional-requirement`
-|Capability area tags |`@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@durability`, `@restart-safety`
-|Validation mode tags |unknown/not-tagged
-|Declared/validated status |`@config-only`
-|Protocol smoke |`no`
-|All tags |`@requirement`, `@phase-ep2`, `@metadata-durability`, `@storage-engine`, `@REQ-DUR-004`, `@functional-requirement`, `@durability`, `@restart-safety`, `@config-only`
-|===
-
-.Rule description
-----
-Six families are still held in handler-local in-memory maps inside
-S3BucketConfigHandler (ABAC routing, bucket object-lock configuration, metadata
-configuration, metadata-table, inventory-table and journal-table configuration).
-They accept and return configuration but do not survive a restart and bypass the
-repository layer. EP-2 requires moving them behind the bucket repository ports so
-they join the durable bucket registry document.
-----
-
-.Gherkin steps
-[source,gherkin]
-----
-  Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-journal-table"
-  And bucket "ep2-bucket-config-test" has a journal-table configuration with table name "ep2-journal-table"
-  When the application process is stopped and started again with the same filesystem root
-  Then the journal-table configuration for bucket "ep2-bucket-config-test" returns table name "ep2-journal-table"
-----
-
 ===== REQ-DUR-005
 
 ====== Scenario: All EP-2 metadata families survive one combined restart
@@ -3879,7 +3874,7 @@ they join the durable bucket registry document.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:194`
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature:193`
 |Rule |A combined restart scenario proves that no metadata family is silently lost
 |Requirement ID(s) |`REQ-DUR-005`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
