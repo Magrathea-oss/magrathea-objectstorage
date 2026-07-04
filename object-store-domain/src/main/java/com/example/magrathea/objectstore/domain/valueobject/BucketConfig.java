@@ -31,13 +31,17 @@ public record BucketConfig(
     String bucketPolicy,
     AbacConfiguration abacConfiguration,
     BucketMetadataConfiguration metadataConfiguration,
-    BucketMetadataTableConfiguration metadataTableConfiguration
+    BucketMetadataTableConfiguration metadataTableConfiguration,
+    BucketObjectLockConfiguration objectLockConfiguration,
+    BucketInventoryTableConfiguration inventoryTableConfiguration,
+    BucketJournalTableConfiguration journalTableConfiguration
 ) {
     /**
      * EMPTY constant — all fields null.
      */
     public static final BucketConfig EMPTY = new BucketConfig(null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null, null, null, null);
+        null, null, null, null, null, null, null, null, null, null, null, null, null,
+        null, null, null);
 
     // ── Getter methods returning Optional ──
 
@@ -117,6 +121,18 @@ public record BucketConfig(
         return Optional.ofNullable(metadataTableConfiguration);
     }
 
+    public Optional<BucketObjectLockConfiguration> getObjectLockConfiguration() {
+        return Optional.ofNullable(objectLockConfiguration);
+    }
+
+    public Optional<BucketInventoryTableConfiguration> getInventoryTableConfiguration() {
+        return Optional.ofNullable(inventoryTableConfiguration);
+    }
+
+    public Optional<BucketJournalTableConfiguration> getJournalTableConfiguration() {
+        return Optional.ofNullable(journalTableConfiguration);
+    }
+
     // ── with* methods ──
 
     public BucketConfig withLoggingConfiguration(BucketLoggingConfiguration logging) {
@@ -125,7 +141,7 @@ public record BucketConfig(
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
             ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
-            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration, objectLockConfiguration, inventoryTableConfiguration, journalTableConfiguration);
     }
 
     public BucketConfig withWebsiteConfiguration(BucketWebsiteConfiguration website) {
@@ -134,7 +150,7 @@ public record BucketConfig(
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
             ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
-            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration, objectLockConfiguration, inventoryTableConfiguration, journalTableConfiguration);
     }
 
     public BucketConfig withNotificationConfiguration(BucketNotificationConfiguration notification) {
@@ -143,7 +159,7 @@ public record BucketConfig(
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
             ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
-            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration, objectLockConfiguration, inventoryTableConfiguration, journalTableConfiguration);
     }
 
     public BucketConfig withAccelerateConfiguration(BucketAccelerateConfiguration accelerate) {
@@ -152,7 +168,7 @@ public record BucketConfig(
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
             ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
-            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration, objectLockConfiguration, inventoryTableConfiguration, journalTableConfiguration);
     }
 
     public BucketConfig withAnalyticsConfiguration(BucketAnalyticsConfiguration analytics) {
@@ -161,7 +177,7 @@ public record BucketConfig(
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
             ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
-            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration, objectLockConfiguration, inventoryTableConfiguration, journalTableConfiguration);
     }
 
     public BucketConfig withInventoryConfiguration(BucketInventoryConfiguration inventory) {
@@ -170,7 +186,7 @@ public record BucketConfig(
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
             ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
-            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration, objectLockConfiguration, inventoryTableConfiguration, journalTableConfiguration);
     }
 
     public BucketConfig withMetricsConfiguration(BucketMetricsConfiguration metrics) {
@@ -179,7 +195,7 @@ public record BucketConfig(
             metrics, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
             ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
-            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration, objectLockConfiguration, inventoryTableConfiguration, journalTableConfiguration);
     }
 
     public BucketConfig withIntelligentTieringConfiguration(BucketIntelligentTieringConfiguration tiering) {
@@ -188,7 +204,7 @@ public record BucketConfig(
             metricsConfiguration, tiering, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
             ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
-            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration, objectLockConfiguration, inventoryTableConfiguration, journalTableConfiguration);
     }
 
     public BucketConfig withEncryptionConfiguration(BucketEncryptionConfiguration encryption) {
@@ -197,7 +213,7 @@ public record BucketConfig(
             metricsConfiguration, intelligentTieringConfiguration, encryption,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
             ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
-            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration, objectLockConfiguration, inventoryTableConfiguration, journalTableConfiguration);
     }
 
     public BucketConfig withLifecycleConfiguration(BucketLifecycleConfiguration lifecycle) {
@@ -206,7 +222,7 @@ public record BucketConfig(
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycle, replicationConfiguration, requestPaymentConfiguration,
             ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
-            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration, objectLockConfiguration, inventoryTableConfiguration, journalTableConfiguration);
     }
 
     public BucketConfig withReplicationConfiguration(BucketReplicationConfiguration replication) {
@@ -215,7 +231,7 @@ public record BucketConfig(
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replication, requestPaymentConfiguration,
             ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
-            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration, objectLockConfiguration, inventoryTableConfiguration, journalTableConfiguration);
     }
 
     public BucketConfig withRequestPaymentConfiguration(BucketRequestPaymentConfiguration payment) {
@@ -224,7 +240,7 @@ public record BucketConfig(
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, payment,
             ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
-            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration, objectLockConfiguration, inventoryTableConfiguration, journalTableConfiguration);
     }
 
     public BucketConfig withOwnershipControls(BucketOwnershipControls ownership) {
@@ -233,7 +249,7 @@ public record BucketConfig(
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
             ownership, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
-            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration, objectLockConfiguration, inventoryTableConfiguration, journalTableConfiguration);
     }
 
     public BucketConfig withPublicAccessBlock(PublicAccessBlockConfiguration publicAccessBlock) {
@@ -242,7 +258,7 @@ public record BucketConfig(
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
             ownershipControls, publicAccessBlock, corsConfiguration, bucketPolicy,
-            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration, objectLockConfiguration, inventoryTableConfiguration, journalTableConfiguration);
     }
 
     public BucketConfig withCorsConfiguration(CorsConfiguration cors) {
@@ -252,7 +268,7 @@ public record BucketConfig(
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
             ownershipControls, publicAccessBlockConfiguration, cors, bucketPolicy,
-            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration, objectLockConfiguration, inventoryTableConfiguration, journalTableConfiguration);
     }
 
     public BucketConfig withBucketPolicy(String policy) {
@@ -262,7 +278,7 @@ public record BucketConfig(
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
             ownershipControls, publicAccessBlockConfiguration, corsConfiguration, policy,
-            abacConfiguration, metadataConfiguration, metadataTableConfiguration);
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration, objectLockConfiguration, inventoryTableConfiguration, journalTableConfiguration);
     }
 
     public BucketConfig withAbacConfiguration(AbacConfiguration abac) {
@@ -272,7 +288,7 @@ public record BucketConfig(
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
             ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
-            abac, metadataConfiguration, metadataTableConfiguration);
+            abac, metadataConfiguration, metadataTableConfiguration, objectLockConfiguration, inventoryTableConfiguration, journalTableConfiguration);
     }
 
     public BucketConfig withMetadataConfiguration(BucketMetadataConfiguration metadata) {
@@ -282,7 +298,7 @@ public record BucketConfig(
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
             ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
-            abacConfiguration, metadata, metadataTableConfiguration);
+            abacConfiguration, metadata, metadataTableConfiguration, objectLockConfiguration, inventoryTableConfiguration, journalTableConfiguration);
     }
 
     public BucketConfig withMetadataTableConfiguration(BucketMetadataTableConfiguration metadataTable) {
@@ -292,7 +308,37 @@ public record BucketConfig(
             metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
             lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
             ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
-            abacConfiguration, metadataConfiguration, metadataTable);
+            abacConfiguration, metadataConfiguration, metadataTable, objectLockConfiguration, inventoryTableConfiguration, journalTableConfiguration);
+    }
+
+    public BucketConfig withObjectLockConfiguration(BucketObjectLockConfiguration objectLock) {
+        Objects.requireNonNull(objectLock);
+        return new BucketConfig(loggingConfiguration, websiteConfiguration, notificationConfiguration,
+            accelerateConfiguration, analyticsConfiguration, inventoryConfiguration,
+            metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
+            lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
+            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration, objectLock, inventoryTableConfiguration, journalTableConfiguration);
+    }
+
+    public BucketConfig withInventoryTableConfiguration(BucketInventoryTableConfiguration inventoryTable) {
+        Objects.requireNonNull(inventoryTable);
+        return new BucketConfig(loggingConfiguration, websiteConfiguration, notificationConfiguration,
+            accelerateConfiguration, analyticsConfiguration, inventoryConfiguration,
+            metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
+            lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
+            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration, objectLockConfiguration, inventoryTable, journalTableConfiguration);
+    }
+
+    public BucketConfig withJournalTableConfiguration(BucketJournalTableConfiguration journalTable) {
+        Objects.requireNonNull(journalTable);
+        return new BucketConfig(loggingConfiguration, websiteConfiguration, notificationConfiguration,
+            accelerateConfiguration, analyticsConfiguration, inventoryConfiguration,
+            metricsConfiguration, intelligentTieringConfiguration, encryptionConfiguration,
+            lifecycleConfiguration, replicationConfiguration, requestPaymentConfiguration,
+            ownershipControls, publicAccessBlockConfiguration, corsConfiguration, bucketPolicy,
+            abacConfiguration, metadataConfiguration, metadataTableConfiguration, objectLockConfiguration, inventoryTableConfiguration, journalTable);
     }
 
     /**

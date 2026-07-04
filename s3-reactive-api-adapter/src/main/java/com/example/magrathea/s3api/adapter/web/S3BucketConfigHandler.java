@@ -7,6 +7,9 @@ import com.example.magrathea.objectstore.domain.valueobject.BucketConfig;
 import com.example.magrathea.objectstore.domain.valueobject.BucketEncryptionConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.BucketIntelligentTieringConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.BucketInventoryConfiguration;
+import com.example.magrathea.objectstore.domain.valueobject.BucketInventoryTableConfiguration;
+import com.example.magrathea.objectstore.domain.valueobject.BucketJournalTableConfiguration;
+import com.example.magrathea.objectstore.domain.valueobject.BucketObjectLockConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.BucketLifecycleConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.BucketLoggingConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.BucketMetricsConfiguration;
@@ -123,14 +126,14 @@ public class S3BucketConfigHandler {
     private final ReactiveBucketService bucketService;
     private final Map<ConfigType, ConfigStrategy<?>> registry;
 
+    // Durable-on-aggregate config families (object-lock, inventory-table, journal-table)
+    // are persisted through the bucket aggregate via ReactiveBucketService.updateBucket
+    // and therefore survive restart in storage-engine mode (EP-2). The remaining
+    // handler-local maps below are still in-memory only (@config-only).
     private final Map<String, List<AbacConfigEntry>> abacConfigs = new ConcurrentHashMap<>();
-    private final Map<String, ObjectLockConfigEntry> objectLockConfigs = new ConcurrentHashMap<>();
     private final Map<String, MetadataConfigEntry> metadataConfigs = new ConcurrentHashMap<>();
     private final Map<String, MetadataTableConfigEntry> metadataTableConfigs = new ConcurrentHashMap<>();
-    private final Map<String, InventoryTableConfigEntry> inventoryTableConfigs = new ConcurrentHashMap<>();
-    private final Map<String, JournalTableConfigEntry> journalTableConfigs = new ConcurrentHashMap<>();
 
-    private record ObjectLockConfigEntry(boolean enabled, String mode, int days) {}
     private record AbacConfigEntry(String id, String principal, String resource, String action,
                                     List<AbacCondition> conditions) {
         private record AbacCondition(String tag, String value) {}
@@ -145,10 +148,6 @@ public class S3BucketConfigHandler {
                                                 String metadataTableName,
                                                 String metadataTableDatabase) {}
     }
-    private record InventoryTableConfigEntry(String id, String destinationFormat,
-                                              String scheduleFrequency, boolean enabled) {}
-    private record JournalTableConfigEntry(String id, String destinationFormat,
-                                            String scheduleFrequency, boolean enabled) {}
 
     public S3BucketConfigHandler(ReactiveBucketService bucketService) {
         this.bucketService = bucketService;
@@ -157,11 +156,8 @@ public class S3BucketConfigHandler {
 
     public void resetInMemoryConfigurations() {
         abacConfigs.clear();
-        objectLockConfigs.clear();
         metadataConfigs.clear();
         metadataTableConfigs.clear();
-        inventoryTableConfigs.clear();
-        journalTableConfigs.clear();
     }
 
     // ─────────────────────────────────────────────────────
@@ -878,7 +874,7 @@ public class S3BucketConfigHandler {
         var bucketName = request.pathVariable("bucket");
         return bucketService.findByName(bucketName)
             .flatMap(bucket -> {
-                var config = objectLockConfigs.get(bucketName);
+                var config = bucketConfig(bucket, BucketConfig::getObjectLockConfiguration).orElse(null);
                 if (config == null || !config.enabled()) {
                     return ServerResponse.ok()
                         .contentType(MediaType.APPLICATION_XML)
@@ -896,17 +892,20 @@ public class S3BucketConfigHandler {
         return bucketService.findByName(bucketName)
             .flatMap(bucket -> request.bodyToMono(ObjectLockConfigurationCommand.class)
                 .flatMap(command -> {
+                    BucketObjectLockConfiguration lock;
                     if (!command.isEnabled()) {
-                        objectLockConfigs.remove(bucketName);
-                        return ServerResponse.ok().build();
+                        lock = BucketObjectLockConfiguration.disabled();
+                    } else {
+                        var mode = command.rule() != null && command.rule().defaultRetention() != null
+                            ? command.rule().defaultRetention().mode() : "GOVERNANCE";
+                        var days = command.rule() != null && command.rule().defaultRetention() != null
+                            ? command.rule().defaultRetention().days() != null ? command.rule().defaultRetention().days() : 5
+                            : 5;
+                        lock = BucketObjectLockConfiguration.of(mode, days);
                     }
-                    var mode = command.rule() != null && command.rule().defaultRetention() != null
-                        ? command.rule().defaultRetention().mode() : "GOVERNANCE";
-                    var days = command.rule() != null && command.rule().defaultRetention() != null
-                        ? command.rule().defaultRetention().days() != null ? command.rule().defaultRetention().days() : 5
-                        : 5;
-                    objectLockConfigs.put(bucketName, new ObjectLockConfigEntry(true, mode, days));
-                    return ServerResponse.ok().build();
+                    return bucketService.updateBucket(
+                            bucket.withBucketConfig(bucket.bucketConfig().withObjectLockConfiguration(lock)))
+                        .then(ServerResponse.ok().build());
                 }))
             .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"));
     }
@@ -1001,7 +1000,7 @@ public class S3BucketConfigHandler {
 
     public Mono<ServerResponse> getBucketInventoryTableConfiguration(ServerRequest request) {
         return findBucket(request, bucket -> {
-            var entry = inventoryTableConfigs.get(bucket.name());
+            var entry = bucketConfig(bucket, BucketConfig::getInventoryTableConfiguration).orElse(null);
             if (entry == null) {
                 return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchInventoryTableConfiguration",
                     "The inventory table configuration does not exist");
@@ -1017,10 +1016,12 @@ public class S3BucketConfigHandler {
     public Mono<ServerResponse> putBucketInventoryTableConfiguration(ServerRequest request) {
         return findBucket(request, bucket -> request.bodyToMono(InventoryTableConfigurationCommand.class)
             .flatMap(command -> {
-                inventoryTableConfigs.put(bucket.name(), new InventoryTableConfigEntry(
+                var config = BucketInventoryTableConfiguration.of(
                     command.id(), command.destinationFormat(), command.scheduleFrequency(),
-                    "true".equals(command.enabled())));
-                return ServerResponse.ok().build();
+                    "true".equals(command.enabled()));
+                return bucketService.updateBucket(
+                        bucket.withBucketConfig(bucket.bucketConfig().withInventoryTableConfiguration(config)))
+                    .then(ServerResponse.ok().build());
             })
             .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "InvalidRequest",
                 "Missing inventory table configuration body")));
@@ -1032,7 +1033,7 @@ public class S3BucketConfigHandler {
 
     public Mono<ServerResponse> getBucketJournalTableConfiguration(ServerRequest request) {
         return findBucket(request, bucket -> {
-            var entry = journalTableConfigs.get(bucket.name());
+            var entry = bucketConfig(bucket, BucketConfig::getJournalTableConfiguration).orElse(null);
             if (entry == null) {
                 return S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchJournalTableConfiguration",
                     "The journal table configuration does not exist");
@@ -1048,10 +1049,12 @@ public class S3BucketConfigHandler {
     public Mono<ServerResponse> putBucketJournalTableConfiguration(ServerRequest request) {
         return findBucket(request, bucket -> request.bodyToMono(JournalTableConfigurationCommand.class)
             .flatMap(command -> {
-                journalTableConfigs.put(bucket.name(), new JournalTableConfigEntry(
+                var config = BucketJournalTableConfiguration.of(
                     command.id(), command.destinationFormat(), command.scheduleFrequency(),
-                    "true".equals(command.enabled())));
-                return ServerResponse.ok().build();
+                    "true".equals(command.enabled()));
+                return bucketService.updateBucket(
+                        bucket.withBucketConfig(bucket.bucketConfig().withJournalTableConfiguration(config)))
+                    .then(ServerResponse.ok().build());
             })
             .switchIfEmpty(S3WebSupport.xmlError(HttpStatus.BAD_REQUEST, "InvalidRequest",
                 "Missing journal table configuration body")));

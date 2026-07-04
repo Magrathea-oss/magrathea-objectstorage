@@ -5,6 +5,9 @@ import com.example.magrathea.objectstore.domain.aggregate.MultipartUpload;
 import com.example.magrathea.objectstore.domain.valueobject.AbacConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.BucketConfig;
 import com.example.magrathea.objectstore.domain.valueobject.CorsConfiguration;
+import com.example.magrathea.objectstore.domain.valueobject.BucketInventoryTableConfiguration;
+import com.example.magrathea.objectstore.domain.valueobject.BucketJournalTableConfiguration;
+import com.example.magrathea.objectstore.domain.valueobject.BucketObjectLockConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.EncryptionAlgorithm;
 import com.example.magrathea.objectstore.domain.valueobject.EncryptionConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.LegalHold;
@@ -98,6 +101,42 @@ class MetadataDurabilityRestartTest {
             BucketStore restarted = new BucketStore(root);
             assertTrue(restarted.findByName("transient-bucket").isEmpty(),
                 "deleted bucket must not reappear after restart");
+        }
+    }
+
+    @Nested
+    @DisplayName("Bucket configuration families durability (REQ-DUR-004)")
+    class BucketConfigFamilies {
+
+        @Test
+        @DisplayName("object-lock, inventory-table and journal-table bucket config survive a restart")
+        void bucketConfigFamiliesSurviveRestart() {
+            Path root = storageRoot.resolve("metadata").resolve("buckets");
+            BucketStore store = new BucketStore(root);
+
+            var config = BucketConfig.EMPTY
+                .withObjectLockConfiguration(BucketObjectLockConfiguration.of("GOVERNANCE", 30))
+                .withInventoryTableConfiguration(
+                    BucketInventoryTableConfiguration.of("inv-1", "Parquet", "Daily", true))
+                .withJournalTableConfiguration(
+                    BucketJournalTableConfiguration.of("jrn-1", "Parquet", "Hourly", true));
+            store.save(Bucket.restore(
+                Bucket.Id.of("bucket-id-config"), "ep2-bucket-config-test",
+                Region.US_EAST_1, StorageClass.STANDARD, false, false, false, config));
+
+            BucketStore restarted = new BucketStore(root);
+            var reloaded = restarted.findByName("ep2-bucket-config-test").orElseThrow().bucketConfig();
+
+            var lock = reloaded.getObjectLockConfiguration().orElseThrow();
+            assertTrue(lock.enabled(), "object-lock enabled flag must survive restart");
+            assertEquals("GOVERNANCE", lock.mode());
+            assertEquals(30, lock.days());
+            assertEquals("inv-1", reloaded.getInventoryTableConfiguration().orElseThrow().id(),
+                "inventory-table configuration must survive restart");
+            assertEquals("jrn-1", reloaded.getJournalTableConfiguration().orElseThrow().id(),
+                "journal-table configuration must survive restart");
+            assertEquals("Hourly",
+                reloaded.getJournalTableConfiguration().orElseThrow().scheduleFrequency());
         }
     }
 
