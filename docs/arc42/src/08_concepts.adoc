@@ -9,9 +9,20 @@ The system follows the hexagonal architecture pattern with three layers:
 
 - **Domain (core):** pure business logic, zero framework dependencies
 - **Application:** orchestration, reactive bridge via Mono/Flux
-- **Infrastructure:** HTTP adapter (RouterFunction), persistence adapter (in-memory)
+- **Infrastructure:** HTTP adapter (RouterFunction), persistence adapters (in-memory default, or durable Storage Engine backend selected via Spring profile)
 
 Dependencies flow only inward: infrastructure → application → domain.
+
+=== Durable Metadata Commit Pattern (EP-2)
+
+Every durable document written by the Storage Engine backend follows the same crash-safe commit discipline, shared by `S3ObjectManifestReferenceStore`, `BucketStore`, `MultipartUploadStateStore`, and `ObjectConfigMetadataStore` (all in `object-store-reactive-repository-storage-engine-infrastructure`):
+
+1. Serialize the document (Jackson 3 `ObjectMapper` with field-only visibility via the shared `DurableJson` helper, or a `Properties`-based format for the object-reference store).
+2. Write the serialized bytes to a temp file in the **same directory** as the final path.
+3. Atomically rename (`StandardCopyOption.ATOMIC_MOVE`, falling back to a non-atomic replace if the filesystem does not support atomic moves) the temp file over the final path.
+4. Delete the temp file if it still exists after the move (defensive cleanup).
+
+This guarantees a reader or a crash never observes a torn or partially written document: the final path always contains either the previous complete document or the new complete document, never a mixture. Concurrent writers to the **same** key are serialized through a striped `ReentrantLock` array (typically 64 stripes, selected by `Math.floorMod(key.hashCode(), stripes)`); writers to **different** keys proceed independently. At process startup, each store's constructor performs a `loadAll()` pass over its directory to repopulate an in-memory cache from the durable files, so restart-safety in storage-engine mode does not depend on incremental replay of events.
 
 === Reactive Non-blocking I/O
 
@@ -100,7 +111,7 @@ This enables independent optimization of read and write paths, and aligns with C
 
 === Handler Minimal Pattern
 
-All handlers (except `S3BucketConfigHandler`) follow the **extract → delegate → response** pattern:
+All handlers, including `S3BucketConfigHandler` (via registry/strategy dispatch onto the durable `Bucket` aggregate), follow the **extract → delegate → response** pattern:
 
 ```java
 public Mono<ServerResponse> putObject(ServerRequest request) {
@@ -130,17 +141,33 @@ Key constraints:
 
 === Postponed Items
 
-The following cross-cutting concerns are intentionally absent from handlers and will be implemented in the repository layer:
+The following cross-cutting concerns are intentionally absent from handlers and are implemented in the repository/service layer instead:
 
-| Concern | Target |
-|---|---|
-| Validation (Spring Reactive Validator) | Repository preconditions |
-| Bucket existence checks | Repository preconditions |
-| Bucket name validation | Repository preconditions |
-| ETag computation | Repository (generated on store) |
-| Handler-local ACL/grants/tagging | Repository |
-| CORS validation | Repository/Service |
-| Website routing | Repository/Service |
+[cols="2,2",options="header"]
+|===
+|Concern |Target
+
+|Validation (Spring Reactive Validator)
+|Repository preconditions
+
+|Bucket existence checks
+|Repository preconditions
+
+|Bucket name validation
+|Repository preconditions
+
+|ETag computation
+|Single-pass streaming tee on store (`UploadDigest`), not a separate materialization pass
+
+|ACL/grants/tagging state
+|Aggregate (`S3Object`/`Bucket`) + repository; object tags/ACL restart-durability remains open (EP-2)
+
+|CORS validation
+|Repository/Service
+
+|Website routing
+|Repository/Service
+|===
 
 === Reactive Error Handling
 
@@ -222,6 +249,11 @@ ObjectStoreEvent (sealed interface)
 ├── BucketMetricsConfigurationRemoved
 ├── BucketIntelligentTieringConfigurationAdded (carries BucketIntelligentTieringConfiguration)
 ├── BucketIntelligentTieringConfigurationRemoved
+├── AbacConfigChanged                   (carries AbacConfiguration)
+├── MetadataConfigChanged                (carries BucketMetadataConfiguration)
+├── MetadataTableConfigChanged           (carries BucketMetadataTableConfiguration)
+├── BucketConfigChanged                  (carries BucketConfig — generic aggregate-level transition used by
+│                                          object-lock, inventory-table, journal-table via withBucketConfig(...))
 ```
 
 ==== S3Object Events
@@ -259,31 +291,37 @@ The system must handle headers that the AWS CLI v2 sends by default on every `aw
 
 ==== Default Headers Sent by AWS CLI v2
 
-| Header | Value | Purpose | Handler Status |
-|--------|-------|---------|----------------|
-| `x-amz-sdk-checksum-algorithm` | `crc64nvme` (default) | Identifies the checksum algorithm used | [yellow]#Accepted by first AWS CLI increment; not validated# |
-| `x-amz-checksum-crc64nvme` | BASE64 CRC64-NVME hash | Payload integrity hash computed automatically by AWS CLI | [yellow]#Accepted by first AWS CLI increment; not validated# |
-| `X-Amz-Date` | ISO 8601 timestamp | SigV4 signing timestamp | [yellow]#Accepted by first AWS CLI increment; not validated# |
-| `X-Amz-Content-SHA256` | SHA256 hex string | SigV4 payload hash | [yellow]#Accepted by first AWS CLI increment; not validated# |
-| `Authorization` | SigV4 signature string | SigV4 signature | [yellow]#Accepted by first AWS CLI increment; not validated# |
-| `User-Agent` | SDK identifier string | Client identification | [yellow]#Accepted by first AWS CLI increment; not used# |
-| `Expect` | `100-continue` | Hop-by-hop header for large payloads | [yellow]#Accepted by first AWS CLI increment; not optimized# |
+[cols="2,2,3,3",options="header"]
+|===
+|Header |Value |Purpose |Handler Status
+
+|`x-amz-sdk-checksum-algorithm` |`crc64nvme` (default) |Identifies the checksum algorithm used |[yellow]#Accepted; not validated#
+|`x-amz-checksum-crc64nvme` |BASE64 CRC64-NVME hash |Payload integrity hash computed automatically by AWS CLI |[yellow]#Accepted; not validated#
+|`X-Amz-Date` |ISO 8601 timestamp |SigV4 signing timestamp |[yellow]#Accepted; not validated (no SigV4 middleware yet — EP-1)#
+|`X-Amz-Content-SHA256` |SHA256 hex string |SigV4 payload hash |[yellow]#Accepted; not validated (EP-1)#
+|`Authorization` |SigV4 signature string |SigV4 signature |[yellow]#Accepted; not validated (EP-1)#
+|`User-Agent` |SDK identifier string |Client identification |[yellow]#Accepted; not used#
+|`Expect` |`100-continue` |Hop-by-hop header for large payloads |[yellow]#Accepted; not optimized#
+|===
 
 ==== Checksum Algorithm Mapping
 
 When `--checksum-algorithm <alg>` is specified, AWS CLI v2 **automatically computes** the hash and sends it in the corresponding header:
 
-| CLI `--checksum-algorithm` | Header Sent | Automatic Computation |
-|---------------------------|-------------|---------------------|
-| `crc64nvme` (default) | `x-amz-checksum-crc64nvme` | [green]#Yes# — AWS CLI computes CRC64-NVME |
-| `crc32` | `x-amz-checksum-crc32` | [green]#Yes# |
-| `crc32c` | `x-amz-checksum-crc32c` | [green]#Yes# |
-| `sha1` | `x-amz-checksum-sha1` | [green]#Yes# |
-| `sha256` | `x-amz-checksum-sha256` | [green]#Yes# |
-| `sha512` | `x-amz-checksum-sha512` | [green]#Yes# |
-| `xxhash64` | `x-amz-checksum-xxhash64` | [green]#Yes# |
-| `xxhash3` | `x-amz-checksum-xxhash3` | [green]#Yes# |
-| `xxhash128` | `x-amz-checksum-xxhash128` | [green]#Yes# |
+[cols="2,2,3",options="header"]
+|===
+|CLI `--checksum-algorithm` |Header Sent |Automatic Computation
+
+|`crc64nvme` (default) |`x-amz-checksum-crc64nvme` |[green]#Yes# — AWS CLI computes CRC64-NVME
+|`crc32` |`x-amz-checksum-crc32` |[green]#Yes#
+|`crc32c` |`x-amz-checksum-crc32c` |[green]#Yes#
+|`sha1` |`x-amz-checksum-sha1` |[green]#Yes#
+|`sha256` |`x-amz-checksum-sha256` |[green]#Yes#
+|`sha512` |`x-amz-checksum-sha512` |[green]#Yes#
+|`xxhash64` |`x-amz-checksum-xxhash64` |[green]#Yes#
+|`xxhash3` |`x-amz-checksum-xxhash3` |[green]#Yes#
+|`xxhash128` |`x-amz-checksum-xxhash128` |[green]#Yes#
+|===
 
 The server must read `x-amz-sdk-checksum-algorithm`, re-compute the hash of the received body with that algorithm, and compare against the corresponding `x-amz-checksum-<alg>` header. A mismatch must return `400 InvalidArgument (ChecksumMismatch)`.
 
@@ -293,23 +331,38 @@ AWS CLI v2 does NOT send `Content-Type` by default unless `--content-type` is ex
 
 ==== Current Gap Summary
 
-| Gap | Impact | Severity |
-|-----|--------|---------|
-| Checksum headers accepted but not validated | First AWS CLI object CRUD increment can pass, but data integrity validation is still absent — corrupted payloads may be accepted silently | [red]#High# |
-| SigV4 headers accepted but not validated | First AWS CLI object CRUD increment can pass, but authentication is still absent — anyone can write/read objects in trusted deployments | [red]#High# |
-| Content-Type not sent by AWS CLI | Wrong content-type may be stored when using AWS CLI unless explicitly provided | [yellow]#Medium# |
-| User-Agent accepted but ignored | No client identification for analytics | [green]#Low# |
-| Expect accepted but not optimized | No explicit 100-continue optimization | [green]#Low# |
+[cols="3,4,1",options="header"]
+|===
+|Gap |Impact |Severity
+
+|Checksum headers accepted but not validated
+|Data integrity validation is still absent — corrupted payloads may be accepted silently
+|[red]#High#
+
+|SigV4 headers accepted but not validated
+|Authentication is still absent — anyone can write/read objects in trusted deployments; tracked as EP-1 (Security & Identity, blocker)
+|[red]#High#
+
+|Content-Type not sent by AWS CLI
+|Wrong content-type may be stored when using AWS CLI unless explicitly provided
+|[yellow]#Medium#
+
+|User-Agent accepted but ignored
+|No client identification for analytics
+|[green]#Low#
+
+|Expect accepted but not optimized
+|No explicit 100-continue optimization
+|[green]#Low#
+|===
 
 === Testing Strategy
 
-Three levels of testing:
+Four levels of testing:
 
 1. **Domain:** Pure JUnit, zero Spring — test invariants and business rules.
 2. **Application:** Reactive application service tests.
 3. **S3 Integration:** Cucumber BDD with WebTestClient — verify HTTP endpoints.
-4. **AWS CLI Compatibility:** targeted AWS CLI Cucumber plus the separate/stale `test-aws-cli.sh` compatibility script.
+4. **AWS CLI Compatibility:** targeted AWS CLI Cucumber runners sharing the same requirement feature files as the WebTestClient runners (see the generated Gherkin requirements appendix).
 
-Latest Phase 9 evidence: `mvn -B -pl s3-reactive-api-adapter -am test -Dsurefire.failIfNoSpecifiedTests=false` passed with **265 tests**, **0 failures**, **0 errors**, and **0 skipped** scenarios. The AWS CLI Cucumber subset (26 scenarios) now covers object CRUD, bucket lifecycle operations, ACL/tagging, and the multipart upload lifecycle: canonical object CRUD basics (put default headers, get content, head, list v1/v2, delete, idempotent delete, `STANDARD` storage class via object attributes, slash-containing object keys through catch-all routes/key normalization), bucket operations (create-bucket + list-buckets, head-bucket, get-bucket-location, get-bucket-versioning, put-bucket-versioning enable, delete-bucket, and failure cases for head-bucket 404, delete-bucket 404, and duplicate create 409), ACL/tagging operations (bucket ACL read/write, object ACL read/write, bucket tagging CRUD, object tagging CRUD, and object attributes returning ETag and ObjectSize), and multipart upload lifecycle (initiate/upload-parts/list-parts/complete, abort, and list multipart uploads). Production fixes for this increment: `S3MultipartHandler.uploadPart` now returns an `ETag` response header; `S3BucketMetadataHandler.putBucketTagging` and `S3ObjectMetadataHandler.putObjectTagging` now consume the request body as `String` to avoid HTTP 415 errors from AWS CLI XML payloads (commit `a03bc4a`).
-
-*Phase 10 Quality Gate (2026-06-12, HEAD `351d088`).* `mvn validate` passes (all module POMs valid). `mvn test` passes with *768 tests across all 10 modules* — 0 failures, 0 errors, 0 skipped. Module breakdown: storage-engine-domain 149, object-store-domain 287, s3-reactive-api-adapter 265 (239 WebTestClient Cucumber + 26 AWS CLI Cucumber), object-store-reactive-application 18, admin-api-adapter 9, storage-engine-reactive-application 4, storage-engine-reactive-infrastructure 29, object-store-reactive-repository-storage-engine-infrastructure 1, bootstrap-application 6. JaCoCo coverage was generated with `mvn -Pcoverage test jacoco:report`; leading modules by instruction coverage: `object-store-domain` 81%, `storage-engine-reactive-application` 82%, `s3-reactive-api-adapter` 77%, `admin-api-adapter` 69%, `storage-engine-domain` 59%, `storage-engine-reactive-infrastructure` 54%, `bootstrap-application` 58%. Lower instruction coverage in `object-store-reactive-application` (18%) and `object-store-reactive-repository-storage-engine-infrastructure` (13%) reflects that these modules contain primarily port interfaces and thin adapters whose runtime behaviour is exercised by integration and Cucumber tests run against the assembled application. Full per-module coverage details are recorded in `docs/test-report.md`.
+Current evidence (point-in-time, not a completion claim) is tracked in `docs/test-report.md` and must not be duplicated verbatim here to avoid staleness. As of the latest full gate in Podman (`magrathea-build:fedora42`; JDK 21, Maven 3.9.9, AWS CLI 2.34.29): `mvn -B --no-transfer-progress clean test` at the repo root passed with **BUILD SUCCESS across all 13 reactor modules, 949 tests, 0 failures, 0 errors**. This includes the EP-2 metadata durability restart-simulation suite (`MetadataDurabilityRestartTest`, `object-store-reactive-repository-storage-engine-infrastructure`) and the upgraded bootstrap restart-safety test (`StorageEngineRestartSafetyTest`, `bootstrap-application`) proving REQ-DUR-001 (durable bucket registry) end to end across a real Spring context restart. JaCoCo remains the current coverage baseline; see `docs/test-report.md` for the latest per-module breakdown.

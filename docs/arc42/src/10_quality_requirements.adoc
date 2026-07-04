@@ -5,12 +5,35 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 === Quality Goals (from Section 1)
 
-| Category | Goal | Description | Metric |
-|---|---|---|---|
-| Functional | S3 API Compatibility | Map the in-scope AWS S3 REST route surface and classify semantic behavior independently | Route inventory plus semantic coverage matrix |
-| Performance | Reactive non-blocking I/O | Upload/download without thread blocking | DataBuffer streaming, no byte[] in handlers |
-| Testability | Layered testing | Domain/unit tests + WebTestClient Cucumber + targeted AWS CLI scenarios + JaCoCo | Current evidence is tracked in `docs/test-report.md`; stale counts must not be used as completion claims |
-| Maintainability | Domain-Driven Design | Pure domain, zero framework dependencies | ADR index maintained in section 9 |
+[cols="2,3,4,3",options="header"]
+|===
+|Category |Goal |Description |Metric
+
+|Functional
+|S3 API Compatibility
+|Map the in-scope AWS S3 REST route surface and classify semantic behavior independently
+|Route inventory plus semantic coverage matrix
+
+|Functional / Non-functional
+|Restart-safe metadata durability
+|Bucket registry, multipart upload state, and per-object/bucket configuration survive a full process restart in storage-engine mode (EP-2)
+|Restart-simulation unit tests (`MetadataDurabilityRestartTest`) plus real Spring-context restart test (`StorageEngineRestartSafetyTest`)
+
+|Performance
+|Reactive non-blocking I/O
+|Upload/download without thread blocking
+|DataBuffer streaming, no byte[] in handlers; bounded-memory GetObject/multipart streaming remains open (EP-3)
+
+|Testability
+|Layered testing
+|Domain/unit tests + WebTestClient Cucumber + targeted AWS CLI scenarios + JaCoCo
+|Current evidence is tracked in `docs/test-report.md`; stale counts must not be used as completion claims
+
+|Maintainability
+|Domain-Driven Design
+|Pure domain, zero framework dependencies
+|ADR index maintained in section 9
+|===
 
 === Quality Scenarios
 
@@ -34,6 +57,13 @@ ifndef::imagesdir[:imagesdir: ../images]
 - **Stimulus:** Code commit
 - **Response:** Maven verification generates JaCoCo coverage as the current baseline
 - **Metric:** Coverage trend and thresholds are taken from current JaCoCo reports; Clover/OpenClover is optional/legacy
+
+==== Scenario 4 — Restart Safety (Storage Engine backend)
+
+- **Context:** Storage-engine profile is active; buckets, multipart uploads, and per-object/bucket configuration have been created
+- **Stimulus:** The application process is stopped and started again against the same filesystem root
+- **Response:** The bucket registry, multipart upload sessions, and per-object/bucket configuration are reloaded from durable filesystem documents; no state is lost or torn
+- **Metric:** `MetadataDurabilityRestartTest` (restart-simulation unit tests) and `StorageEngineRestartSafetyTest` (real Spring-context restart) both pass; see `docs/test-report.md` for current run evidence
 
 // The generated Gherkin requirements report is included as a top-level ARC42 appendix
 // from arc42-template.adoc (see AGENTS.md §B.7), not as a subsection of this chapter.

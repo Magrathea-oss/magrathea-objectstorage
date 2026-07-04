@@ -3,25 +3,42 @@ ifndef::imagesdir[:imagesdir: ../images]
 [[section-introduction-and-goals]]
 == Introduction and Goals
 
-The Magrathea ObjectStore project implements an **AWS S3-compatible object storage** route surface built with Spring Boot 4 WebFlux and Java 21.
+Magrathea ObjectStore implements an **AWS S3-compatible object storage** route surface built with Spring Boot 4 WebFlux and Java 21. It is evolving from a reference DDD/reactive implementation toward an enterprise-ready, market-leading S3-compatible object store (see `PLAN.md`, Enterprise Production Readiness Plan EP-0..EP-11 and Killer-App Track KA-1..KA-6).
 
-It provides a lightweight implementation of the AWS S3 REST API route surface for development, testing, and small-scale deployments, plus separate internal/admin endpoints for operational configuration. AWS CLI parity has improved for canonical object CRUD basics, but full S3 scenario parity is not complete.
+It provides an S3-compatible REST API for object CRUD, bucket configuration, and multipart upload, plus a separate internal/admin JSON API for operational configuration. Two persistence backends are selectable: an in-memory single-node backend (default) and a Storage Engine backend with filesystem-durable metadata and content. AWS CLI parity has improved for canonical object CRUD basics and metadata durability; full S3 scenario parity and production hardening (security, streaming completeness, space management, operability) are tracked as open Enterprise Production Readiness phases.
 
 === Goals
 
-- **S3 API compatibility**: map the in-scope AWS S3 REST API route surface and classify semantic implementation separately from route count
-- **Reactive by design**: full WebFlux non-blocking I/O, DataBuffer streaming for binary content
-- **Domain-Driven Design**: pure domain with zero framework dependencies, hexagonal architecture
-- **Testability**: domain/unit tests, WebTestClient Cucumber, targeted AWS CLI object CRUD compatibility, explicit gap tags when scenarios remain unsupported, and JaCoCo coverage reporting
+* **S3 API compatibility**: map the in-scope AWS S3 REST API route surface and classify semantic implementation separately from route count.
+* **Reactive by design**: full WebFlux non-blocking I/O, `DataBuffer` streaming for binary content.
+* **Domain-Driven Design**: pure domain with zero framework dependencies, hexagonal architecture, explicit bounded contexts (Object Store, Storage Engine).
+* **Durability where selected**: the Storage Engine backend persists bucket registry, multipart upload state, per-object configuration, and bucket configuration families as crash-safe filesystem documents (temp-file + atomic-rename commits) that survive a full process restart.
+* **Testability**: domain/unit tests, WebTestClient Cucumber, targeted AWS CLI compatibility, explicit gap tags (`@implemented-and-validated`, `@implemented-not-e2e-validated`, `@partial`, `@config-only`, `@absent`, `@not-implemented`) when scenarios remain unsupported, and JaCoCo coverage reporting.
+* **Evidence-based completion**: every completion claim is backed by production code plus semantic tests; see `docs/test-report.md` for current validation evidence and the generated Gherkin requirements appendix for per-scenario status.
 
 === Stakeholders
 
-| Role | Contact | Expectations |
-|------|---------|-------------|
-| Developer | Development team | Clean DDD code, reactive patterns, comprehensive tests |
-| Tester | QA team | Cucumber BDD scenarios, AWS CLI compatibility verification |
-| Architect | Architecture team | ARC42 documentation, ADRs, C4 diagrams, DDD compliance |
+[cols="1,2,3",options="header"]
+|===
+|Role |Contact |Expectations
+
+|Developer
+|Development team
+|Clean DDD code, reactive patterns, comprehensive tests
+
+|Tester
+|QA team
+|Cucumber BDD scenarios, AWS CLI compatibility verification, restart-safety validation
+
+|Architect
+|Architecture team
+|ARC42 documentation, ADRs, C4 diagrams, DDD compliance, evidence-based status tracking
+
+|Operator / Admin
+|Operations team
+|Admin JSON API for storage policy/device/disk-set visibility, durable metadata, observable restart behavior
+|===
 
 === Motivation
 
-The project serves as a reference implementation of Java DDD + Spring Boot 4 reactive patterns with hexagonal architecture and is evolving toward production-quality S3-compatible storage through evidence-based semantic coverage.
+The project serves as a reference implementation of Java DDD + Spring Boot 4 reactive patterns with hexagonal architecture, and is evolving toward production-quality, market-differentiated S3-compatible storage through evidence-based semantic coverage. The roadmap (`PLAN.md`, `docs/roadmap.md`) sequences durability (EP-2), streaming completeness (EP-3), security/identity (EP-1), space management (EP-4), operability (EP-5), and further phases before broader production claims, alongside a Killer-App Track (positioning, ecosystem conformance, data-lake readiness, distribution) documented in `docs/positioning.md`.

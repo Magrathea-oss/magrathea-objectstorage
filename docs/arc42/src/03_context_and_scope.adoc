@@ -17,9 +17,27 @@ The system context shows:
 
 === Technical Context
 
-| Communication Partner | Input | Output | Protocol |
-|----------------------|-------|--------|----------|
-| User (AWS CLI, SDK, HTTP client) | S3 REST API requests (XML/JSON) including analytics (`?analytics`), inventory (`?inventory`), metrics (`?metrics`), intelligent-tiering (`?intelligent-tiering`), ABAC (`?abac`), object lock (`?object-lock`), metadata config (`?metadata-config`), metadata table config (`?metadata-table-config`), session (`?session`), directory bucket (`?directory-buckets`), torrent (`?torrent`), restore (`?restore`), select (`?select`), rename (`?rename`), legal hold (`?legal-hold`), retention (`?retention`) queries | S3 REST API responses (XML/JSON) | HTTPS |
-| User (binary upload) | Binary data via HTTP PUT | — | HTTP body |
-| User (binary download) | — | Binary data via HTTP GET | HTTP body |
-| Operator/Admin UI | `/admin/**` JSON requests and static UI/docs requests | Read-only catalog JSON, non-persistent validation results, generated UI assets, ARC42 JSON, C4 images | HTTP/JSON + static resources |
+[cols="2,3,3,1",options="header"]
+|===
+|Communication Partner |Input |Output |Protocol
+
+|User (AWS CLI, SDK, HTTP client)
+|S3 REST API requests (XML/JSON) including analytics (`?analytics`), inventory (`?inventory`), metrics (`?metrics`), intelligent-tiering (`?intelligent-tiering`), ABAC (`?abac`), object lock (`?object-lock`), metadata config (`?metadata-config`), metadata table config (`?metadata-table-config`), inventory/journal table config (`?inventory-table-config`, `?journal-table-config`), session (`?session`), directory bucket (`?directory-buckets`), torrent (`?torrent`), restore (`?restore`), select (`?select`), rename (`?rename`), legal hold (`?legal-hold`), retention (`?retention`) queries
+|S3 REST API responses (XML/JSON)
+|HTTPS
+
+|User (binary upload)
+|Binary data via HTTP PUT
+|—
+|HTTP body
+
+|User (binary download)
+|—
+|Binary data via HTTP GET
+|HTTP body
+
+|Operator/Admin UI
+|`/admin/**` JSON requests and static UI/docs requests
+|Read-only catalog JSON, non-persistent validation results, generated UI assets, ARC42 JSON, C4 images
+|HTTP/JSON + static resources
+|===

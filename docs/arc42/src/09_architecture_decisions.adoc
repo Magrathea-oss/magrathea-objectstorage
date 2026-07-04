@@ -5,23 +5,83 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 All architectural decisions are documented as Architecture Decision Records (ADRs) in `docs/adr/`.
 
-| ADR | Title | Status |
-|-----|-------|--------|
-| [0001](adr/0001-multi-module-per-bounded-context.md) | Multi-Module per Bounded Context | ✅ Accepted |
-| [0002](adr/0002-zero-dependency-domain-purity.md) | Zero-dependency domain purity | ✅ Accepted |
-| [0003](adr/0003-binarycontent-vs-databuffer-boundary.md) | BinaryContent vs DataBuffer boundary | ✅ Accepted |
-| [0004](adr/0004-reactive-boundary-completablefuture-to-mono-flux.md) | Reactive boundary CompletableFuture to Mono/Flux | ✅ Accepted |
-| [0005](adr/0005-routerfunction-functional-webflux-pattern.md) | RouterFunction functional WebFlux pattern | ✅ Accepted |
-| [0006](adr/0006-s3-api-protocol-endpoint-mapping.md) | S3 reactive API protocol endpoint mapping | ✅ Accepted |
-| [0007](adr/0007-pluggable-s3-api-autoconfiguration.md) | Pluggable S3 reactive API via Spring Boot Auto-Configuration | ✅ Accepted |
-| [0008](adr/0008-remove-xml-parsing-use-spring-codec.md) | Remove all custom XML parsing, use Spring Boot 4 codec infrastructure | ✅ Accepted |
-| [0009](adr/0009-reactive-repository-domain-separation.md) | Reactive repository and domain separation | ✅ Accepted |
-| [0010](adr/0010-course-correction-reactive-quality.md) | Course correction: reactive migration quality issues | ✅ Accepted |
-| [0011](adr/0011-course-correction-bucket-configuration-redesign.md) | Course correction: Bucket.Configuration redesign | ✅ Accepted |
-| [0012](adr/0012-phase-f-advanced-s3-operations.md) | Phase F: Advanced and Specialized S3 Operations | ✅ Accepted |
-| [0013](adr/0013-course-correction-phase-f-domain-application-ownership-and-aws-cli-verification-gate.md) | Course correction: Phase F domain/application ownership and AWS CLI verification gate | ✅ Accepted |
-| [0014](adr/0014-storage-engine-bounded-context.md) | Storage Engine bounded context | ✅ Accepted |
-| [0015](adr/0015-handler-minimal-pattern-and-postponed-repository-responsibilities.md) | Handler minimal pattern and postponed repository responsibilities | ✅ Accepted |
-| [0016](adr/0016-course-correction-storage-engine-policy-device-configuration-and-minio-standard-use-case.md) | Course correction: storage engine policy/device configuration and MINIO_STANDARD use case | ✅ Accepted |
-| [0017](adr/0017-course-correction-broaden-project-wide-correction-plan-beyond-storage-engine-notes.md) | Course correction: broaden project-wide correction plan beyond storage-engine notes | ✅ Accepted |
-| [0018](adr/0018-course-correction-classify-s3-api-coverage-by-semantic-implementation-not-route-count.md) | Course correction: classify S3 API coverage by semantic implementation, not route count | ✅ Accepted |
+[cols="1,5,1",options="header"]
+|===
+|ADR |Title |Status
+
+|link:../../adr/0001-multi-module-per-bounded-context.md[0001]
+|Multi-Module per Bounded Context
+|✅ Accepted
+
+|link:../../adr/0002-zero-dependency-domain-purity.md[0002]
+|Zero-dependency domain purity
+|✅ Accepted
+
+|link:../../adr/0003-binarycontent-vs-databuffer-boundary.md[0003]
+|BinaryContent vs DataBuffer boundary
+|✅ Accepted
+
+|link:../../adr/0004-reactive-boundary-completablefuture-to-mono-flux.md[0004]
+|Reactive boundary CompletableFuture to Mono/Flux
+|✅ Accepted
+
+|link:../../adr/0005-routerfunction-functional-webflux-pattern.md[0005]
+|RouterFunction functional WebFlux pattern
+|✅ Accepted
+
+|link:../../adr/0006-s3-api-protocol-endpoint-mapping.md[0006]
+|S3 reactive API protocol endpoint mapping
+|✅ Accepted
+
+|link:../../adr/0007-pluggable-s3-api-autoconfiguration.md[0007]
+|Pluggable S3 reactive API via Spring Boot Auto-Configuration
+|✅ Accepted
+
+|link:../../adr/0008-remove-xml-parsing-use-spring-codec.md[0008]
+|Remove all custom XML parsing, use Spring Boot 4 codec infrastructure
+|✅ Accepted
+
+|link:../../adr/0009-reactive-repository-domain-separation.md[0009]
+|Reactive repository and domain separation
+|✅ Accepted
+
+|link:../../adr/0010-course-correction-reactive-quality.md[0010]
+|Course correction: reactive migration quality issues
+|✅ Accepted
+
+|link:../../adr/0011-course-correction-bucket-configuration-redesign.md[0011]
+|Course correction: Bucket.Configuration redesign
+|✅ Accepted
+
+|link:../../adr/0012-phase-f-advanced-s3-operations.md[0012]
+|Phase F: Advanced and Specialized S3 Operations
+|✅ Accepted
+
+|link:../../adr/0013-course-correction-phase-f-domain-application-ownership-and-aws-cli-verification-gate.md[0013]
+|Course correction: Phase F domain/application ownership and AWS CLI verification gate
+|✅ Accepted
+
+|link:../../adr/0014-storage-engine-bounded-context.md[0014]
+|Storage Engine bounded context
+|✅ Accepted
+
+|link:../../adr/0015-handler-minimal-pattern-and-postponed-repository-responsibilities.md[0015]
+|Handler minimal pattern and postponed repository responsibilities
+|✅ Accepted
+
+|link:../../adr/0016-course-correction-storage-engine-policy-device-configuration-and-minio-standard-use-case.md[0016]
+|Course correction: storage engine policy/device configuration and MINIO_STANDARD use case
+|✅ Accepted
+
+|link:../../adr/0017-course-correction-broaden-project-wide-correction-plan-beyond-storage-engine-notes.md[0017]
+|Course correction: broaden project-wide correction plan beyond storage-engine notes
+|✅ Accepted
+
+|link:../../adr/0018-course-correction-classify-s3-api-coverage-by-semantic-implementation-not-route-count.md[0018]
+|Course correction: classify S3 API coverage by semantic implementation, not route count
+|✅ Accepted
+
+|link:../../adr/0019-adopt-the-mit-license.md[0019]
+|Adopt the MIT license (Killer-App Track KA-1)
+|✅ Accepted
+|===

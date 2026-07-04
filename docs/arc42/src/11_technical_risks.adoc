@@ -3,11 +3,51 @@ ifndef::imagesdir[:imagesdir: ../images]
 [[section-technical-risks]]
 == Risks and Technical Debts
 
-| # | Risk | Impact | Mitigation |
-|---|---|---|---|
-| 1 | **Default backend is in-memory** — reactive in-memory repositories do not persist to disk | Data loss on restart | Continue storage-engine integration through `storage-engine-reactive-*` modules and verify end-to-end read/write before production claims |
-| 2 | **S3 semantic depth** — 111/111 operations are routed as a surface inventory, but route count is not semantic completion. AWS CLI parity has improved for the canonical object CRUD subset, but full S3 scenario parity is incomplete. | AWS SDK features may expect deeper semantics than the in-memory implementation provides | Track semantic gaps in PLAN.md and ADR follow-ups; prioritize AWS CLI/SDK compatibility cases and keep unsupported cases explicitly tagged |
-| 3 | **In-memory content store** — large objects stored in ConcurrentHashMap | OutOfMemoryError for files > 1GB | Flush to file system, chunked streaming, content store with file persistence |
-| 4 | **No authentication/authorization** — AWS SigV4 not implemented | Usable only in trusted environments | Implement SigV4 verification middleware |
-| 5 | **Storage-engine runtime verification incomplete** — policy/YAML/device planning exists, but selected-backend read/write and physical EC shard placement are not yet verified | Alternative persistence may be incorrectly assumed complete | Keep runtime claims gated by Phase 6/7 tests and document `MINIO_STANDARD` as planning-verified only until end-to-end scenarios pass |
-| 6 | **Missing checksum validation** — `x-amz-checksum-crc64nvme` and `x-amz-sdk-checksum-algorithm` headers are accepted by the first AWS CLI object CRUD increment, but are not validated. AWS CLI v2 sends these by default and computes the hash automatically. The server should re-compute and verify. | Corrupted payloads accepted silently — data integrity not verified | Read `x-amz-sdk-checksum-algorithm`, re-compute hash with that algorithm, compare with `x-amz-checksum-crc64nvme`; return `400 InvalidArgument` on mismatch |
+Risk status is cross-referenced with the Enterprise Production Readiness Plan (`PLAN.md`, EP-0..EP-11) so that mitigation ownership stays traceable. No risk below is closed until the referenced EP phase is `@implemented-and-validated`.
+
+[cols="1,4,3,4,2",options="header"]
+|===
+|# |Risk |Impact |Mitigation |EP reference
+
+|1
+|**Default backend is in-memory** — the `single-node` profile's reactive in-memory repositories do not persist to disk. The Storage Engine backend (`storage-engine` profile) now durably persists object bytes/manifests/references AND (as of EP-2) the bucket registry, multipart upload state, and per-object/bucket configuration — but it must be explicitly selected and is not the default.
+|Data loss on restart when running the default profile
+|Keep the in-memory default explicit and documented; continue validating the storage-engine profile's durability guarantees end to end before any production default change
+|EP-2 (`@partial` — core metadata families durable and restart-tested; object tags/ACL durability and full Cucumber e2e runner wiring remain open)
+
+|2
+|**S3 semantic depth** — the in-scope route surface is mapped, but route count is not semantic completion. AWS CLI parity has improved for the canonical object CRUD subset and metadata durability, but full S3 scenario parity is incomplete.
+|AWS SDK features may expect deeper semantics than currently implemented
+|Track semantic gaps in `PLAN.md`; prioritize AWS CLI/SDK compatibility cases and keep unsupported cases explicitly tagged (`@not-implemented`, `@partial`, `@config-only`)
+|Ongoing (S3 API Semantic Completion Plan, `PLAN.md`)
+
+|3
+|**Streaming completeness gap** — `GetObject` (full-body and Range) still materializes the whole object via `collectList()`, and `S3MultipartHandler.uploadPart` still uses `DataBufferUtils.join` without persisting part bodies through the storage engine.
+|`OutOfMemoryError` risk for large objects on read; multipart uploads do not durably assemble the real object
+|Extend the streaming-tee pattern already used for PutObject (`UploadDigest`, single-pass ETag/length) to the read and multipart-part paths; extend `ReactiveUploadStreamingArchitectureTest` to forbid `join`/`collectList` in the fixed paths
+|EP-3 (`@partial` — write path fixed and guarded; read path and multipart part persistence open)
+
+|4
+|**No authentication/authorization** — AWS SigV4 is accepted but not validated; there is no deny-by-default authorization or audit logging.
+|Usable only in trusted environments; anyone can write/read objects
+|Implement SigV4 verification middleware, deny-by-default authorization, audit logging, and real server-side encryption
+|EP-1 (`@absent`, blocker)
+
+|5
+|**Space management and data hygiene absent** — no chunk garbage collection/reference counting beyond on-demand `FileSystemRecoveryScanner`, no quotas, no defined ENOSPC behavior, no background scrubbing.
+|Deleted-object chunks are never reclaimed; disk-full behavior is undefined; latent corruption may go undetected
+|Implement chunk GC/refcounting, per-bucket/tenant quotas, defined ENOSPC → S3 error mapping, and periodic integrity scrubbing
+|EP-4 (`@absent`, high priority)
+
+|6
+|**Operability gaps** — no CI pipeline runs the full gate/appendix-check/Docker build; no documented backup/restore or DR rehearsal; readiness/liveness probes beyond `/admin/health` are not verified.
+|Regressions may reach `main` undetected; recovery procedures are undocumented/unrehearsed
+|Wire CI to the full Maven gate + Gherkin appendix `--check` + Docker build; document and rehearse backup/restore and DR with declared RTO/RPO
+|EP-5 (`@absent`, high priority)
+
+|7
+|**Distributed readiness is modeled, not executed** — placement, quorum, anti-entropy, and rebalance planning are unit-validated in `storage-engine-domain`, but there is no real networked membership, replication execution, or multi-node e2e validation.
+|Multi-node/cluster claims would be premature; no HA guarantee exists today
+|Do not claim cluster readiness until EP-10 (S3 Cluster) is validated end to end by multi-node scenarios, gated on the EP-8 cluster architecture ADR
+|EP-8 / EP-10 (`@absent`, high priority after ADR acceptance)
+|===

@@ -7,35 +7,86 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 **Single node, running locally.**
 
-| Element | Description |
-|---|---|
-| Runtime JAR | `bootstrap-application-1.0.0-SNAPSHOT.jar` running on the configured HTTP port |
-| Static resources | Generated Vue/admin documentation assets, ARC42 JSON, ADR JSON, JaCoCo JSON exports, C4 PNGs, and ARC42 images served from classpath `static/**` |
-| Default file store | In-memory (ConcurrentHashMap), allocated in the same JVM heap as the server |
-| Java Runtime | JDK 21 |
-| Build Tool | Apache Maven 3.9+ |
+[cols="2,4",options="header"]
+|===
+|Element |Description
+
+|Runtime JAR
+|`bootstrap-application-1.0.0-SNAPSHOT.jar` running on the configured HTTP port
+
+|Static resources
+|Generated Vue/admin documentation assets, ARC42 JSON, ADR JSON, JaCoCo JSON exports, C4 PNGs, and ARC42 images served from classpath `static/**`
+
+|Default backend (`single-node` profile)
+|In-memory (ConcurrentHashMap), allocated in the same JVM heap as the server; does not persist across restarts
+
+|Storage Engine backend (`storage-engine` profile)
+|Filesystem-durable: bucket registry, multipart upload state, per-object configuration, and S3 object manifest references are committed under a configurable filesystem root (`storage.engine.filesystem.root`) with crash-safe temp-file + atomic-rename writes; selected explicitly, never the default
+
+|Java Runtime
+|JDK 21
+
+|Build Tool
+|Apache Maven 3.9+
+|===
 
 === Docker Deployment
 
 A `Dockerfile` and `docker-compose.yml` are present at the project root for containerized execution:
 
 **Dockerfile:**
-- Builder stage: Maven 3.9 + Eclipse Temurin 21 with Node.js installed for documentation/frontend generation
-- Regenerates web documentation and admin UI static assets inside the builder stage from source-controlled docs and `magrathea-ui` sources
-- Does not copy host-generated `bootstrap-application/src/main/resources/static/**` assets; `.dockerignore` excludes those generated resources from the build context
-- Runtime stage: Eclipse Temurin 21 JRE, copies the packaged Spring Boot JAR from the builder
-- Exposes ports 8080 and 8081
-- Entrypoint: `java -jar /app.jar`
+
+* Builder stage: Maven 3.9 + Eclipse Temurin 21 with Node.js installed for documentation/frontend generation
+* Regenerates web documentation and admin UI static assets inside the builder stage from source-controlled docs and `magrathea-ui` sources
+* Runs the Gherkin requirements appendix quality gate (`--check` against the committed appendix) before regenerating it deterministically, so the image build fails if the ARC42 appendix is stale relative to the shared requirement feature files
+* Does not copy host-generated `bootstrap-application/src/main/resources/static/**` assets; `.dockerignore` excludes those generated resources from the build context
+* Runtime stage: Eclipse Temurin 21 JRE, copies the packaged Spring Boot JAR from the builder
+* Exposes ports 8080 and 8081
+* Entrypoint: `java -jar /app.jar`
 
 **docker-compose.yml:**
-- Single service `magrathea-s3` on port `8080:8080`
-- Environment variables for configuration
+
+* Single service `magrathea-s3` on port `8080:8080`
+* Environment variables for configuration, including backend profile selection and `storage.engine.filesystem.root`
+
+=== Storage Engine Filesystem Layout (storage-engine profile)
+
+When the `storage-engine` profile is active, durable state is organized under the configured filesystem root as follows:
+
+[cols="2,3",options="header"]
+|===
+|Path |Contents
+
+|`nodes/*/chunks/`, `devices/*/`
+|Content-addressed chunk storage and dedup index (Storage Engine core)
+
+|`metadata/manifests/`
+|Object manifests (ordered chunk references, checksums)
+
+|`metadata/s3-object-references/`
+|Latest bucket/key → manifest reference (`S3ObjectManifestReferenceStore`)
+
+|`metadata/buckets/`
+|Bucket registry: full `BucketConfig` document per bucket (`BucketStore`)
+
+|`metadata/multipart-uploads/`
+|Multipart upload sessions: upload id, key, initiated timestamp, recorded parts (`MultipartUploadStateStore`)
+
+|`metadata/object-config/`
+|Per-object configuration: legal hold, object lock, retention, encryption, restore state (`ObjectConfigMetadataStore`)
+|===
+
+Every document under `metadata/**` is committed with the same crash-safe discipline: write to a temp file in the target directory, then atomically rename over the final path. Concurrent writers to the same key are serialized through striped per-key locks.
 
 === Production Deployment (Future)
 
-The two-container architecture (`s3-server` + `file-store`) is intentionally monolithic for single-node operation. In the future:
+The current single-process deployment is intentionally monolithic for single-node operation. Enterprise Production Readiness phases (`PLAN.md`, EP-0..EP-11) sequence the path to production, including:
 
-- `file-store` can be replaced by R2DBC + PostgreSQL for relational persistence
-- `file-store` can become a separate container for horizontal scaling
-- `s3-server` can be clustered with session affinity
-- Storage Engine deployment uses `storage-engine-reactive-application`, `storage-engine-reactive-infrastructure`, and the ACL adapter. Phase 5 verifies policy/catalog planning; end-to-end runtime read/write remains a pending gate before production claims.
+* EP-1 (Security & Identity): SigV4 authentication, deny-by-default authorization, audit logging, real SSE
+* EP-2 (Complete Metadata Durability): bucket registry, multipart state, and per-object/bucket configuration are durable in storage-engine mode (delivered for these families; object tags/ACL durability and end-to-end Cucumber runner wiring remain open)
+* EP-3 (Reactive Streaming Completion): bounded-memory GetObject and multipart part-body streaming
+* EP-4 (Space Management & Data Hygiene): chunk GC, dedup refcounting, quotas, ENOSPC behavior, scrubbing
+* EP-5 (Operability & Delivery): CI pipeline, backup/restore, DR, probes, graceful shutdown
+* EP-10 (S3 Cluster, multi-node): after an accepted cluster architecture ADR (EP-8) — membership, quorum, failover, healing, rebalance validated by multi-node scenarios
+
+No production distributed-cluster claims are made until EP-10 is validated end to end; see `PLAN.md` for current status per phase.

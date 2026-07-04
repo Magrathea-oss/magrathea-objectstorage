@@ -21,7 +21,13 @@ ifndef::imagesdir[:imagesdir: ../images]
 - `object-store-domain`: uses ONLY AWS S3 native terminology — no custom abstractions like BinaryContent
 - `object-store-domain`: zero dependencies except test dependencies
 - No `shared-domain` module exists
-- `storage-engine-domain`, `storage-engine-reactive-application`, `storage-engine-reactive-infrastructure`, and `object-store-reactive-repository-storage-engine-infrastructure` form the Storage Engine bounded context. Phase 5 verifies policy/YAML/device planning for `MINIO_STANDARD`; end-to-end storage-engine runtime read/write remains a pending verification gate.
+- `storage-engine-domain`, `storage-engine-reactive-application`, `storage-engine-reactive-infrastructure`, and `object-store-reactive-repository-storage-engine-infrastructure` form the Storage Engine bounded context. Policy/YAML/device planning for `MINIO_STANDARD` and end-to-end storage-engine runtime read/write (object bytes, manifests, object references) are verified; distributed multi-node execution and further Enterprise Production Readiness phases (EP-1 security, EP-3 streaming completion, EP-4 space management) remain open per `PLAN.md`.
+
+=== Durability Constraints (Storage Engine backend)
+
+- Every durable metadata document (bucket registry, multipart upload state, per-object configuration, S3 object manifest references) is committed with the same crash-safe discipline: write to a temp file in the target directory, then atomically rename over the final path (`DurableJson`, `S3ObjectManifestReferenceStore`). Readers and restart recovery never observe a torn or partially written document.
+- Concurrent mutation of the same durable key is serialized through striped per-key `ReentrantLock`s (typically 64 stripes); unrelated keys use independent stripes and are not serialized against each other.
+- The Storage Engine backend is selected explicitly via the `storage-engine` Spring profile; the in-memory backend remains the default and does not persist across restarts.
 
 === Infrastructure Constraints
 

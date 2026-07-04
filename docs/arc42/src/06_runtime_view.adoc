@@ -14,7 +14,9 @@ image::../../c4/images/CreateBucketRuntime.png[CreateBucket Runtime, width=600]
 1. User → s3-reactive-api-adapter: `PUT /{bucket}`
 2. s3-reactive-api-adapter → reactive-bucket-management: CreateBucket use case
 3. reactive-bucket-management → reactive-repository-application: Save Bucket aggregate via command repository
-4. reactive-repository-application → reactive-infrastructure: Persist Bucket aggregate
+4. reactive-repository-application → reactive-infrastructure (default) or object-store-reactive-repository-storage-engine-infrastructure (storage-engine profile): Persist Bucket aggregate
+
+**Durability note:** in storage-engine mode, the full `BucketConfig` document is committed to `metadata/buckets/` via `BucketStore` with a crash-safe temp-file + atomic-rename write, so the bucket survives a process restart. In the default in-memory profile, the bucket does not survive a restart.
 
 === Scenario 2 — PutObject
 
@@ -52,8 +54,10 @@ image::../../c4/images/MultipartUploadRuntime.png[MultipartUpload Runtime, width
 2. s3-reactive-api-adapter → reactive-object-store: Multipart upload lifecycle use cases
 3. reactive-object-store → reactive-repository-application: Write multipart upload state via command repository
 4. reactive-object-store → reactive-repository-application: Read multipart upload state via query repository
-5. reactive-repository-application → reactive-infrastructure: Persist multipart upload state
-6. reactive-repository-application → reactive-infrastructure: Read multipart upload state from persistence
+5. reactive-repository-application → reactive-infrastructure (default) or storage-engine adapter: Persist multipart upload state
+6. reactive-repository-application → reactive-infrastructure (default) or storage-engine adapter: Read multipart upload state from persistence
+
+**Durability note:** in storage-engine mode, the upload id, key, initiated timestamp, and every recorded part (part number, ETag, size) are committed to `metadata/multipart-uploads/` via `MultipartUploadStateStore`, so in-progress uploads survive a process restart and can be listed/aborted after recovery. Multipart **part-body** persistence through the storage engine (as opposed to session state) remains an open item (EP-3).
 
 === Scenario 5 — Bucket Configuration (CORS, Lifecycle, Policy, Encryption, Logging, Website, Notification, Replication, Request Payment, Ownership Controls, Public Access Block, Accelerate, Analytics, Inventory, Metrics, Intelligent-Tiering, ABAC, Object Lock, Metadata Configuration)
 
@@ -68,30 +72,35 @@ image::../../c4/images/BucketConfigurationRuntime.png[Bucket Configuration Runti
 
 **Configuration types and query parameters:**
 
-| Configuration | Query Param | List support | Domain Value Object |
-|---|---|---|---|
-| CORS | `?cors` | No | `CorsConfiguration` |
-| Lifecycle | `?lifecycle` | No | `BucketLifecycleConfiguration` |
-| Policy | `?policy` | No | `BucketPolicy` |
-| Encryption | `?encryption` | No | `BucketEncryptionConfiguration` |
-| Logging | `?logging` | No | `BucketLoggingConfiguration` |
-| Website | `?website` | No | `BucketWebsiteConfiguration` |
-| Notification | `?notification` | No | `BucketNotificationConfiguration` |
-| Replication | `?replication` | No | `BucketReplicationConfiguration` |
-| Request Payment | `?requestPayment` | No | `BucketRequestPaymentConfiguration` |
-| Ownership Controls | `?ownershipControls` | No | `BucketOwnershipControls` |
-| Public Access Block | `?publicAccessBlock` | No | `PublicAccessBlockConfiguration` |
-| Accelerate | `?accelerate` | No | `BucketAccelerateConfiguration` |
-| Analytics | `?analytics` | Yes (`list-type`) | `BucketAnalyticsConfiguration` |
-| Inventory | `?inventory` | Yes (`list-type`) | `BucketInventoryConfiguration` |
-| Metrics | `?metrics` | No | `BucketMetricsConfiguration` |
-| Intelligent-Tiering | `?intelligent-tiering` | No | `BucketIntelligentTieringConfiguration` |
-| ABAC | `?abac` | No | ABAC command/query DTOs |
-| Object Lock | `?object-lock` | No | `ObjectLockConfiguration` command/query DTOs |
-| Bucket Metadata Configuration | `?metadata-config` | No | `MetadataConfiguration` command/query DTOs |
-| Bucket Metadata Table Configuration | `?metadata-table-config` | No | `MetadataTableConfiguration` command/query DTOs |
-| Inventory Table Configuration | `?inventory-table-config` | No | metadata table command/query DTOs |
-| Journal Table Configuration | `?journal-table-config` | No | metadata table command/query DTOs |
+As of the EP-2 metadata durability work, every family below is a value object on `BucketConfig` and persists through `bucket.withBucketConfig(...)` / dedicated `with*()` methods — durable in storage-engine mode, in-memory-only in the default profile.
+
+[cols="3,2,1,3",options="header"]
+|===
+|Configuration |Query Param |List support |Domain Value Object
+
+|CORS |`?cors` |No |`CorsConfiguration`
+|Lifecycle |`?lifecycle` |No |`BucketLifecycleConfiguration`
+|Policy |`?policy` |No |`BucketPolicy` (String)
+|Encryption |`?encryption` |No |`BucketEncryptionConfiguration`
+|Logging |`?logging` |No |`BucketLoggingConfiguration`
+|Website |`?website` |No |`BucketWebsiteConfiguration`
+|Notification |`?notification` |No |`BucketNotificationConfiguration`
+|Replication |`?replication` |No |`BucketReplicationConfiguration`
+|Request Payment |`?requestPayment` |No |`BucketRequestPaymentConfiguration`
+|Ownership Controls |`?ownershipControls` |No |`BucketOwnershipControls`
+|Public Access Block |`?publicAccessBlock` |No |`PublicAccessBlockConfiguration`
+|Accelerate |`?accelerate` |No |`BucketAccelerateConfiguration`
+|Analytics |`?analytics` |Yes (`list-type`) |`BucketAnalyticsConfiguration`
+|Inventory |`?inventory` |Yes (`list-type`) |`BucketInventoryConfiguration`
+|Metrics |`?metrics` |No |`BucketMetricsConfiguration`
+|Intelligent-Tiering |`?intelligent-tiering` |No |`BucketIntelligentTieringConfiguration`
+|ABAC |`?abac` |No |`AbacConfiguration` (rules: id, principal, resource, action, conditions)
+|Object Lock (bucket default) |`?object-lock` |No |`BucketObjectLockConfiguration`
+|Bucket Metadata Configuration |`?metadata-config` |No |`BucketMetadataConfiguration` (rules: id, status, resourceType, resourceSubtype)
+|Bucket Metadata Table Configuration |`?metadata-table-config` |No |`BucketMetadataTableConfiguration` (rules: id, status, tableName, database)
+|Inventory Table Configuration |`?inventory-table-config` |No |`BucketInventoryTableConfiguration`
+|Journal Table Configuration |`?journal-table-config` |No |`BucketJournalTableConfiguration`
+|===
 
 === Scenario 6 — Phase F Advanced Object Operations
 
@@ -104,7 +113,7 @@ image::../../c4/images/BucketConfigurationRuntime.png[Bucket Configuration Runti
 4. `S3ObjectMetadataHandler` handles metadata-oriented Phase F operations such as legal hold, retention, and encryption update.
 5. Reactive services/repositories are used where object or bucket state must be read or updated.
 
-**Verification:** S3 adapter Cucumber remains evidence-gated. The latest targeted command, `mvn -B -pl s3-reactive-api-adapter -am test -Dsurefire.failIfNoSpecifiedTests=false`, completed with 248 tests, 0 failures, 0 errors, and 0 skipped scenarios. AWS CLI parity is improved for canonical object CRUD basics, including slash-containing object keys, but not complete for all S3 scenarios.
+**Verification:** S3 adapter Cucumber remains evidence-gated; current per-suite counts are tracked in `docs/test-report.md` rather than duplicated here to avoid staleness. AWS CLI parity is improved for canonical object CRUD basics, including slash-containing object keys, but not complete for all S3 scenarios.
 
 === Scenario 6b — Admin Static Asset and Documentation UI
 

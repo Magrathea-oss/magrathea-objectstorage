@@ -3,27 +3,100 @@ ifndef::imagesdir[:imagesdir: ../images]
 [[section-glossary]]
 == Glossary
 
-| Term | Definition |
-|---|---|
-| Bucket | S3 object container. Identified by a unique DNS-compliant name (3-63 characters, lowercase) |
-| S3Object | S3 object: key, metadata, version, ACL, tagging, attributes, binary content |
-| ObjectKey | Unique key of an object within a bucket |
-| Region | AWS S3 region (e.g., `us-east-1`, `eu-west-1`) |
-| StorageClass | S3 storage class: `STANDARD`, `INTELLIGENT_TIERING`, `PARANOIC_MODE` |
-| MINIO_STANDARD | Storage Engine policy use case whose S3-facing storage class is `STANDARD`; Phase 5 semantics: dedup disabled, EC planning `4 data / 2 parity`, replication factor `1`, compression disabled, encryption disabled by default |
-| Admin API | Internal `/admin/**` JSON API for storage policy, device, and configuration management; not part of S3 API coverage |
-| ETag | Entity tag for optimistic concurrency and content verification |
-| VersionId | Version identifier for versioned objects |
-| ACL | Access Control List: `private`, `public-read`, `public-read-write`, `authenticated-read` |
-| Tagging | Key-value pairs for object/bucket categorization |
-| CORS | Cross-Origin Resource Sharing: allowed origins, methods, headers |
-| Multipart Upload | Upload of large objects in parts (Phase C) |
-| RouterFunction | Functional WebFlux pattern for defining HTTP routes programmatically |
-| CompletableFuture | Standard Java async — bridge between pure domain and reactive infrastructure |
-| Flux<DataBuffer> | Reactive type for binary streaming in WebFlux |
-| S3ObjectWrite | Domain interface: object save contract without reactive types |
-| S3ObjectContent | Domain interface: object read contract without reactive types |
-| ARC42 | Architecture documentation template in 12 sections |
-| ADR | Architecture Decision Record (Michael Nygard format) |
-| C4 Model | Architecture description method with 4 levels (Context, Container, Component, Code) |
-| Structurizr DSL | Domain-specific language for modeling C4 diagrams |
+[cols="2,5",options="header"]
+|===
+|Term |Definition
+
+|Bucket
+|S3 object container. Identified by a unique DNS-compliant name (3-63 characters, lowercase)
+
+|S3Object
+|S3 object: key, metadata, version, ACL, tagging, attributes, binary content
+
+|ObjectKey
+|Unique key of an object within a bucket
+
+|Region
+|AWS S3 region (e.g., `us-east-1`, `eu-west-1`)
+
+|StorageClass
+|S3 storage class: `STANDARD`, `INTELLIGENT_TIERING`, `PARANOIC_MODE`
+
+|MINIO_STANDARD
+|Storage Engine policy use case whose S3-facing storage class is `STANDARD`: dedup disabled, EC planning `4 data / 2 parity`, replication factor `1`, compression disabled, encryption disabled by default
+
+|Admin API
+|Internal `/admin/**` JSON API for storage policy, device, and configuration management; not part of S3 API coverage
+
+|ETag
+|Entity tag for optimistic concurrency and content verification; computed via a single-pass streaming tee (`UploadDigest`) during PutObject, not a separate materialization pass
+
+|VersionId
+|Version identifier for versioned objects
+
+|ACL
+|Access Control List: `private`, `public-read`, `public-read-write`, `authenticated-read`
+
+|Tagging
+|Key-value pairs for object/bucket categorization
+
+|CORS
+|Cross-Origin Resource Sharing: allowed origins, methods, headers
+
+|Multipart Upload
+|Upload of large objects in parts; session state (upload id, recorded parts) is durable in storage-engine mode via `MultipartUploadStateStore`, but part-body persistence and final assembly through the storage engine remain open (EP-3)
+
+|Storage Engine backend
+|Durable persistence backend selected via the `storage-engine` Spring profile; commits bucket registry, multipart upload state, per-object configuration, and object manifest references as crash-safe filesystem documents under a configurable root
+
+|EP-2 / Metadata Durability
+|Enterprise Production Readiness phase closing the in-memory-metadata gap for the storage-engine backend: bucket registry, multipart upload state, per-object configuration, and all bucket configuration families are durable and restart-tested
+
+|BucketStore
+|Durable JSON store for bucket aggregates (including the full `BucketConfig` document) under `metadata/buckets/`
+
+|MultipartUploadStateStore
+|Durable JSON store for multipart upload sessions (upload id, key, initiated timestamp, recorded parts) under `metadata/multipart-uploads/`
+
+|ObjectConfigMetadataStore
+|Durable JSON store for per-object legal hold, object lock, retention, encryption, and restore state under `metadata/object-config/`
+
+|S3ObjectManifestReferenceStore
+|Durable per-bucket/key index from S3 object to the latest storage-engine manifest, under `metadata/s3-object-references/`
+
+|DurableJson
+|Shared Jackson 3 field-visibility mapper and atomic write/read/wipe helper used by the durable storage-engine stores
+
+|RouterFunction
+|Functional WebFlux pattern for defining HTTP routes programmatically
+
+|CompletableFuture
+|Standard Java async — bridge between pure domain and reactive infrastructure
+
+|Flux<DataBuffer>
+|Reactive type for binary streaming in WebFlux
+
+|S3ObjectWrite
+|Domain interface: object save contract without reactive types
+
+|S3ObjectContent
+|Domain interface: object read contract without reactive types
+
+|Enterprise Production Readiness Plan (EP-0..EP-11)
+|`PLAN.md` roadmap sequencing governance, security, durability, streaming, space management, operability, performance, admin panel, cluster architecture, and optional gateways before broader production claims
+
+|Killer-App Track (KA-1..KA-6)
+|`PLAN.md` / `docs/positioning.md` roadmap for competitive differentiation: positioning and MIT licensing, ecosystem conformance, data-lake readiness (S3 Tables), eventing/tiering/federation, distribution, and public proof
+
+|ARC42
+|Architecture documentation template in 12 sections
+
+|ADR
+|Architecture Decision Record (Michael Nygard format)
+
+|C4 Model
+|Architecture description method with 4 levels (Context, Container, Component, Code)
+
+|Structurizr DSL
+|Domain-specific language for modeling C4 diagrams
+|===

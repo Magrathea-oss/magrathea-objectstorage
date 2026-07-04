@@ -62,15 +62,30 @@ Implements the Command-Query Separation (CQS) pattern at the application layer. 
 - **Required Interface:** Reactive persistence implementations
 - **Technology:** Java 21, Mono/Flux, CQS pattern
 
-==== reactive-infrastructure (In-process reactive database)
+==== reactive-infrastructure (In-process reactive database — default backend)
 
 **Blackbox Description:**
-Implements reactive in-memory repositories with ConcurrentHashMap using Mono/Flux. Not an external database — resets when the process stops.
+Implements reactive in-memory repositories with ConcurrentHashMap using Mono/Flux. Not an external database — resets when the process stops. This is the **default** backend (`single-node` profile); it does not persist across restarts.
 
 - **Provided Interface:** InMemoryReactiveBucketRepository, InMemoryReactiveS3ObjectRepository, InMemoryReactiveMultipartUploadRepository
 - **Required Interface:** CQS repository interfaces
 - **Technology:** Java 21, ConcurrentHashMap, Reactor
 - **Tag:** Database
+
+==== object-store-reactive-repository-storage-engine-infrastructure (Durable storage-engine backend)
+
+**Blackbox Description:**
+Implements the CQS repository interfaces backed by the Storage Engine, selected explicitly via the `storage-engine` Spring profile. Bridges the Object Store bounded context to the Storage Engine through the object-store-to-storage-engine ACL adapter (`ObjectStoreToStorageEngineTranslator`). Every durable document (bucket registry, multipart upload state, per-object configuration, S3 object manifest references) is committed with a crash-safe temp-file + atomic-rename write and reloaded at process startup, so this backend survives a full process restart — unlike the in-memory default.
+
+- **Provided Interface:** `StorageEngineReactiveBucketRepository`, `StorageEngineReactiveS3ObjectRepository`, `StorageEngineReactiveMultipartUploadRepository`
+- **Required Interface:** `ReactiveStorageOrchestrator` (chunk/manifest read-write), CQS repository interfaces
+- **Technology:** Java 21, Reactor, `tools.jackson.core:jackson-databind` (field-visibility JSON mapper), filesystem I/O on `Schedulers.boundedElastic()`
+- **Durable stores (EP-2 metadata durability):**
+ * `BucketStore` — bucket aggregates including the full `BucketConfig` document (all configuration families) under `metadata/buckets/`
+ * `MultipartUploadStateStore` — multipart upload sessions (upload id, key, initiated timestamp, recorded parts) under `metadata/multipart-uploads/`
+ * `ObjectConfigMetadataStore` — per-object legal hold, object lock, retention, encryption, and restore state as one self-consistent document per bucket/key under `metadata/object-config/`
+ * `S3ObjectManifestReferenceStore` — latest bucket/key → storage-engine manifest reference, striped-lock read-compose-write under `metadata/s3-object-references/`
+ * `DurableJson` — shared Jackson mapper and atomic write/read/wipe helpers used by the stores above
 
 ==== admin-api-adapter (internal/admin HTTP adapter)
 
@@ -99,69 +114,148 @@ The current mutability contract is read-only at runtime: YAML-backed storage pol
 .C3 Component — s3-reactive-api-adapter
 image::../../c4/images/S3ReactiveApiAdapterComponents.png[S3 Reactive API Adapter Components, width=600]
 
-| Component | Responsibility | Handler Pattern |
-|---|---|---|
-| `S3PathRouter` | Entry point RouterFunction: defines S3 routes and dispatches requests to handlers | — |
-| `S3BucketOperationsHandler` | Bucket lifecycle: create, delete, head, list, location, versioning, directory-bucket listing | ✅ Minimal (extract → delegate → response) |
-| `S3BucketMetadataHandler` | Bucket metadata: ACL, tagging | ✅ Minimal (extract → delegate → response) |
-| `S3BucketConfigHandler` | Bucket configuration: CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate, analytics, inventory, metrics, intelligent-tiering, ABAC, object lock, bucket metadata/table configuration | ⏳ Excluded (complex registry + ConcurrentHashMap — postponed) |
-| `S3ObjectOperationsHandler` | Object CRUD, copy, multi-delete, rename, torrent, restore, select, Object Lambda response | ✅ Minimal (extract → delegate → response) |
-| `S3ObjectMetadataHandler` | Object metadata: ACL, tagging, attributes, legal hold, retention, encryption metadata | ✅ Minimal (extract → delegate → response) |
-| `S3MultipartHandler` | Multipart upload lifecycle: initiate, upload, complete, abort, list | ✅ Minimal (extract → delegate → response) |
-| `S3SessionHandler` | CreateSession support for Phase F session management | ✅ Minimal (extract → delegate → response) |
-| `S3WebSupport` | Shared request predicates, parsing, lookup, error helpers | — |
+[cols="2,4,2",options="header"]
+|===
+|Component |Responsibility |Handler Pattern
+
+|`S3PathRouter`
+|Entry point RouterFunction: defines S3 routes and dispatches requests to handlers
+|—
+
+|`S3BucketOperationsHandler`
+|Bucket lifecycle: create, delete, head, list, location, versioning, directory-bucket listing
+|✅ Minimal (extract → delegate → response)
+
+|`S3BucketMetadataHandler`
+|Bucket metadata: ACL, tagging
+|✅ Minimal (extract → delegate → response)
+
+|`S3BucketConfigHandler`
+|Bucket configuration: CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate, analytics, inventory, metrics, intelligent-tiering, ABAC, object lock, bucket metadata/table, inventory-table, journal-table configuration
+|✅ Minimal via registry/strategy dispatch onto the durable `Bucket` aggregate (no handler-local state)
+
+|`S3ObjectOperationsHandler`
+|Object CRUD, copy, multi-delete, rename, torrent, restore, select, Object Lambda response
+|✅ Minimal (extract → delegate → response)
+
+|`S3ObjectMetadataHandler`
+|Object metadata: ACL, tagging, attributes, legal hold, retention, encryption metadata
+|✅ Minimal (extract → delegate → response)
+
+|`S3MultipartHandler`
+|Multipart upload lifecycle: initiate, upload, complete, abort, list
+|✅ Minimal (extract → delegate → response); part-body persistence through the storage engine remains open (EP-3)
+
+|`S3SessionHandler`
+|CreateSession support for Phase F session management
+|✅ Minimal (extract → delegate → response)
+
+|`S3WebSupport`
+|Shared request predicates, parsing, lookup, error helpers
+|—
+|===
 
 === Level 2 — Component Diagram (reactive-object-store)
 
 .C3 Component — reactive-object-store
 image::../../c4/images/ReactiveObjectStoreComponents.png[Reactive Object Store Components, width=600]
 
-| Component | Responsibility |
-|---|---|
-| `ReactiveObjectService` | Reactive application service: object CRUD, metadata, listing, content retrieval via Mono/Flux |
-| `ReactiveMultipartUploadService` | Reactive application service: multipart upload session and part lifecycle via Mono/Flux |
-| `S3Object` | Domain aggregate: object identity, key, ETag, storage class, metadata |
-| `MultipartUpload` | Domain aggregate: multipart state, uploaded parts, completion/abort |
-| `S3ObjectRepository port` | Repository port: object metadata and binary content persistence |
-| `MultipartUploadRepository port` | Repository port: multipart upload persistence |
-| `BucketRepository read port` | Read-side repository port: bucket existence validation |
-| `DefaultS3ObjectWrite / DefaultS3ObjectContent` | Application-layer content boundary: Flux<DataBuffer> without leaking into the domain |
+[cols="2,4",options="header"]
+|===
+|Component |Responsibility
+
+|`ReactiveObjectService`
+|Reactive application service: object CRUD, metadata, listing, content retrieval via Mono/Flux
+
+|`ReactiveMultipartUploadService`
+|Reactive application service: multipart upload session and part lifecycle via Mono/Flux
+
+|`S3Object`
+|Domain aggregate: object identity, key, ETag, storage class, metadata
+
+|`MultipartUpload`
+|Domain aggregate: multipart state, uploaded parts, completion/abort
+
+|`S3ObjectRepository port`
+|Repository port: object metadata and binary content persistence
+
+|`MultipartUploadRepository port`
+|Repository port: multipart upload persistence
+
+|`BucketRepository read port`
+|Read-side repository port: bucket existence validation
+
+|`DefaultS3ObjectWrite` / `DefaultS3ObjectContent`
+|Application-layer content boundary: `Flux<DataBuffer>` without leaking into the domain
+|===
 
 === Level 2 — Component Diagram (reactive-bucket-management)
 
 .C3 Component — reactive-bucket-management
 image::../../c4/images/ReactiveBucketManagementComponents.png[Reactive Bucket Management Components, width=600]
 
-| Component | Responsibility |
-|---|---|
-| `ReactiveBucketService` | Reactive application service: bucket lifecycle, versioning, CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate, analytics, inventory, metrics, intelligent-tiering, ABAC, object lock, and metadata configuration via Mono/Flux |
-| `Bucket` | Domain aggregate root: bucket identity, name, region, storage class, versioning, encryption, and dedicated configuration fields per config type (CORS, Lifecycle, Encryption, Logging, Website, Notification, Replication, Policy, PublicAccessBlock, OwnershipControls, RequestPayment, Accelerate, plus multi-instance maps for Analytics, Inventory, Metrics, Intelligent-Tiering). Emits specific ObjectStoreEvent subtypes per config change (e.g., `BucketLifecycleConfigurationChanged`, `BucketNotificationConfigurationChanged`). Each config feature has a dedicated `with*()` / `without*()` method — no generic `withConfiguration()` / flat `Configuration` record. |
-| `BucketRepository port` | Repository port: bucket metadata and configuration persistence |
+[cols="2,4",options="header"]
+|===
+|Component |Responsibility
+
+|`ReactiveBucketService`
+|Reactive application service: bucket lifecycle, versioning, CORS, lifecycle, policy, encryption, logging, website, notification, replication, request payment, ownership controls, public access block, accelerate, analytics, inventory, metrics, intelligent-tiering, ABAC, object lock, bucket metadata, metadata-table, inventory-table, and journal-table configuration via Mono/Flux
+
+|`Bucket`
+|Domain aggregate root: bucket identity, name, region, storage class, versioning, encryption, directory-bucket flag, and a single `BucketConfig` value object holding 22 dedicated configuration fields (CORS, Lifecycle, Encryption, Logging, Website, Notification, Replication, Policy, PublicAccessBlock, OwnershipControls, RequestPayment, Accelerate, Analytics, Inventory, Metrics, Intelligent-Tiering, ABAC, Metadata, Metadata-Table, Object-Lock, Inventory-Table, Journal-Table). Emits specific `ObjectStoreEvent` subtypes per config change (e.g., `BucketLifecycleConfigurationChanged`, `BucketNotificationConfigurationChanged`, `BucketConfigChanged` for the aggregate-level `withBucketConfig(...)` transition used by the newer families). Each config feature has a dedicated `with*()` method on `Bucket` and/or `BucketConfig` — no generic flat `Configuration` record.
+
+|`BucketRepository port`
+|Repository port: bucket metadata and configuration persistence (durable in storage-engine mode via `BucketStore`)
+|===
 
 === Level 2 — Component Diagram (reactive-repository-application)
 
 .C3 Component — reactive-repository-application
 image::../../c4/images/ReactiveRepositoryApplicationComponents.png[Reactive Repository Application Components, width=600]
 
-| Component | Responsibility |
-|---|---|
-| `BucketCommandRepository` | Command repository: bucket writes (save, delete) via Mono<Void> |
-| `BucketQueryRepository` | Query repository: bucket reads (find by id, find by name) via Mono<Bucket> |
-| `S3ObjectCommandRepository` | Command repository: object writes (save, delete) via Mono<Void> |
-| `S3ObjectQueryRepository` | Query repository: object reads (find by id, find by bucket, list) via Mono<Flux<S3Object>> |
-| `MultipartUploadCommandRepository` | Command repository: multipart upload writes (save, delete, update parts) via Mono<Void> |
-| `MultipartUploadQueryRepository` | Query repository: multipart upload reads (find by upload id, list by bucket) via Mono<Flux<MultipartUpload>> |
+[cols="2,4",options="header"]
+|===
+|Component |Responsibility
+
+|`BucketCommandRepository`
+|Command repository: bucket writes (save, delete) via `Mono<CommandResult<Bucket>>`
+
+|`BucketQueryRepository`
+|Query repository: bucket reads (find by id, find by name, find all) via `Mono<Bucket>` / `Flux<Bucket>`
+
+|`S3ObjectCommandRepository`
+|Command repository: object writes (save, delete, save-with-content) via `Mono<CommandResult<S3Object>>`
+
+|`S3ObjectQueryRepository`
+|Query repository: object reads (find by id, find by bucket, list, get content) via `Mono<S3Object>` / `Flux<S3Object>`
+
+|`MultipartUploadCommandRepository`
+|Command repository: multipart upload writes (save, delete, update parts) via `Mono<CommandResult<MultipartUpload>>`
+
+|`MultipartUploadQueryRepository`
+|Query repository: multipart upload reads (find by upload id, list by bucket) via `Mono<MultipartUpload>` / `Flux<MultipartUpload>`
+|===
 
 === Level 2 — Component Diagram (reactive-infrastructure)
 
 .C3 Component — reactive-infrastructure
 image::../../c4/images/ReactiveInfrastructureComponents.png[Reactive Infrastructure Components, width=600]
 
-| Component | Responsibility |
-|---|---|
-| `InMemoryReactiveBucketRepository` | In-memory reactive BucketRepository: ConcurrentHashMap for bucket aggregates and configuration via Mono/Flux |
-| `InMemoryReactiveS3ObjectRepository` | In-memory reactive S3ObjectRepository: ConcurrentHashMap for metadata and raw bytes via Mono/Flux |
-| `InMemoryReactiveMultipartUploadRepository` | In-memory reactive MultipartUploadRepository: ConcurrentHashMap for upload sessions via Mono/Flux |
+[cols="2,4",options="header"]
+|===
+|Component |Responsibility
+
+|`InMemoryReactiveBucketRepository`
+|In-memory reactive BucketRepository: ConcurrentHashMap for bucket aggregates and configuration via Mono/Flux (does not persist across restarts)
+
+|`InMemoryReactiveS3ObjectRepository`
+|In-memory reactive S3ObjectRepository: ConcurrentHashMap for metadata and raw bytes via Mono/Flux (does not persist across restarts)
+
+|`InMemoryReactiveMultipartUploadRepository`
+|In-memory reactive MultipartUploadRepository: ConcurrentHashMap for upload sessions via Mono/Flux (does not persist across restarts)
+|===
+
+See `object-store-reactive-repository-storage-engine-infrastructure` (Level 1) for the durable storage-engine alternative selected via the `storage-engine` profile.
 
 === Level 3 — Code View (Aggregate Root Patterns)
 
@@ -214,6 +308,14 @@ public interface Bucket {
     Bucket withIntelligentTieringConfiguration(String id, BucketIntelligentTieringConfiguration tiering);
     Bucket withoutIntelligentTieringConfiguration(String id);
 
+    // EP-2: ABAC, bucket metadata, and metadata-table configuration (rules-based,
+    // matching the S3 API shape), plus the newer object-lock/inventory-table/
+    // journal-table families — all durable in storage-engine mode via BucketStore
+    Bucket withAbacConfiguration(AbacConfiguration abac);
+    Bucket withMetadataConfiguration(BucketMetadataConfiguration metadata);
+    Bucket withMetadataTableConfiguration(BucketMetadataTableConfiguration metadataTable);
+    Bucket withBucketConfig(BucketConfig config); // generic aggregate-level config transition
+
     // Domain event access
     List<ObjectStoreEvent> domainEvents();
     Bucket clearEvents();
@@ -241,6 +343,8 @@ public interface S3Object {
     S3Object clearEvents();
 }
 ```
+
+**Durability note:** in storage-engine mode, legal hold, object lock configuration, retention, encryption, and restore state are durable via `ObjectConfigMetadataStore` (EP-2). Object tags and ACL currently live on the `S3Object` aggregate but are not yet part of a durable reference document, so they remain `@partial` for restart durability — tracked as an open EP-2 item.
 
 ==== MultipartUpload Aggregate
 
@@ -286,11 +390,31 @@ public class S3BucketConfigHandler {
 
 === Important Interfaces
 
-| Interface | Description | Connected Containers |
-|---|---|---|
-| S3 REST API | Public object API — AWS S3-compatible route surface only | User ↔ s3-reactive-api-adapter |
-| Admin JSON API | Internal/administrative `/admin/**` API for policy/device/configuration management; not S3 coverage | Operator/Admin UI ↔ admin-api-adapter |
-| Reactive service calls | ReactiveBucketService, ReactiveObjectService, ReactiveMultipartUploadService via Mono/Flux | s3-reactive-api-adapter ↔ reactive-object-store / reactive-bucket-management |
-| CQS repository interfaces | Mono/Flux-based command and query ports | reactive-object-store / reactive-bucket-management ↔ reactive-repository-application |
-| Repository implementations | Reactive in-memory adapters or Storage Engine ACL adapter, selected explicitly | reactive-repository-application ↔ reactive-infrastructure / object-store-reactive-repository-storage-engine-infrastructure |
-| Bucket lookup | Bucket existence validation | reactive-object-store → reactive-bucket-management |
+[cols="2,4,3",options="header"]
+|===
+|Interface |Description |Connected Containers
+
+|S3 REST API
+|Public object API — AWS S3-compatible route surface only
+|User ↔ s3-reactive-api-adapter
+
+|Admin JSON API
+|Internal/administrative `/admin/**` API for policy/device/configuration management; not S3 coverage
+|Operator/Admin UI ↔ admin-api-adapter
+
+|Reactive service calls
+|`ReactiveBucketService`, `ReactiveObjectService`, `ReactiveMultipartUploadService` via Mono/Flux
+|s3-reactive-api-adapter ↔ reactive-object-store / reactive-bucket-management
+
+|CQS repository interfaces
+|Mono/Flux-based command and query ports
+|reactive-object-store / reactive-bucket-management ↔ reactive-repository-application
+
+|Repository implementations
+|In-memory adapters (default, non-durable) or Storage Engine durable adapter, selected explicitly via Spring profile
+|reactive-repository-application ↔ reactive-infrastructure / object-store-reactive-repository-storage-engine-infrastructure
+
+|Bucket lookup
+|Bucket existence validation
+|reactive-object-store → reactive-bucket-management
+|===
