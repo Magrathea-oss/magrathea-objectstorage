@@ -164,24 +164,31 @@ Business Need: EP-2 Complete Metadata Durability
       When the application process is stopped and started again with the same filesystem root
       Then the journal-table configuration for bucket "ep2-bucket-config-test" returns id "ep2-journal-table"
 
-  Rule: Remaining handler-local bucket configuration families must move behind durable repository ports
-    ABAC routing, bucket metadata configuration and the metadata-table configuration are
-    still held in handler-local in-memory maps inside S3BucketConfigHandler. They accept
-    and return configuration but do not survive a restart and bypass the repository layer.
-    EP-2 requires moving them onto the bucket aggregate (as object-lock, inventory-table
-    and journal-table already were) so they join the durable bucket registry document.
+  Rule: ABAC, metadata and metadata-table configuration are durable on the bucket aggregate
+    ABAC routing, bucket metadata configuration and metadata-table configuration were
+    previously held in handler-local in-memory maps inside S3BucketConfigHandler. They
+    are now modelled on the bucket aggregate (matching the S3 API shape) and persisted
+    through the durable bucket registry document, so no bucket configuration family
+    remains as handler-local web-adapter state.
 
-    @REQ-DUR-004 @functional-requirement @durability @restart-safety @config-only
+    @REQ-DUR-004 @functional-requirement @non-functional-requirement @durability @restart-safety @implemented-not-e2e-validated
     Scenario: Bucket ABAC configuration survives restart
       Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-abac"
-      And bucket "ep2-bucket-config-test" has an ABAC rule granting "s3:GetObject" when attribute "role" equals "admin"
+      And bucket "ep2-bucket-config-test" has an ABAC rule granting "s3:GetObject" to principal "user/admin" gated by tag "role" equal to "admin"
       When the application process is stopped and started again with the same filesystem root
-      Then the bucket ABAC configuration for "ep2-bucket-config-test" includes the rule granting "s3:GetObject"
+      Then the bucket ABAC configuration for "ep2-bucket-config-test" includes the rule granting "s3:GetObject" gated by tag "role" equal to "admin"
 
-    @REQ-DUR-004 @functional-requirement @durability @restart-safety @config-only
+    @REQ-DUR-004 @functional-requirement @non-functional-requirement @durability @restart-safety @implemented-not-e2e-validated
+    Scenario: Bucket metadata configuration survives restart
+      Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-metadata"
+      And bucket "ep2-bucket-config-test" has a metadata configuration rule "md-1" with status "Enabled" for resource type "OBJECT" subtype "TAGS"
+      When the application process is stopped and started again with the same filesystem root
+      Then the metadata configuration for bucket "ep2-bucket-config-test" includes rule "md-1" for resource type "OBJECT"
+
+    @REQ-DUR-004 @functional-requirement @non-functional-requirement @durability @restart-safety @implemented-not-e2e-validated
     Scenario: Bucket metadata-table configuration survives restart
       Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-metadata-table"
-      And bucket "ep2-bucket-config-test" has a metadata-table configuration with table name "ep2-metadata-table"
+      And bucket "ep2-bucket-config-test" has a metadata-table configuration rule "mdt-1" with table name "ep2-metadata-table" in database "analytics-db"
       When the application process is stopped and started again with the same filesystem root
       Then the metadata-table configuration for bucket "ep2-bucket-config-test" returns table name "ep2-metadata-table"
 
