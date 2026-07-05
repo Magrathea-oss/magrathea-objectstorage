@@ -175,3 +175,19 @@ A future test or validation change is done only when:
 - The ARC42 appendix should group scenarios by requirement ID, functional and/or non-functional classification, capability area, rule, tags, validation mode, declared support status, and validated implementation status.
 - Magrathea reports must distinguish S3 API compatibility requirements, storage-engine internal abilities, admin-only capabilities, protocol smoke checks, and legacy/regression checks.
 - Appendix status must be based on observed runner output, tracked implementation state, or explicit pending/unknown markers; do not infer completion from route inventories, generated API lists, README claims, or status-only smoke checks.
+
+### B.8 Requirements vs Specs folder separation in Cucumber features
+
+Cucumber `.feature` files are organized by stakeholder audience into two folders:
+
+```
+s3-reactive-api-adapter/src/test/features/
+├── requirements/          # Business Need — stakeholder: product owner, S3 API consumer
+└── specs/                 # Ability — stakeholder: developer, maintainer, code reviewer
+```
+
+- **`requirements/`** contains only `Business Need` scenarios. Each scenario describes externally observable behavior through an S3-compatible API or Admin API endpoint.
+- **`specs/`** contains only `Ability` scenarios. Each scenario describes an internal mechanism, structural coding standard, or operational capability that has no external S3 API equivalent.
+- A scenario may carry both `@business-need` and `@spec` tags only when the same Gherkin text is shared between two runners with different validation modes; in that case the file lives in `requirements/` and the `@spec` runner filters by tag.
+- The Gherkin requirements appendix (`docs/arc42/generated/gherkin-requirements.adoc`) must group `requirements/` and `specs/` scenarios under separate subsections.
+- Existing JUnit tests that validate `Ability` scenarios remain as fast mechanism tests alongside the Cucumber specs; they are not replaced but complemented.
