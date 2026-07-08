@@ -214,6 +214,14 @@ final class S3ObjectManifestReferenceStore {
             properties.setProperty(prefix + "value", entry.getValue());
             index++;
         }
+        properties.setProperty("objectTags.count", Integer.toString(reference.objectTags().size()));
+        int tagIndex = 0;
+        for (Map.Entry<String, String> entry : reference.objectTags().entrySet()) {
+            String prefix = "objectTags." + tagIndex + ".";
+            properties.setProperty(prefix + "key", entry.getKey());
+            properties.setProperty(prefix + "value", entry.getValue());
+            tagIndex++;
+        }
 
         try (StringWriter writer = new StringWriter()) {
             properties.store(writer, "Magrathea storage-engine S3 object manifest reference");
@@ -242,12 +250,24 @@ final class S3ObjectManifestReferenceStore {
             }
         }
 
+        int tagCount = Integer.parseInt(properties.getProperty("objectTags.count", "0"));
+        java.util.LinkedHashMap<String, String> tags = new java.util.LinkedHashMap<>();
+        for (int index = 0; index < tagCount; index++) {
+            String prefix = "objectTags." + index + ".";
+            String tagKey = properties.getProperty(prefix + "key");
+            String tagValue = properties.getProperty(prefix + "value");
+            if (tagKey != null && tagValue != null) {
+                tags.put(tagKey, tagValue);
+            }
+        }
+
         return new Reference(
             required(properties, "bucket"),
             required(properties, "key"),
             properties.getProperty("storageClass"),
             properties.getProperty("etag"),
             Map.copyOf(metadata),
+            Map.copyOf(tags),
             Long.parseLong(required(properties, "size")),
             ManifestId.of(UUID.fromString(required(properties, "manifestId"))),
             VersionId.of(required(properties, "versionId")),
@@ -279,10 +299,15 @@ final class S3ObjectManifestReferenceStore {
         String storageClass,
         String etag,
         Map<String, String> userMetadata,
+        Map<String, String> objectTags,
         long size,
         ManifestId manifestId,
         VersionId versionId,
         ZonedDateTime createdAt) {
+
+        Reference {
+            objectTags = objectTags == null ? Map.of() : Map.copyOf(objectTags);
+        }
 
         static Reference from(S3Object object, ManifestId manifestId, VersionId versionId) {
             return new Reference(
@@ -291,6 +316,7 @@ final class S3ObjectManifestReferenceStore {
                 object.storageClass(),
                 object.etag(),
                 object.userMetadata(),
+                object.objectTags(),
                 object.size(),
                 manifestId,
                 versionId,
@@ -307,7 +333,8 @@ final class S3ObjectManifestReferenceStore {
                     size,
                     createdAt,
                     List.of())
-                .withEtag(etag);
+                .withEtag(etag)
+                .withObjectTags(objectTags);
         }
     }
 }

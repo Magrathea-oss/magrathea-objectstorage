@@ -133,6 +133,7 @@ public class StorageEngineReactiveS3ObjectRepository
                             clean.storageClass(),
                             clean.etag() != null ? clean.etag() : committed.etag(),
                             clean.userMetadata(),
+                            clean.objectTags(),
                             clean.size(),
                             committed.manifestId(),
                             committed.versionId(),

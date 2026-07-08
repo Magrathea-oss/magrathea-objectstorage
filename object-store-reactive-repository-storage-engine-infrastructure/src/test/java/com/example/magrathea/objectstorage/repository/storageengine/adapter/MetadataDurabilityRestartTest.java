@@ -21,6 +21,8 @@ import com.example.magrathea.objectstore.domain.valueobject.RestoreConfiguration
 import com.example.magrathea.objectstore.domain.valueobject.StorageClass;
 import com.example.magrathea.objectstore.domain.valueobject.UploadId;
 import com.example.magrathea.objectstore.domain.valueobject.UploadPart;
+import com.example.magrathea.storageengine.domain.valueobject.ManifestId;
+import com.example.magrathea.storageengine.domain.valueobject.VersionId;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -207,6 +209,45 @@ class MetadataDurabilityRestartTest {
 
             MultipartUploadStateStore restarted = new MultipartUploadStateStore(root);
             assertTrue(restarted.findById(UploadId.of("uploadEp2Aborted")).isEmpty());
+        }
+    }
+
+    @Nested
+    @DisplayName("Object tags durability via the manifest reference (REQ-DUR-003 tags)")
+    class ObjectTags {
+
+        @Test
+        @DisplayName("object tags recorded in the committed reference survive a restart")
+        void objectTagsSurviveRestart() {
+            Path root = storageRoot.resolve("metadata").resolve("s3-object-references");
+            S3ObjectManifestReferenceStore store = new S3ObjectManifestReferenceStore(root);
+
+            var reference = new S3ObjectManifestReferenceStore.Reference(
+                "durable-reports",
+                "documents/tags-doc.pdf",
+                "STANDARD",
+                "\"etag-tags-1\"",
+                java.util.Map.of("x-amz-meta-owner", "storage-team"),
+                java.util.Map.of("Project", "Alpha", "Version", "2"),
+                1024L,
+                ManifestId.of(java.util.UUID.randomUUID()),
+                VersionId.of("v1"),
+                java.time.ZonedDateTime.parse("2026-07-02T09:00:00Z"));
+            store.commitLatest("durable-reports", "documents/tags-doc.pdf",
+                current -> java.util.Optional.of(reference)).block();
+
+            // Simulated restart: fresh store instance reads the durable file.
+            S3ObjectManifestReferenceStore restarted = new S3ObjectManifestReferenceStore(root);
+            var reloaded = restarted.find("durable-reports", "documents/tags-doc.pdf")
+                .block().orElseThrow();
+
+            assertEquals(java.util.Map.of("Project", "Alpha", "Version", "2"),
+                reloaded.objectTags(), "object tags must survive restart in the reference");
+            var restored = reloaded.toS3Object();
+            assertEquals("Alpha", restored.objectTags().get("Project"),
+                "restored aggregate must expose the persisted tags for GetObjectTagging");
+            assertEquals(java.util.Map.of("x-amz-meta-owner", "storage-team"),
+                restored.userMetadata(), "user metadata must not be mixed with tags");
         }
     }
 
