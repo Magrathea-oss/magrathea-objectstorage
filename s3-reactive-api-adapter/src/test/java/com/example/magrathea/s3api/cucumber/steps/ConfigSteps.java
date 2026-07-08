@@ -793,7 +793,7 @@ public class ConfigSteps {
 
     @Given("bucket ownership controls are preset with ownership {string}")
     public void bucketOwnershipControlsPreset(String ownership) {
-        var body = "<OwnershipControls><Rule><Ownership>" + ownership + "</Ownership></Rule></OwnershipControls>";
+        var body = "<OwnershipControls><Ownership>" + ownership + "</Ownership></OwnershipControls>";
         webTestClient.put()
             .uri("/test-bucket?ownershipControls")
             .contentType(MediaType.APPLICATION_XML)
@@ -804,7 +804,7 @@ public class ConfigSteps {
 
     @When("bucket ownership controls are configured with ownership {string}")
     public void putBucketOwnershipControls(String ownership) {
-        var body = "<OwnershipControls><Rule><Ownership>" + ownership + "</Ownership></Rule></OwnershipControls>";
+        var body = "<OwnershipControls><Ownership>" + ownership + "</Ownership></OwnershipControls>";
         var result = webTestClient.put()
             .uri("/test-bucket?ownershipControls")
             .contentType(MediaType.APPLICATION_XML)
@@ -860,7 +860,7 @@ public class ConfigSteps {
 
     @When("bucket ownership controls are configured for {string} with ownership {string}")
     public void putBucketOwnershipControlsFor(String bucket, String ownership) {
-        var body = "<OwnershipControls><Rule><Ownership>" + ownership + "</Ownership></Rule></OwnershipControls>";
+        var body = "<OwnershipControls><Ownership>" + ownership + "</Ownership></OwnershipControls>";
         var result = webTestClient.put()
             .uri("/{bucket}?ownershipControls", bucket)
             .contentType(MediaType.APPLICATION_XML)

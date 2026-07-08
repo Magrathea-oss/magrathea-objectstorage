@@ -98,6 +98,18 @@ public class AwsCliObjectSteps {
 
     // ── Given steps ──
 
+    @Given("the S3 API is running with the single-node in-memory backend and no storage-engine profile active")
+    public void s3ApiRunningWithSingleNodeBackend() {
+        // Verified by Spring context configuration: AwsCliTestApp component-scans
+        // com.example.magrathea.objectstore and com.example.magrathea.reactive with no
+        // "storage-engine" profile or property active, so Spring's implicit "default"
+        // profile applies and the S3 object and bucket repositories resolve to the
+        // in-memory reactive adapters (InMemoryReactiveS3ObjectRepository,
+        // InMemoryReactiveBucketRepository), matching @Profile({"single-node", "default"}).
+        // Per ADR-0014/README.md, "single-node" is documented as suitable for
+        // development and single-node/test deployments, not durable production storage.
+    }
+
     @Given("an object key {string}")
     public void anObjectKey(String key) {
         currentKey = key;
