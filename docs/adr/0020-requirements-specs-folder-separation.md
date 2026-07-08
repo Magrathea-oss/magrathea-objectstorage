@@ -55,4 +55,16 @@ Rules:
 
 ## Status
 
-Proposed — pending approval and AGENTS.md update.
+**Accepted** (2026-07-07). AGENTS.md §B.8 documents this convention. The two-folder
+layout is in active use:
+
+- `requirements/` contains 11 `Business Need` feature files, including the phase-1
+  through phase-6/EP2 shared requirement features and the single-node-backend-*
+  features migrated from the legacy `awscli/` folder under ADR 0021 Phase 2.
+- `specs/` contains `fs-concurrency.feature` (`Ability`), with further specs planned
+  under ADR 0021 Phase 3 (e.g. `runtime-effects.feature` candidate).
+
+ADR 0021 tracks the ongoing migration of the remaining legacy `features/object-store/`
+directory (239 scenarios) into this structure. Rule 3 (shared `@business-need`/`@spec`
+tagging for dual-runner scenarios) has not yet been exercised by any migrated feature;
+it remains valid guidance for future dual-validation-mode specs.
