@@ -66,23 +66,34 @@ public class FsConcurrencySteps {
     @Given("a bucket named {string} exists")
     public void bucketExists(String bucketName) {
         currentBucket = bucketName;
-        webTestClient.put()
+        var result = webTestClient.put()
             .uri("/{bucket}", bucketName)
             .exchange()
-            .expectStatus().isOk();
+            .returnResult();
+        int status = result.getStatus().value();
+        assertTrue(status == 200 || status == 409,
+            "bucket precondition should create the bucket or find it already existing, got HTTP " + status);
     }
 
     // ── When ──
 
     @When("{int} concurrent PUT requests are sent for object {string} with distinct content bodies 1 KB each")
+    public void concurrentPutRequestsWithDistinctBodiesOneKbEach(int concurrency, String key) throws Exception {
+        runConcurrentPutRequests(concurrency, key, "x".repeat(1024));
+    }
+
+    @When("{int} concurrent PUT requests are sent for object {string} with distinct content bodies")
     public void concurrentPutRequestsWithDistinctBodies(int concurrency, String key) throws Exception {
+        runConcurrentPutRequests(concurrency, key, "restart-body-content");
+    }
+
+    private void runConcurrentPutRequests(int concurrency, String key, String contentSuffix) throws Exception {
         currentKey = key;
-        String content = "x".repeat(1024);
         ExecutorService executor = Executors.newFixedThreadPool(concurrency);
         try {
             Map<Integer, CompletableFuture<Integer>> futures = new ConcurrentHashMap<>();
             for (int i = 0; i < concurrency; i++) {
-                String body = i + "-" + content; // each body is distinct
+                String body = i + "-" + contentSuffix; // each body is distinct
                 uploadedBodies.add(body);
                 futures.put(i, CompletableFuture.supplyAsync(() -> {
                     var result = webTestClient.put()
@@ -167,17 +178,23 @@ public class FsConcurrencySteps {
 
     @Then("a subsequent GET for {string} returns content matching exactly one of the uploaded bodies")
     public void getReturnsMatchingBody(String key) {
-        String body = webTestClient.get()
+        var result = webTestClient.get()
             .uri("/{bucket}/{key}", currentBucket, key)
             .exchange()
             .expectStatus().isOk()
             .expectBody(String.class)
-            .returnResult()
-            .getResponseBody();
+            .returnResult();
+        String body = result.getResponseBody();
+        getEtag = result.getResponseHeaders().getFirst(HttpHeaders.ETAG);
         assertNotNull(body, "GET response body must not be null");
         getBody = body;
         assertTrue(uploadedBodies.contains(body),
             "GET body must match exactly one uploaded body. Got: " + body.substring(0, Math.min(20, body.length())) + "...");
+    }
+
+    @Then("a GET for {string} returns content matching exactly one of the uploaded bodies")
+    public void getReturnsMatchingBodyAfterRestart(String key) {
+        getReturnsMatchingBody(key);
     }
 
     @Then("the ETag header matches the expected ETag for that body")
@@ -241,9 +258,9 @@ public class FsConcurrencySteps {
 
     private static String computeEtag(String body) {
         try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            MessageDigest md = MessageDigest.getInstance("MD5");
             byte[] digest = md.digest(body.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(digest);
+            return "\"" + HexFormat.of().formatHex(digest) + "\"";
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException(e);
         }

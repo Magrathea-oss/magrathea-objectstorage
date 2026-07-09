@@ -178,6 +178,10 @@ public final class S3ResponseBuilder {
         }
     }
 
+    private static void applyContentLength(ServerResponse.HeadersBuilder<?> builder, S3Object obj) {
+        builder.header("Content-Length", String.valueOf(obj.size()));
+    }
+
     private static void applyContentType(ServerResponse.HeadersBuilder<?> builder, S3Object obj, String contentType) {
         if (contentType != null && !contentType.isBlank()) {
             builder.header("Content-Type", contentType);
@@ -207,6 +211,23 @@ public final class S3ResponseBuilder {
     }
 
     /**
+     * 200 OK for HeadObject with all S3 object headers and Content-Length.
+     * No body is sent, but Content-Length describes the stored object's byte size.
+     */
+    public static Mono<ServerResponse> headObject(S3Object obj) {
+        var builder = ServerResponse.ok();
+        applyEtag(builder, obj);
+        var enc = obj.encryption();
+        if (enc != null) {
+            applyEncryptionHeaders(builder, enc);
+        }
+        applyChecksumHeaders(builder, obj);
+        applyUserMetadataHeaders(builder, obj);
+        applyContentLength(builder, obj);
+        return builder.build();
+    }
+
+    /**
      * 200 OK with all S3 object headers and a streaming body.
      * Headers are applied to the builder BEFORE the body flux is attached —
      * the body flux is NEVER consumed for header computation.
@@ -220,6 +241,7 @@ public final class S3ResponseBuilder {
         }
         applyChecksumHeaders(builder, obj);
         applyUserMetadataHeaders(builder, obj);
+        applyContentLength(builder, obj);
         return builder.body(BodyInserters.fromDataBuffers(body));
     }
 
@@ -235,6 +257,7 @@ public final class S3ResponseBuilder {
         }
         applyChecksumHeaders(builder, obj);
         applyUserMetadataHeaders(builder, obj);
+        applyContentLength(builder, obj);
         applyContentType(builder, obj, contentType);
         return builder.body(BodyInserters.fromDataBuffers(body));
     }

@@ -301,7 +301,7 @@ public class S3ObjectOperationsHandler {
     public Mono<ServerResponse> headObject(ServerRequest request) {
         var objectKey = S3RequestExtractor.extractObjectKey(request);
         return objectService.getObject(objectKey)
-            .flatMap(obj -> evaluateConditionals(obj, request, () -> S3ResponseBuilder.ok(obj)))
+            .flatMap(obj -> evaluateConditionals(obj, request, () -> S3ResponseBuilder.headObject(obj)))
             .switchIfEmpty(Mono.defer(() -> ServerResponse.notFound().build()))
             .onErrorResume(Throwable.class, e -> ServerResponse.notFound().build());
     }
