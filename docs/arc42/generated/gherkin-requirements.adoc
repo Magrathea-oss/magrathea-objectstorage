@@ -18,8 +18,8 @@ Generated from `s3-reactive-api-adapter/src/test/features/requirements` using `p
 
 === Summary
 
-* Feature files scanned: 15
-* Scenarios discovered: 344
+* Feature files scanned: 16
+* Scenarios discovered: 353
 * Protocol-smoke scenarios: 122
 
 ==== Status tag counts
@@ -27,7 +27,7 @@ Generated from `s3-reactive-api-adapter/src/test/features/requirements` using `p
 [cols="1,1",options="header"]
 |===
 |Tag |Scenario count
-|`@absent` |4
+|`@absent` |13
 |`@config-only` |69
 |`@implemented-and-validated` |42
 |`@implemented-not-e2e-validated` |34
@@ -42,7 +42,7 @@ Generated from `s3-reactive-api-adapter/src/test/features/requirements` using `p
 [cols="1,1",options="header"]
 |===
 |Tag |Scenario count
-|`@awscli-required` |45
+|`@awscli-required` |54
 |`@bootstrap-integration-required` |3
 |`@filesystem-inspection-required` |1
 |`@log-inspection-required` |3
@@ -50,7 +50,7 @@ Generated from `s3-reactive-api-adapter/src/test/features/requirements` using `p
 |`@pipeline-unit-required` |9
 |`@static-architecture-required` |2
 |`@tracing-inspection-required` |2
-|`@webclient-required` |276
+|`@webclient-required` |285
 |`unknown/not-tagged` |35
 |===
 
@@ -59,8 +59,8 @@ Generated from `s3-reactive-api-adapter/src/test/features/requirements` using `p
 [cols="1,1",options="header"]
 |===
 |Tag |Scenario count
-|`@functional-requirement` |136
-|`@non-functional-requirement` |68
+|`@functional-requirement` |145
+|`@non-functional-requirement` |70
 |`unknown/not-tagged` |202
 |===
 
@@ -3209,6 +3209,297 @@ production readiness. Completion must not be inferred from route inventories, pl
   And any future status "@implemented-not-e2e-validated" is allowed only for behavior implemented in production code without full multi-node end-to-end evidence
   And the reports do not mark distributed readiness as complete or "@implemented-and-validated"
   And the reports distinguish modeled planner behavior from distributed-production readiness
+----
+
+==== s3-reactive-api-adapter/src/test/features/requirements/phase-ep1-security-identity.feature
+
+* Feature title: Business Need: EP-1 S3 security and identity
+* Feature tags: `@requirement`, `@phase-ep1`, `@s3-api`, `@security`, `@identity`, `@auth`, `@business-need`
+* Feature description:
++
+----
+Magrathea must authenticate S3 requests, authorize actions deny-by-default,
+audit decisions, and encrypt protected object data at rest before it can be
+exposed to untrusted networks or claim production S3 compatibility.
+----
+
+===== REQ-SEC-001
+
+====== Scenario: Anonymous PutObject is rejected when secured S3 mode is enabled
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep1-security-identity.feature:10`
+|Rule |SigV4 authentication is required in secured mode
+|Requirement ID(s) |`REQ-SEC-001`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep1`, `@s3-api`, `@security`, `@identity`, `@auth`, `@business-need`, `@sigv4`, `@authentication`
+|Validation mode tags |`@webclient-required`, `@awscli-required`
+|Declared/validated status |`@absent`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep1`, `@s3-api`, `@security`, `@identity`, `@auth`, `@business-need`, `@REQ-SEC-001`, `@functional-requirement`, `@sigv4`, `@authentication`, `@webclient-required`, `@awscli-required`, `@absent`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given secured S3 mode is enabled with credential profile "tenant-a-dev"
+  And bucket "secure-ingest" exists for account "111122223333"
+  When an unsigned S3 PutObject request stores object "incoming/report.csv" with body "tenant data"
+  Then the response status is 403
+  And the S3 error code is "AccessDenied"
+  And object "incoming/report.csv" is not stored in bucket "secure-ingest"
+  And an audit event records decision "deny" for action "s3:PutObject" without object body bytes
+----
+
+===== REQ-SEC-002
+
+====== Scenario: Correctly signed SigV4 PutObject is accepted for a known access key
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep1-security-identity.feature:20`
+|Rule |SigV4 authentication is required in secured mode
+|Requirement ID(s) |`REQ-SEC-002`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep1`, `@s3-api`, `@security`, `@identity`, `@auth`, `@business-need`, `@sigv4`, `@authentication`
+|Validation mode tags |`@webclient-required`, `@awscli-required`
+|Declared/validated status |`@absent`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep1`, `@s3-api`, `@security`, `@identity`, `@auth`, `@business-need`, `@REQ-SEC-002`, `@functional-requirement`, `@sigv4`, `@authentication`, `@webclient-required`, `@awscli-required`, `@absent`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given secured S3 mode is enabled with access key "AKIAMAGRATHEATEST1" for principal "tenant-a-writer"
+  And bucket policy for "secure-ingest" allows principal "tenant-a-writer" action "s3:PutObject" on prefix "incoming/"
+  When a SigV4 signed S3 PutObject request stores object "incoming/report.csv" with body "tenant data"
+  Then the response status is 200
+  And the response ETag header is present
+  And a subsequent signed GetObject for "incoming/report.csv" returns body "tenant data"
+  And an audit event records decision "allow" for principal "tenant-a-writer" and action "s3:PutObject"
+----
+
+===== REQ-SEC-003
+
+====== Scenario Outline: Invalid SigV4 authentication is rejected before object mutation
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep1-security-identity.feature:30`
+|Rule |SigV4 authentication is required in secured mode
+|Requirement ID(s) |`REQ-SEC-003`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep1`, `@s3-api`, `@security`, `@identity`, `@auth`, `@business-need`, `@sigv4`, `@authentication`
+|Validation mode tags |`@webclient-required`, `@awscli-required`
+|Declared/validated status |`@absent`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep1`, `@s3-api`, `@security`, `@identity`, `@auth`, `@business-need`, `@REQ-SEC-003`, `@functional-requirement`, `@sigv4`, `@authentication`, `@webclient-required`, `@awscli-required`, `@absent`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given secured S3 mode is enabled with access key "AKIAMAGRATHEATEST1" for principal "tenant-a-writer"
+  And bucket "secure-ingest" exists for account "111122223333"
+  When a SigV4 signed S3 PutObject request for object "incoming/bad-auth.txt" is sent with authentication defect "<defect>"
+  Then the response status is 403
+  And the S3 error code is "<errorCode>"
+  And object "incoming/bad-auth.txt" is not stored in bucket "secure-ingest"
+  And an audit event records decision "deny" for authentication defect "<defect>"
+----
+
+.Examples
+[cols="1,1",options="header"]
+|===
+| defect | errorCode
+| unknown-access-key | InvalidAccessKeyId
+| bad-signature | SignatureDoesNotMatch
+| stale-x-amz-date | RequestTimeTooSkewed
+| payload-hash-mismatch | XAmzContentSHA256Mismatch
+|===
+
+===== REQ-SEC-004
+
+====== Scenario: Authenticated principal without an allow policy is denied by default
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep1-security-identity.feature:49`
+|Rule |S3 authorization is deny-by-default and policy driven
+|Requirement ID(s) |`REQ-SEC-004`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep1`, `@s3-api`, `@security`, `@identity`, `@auth`, `@business-need`, `@authorization`, `@bucket-policy`
+|Validation mode tags |`@webclient-required`, `@awscli-required`
+|Declared/validated status |`@absent`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep1`, `@s3-api`, `@security`, `@identity`, `@auth`, `@business-need`, `@REQ-SEC-004`, `@functional-requirement`, `@authorization`, `@bucket-policy`, `@webclient-required`, `@awscli-required`, `@absent`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given secured S3 mode is enabled with access key "AKIAMAGRATHEAREAD1" for principal "tenant-a-reader"
+  And bucket "secure-ingest" exists for account "111122223333"
+  And no bucket policy or ACL grants principal "tenant-a-reader" action "s3:GetObject" on object "incoming/report.csv"
+  When principal "tenant-a-reader" sends a correctly signed GetObject request for "incoming/report.csv"
+  Then the response status is 403
+  And the S3 error code is "AccessDenied"
+  And an audit event records decision "deny" with reason "no-allowing-policy"
+----
+
+===== REQ-SEC-005
+
+====== Scenario: Explicit bucket policy deny overrides an allow
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep1-security-identity.feature:59`
+|Rule |S3 authorization is deny-by-default and policy driven
+|Requirement ID(s) |`REQ-SEC-005`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep1`, `@s3-api`, `@security`, `@identity`, `@auth`, `@business-need`, `@authorization`, `@bucket-policy`
+|Validation mode tags |`@webclient-required`, `@awscli-required`
+|Declared/validated status |`@absent`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep1`, `@s3-api`, `@security`, `@identity`, `@auth`, `@business-need`, `@REQ-SEC-005`, `@functional-requirement`, `@authorization`, `@bucket-policy`, `@webclient-required`, `@awscli-required`, `@absent`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given secured S3 mode is enabled with principal "tenant-a-writer"
+  And bucket policy for "secure-ingest" allows principal "tenant-a-writer" action "s3:PutObject" on prefix "incoming/"
+  And bucket policy for "secure-ingest" denies principal "tenant-a-writer" action "s3:PutObject" on object "incoming/blocked.csv"
+  When principal "tenant-a-writer" sends a correctly signed PutObject request for "incoming/blocked.csv" with body "blocked"
+  Then the response status is 403
+  And the S3 error code is "AccessDenied"
+  And object "incoming/blocked.csv" is not stored in bucket "secure-ingest"
+  And an audit event records decision "deny" with reason "explicit-deny"
+----
+
+===== REQ-SEC-006
+
+====== Scenario: PublicAccessBlock prevents public ACL access even when an object ACL is public-read
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep1-security-identity.feature:70`
+|Rule |S3 authorization is deny-by-default and policy driven
+|Requirement ID(s) |`REQ-SEC-006`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep1`, `@s3-api`, `@security`, `@identity`, `@auth`, `@business-need`, `@authorization`, `@acl`, `@public-access-block`
+|Validation mode tags |`@webclient-required`, `@awscli-required`
+|Declared/validated status |`@absent`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep1`, `@s3-api`, `@security`, `@identity`, `@auth`, `@business-need`, `@REQ-SEC-006`, `@functional-requirement`, `@authorization`, `@acl`, `@public-access-block`, `@webclient-required`, `@awscli-required`, `@absent`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given secured S3 mode is enabled
+  And bucket "secure-public-block" has PublicAccessBlock setting "BlockPublicAcls" enabled
+  And object "docs/public.txt" has ACL "public-read"
+  When an unsigned GetObject request reads "docs/public.txt" from bucket "secure-public-block"
+  Then the response status is 403
+  And the S3 error code is "AccessDenied"
+  And an audit event records decision "deny" with reason "public-access-block"
+----
+
+===== REQ-SEC-007
+
+====== Scenario: Expected bucket owner mismatch rejects an otherwise authorized request
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep1-security-identity.feature:80`
+|Rule |S3 authorization is deny-by-default and policy driven
+|Requirement ID(s) |`REQ-SEC-007`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep1`, `@s3-api`, `@security`, `@identity`, `@auth`, `@business-need`, `@authorization`, `@expected-owner`
+|Validation mode tags |`@webclient-required`, `@awscli-required`
+|Declared/validated status |`@absent`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep1`, `@s3-api`, `@security`, `@identity`, `@auth`, `@business-need`, `@REQ-SEC-007`, `@functional-requirement`, `@authorization`, `@expected-owner`, `@webclient-required`, `@awscli-required`, `@absent`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given secured S3 mode is enabled with principal "tenant-a-reader"
+  And bucket "secure-ingest" is owned by account "111122223333"
+  And principal "tenant-a-reader" is allowed action "s3:GetObject" on bucket "secure-ingest"
+  When principal "tenant-a-reader" sends a signed GetObject request with header "x-amz-expected-bucket-owner" set to "999900001111"
+  Then the response status is 403
+  And the S3 error code is "AccessDenied"
+  And an audit event records decision "deny" with reason "expected-owner-mismatch"
+----
+
+===== REQ-SEC-008
+
+====== Scenario: Audit events are durable and redact secrets and object bodies
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep1-security-identity.feature:92`
+|Rule |Security side effects are observable and safe
+|Requirement ID(s) |`REQ-SEC-008`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep1`, `@s3-api`, `@security`, `@identity`, `@auth`, `@business-need`, `@audit`, `@observability`
+|Validation mode tags |`@webclient-required`, `@awscli-required`
+|Declared/validated status |`@absent`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep1`, `@s3-api`, `@security`, `@identity`, `@auth`, `@business-need`, `@REQ-SEC-008`, `@functional-requirement`, `@non-functional-requirement`, `@audit`, `@observability`, `@webclient-required`, `@awscli-required`, `@absent`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given secured S3 mode is enabled with principal "tenant-a-writer"
+  When principal "tenant-a-writer" sends a signed PutObject request for "incoming/secret.txt" with body "do-not-log-this-body"
+  Then an audit event is durably recorded with request id, principal, action, bucket, object key, decision, and response status
+  And the audit event does not contain the secret access key
+  And the audit event does not contain object body text "do-not-log-this-body"
+  And the audit event remains available after an application restart
+----
+
+===== REQ-SEC-009
+
+====== Scenario: SSE-S3 encrypted object bytes are not stored as plaintext at rest
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep1-security-identity.feature:101`
+|Rule |Security side effects are observable and safe
+|Requirement ID(s) |`REQ-SEC-009`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep1`, `@s3-api`, `@security`, `@identity`, `@auth`, `@business-need`, `@encryption`, `@sse`, `@durability`
+|Validation mode tags |`@webclient-required`, `@awscli-required`
+|Declared/validated status |`@absent`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep1`, `@s3-api`, `@security`, `@identity`, `@auth`, `@business-need`, `@REQ-SEC-009`, `@functional-requirement`, `@non-functional-requirement`, `@encryption`, `@sse`, `@durability`, `@webclient-required`, `@awscli-required`, `@absent`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given secured S3 mode is enabled with SSE-S3 default encryption for bucket "secure-encrypted"
+  When a signed PutObject request stores object "records/pii.json" with body "{\"ssn\":\"123-45-6789\"}"
+  Then the response status is 200
+  And a signed GetObject request returns body "{\"ssn\":\"123-45-6789\"}"
+  And filesystem inspection under storage root "target/storage-engine-it/REQ-SEC-009-sse" finds no plaintext occurrence of "123-45-6789"
+  And an audit event records encryption mode "SSE-S3"
 ----
 
 ==== s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature

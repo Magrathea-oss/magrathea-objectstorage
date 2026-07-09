@@ -305,11 +305,11 @@ This section defines the path from "validated prototype with honest gaps" to an 
 |---|---|
 | Focus | Authentication, authorization, audit, and real encryption. Planner-verified evidence: no SigV4 signature verification, no Spring Security dependency, the S3 API accepts anonymous requests; ACLs/policies are persisted but never enforced. |
 | Owner agents | `java-domain-coder` (policy model), `java-infra-coder` (filters/adapters), `java-tester` |
-| Requirement feature file | `phase-ep1-security.feature` |
+| Requirement feature file | `s3-reactive-api-adapter/src/test/features/requirements/phase-ep1-security-identity.feature` |
 | Key requirement IDs | REQ-SEC-* |
 | Expected outputs | AWS SigV4 request authentication; durable credential/access-key store; deny-by-default authorization with bucket policy/ACL evaluation; audit logging of requests; real SSE (currently metadata-only) with pluggable key management; TLS deployment guidance. |
-| Acceptance gates | Unauthenticated/incorrectly signed requests rejected; deny-by-default proven by tests; ACL/policy enforcement validated in both runner modes; audit events observable; SSE round-trip proven at rest, not just headers. |
-| Status | `@absent` |
+| Acceptance gates | Unauthenticated/incorrectly signed requests rejected; deny-by-default proven by tests; ACL/policy enforcement validated in both runner modes; audit events observable and durable; SSE round-trip proven at rest, not just headers. |
+| Status | `@absent`; ADR 0022 records the complete-S3 sequencing and EP-1 first-slice scope. |
 
 KA dependencies: KA-2 (Ceph s3-tests requires SigV4), KA-3 (presigned URLs), and KA-4 (identity federation incl. Kerberos) all depend on EP-1 — this raises EP-1's practical priority; identity work lands in the planned identity-access bounded context (see Bounded Context Evolution under the Killer-App Track).
 
