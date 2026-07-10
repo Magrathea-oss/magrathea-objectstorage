@@ -253,6 +253,24 @@ public class Ka5DistributionPackagingSteps {
             "CI workflow should fail when Spring Boot generated-password banner appears");
     }
 
+    @Then("the CI workflow builds required reactor dependency modules for the focused Maven gate")
+    public void ciWorkflowBuildsRequiredReactorDependencies() {
+        assertInspected();
+        assertTrue(inspectedSource.contains("-pl s3-reactive-api-adapter -am"),
+            "CI focused Maven gate should build required reactor dependency modules on a clean runner");
+        assertTrue(inspectedSource.contains("-Dsurefire.failIfNoSpecifiedTests=false"),
+            "CI focused Maven gate should allow upstream reactor modules that do not contain the selected test classes");
+    }
+
+    @Then("the CI workflow writes focused validation logs to an existing directory")
+    public void ciWorkflowWritesFocusedLogsToExistingDirectory() {
+        assertInspected();
+        assertTrue(inspectedSource.contains("mkdir -p target"),
+            "CI workflow should create the root target directory before tee writes target/focused-cucumber.log");
+        assertTrue(inspectedSource.contains("tee target/focused-cucumber.log"),
+            "CI workflow should retain the focused Cucumber log for generated-password checks");
+    }
+
     @Then("the CI workflow builds and smokes the root JVM Docker image")
     public void ciWorkflowBuildsAndSmokesRootJvmDockerImage() {
         assertInspected();

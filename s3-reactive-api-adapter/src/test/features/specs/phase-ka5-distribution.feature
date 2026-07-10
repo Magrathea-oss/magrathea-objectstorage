@@ -48,5 +48,7 @@ Ability: Native-image distribution packaging
       And the CI workflow checks the Gherkin appendix freshness
       And the CI workflow checks source hygiene
       And the CI workflow runs focused Cucumber validation for security, metadata durability, Phase 3 streaming, and Phase 5 S3 semantics
+      And the CI workflow builds required reactor dependency modules for the focused Maven gate
+      And the CI workflow writes focused validation logs to an existing directory
       And the CI workflow builds and smokes the root JVM Docker image
       And the CI workflow keeps native Docker packaging available as an explicit manual validation job
