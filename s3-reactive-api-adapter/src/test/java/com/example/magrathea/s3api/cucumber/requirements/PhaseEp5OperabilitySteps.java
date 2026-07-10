@@ -60,6 +60,8 @@ public class PhaseEp5OperabilitySteps {
     private ManagedProcess gracefulProcess;
     private CompletableFuture<HttpResponse<String>> inFlightPutFuture;
     private CountDownLatch inFlightBodyStarted;
+    private CompletableFuture<HttpResponse<String>> inFlightCompletionFuture;
+    private CountDownLatch inFlightCompletionBodyStarted;
     private byte[] inFlightPayload;
     private List<CompletableFuture<HttpResponse<String>>> concurrentPutFutures = List.of();
     private List<CountDownLatch> concurrentBodyStarted = List.of();
@@ -229,6 +231,43 @@ public class PhaseEp5OperabilitySteps {
         startSlowStreamingPut(path, byteCount);
     }
 
+    @Given("part {int} of the recorded multipart upload contains {int} deterministic bytes")
+    public void recordedMultipartPartContainsDeterministicBytes(int partNumber, int byteCount)
+            throws IOException, InterruptedException {
+        requireGracefulProcess();
+        assertThat(multipartUploadId).as("recorded multipart upload ID").isNotBlank();
+        inFlightPayload = deterministicPayload(byteCount);
+        String path = "/" + multipartBucket + "/" + multipartKey
+            + "?partNumber=" + partNumber
+            + "&uploadId=" + URLEncoder.encode(multipartUploadId, StandardCharsets.UTF_8);
+        HttpResponse<String> uploadPart = sendBytes(gracefulProcess, "PUT", path, inFlightPayload);
+        assertThat(uploadPart.statusCode()).isEqualTo(200);
+        drainedPartETag = uploadPart.headers().firstValue("ETag").orElse(null);
+        assertThat(drainedPartETag).as("uploaded part ETag").isNotBlank();
+    }
+
+    @When("an S3 client starts completing the recorded multipart upload with a throttled XML request body")
+    public void s3ClientStartsCompletingRecordedMultipartUploadWithThrottledXmlBody() {
+        requireGracefulProcess();
+        assertThat(drainedPartETag).as("uploaded part ETag").isNotBlank();
+        String completionXml = "<CompleteMultipartUpload><Part><PartNumber>1</PartNumber><ETag>"
+            + drainedPartETag
+            + "</ETag></Part></CompleteMultipartUpload>";
+        String path = "/" + multipartBucket + "/" + multipartKey
+            + "?uploadId=" + URLEncoder.encode(multipartUploadId, StandardCharsets.UTF_8);
+        byte[] requestBody = completionXml.getBytes(StandardCharsets.UTF_8);
+        inFlightCompletionBodyStarted = new CountDownLatch(1);
+        HttpRequest request = HttpRequest.newBuilder(
+                URI.create("http://127.0.0.1:" + gracefulProcess.port() + path))
+            .timeout(Duration.ofSeconds(15))
+            .header("Content-Type", "application/xml")
+            .POST(HttpRequest.BodyPublishers.ofInputStream(
+                () -> new SlowInputStream(requestBody, inFlightCompletionBodyStarted, 16, 50)))
+            .build();
+        inFlightCompletionFuture = httpClient.sendAsync(
+            request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+    }
+
     @When("S3 clients concurrently stream these deterministic objects to bucket {string}:")
     public void s3ClientsConcurrentlyStreamDeterministicObjects(String bucket, DataTable table) {
         requireGracefulProcess();
@@ -265,6 +304,21 @@ public class PhaseEp5OperabilitySteps {
         gracefulProcess.process().toHandle().destroy();
     }
 
+    @When("operators send SIGTERM after multipart completion body delivery has started")
+    public void operatorsSendSigtermAfterMultipartCompletionBodyDeliveryHasStarted() throws InterruptedException {
+        requireGracefulProcess();
+        assertThat(inFlightCompletionBodyStarted).as("completion body start signal").isNotNull();
+        assertThat(inFlightCompletionBodyStarted.await(5, TimeUnit.SECONDS))
+            .as("multipart completion request body should start before SIGTERM")
+            .isTrue();
+        Thread.sleep(100);
+        assertThat(inFlightCompletionFuture).as("in-flight CompleteMultipartUpload future").isNotNull();
+        assertThat(inFlightCompletionFuture.isDone())
+            .as("CompleteMultipartUpload should still be in flight when SIGTERM is sent")
+            .isFalse();
+        gracefulProcess.process().toHandle().destroy();
+    }
+
     @When("operators send SIGTERM after every concurrent request body has started")
     public void operatorsSendSigtermAfterEveryConcurrentRequestBodyHasStarted() throws InterruptedException {
         requireGracefulProcess();
@@ -292,6 +346,14 @@ public class PhaseEp5OperabilitySteps {
         assertThat(uploadPartResponse.statusCode()).isEqualTo(expectedStatus);
         drainedPartETag = uploadPartResponse.headers().firstValue("ETag").orElse(null);
         assertThat(drainedPartETag).as("drained UploadPart ETag").isNotBlank();
+    }
+
+    @Then("the in-flight CompleteMultipartUpload completes with HTTP status {int}")
+    public void inFlightCompleteMultipartUploadCompletesWithHttpStatus(int expectedStatus) throws Exception {
+        assertThat(inFlightCompletionFuture).as("in-flight CompleteMultipartUpload future").isNotNull();
+        HttpResponse<String> completion = inFlightCompletionFuture.get(15, TimeUnit.SECONDS);
+        assertThat(completion.statusCode()).isEqualTo(expectedStatus);
+        assertThat(completion.body()).contains("<CompleteMultipartUploadResult>");
     }
 
     @Then("every concurrent PutObject completes with HTTP status {int}")
@@ -599,6 +661,16 @@ public class PhaseEp5OperabilitySteps {
     private HttpResponse<String> awaitInFlightWrite() throws Exception {
         assertThat(inFlightPutFuture).as("in-flight S3 write future").isNotNull();
         return inFlightPutFuture.get(15, TimeUnit.SECONDS);
+    }
+
+    private HttpResponse<String> sendBytes(ManagedProcess managedProcess, String method, String path, byte[] body)
+            throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + managedProcess.port() + path))
+            .timeout(Duration.ofSeconds(10))
+            .header("Content-Type", "application/octet-stream")
+            .method(method, HttpRequest.BodyPublishers.ofByteArray(body))
+            .build();
+        return httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
     }
 
     private static String xmlElement(String xml, String name) {

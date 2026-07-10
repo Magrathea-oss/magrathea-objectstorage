@@ -45,6 +45,10 @@ verifies the final object's byte count and SHA-256 checksum.
 PutObject bodies at the same time; the test waits until both bodies are active, sends one `SIGTERM`, requires both
 requests to return HTTP 200, restarts with the same root, and verifies both objects by byte count and SHA-256.
 
+`REQ-OPS-012` validates multipart completion itself as an active request. The test uploads a deterministic 524,288-byte
+part, starts `CompleteMultipartUpload` with a throttled XML body, sends `SIGTERM` after body delivery begins, requires the
+completion response to return HTTP 200, then restarts and verifies the assembled object by byte count and SHA-256.
+
 ## Recovery verification
 
 After restart:
@@ -57,5 +61,5 @@ After restart:
 ## Open gaps
 
 - Two concurrent PutObject drains are validated, but larger request sets and mixed upload/read draining have not yet been load-tested.
-- Multipart UploadPart draining is validated, but CompleteMultipartUpload and cancellation races during shutdown still need dedicated evidence.
+- Multipart UploadPart and CompleteMultipartUpload draining are validated, but abort and client-cancellation races during shutdown still need dedicated evidence.
 - Multi-node traffic shifting and rolling shutdown remain future distributed-operability work.

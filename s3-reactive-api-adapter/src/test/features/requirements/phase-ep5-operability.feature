@@ -98,6 +98,20 @@ Business Need: EP-5 operational health probes
         | objects/concurrent-a.bin   | 262144 |
         | objects/concurrent-b.bin   | 262144 |
 
+    @implemented-and-validated @REQ-OPS-012 @functional-requirement @non-functional-requirement @observability @graceful-shutdown @request-draining @multipart @durability @restart-safety
+    Scenario: SIGTERM drains an in-flight CompleteMultipartUpload before process exit
+      Given a storage-engine S3 process is running with graceful shutdown enabled and filesystem root "target/ep5-graceful-multipart-completion/current"
+      And bucket "ep5-graceful-multipart-completion-bucket" is created before in-flight shutdown validation
+      And a multipart upload is initiated for object "objects/completing-at-shutdown.bin" in bucket "ep5-graceful-multipart-completion-bucket"
+      And part 1 of the recorded multipart upload contains 524288 deterministic bytes
+      When an S3 client starts completing the recorded multipart upload with a throttled XML request body
+      And operators send SIGTERM after multipart completion body delivery has started
+      Then the in-flight CompleteMultipartUpload completes with HTTP status 200
+      And the process exits within 10 seconds without forced termination
+      And the shutdown log must not contain Spring Boot's generated security password banner
+      When recovery starts the S3 process again with the same filesystem root
+      Then object "objects/completing-at-shutdown.bin" in bucket "ep5-graceful-multipart-completion-bucket" has 524288 bytes with the streamed content checksum
+
   Rule: Backup and restore rehearsals prove recoverability from storage-engine filesystem backups
 
     @implemented-and-validated @REQ-OPS-005 @functional-requirement @non-functional-requirement @backup @restore @disaster-recovery @durability @restart-safety
