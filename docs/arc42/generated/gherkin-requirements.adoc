@@ -19,7 +19,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 === Summary
 
 * Feature files scanned: 22
-* Scenarios discovered: 390
+* Scenarios discovered: 391
 * Protocol-smoke scenarios: 122
 
 ==== Status tag counts
@@ -30,7 +30,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |`@absent` |3
 |`@config-only` |69
 |`@implemented-and-validated` |103
-|`@implemented-not-e2e-validated` |21
+|`@implemented-not-e2e-validated` |22
 |`@not-implemented` |12
 |`@placeholder` |9
 |`unknown/not-tagged` |178
@@ -52,7 +52,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |`@static-architecture-required` |6
 |`@tracing-inspection-required` |2
 |`@webclient-required` |294
-|`unknown/not-tagged` |49
+|`unknown/not-tagged` |50
 |===
 
 ==== Classification tag counts
@@ -60,8 +60,8 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 [cols="1,1",options="header"]
 |===
 |Tag |Scenario count
-|`@functional-requirement` |175
-|`@non-functional-requirement` |86
+|`@functional-requirement` |176
+|`@non-functional-requirement` |87
 |`unknown/not-tagged` |202
 |===
 
@@ -2735,6 +2735,38 @@ so container platforms and CI smoke gates can distinguish a running process from
   Then disaster recovery completes within the declared RTO
   And object "objects/rpo.txt" in bucket "ep5-disaster-recovery-bucket" can be read with body "inside the recovery point"
   And the recovered data satisfies the declared RPO
+----
+
+===== REQ-OPS-008
+
+====== Scenario: Packaged alerting bundle declares SLOs and first-response alerts for single-node operations
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep5-operability.feature:86`
+|Rule |Shipped SLO and alert rules give operators actionable first-response guidance
+|Requirement ID(s) |`REQ-OPS-008`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep5`, `@operability`, `@admin-api`, `@business-need`, `@slo`, `@alerting`, `@prometheus`, `@loki`, `@runbook`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-not-e2e-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep5`, `@operability`, `@admin-api`, `@business-need`, `@implemented-not-e2e-validated`, `@REQ-OPS-008`, `@functional-requirement`, `@non-functional-requirement`, `@slo`, `@alerting`, `@prometheus`, `@loki`, `@runbook`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the EP-5 SLO runbook exists at "docs/runbooks/slo-alerts.md"
+  And the Prometheus alert rule pack exists at "ops/prometheus/magrathea-objectstorage-alerts.yml"
+  And the Loki alert rule pack exists at "ops/loki/magrathea-objectstorage-log-alerts.yml"
+  When operators inspect the shipped EP-5 alerting bundle
+  Then the SLO runbook declares objectives:
+  And the Prometheus rule pack declares alerts:
+  And the Loki rule pack declares log alerts:
+  And every shipped alert includes a runbook link
+  And the generated-password log alert searches for the Spring Boot generated-password banner
 ----
 
 ==== s3-reactive-api-adapter/src/test/features/requirements/single-node-backend-bucket-configuration.feature
@@ -12423,7 +12455,7 @@ so Magrathea Object Storage can run without requiring a Java runtime in the fina
   Then the CI workflow uses Java "25"
   And the CI workflow checks the Gherkin appendix freshness
   And the CI workflow checks source hygiene
-  And the CI workflow runs focused Cucumber validation for security, metadata durability, Phase 3 streaming, EP-5 operability and migration, and Phase 5 S3 semantics
+  And the CI workflow runs focused Cucumber validation for security, metadata durability, Phase 3 streaming, EP-5 operability, migration, alerting, and Phase 5 S3 semantics
   And the CI workflow builds required reactor dependency modules for the focused Maven gate
   And the CI workflow writes focused validation logs to an existing directory
   And the CI workflow builds and smokes the root JVM Docker image

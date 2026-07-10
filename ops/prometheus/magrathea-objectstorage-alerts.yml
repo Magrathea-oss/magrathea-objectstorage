@@ -1,0 +1,63 @@
+groups:
+  - name: magrathea-objectstorage.operability
+    interval: 30s
+    rules:
+      - alert: MagratheaAdminLivenessProbeDown
+        expr: probe_success{job="magrathea-admin-live"} == 0
+        for: 2m
+        labels:
+          severity: page
+          service: magrathea-objectstorage
+          objective: admin-liveness
+        annotations:
+          summary: "Magrathea Admin API liveness probe is failing"
+          description: "The /admin/live probe has failed for more than two minutes. Check process health before routing traffic."
+          runbook_url: "docs/runbooks/slo-alerts.md#magratheaadminlivenessprobedown"
+
+      - alert: MagratheaAdminReadinessProbeNotReady
+        expr: probe_success{job="magrathea-admin-ready"} == 0
+        for: 5m
+        labels:
+          severity: page
+          service: magrathea-objectstorage
+          objective: admin-readiness
+        annotations:
+          summary: "Magrathea Admin API readiness probe is not ready"
+          description: "The /admin/ready probe is failing or returning not-ready. Inspect storage-policy, storage-device, and disk-set catalog configuration."
+          runbook_url: "docs/runbooks/slo-alerts.md#magratheaadminreadinessprobenotready"
+
+      - alert: MagratheaS3SmokeProbeFailing
+        expr: probe_success{job="magrathea-s3-smoke"} == 0
+        for: 5m
+        labels:
+          severity: page
+          service: magrathea-objectstorage
+          objective: s3-smoke-availability
+        annotations:
+          summary: "Magrathea S3 smoke probe is failing"
+          description: "The black-box S3 ListBuckets/PutObject/GetObject smoke probe is failing. Validate SigV4/security mode, backend selection, and storage-engine readiness."
+          runbook_url: "docs/runbooks/slo-alerts.md#magratheas3smokeprobefailing"
+
+      - alert: MagratheaStorageEngineFilesystemNearFull
+        expr: storage_filesystem_available_ratio{job="magrathea-storage-engine"} < 0.15
+        for: 10m
+        labels:
+          severity: ticket
+          service: magrathea-objectstorage
+          objective: storage-capacity
+        annotations:
+          summary: "Magrathea storage-engine filesystem has less than 15% free space"
+          description: "The storage-engine filesystem free ratio is below the operational threshold. Plan capacity expansion or move data before writes fail."
+          runbook_url: "docs/runbooks/slo-alerts.md#magratheastorageenginefilesystemnearfull"
+
+      - alert: MagratheaOfflineBackupTooOld
+        expr: time() - magrathea_last_successful_offline_backup_timestamp_seconds > 86400
+        for: 15m
+        labels:
+          severity: ticket
+          service: magrathea-objectstorage
+          objective: backup-rpo
+        annotations:
+          summary: "Magrathea offline backup age exceeds the declared RPO window"
+          description: "No successful offline backup has been observed within 24 hours. The current single-node DR RPO is the last completed offline backup."
+          runbook_url: "docs/runbooks/slo-alerts.md#magratheaofflinebackuptooold"

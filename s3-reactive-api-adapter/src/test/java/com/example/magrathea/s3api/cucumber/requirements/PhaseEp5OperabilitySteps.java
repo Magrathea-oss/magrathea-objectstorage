@@ -51,6 +51,9 @@ public class PhaseEp5OperabilitySteps {
     private boolean gracefulProcessForced;
     private int declaredRtoSeconds;
     private String declaredRpo;
+    private String sloRunbookText;
+    private String prometheusRulePackText;
+    private String lokiRulePackText;
     private long disasterRecoveryStartedNanos;
     private long disasterRecoveryCompletedNanos;
     private String lastRecoveredBody;
@@ -257,6 +260,60 @@ public class PhaseEp5OperabilitySteps {
         disasterRecoveryCompletedNanos = System.nanoTime();
     }
 
+    @Given("the EP-5 SLO runbook exists at {string}")
+    public void ep5SloRunbookExistsAt(String path) throws IOException {
+        sloRunbookText = readRequiredFile(path);
+    }
+
+    @Given("the Prometheus alert rule pack exists at {string}")
+    public void prometheusAlertRulePackExistsAt(String path) throws IOException {
+        prometheusRulePackText = readRequiredFile(path);
+    }
+
+    @Given("the Loki alert rule pack exists at {string}")
+    public void lokiAlertRulePackExistsAt(String path) throws IOException {
+        lokiRulePackText = readRequiredFile(path);
+    }
+
+    @When("operators inspect the shipped EP-5 alerting bundle")
+    public void operatorsInspectTheShippedEp5AlertingBundle() {
+        assertThat(sloRunbookText).as("SLO runbook text").isNotBlank();
+        assertThat(prometheusRulePackText).as("Prometheus rule pack text").isNotBlank();
+        assertThat(lokiRulePackText).as("Loki rule pack text").isNotBlank();
+    }
+
+    @Then("the SLO runbook declares objectives:")
+    public void sloRunbookDeclaresObjectives(DataTable table) {
+        table.asMaps().forEach(row -> {
+            assertThat(sloRunbookText).contains(row.get("objective"));
+            assertThat(sloRunbookText).contains(row.get("target"));
+            assertThat(sloRunbookText).contains(row.get("signal"));
+        });
+    }
+
+    @Then("the Prometheus rule pack declares alerts:")
+    public void prometheusRulePackDeclaresAlerts(DataTable table) {
+        table.asMaps().forEach(row -> assertAlertRule(prometheusRulePackText,
+            row.get("alert"), row.get("severity"), row.get("expression fragment")));
+    }
+
+    @Then("the Loki rule pack declares log alerts:")
+    public void lokiRulePackDeclaresLogAlerts(DataTable table) {
+        table.asMaps().forEach(row -> assertAlertRule(lokiRulePackText,
+            row.get("alert"), row.get("severity"), row.get("query fragment")));
+    }
+
+    @Then("every shipped alert includes a runbook link")
+    public void everyShippedAlertIncludesRunbookLink() {
+        assertAllAlertsHaveRunbookLinks(prometheusRulePackText);
+        assertAllAlertsHaveRunbookLinks(lokiRulePackText);
+    }
+
+    @Then("the generated-password log alert searches for the Spring Boot generated-password banner")
+    public void generatedPasswordLogAlertSearchesForSpringBootGeneratedPasswordBanner() {
+        assertThat(lokiRulePackText).contains("Using generated security password");
+    }
+
     @Then("disaster recovery completes within the declared RTO")
     public void disasterRecoveryCompletesWithinDeclaredRto() {
         assertThat(disasterRecoveryStartedNanos).as("DR start timestamp").isPositive();
@@ -374,6 +431,40 @@ public class PhaseEp5OperabilitySteps {
             socket.setReuseAddress(false);
             return socket.getLocalPort();
         }
+    }
+
+    private static String readRequiredFile(String path) throws IOException {
+        Path file = Path.of(path);
+        if (!Files.exists(file)) {
+            file = Path.of("..").resolve(path).normalize();
+        }
+        assertThat(Files.exists(file)).as("required operational file: %s", file).isTrue();
+        assertThat(Files.isRegularFile(file)).as("required operational file should be a regular file: %s", file).isTrue();
+        return Files.readString(file, StandardCharsets.UTF_8);
+    }
+
+    private static void assertAlertRule(String rulePack, String alert, String severity, String expressionFragment) {
+        assertThat(rulePack).contains("alert: " + alert);
+        assertThat(rulePack).contains("severity: " + severity);
+        assertThat(rulePack).contains(expressionFragment);
+        assertThat(rulePack).contains("runbook_url:");
+    }
+
+    private static void assertAllAlertsHaveRunbookLinks(String rulePack) {
+        int alertCount = countOccurrences(rulePack, "alert: ");
+        int runbookCount = countOccurrences(rulePack, "runbook_url:");
+        assertThat(alertCount).as("alert count in rule pack").isPositive();
+        assertThat(runbookCount).as("runbook links in rule pack").isGreaterThanOrEqualTo(alertCount);
+    }
+
+    private static int countOccurrences(String haystack, String needle) {
+        int count = 0;
+        int index = haystack.indexOf(needle);
+        while (index >= 0) {
+            count++;
+            index = haystack.indexOf(needle, index + needle.length());
+        }
+        return count;
     }
 
     private static Path extractCatalogDir(Path catalogRoot, String classpathDir, List<String> fileNames) {

@@ -253,7 +253,7 @@ public class Ka5DistributionPackagingSteps {
             "CI workflow should check source hygiene");
     }
 
-    @Then("the CI workflow runs focused Cucumber validation for security, metadata durability, Phase 3 streaming, EP-5 operability and migration, and Phase 5 S3 semantics")
+    @Then("the CI workflow runs focused Cucumber validation for security, metadata durability, Phase 3 streaming, EP-5 operability, migration, alerting, and Phase 5 S3 semantics")
     public void ciWorkflowRunsFocusedCucumberValidation() {
         assertInspected();
         for (String runner : new String[] {

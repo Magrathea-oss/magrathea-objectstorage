@@ -1,0 +1,27 @@
+groups:
+  - name: magrathea-objectstorage.log-safety
+    interval: 30s
+    rules:
+      - alert: MagratheaGeneratedSecurityPasswordBannerDetected
+        expr: count_over_time({app="magrathea-objectstorage"} |= "Using generated security password" [5m]) > 0
+        for: 0m
+        labels:
+          severity: page
+          service: magrathea-objectstorage
+          objective: security-mode-safety
+        annotations:
+          summary: "Spring Boot generated security password banner detected"
+          description: "A packaged or operational runtime emitted the generated-password banner. Disable default user auto-configuration or explicitly configure security mode before accepting traffic."
+          runbook_url: "docs/runbooks/slo-alerts.md#magratheageneratedsecuritypasswordbannerdetected"
+
+      - alert: MagratheaUnsupportedManifestSchemaDetected
+        expr: count_over_time({app="magrathea-objectstorage"} |= "Unsupported manifest schema version" [10m]) > 0
+        for: 0m
+        labels:
+          severity: ticket
+          service: magrathea-objectstorage
+          objective: schema-migration-safety
+        annotations:
+          summary: "Unsupported storage-engine manifest schema detected"
+          description: "A storage-engine repository rejected a future or invalid manifest schema version. Stop writes to the affected root and follow the schema migration runbook."
+          runbook_url: "docs/runbooks/slo-alerts.md#magratheaunsupportedmanifestschemadetected"

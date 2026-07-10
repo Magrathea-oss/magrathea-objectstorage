@@ -79,3 +79,33 @@ Business Need: EP-5 operational health probes
       Then disaster recovery completes within the declared RTO
       And object "objects/rpo.txt" in bucket "ep5-disaster-recovery-bucket" can be read with body "inside the recovery point"
       And the recovered data satisfies the declared RPO
+
+  Rule: Shipped SLO and alert rules give operators actionable first-response guidance
+
+    @implemented-not-e2e-validated @REQ-OPS-008 @functional-requirement @non-functional-requirement @slo @alerting @prometheus @loki @runbook
+    Scenario: Packaged alerting bundle declares SLOs and first-response alerts for single-node operations
+      Given the EP-5 SLO runbook exists at "docs/runbooks/slo-alerts.md"
+      And the Prometheus alert rule pack exists at "ops/prometheus/magrathea-objectstorage-alerts.yml"
+      And the Loki alert rule pack exists at "ops/loki/magrathea-objectstorage-log-alerts.yml"
+      When operators inspect the shipped EP-5 alerting bundle
+      Then the SLO runbook declares objectives:
+        | objective                  | target | signal                                                 |
+        | admin-liveness            | 99.9%  | GET /admin/live                                       |
+        | admin-readiness           | 99.5%  | GET /admin/ready                                      |
+        | s3-smoke-availability     | 99.0%  | S3 ListBuckets/PutObject/GetObject smoke probe        |
+        | backup-rpo                | 24h    | last completed offline backup                         |
+        | security-mode-safety      | 0      | Spring Boot generated-password banner                 |
+        | schema-migration-safety   | 0      | Unsupported manifest schema version                   |
+      And the Prometheus rule pack declares alerts:
+        | alert                                      | severity | expression fragment                                      |
+        | MagratheaAdminLivenessProbeDown            | page     | magrathea-admin-live                                     |
+        | MagratheaAdminReadinessProbeNotReady       | page     | magrathea-admin-ready                                    |
+        | MagratheaS3SmokeProbeFailing               | page     | magrathea-s3-smoke                                       |
+        | MagratheaStorageEngineFilesystemNearFull   | ticket   | storage_filesystem_available_ratio                       |
+        | MagratheaOfflineBackupTooOld               | ticket   | magrathea_last_successful_offline_backup_timestamp_seconds |
+      And the Loki rule pack declares log alerts:
+        | alert                                             | severity | query fragment                         |
+        | MagratheaGeneratedSecurityPasswordBannerDetected  | page     | generated security password            |
+        | MagratheaUnsupportedManifestSchemaDetected        | ticket   | Unsupported manifest schema version    |
+      And every shipped alert includes a runbook link
+      And the generated-password log alert searches for the Spring Boot generated-password banner
