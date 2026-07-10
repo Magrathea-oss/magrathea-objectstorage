@@ -119,7 +119,7 @@ docker build --network=host -f Dockerfile -t magrathea-objectstorage:jvm .
 docker run --rm --network=host magrathea-objectstorage:jvm
 ```
 
-The JVM runtime image uses public ECR mirrored Maven/Temurin bases, runs as the non-root `magrathea` user with writable `/app/data`, activates the `storage-engine` profile with packaged YAML catalogs, exposes ports 8080/8081, and has an Admin API healthcheck. The 2026-07-10 validation used `--network=host` because the local Docker sandbox cannot create bridge networking; it passed Admin health, `/admin/live`, `/admin/ready` with ready catalog status, S3 ListBuckets XML, bucket/object PUT/GET, selected-backend log verification, and generated-password log checks.
+The JVM runtime image uses public ECR mirrored Maven/Temurin bases, runs as the non-root `magrathea` user with writable `/app/data`, activates the `storage-engine` profile with packaged YAML catalogs, exposes ports 8080/8081, and has an Admin API healthcheck. Graceful shutdown is enabled for the bootstrap application. The 2026-07-10 validation used `--network=host` because the local Docker sandbox cannot create bridge networking; it passed Admin health, `/admin/live`, `/admin/ready` with ready catalog status, S3 ListBuckets XML, bucket/object PUT/GET, selected-backend log verification, SIGTERM committed-object recovery, and generated-password log checks.
 
 A native-image path is also available for JVM-free deployment:
 

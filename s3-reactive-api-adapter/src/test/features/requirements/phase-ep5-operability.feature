@@ -41,3 +41,15 @@ Business Need: EP-5 operational health probes
         | storage-device-catalog | not-configured |
         | disk-set-catalog       | not-configured |
       And the Admin API response has a link named "live" to "/admin/live"
+
+  Rule: Graceful shutdown protects committed storage-engine state
+
+    @implemented-and-validated @REQ-OPS-004 @functional-requirement @non-functional-requirement @observability @graceful-shutdown @restart-safety @durability
+    Scenario: Storage-engine process terminates on SIGTERM without losing committed S3 objects
+      Given a storage-engine S3 process is running with graceful shutdown enabled and filesystem root "target/ep5-graceful-shutdown/current"
+      And bucket "ep5-graceful-shutdown-bucket" contains object "objects/shutdown-drain.txt" with body "committed before shutdown"
+      When operators send SIGTERM to the S3 process
+      Then the process exits within 10 seconds without forced termination
+      And the shutdown log must not contain Spring Boot's generated security password banner
+      When recovery starts the S3 process again with the same filesystem root
+      Then object "objects/shutdown-drain.txt" in bucket "ep5-graceful-shutdown-bucket" can be read with body "committed before shutdown"

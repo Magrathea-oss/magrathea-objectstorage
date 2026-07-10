@@ -10,6 +10,7 @@ import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemW
 import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemWriteInterruptedException;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
@@ -37,6 +38,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
     "com.example.magrathea.admin"
 })
 public class RequirementsTestApp {
+
+    public static void main(String[] args) {
+        SpringApplication.run(RequirementsTestApp.class, args);
+    }
 
     @Bean
     public Phase2FilesystemReliabilitySteps.State phase2FilesystemReliabilityState() {

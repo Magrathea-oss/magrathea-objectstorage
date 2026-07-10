@@ -353,13 +353,13 @@ KA dependencies: KA-2 (Ceph s3-tests requires SigV4), KA-3 (presigned URLs), and
 
 | Field | Plan |
 |---|---|
-| Focus | First CI/operability slice now exists: appendix/source-hygiene checks, focused Cucumber/security/semantic/EP-5 gates, root JVM Docker build+smoke, manual native Docker build+smoke, packaged single-node containers using storage-engine by default, and Admin API liveness/readiness probes. Broader EP-5 operability remains open. |
+| Focus | First CI/operability slice now exists: appendix/source-hygiene checks, focused Cucumber/security/semantic/EP-5 gates, root JVM Docker build+smoke, manual native Docker build+smoke, packaged single-node containers using storage-engine by default, Admin API liveness/readiness probes, and first SIGTERM graceful-shutdown storage-engine validation. Broader EP-5 operability remains open. |
 | Owner agents | `java-scaffolder`, `java-infra-coder`, `documenter`, `java-tester` |
 | Requirement feature file | `s3-reactive-api-adapter/src/test/features/requirements/phase-ep5-operability.feature` (Business Need; remaining procedures stay tagged `@not-implemented` until automated) |
 | Key requirement IDs | REQ-OPS-* |
 | Expected outputs | CI pipeline running the full gate + appendix check + docker build; release/versioning strategy; backup/restore procedure; DR with declared RTO/RPO; enforced schema/manifest versioning and migration; runbooks; SLOs and alert rules; readiness/liveness probes beyond `/admin/health`; verified graceful shutdown draining. |
 | Acceptance gates | CI runs green on the full gate; backup/restore rehearsed; probes and shutdown behavior validated; versioning/migration enforced by tests. |
-| Status | `@partial`: CI packaging gates are wired; packaged JVM/native single-node containers activate storage-engine and package YAML catalogs so `/admin/ready` is expected to be ready; Admin API `/admin/live` + `/admin/ready` are implemented and Cucumber-validated as `REQ-OPS-001..003`, including fail-closed readiness when required catalogs are unavailable; backup/restore, DR, schema migration/versioning, runbooks, SLO/alert rules, and graceful shutdown validation remain. |
+| Status | `@partial`: CI packaging gates are wired; packaged JVM/native single-node containers activate storage-engine and package YAML catalogs so `/admin/ready` is expected to be ready; Admin API `/admin/live` + `/admin/ready` are implemented and Cucumber-validated as `REQ-OPS-001..003`, including fail-closed readiness when required catalogs are unavailable; `REQ-OPS-004` validates that a storage-engine process exits after SIGTERM without forced termination and preserves a committed S3 object across restart; backup/restore, DR, schema migration/versioning, runbooks, SLO/alert rules, and broader in-flight request draining evidence remain. |
 
 ### EP-6 — Performance & Capacity Validation (HIGH)
 
@@ -475,7 +475,7 @@ Owner rule (2026-07-02): any gRPC used by the SMB/VFS gateway follows the same r
 | 2 | EP-3 Reactive streaming completion | Blocker | `@partial` |
 | 3 | EP-1 Security & identity | Blocker | `@implemented-and-validated` — current S3 security slice plus built-in durable credential, policy, audit, and key-management services validated |
 | 4 | EP-4 Space management & data hygiene | High | `@absent` |
-| 5 | EP-5 Operability & delivery | High | `@absent` |
+| 5 | EP-5 Operability & delivery | High | `@partial` |
 | 6 | EP-6 Performance & capacity | High | `@absent` |
 | 7 | EP-7 Complete admin panel (backend contracts may proceed in parallel with EP-1..EP-6) | High | `@partial` |
 | 8 | EP-8 HA decision & supply chain | Medium | `@absent` |
@@ -491,7 +491,7 @@ EP-0 governance applies continuously from the start.
 - [x] EP-2: all declared storage-engine metadata families (bucket registry, multipart state, per-object configuration, object tags/ACLs, and bucket configuration) survive restart in storage-engine mode, validated by restart harness scenarios.
 - [ ] EP-3: GetObject and multipart paths stream with bounded memory; architecture tests guard all fixed paths.
 - [ ] EP-4: chunk GC, dedup refcounting, quotas, ENOSPC behavior, and scrubbing are validated.
-- [ ] EP-5: CI pipeline green on full gate + appendix check + docker build; backup/restore and DR rehearsed; probes/shutdown validated.
+- [ ] EP-5: CI pipeline green on full gate + appendix check + docker build; backup/restore and DR rehearsed; probes and first SIGTERM shutdown validation exist, broader in-flight draining still pending.
 - [ ] EP-6: load/soak limits documented and reproducibly validated.
 - [ ] EP-7: complete admin panel delivered and validated; panel is not an alternate object API.
 - [ ] EP-8: cluster architecture ADR (transport, membership, consistency model, failure-domain topology) accepted; SBOM/CVE/image hardening/license gates wired into CI.
