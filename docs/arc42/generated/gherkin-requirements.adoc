@@ -19,7 +19,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 === Summary
 
 * Feature files scanned: 21
-* Scenarios discovered: 385
+* Scenarios discovered: 386
 * Protocol-smoke scenarios: 122
 
 ==== Status tag counts
@@ -29,7 +29,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |Tag |Scenario count
 |`@absent` |3
 |`@config-only` |69
-|`@implemented-and-validated` |98
+|`@implemented-and-validated` |99
 |`@implemented-not-e2e-validated` |21
 |`@not-implemented` |12
 |`@placeholder` |9
@@ -52,7 +52,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |`@static-architecture-required` |6
 |`@tracing-inspection-required` |2
 |`@webclient-required` |294
-|`unknown/not-tagged` |44
+|`unknown/not-tagged` |45
 |===
 
 ==== Classification tag counts
@@ -60,7 +60,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 [cols="1,1",options="header"]
 |===
 |Tag |Scenario count
-|`@functional-requirement` |171
+|`@functional-requirement` |172
 |`@non-functional-requirement` |82
 |`unknown/not-tagged` |202
 |===
@@ -2610,6 +2610,36 @@ so container platforms and CI smoke gates can distinguish a running process from
   And the Admin API response field "probe" is "readiness"
   And the Admin API response field "status" is "ready"
   And the Admin API readiness components are ready:
+  And the Admin API response has a link named "live" to "/admin/live"
+----
+
+===== REQ-OPS-003
+
+====== Scenario: Admin readiness fails closed when required storage catalogs are unavailable
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep5-operability.feature:32`
+|Rule |Admin API probes expose process liveness and catalog readiness without using S3 object routes
+|Requirement ID(s) |`REQ-OPS-003`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep5`, `@operability`, `@admin-api`, `@business-need`, `@observability`, `@readiness`, `@fail-closed`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep5`, `@operability`, `@admin-api`, `@business-need`, `@implemented-and-validated`, `@REQ-OPS-003`, `@functional-requirement`, `@observability`, `@readiness`, `@fail-closed`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the Admin API is missing storage policy, storage device, and disk-set catalogs
+  When an Admin API client requests GET "/admin/ready"
+  Then the Admin API response status is 503
+  And the Admin API response field "probe" is "readiness"
+  And the Admin API response field "status" is "not-ready"
+  And the Admin API readiness components have status:
   And the Admin API response has a link named "live" to "/admin/live"
 ----
 

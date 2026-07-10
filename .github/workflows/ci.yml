@@ -87,6 +87,8 @@ jobs:
             fi
             sleep 1
           done
+          curl -fsS http://127.0.0.1:8081/admin/live >/tmp/magrathea-admin-live.json
+          curl -fsS http://127.0.0.1:8081/admin/ready >/tmp/magrathea-admin-ready.json
           curl -fsS -H 'Accept: application/xml' http://127.0.0.1:8080/ >/tmp/magrathea-listbuckets.xml
           curl -fsS -X PUT http://127.0.0.1:8080/ci-jvm-smoke-bucket >/tmp/magrathea-put-bucket.out
           printf 'ci-jvm-smoke-body' | curl -fsS -X PUT --data-binary @- http://127.0.0.1:8080/ci-jvm-smoke-bucket/object.txt >/tmp/magrathea-put-object.out
@@ -125,6 +127,8 @@ jobs:
             fi
             sleep 1
           done
+          curl -fsS http://127.0.0.1:8081/admin/live >/tmp/magrathea-native-admin-live.json
+          curl -fsS http://127.0.0.1:8081/admin/ready >/tmp/magrathea-native-admin-ready.json
           curl -fsS -H 'Accept: application/xml' http://127.0.0.1:8080/ >/tmp/magrathea-native-listbuckets.xml
           docker run --rm --entrypoint sh magrathea-objectstorage:native -c '! command -v java && ! command -v javac'
           docker logs magrathea-native-smoke > docker-smoke-native.log 2>&1

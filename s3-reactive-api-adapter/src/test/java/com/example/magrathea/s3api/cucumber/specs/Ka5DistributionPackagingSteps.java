@@ -281,6 +281,10 @@ public class Ka5DistributionPackagingSteps {
             "CI workflow should start the root JVM Docker image for smoke validation");
         assertTrue(inspectedSource.contains("http://127.0.0.1:8081/admin/health"),
             "CI workflow should smoke the Admin API health endpoint");
+        assertTrue(inspectedSource.contains("http://127.0.0.1:8081/admin/live"),
+            "CI workflow should smoke the Admin API liveness endpoint");
+        assertTrue(inspectedSource.contains("http://127.0.0.1:8081/admin/ready"),
+            "CI workflow should smoke the Admin API readiness endpoint");
         assertTrue(inspectedSource.contains("ci-jvm-smoke-bucket/object.txt"),
             "CI workflow should smoke S3 bucket/object PUT/GET behavior");
     }

@@ -27,3 +27,17 @@ Business Need: EP-5 operational health probes
         | storage-device-catalog |
         | disk-set-catalog       |
       And the Admin API response has a link named "live" to "/admin/live"
+
+    @implemented-and-validated @REQ-OPS-003 @functional-requirement @observability @readiness @fail-closed
+    Scenario: Admin readiness fails closed when required storage catalogs are unavailable
+      Given the Admin API is missing storage policy, storage device, and disk-set catalogs
+      When an Admin API client requests GET "/admin/ready"
+      Then the Admin API response status is 503
+      And the Admin API response field "probe" is "readiness"
+      And the Admin API response field "status" is "not-ready"
+      And the Admin API readiness components have status:
+        | component              | status         |
+        | storage-policy-catalog | not-configured |
+        | storage-device-catalog | not-configured |
+        | disk-set-catalog       | not-configured |
+      And the Admin API response has a link named "live" to "/admin/live"

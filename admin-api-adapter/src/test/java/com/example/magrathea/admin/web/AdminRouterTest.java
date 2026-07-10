@@ -76,6 +76,26 @@ class AdminRouterTest {
     }
 
     @Test
+    void readinessFailsClosedWhenRequiredCatalogsAreMissing() {
+        WebTestClient client = clientWith(null, null, null);
+
+        client.get().uri("/admin/ready")
+            .exchange()
+            .expectStatus().isEqualTo(503)
+            .expectHeader().contentType(MediaType.APPLICATION_JSON)
+            .expectBody()
+            .jsonPath("$.probe").isEqualTo("readiness")
+            .jsonPath("$.status").isEqualTo("not-ready")
+            .jsonPath("$.components[0].name").isEqualTo("storage-policy-catalog")
+            .jsonPath("$.components[0].status").isEqualTo("not-configured")
+            .jsonPath("$.components[1].name").isEqualTo("storage-device-catalog")
+            .jsonPath("$.components[1].status").isEqualTo("not-configured")
+            .jsonPath("$.components[2].name").isEqualTo("disk-set-catalog")
+            .jsonPath("$.components[2].status").isEqualTo("not-configured")
+            .jsonPath("$._links.live.href").isEqualTo("/admin/live");
+    }
+
+    @Test
     void catalogEndpointReturnsServiceUnavailableWhenRequiredCatalogIsMissing() {
         WebTestClient client = clientWith(null, null, null);
 

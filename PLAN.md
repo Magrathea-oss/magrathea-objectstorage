@@ -359,7 +359,7 @@ KA dependencies: KA-2 (Ceph s3-tests requires SigV4), KA-3 (presigned URLs), and
 | Key requirement IDs | REQ-OPS-* |
 | Expected outputs | CI pipeline running the full gate + appendix check + docker build; release/versioning strategy; backup/restore procedure; DR with declared RTO/RPO; enforced schema/manifest versioning and migration; runbooks; SLOs and alert rules; readiness/liveness probes beyond `/admin/health`; verified graceful shutdown draining. |
 | Acceptance gates | CI runs green on the full gate; backup/restore rehearsed; probes and shutdown behavior validated; versioning/migration enforced by tests. |
-| Status | `@partial`: CI packaging gates are wired and Admin API `/admin/live` + `/admin/ready` are implemented and Cucumber-validated as `REQ-OPS-001/002`; backup/restore, DR, schema migration/versioning, runbooks, SLO/alert rules, and graceful shutdown validation remain. |
+| Status | `@partial`: CI packaging gates are wired and Admin API `/admin/live` + `/admin/ready` are implemented and Cucumber-validated as `REQ-OPS-001..003`, including fail-closed readiness when required catalogs are unavailable; backup/restore, DR, schema migration/versioning, runbooks, SLO/alert rules, and graceful shutdown validation remain. |
 
 ### EP-6 — Performance & Capacity Validation (HIGH)
 
