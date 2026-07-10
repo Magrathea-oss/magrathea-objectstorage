@@ -19,7 +19,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 === Summary
 
 * Feature files scanned: 21
-* Scenarios discovered: 387
+* Scenarios discovered: 388
 * Protocol-smoke scenarios: 122
 
 ==== Status tag counts
@@ -29,7 +29,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |Tag |Scenario count
 |`@absent` |3
 |`@config-only` |69
-|`@implemented-and-validated` |100
+|`@implemented-and-validated` |101
 |`@implemented-not-e2e-validated` |21
 |`@not-implemented` |12
 |`@placeholder` |9
@@ -52,7 +52,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |`@static-architecture-required` |6
 |`@tracing-inspection-required` |2
 |`@webclient-required` |294
-|`unknown/not-tagged` |46
+|`unknown/not-tagged` |47
 |===
 
 ==== Classification tag counts
@@ -60,8 +60,8 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 [cols="1,1",options="header"]
 |===
 |Tag |Scenario count
-|`@functional-requirement` |173
-|`@non-functional-requirement` |83
+|`@functional-requirement` |174
+|`@non-functional-requirement` |84
 |`unknown/not-tagged` |202
 |===
 
@@ -2671,6 +2671,37 @@ so container platforms and CI smoke gates can distinguish a running process from
   And the shutdown log must not contain Spring Boot's generated security password banner
   When recovery starts the S3 process again with the same filesystem root
   Then object "objects/shutdown-drain.txt" in bucket "ep5-graceful-shutdown-bucket" can be read with body "committed before shutdown"
+----
+
+===== REQ-OPS-005
+
+====== Scenario: Storage-engine filesystem backup restores committed S3 data after primary data loss
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep5-operability.feature:60`
+|Rule |Backup and restore rehearsals prove recoverability from storage-engine filesystem backups
+|Requirement ID(s) |`REQ-OPS-005`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep5`, `@operability`, `@admin-api`, `@business-need`, `@backup`, `@restore`, `@disaster-recovery`, `@durability`, `@restart-safety`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep5`, `@operability`, `@admin-api`, `@business-need`, `@implemented-and-validated`, `@REQ-OPS-005`, `@functional-requirement`, `@non-functional-requirement`, `@backup`, `@restore`, `@disaster-recovery`, `@durability`, `@restart-safety`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given a storage-engine S3 process is running with graceful shutdown enabled and filesystem root "target/ep5-backup-restore/current"
+  And bucket "ep5-backup-restore-bucket" contains object "objects/restored.txt" with body "restored from backup"
+  When operators stop the S3 process for a backup window
+  And operators copy the storage-engine filesystem root to backup location "target/ep5-backup-restore/backup"
+  And the primary storage-engine filesystem root is lost
+  And operators restore the backup to the primary filesystem root
+  And recovery starts the S3 process again with the same filesystem root
+  Then object "objects/restored.txt" in bucket "ep5-backup-restore-bucket" can be read with body "restored from backup"
 ----
 
 ==== s3-reactive-api-adapter/src/test/features/requirements/single-node-backend-bucket-configuration.feature

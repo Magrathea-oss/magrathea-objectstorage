@@ -46,6 +46,7 @@ public class PhaseEp5OperabilitySteps {
     private Path gracefulDevicesDir;
     private Path gracefulDisksetsDir;
     private Path gracefulLog;
+    private Path backupRoot;
     private ManagedProcess gracefulProcess;
     private boolean gracefulProcessForced;
 
@@ -195,6 +196,48 @@ public class PhaseEp5OperabilitySteps {
         stopGracefulProcessIfRunning();
     }
 
+    @When("operators stop the S3 process for a backup window")
+    public void operatorsStopTheS3ProcessForBackupWindow() throws InterruptedException {
+        requireGracefulProcess();
+        gracefulProcess.process().destroy();
+        boolean exited = gracefulProcess.process().waitFor(10, TimeUnit.SECONDS);
+        if (!exited) {
+            gracefulProcessForced = true;
+            gracefulProcess.process().destroyForcibly();
+        }
+        assertThat(exited).as("process should stop cleanly before offline backup").isTrue();
+        assertThat(gracefulProcessForced).isFalse();
+        gracefulProcess = null;
+    }
+
+    @When("operators copy the storage-engine filesystem root to backup location {string}")
+    public void operatorsCopyStorageEngineRootToBackupLocation(String backupLocation) throws IOException {
+        assertThat(gracefulStorageRoot).as("storage root to back up").isNotNull();
+        backupRoot = Path.of(backupLocation);
+        deleteRecursively(backupRoot);
+        copyRecursively(gracefulStorageRoot, backupRoot);
+        assertThat(Files.exists(backupRoot.resolve("metadata")))
+            .as("backup should contain storage-engine metadata")
+            .isTrue();
+    }
+
+    @When("the primary storage-engine filesystem root is lost")
+    public void primaryStorageEngineFilesystemRootIsLost() throws IOException {
+        assertThat(gracefulStorageRoot).as("primary storage root").isNotNull();
+        deleteRecursively(gracefulStorageRoot);
+        assertThat(Files.exists(gracefulStorageRoot)).isFalse();
+    }
+
+    @When("operators restore the backup to the primary filesystem root")
+    public void operatorsRestoreBackupToPrimaryFilesystemRoot() throws IOException {
+        assertThat(backupRoot).as("backup root").isNotNull();
+        assertThat(Files.exists(backupRoot)).as("backup root must exist").isTrue();
+        copyRecursively(backupRoot, gracefulStorageRoot);
+        assertThat(Files.exists(gracefulStorageRoot.resolve("metadata")))
+            .as("restored primary should contain storage-engine metadata")
+            .isTrue();
+    }
+
     private void assertReadinessComponentStatus(String component, String expectedStatus) {
         List<String> statuses = JsonPath.read(responseBody(), "$.components[?(@.name == '" + component + "')].status");
         assertThat(statuses)
@@ -315,6 +358,22 @@ public class PhaseEp5OperabilitySteps {
         try (var stream = Files.walk(path)) {
             for (Path entry : stream.sorted((left, right) -> right.compareTo(left)).toList()) {
                 Files.deleteIfExists(entry);
+            }
+        }
+    }
+
+    private static void copyRecursively(Path source, Path target) throws IOException {
+        assertThat(Files.exists(source)).as("source to copy: %s", source).isTrue();
+        try (var stream = Files.walk(source)) {
+            for (Path entry : stream.toList()) {
+                Path relative = source.relativize(entry);
+                Path destination = target.resolve(relative);
+                if (Files.isDirectory(entry)) {
+                    Files.createDirectories(destination);
+                } else {
+                    Files.createDirectories(destination.getParent());
+                    Files.copy(entry, destination);
+                }
             }
         }
     }

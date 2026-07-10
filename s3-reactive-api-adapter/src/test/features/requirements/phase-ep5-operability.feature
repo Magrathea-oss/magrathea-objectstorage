@@ -53,3 +53,16 @@ Business Need: EP-5 operational health probes
       And the shutdown log must not contain Spring Boot's generated security password banner
       When recovery starts the S3 process again with the same filesystem root
       Then object "objects/shutdown-drain.txt" in bucket "ep5-graceful-shutdown-bucket" can be read with body "committed before shutdown"
+
+  Rule: Backup and restore rehearsals prove recoverability from storage-engine filesystem backups
+
+    @implemented-and-validated @REQ-OPS-005 @functional-requirement @non-functional-requirement @backup @restore @disaster-recovery @durability @restart-safety
+    Scenario: Storage-engine filesystem backup restores committed S3 data after primary data loss
+      Given a storage-engine S3 process is running with graceful shutdown enabled and filesystem root "target/ep5-backup-restore/current"
+      And bucket "ep5-backup-restore-bucket" contains object "objects/restored.txt" with body "restored from backup"
+      When operators stop the S3 process for a backup window
+      And operators copy the storage-engine filesystem root to backup location "target/ep5-backup-restore/backup"
+      And the primary storage-engine filesystem root is lost
+      And operators restore the backup to the primary filesystem root
+      And recovery starts the S3 process again with the same filesystem root
+      Then object "objects/restored.txt" in bucket "ep5-backup-restore-bucket" can be read with body "restored from backup"
