@@ -1,5 +1,10 @@
 package com.example.magrathea.s3api.cucumber.specs;
 
+import com.example.magrathea.objectstore.domain.aggregate.Bucket;
+import com.example.magrathea.objectstore.domain.aggregate.MultipartUpload;
+import com.example.magrathea.objectstore.domain.valueobject.ObjectKey;
+import com.example.magrathea.objectstore.domain.valueobject.UploadId;
+import com.example.magrathea.objectstorage.repository.storageengine.adapter.StorageEngineReactiveMultipartUploadRepository;
 import com.example.magrathea.storageengine.domain.valueobject.BucketId;
 import com.example.magrathea.storageengine.domain.valueobject.BucketRef;
 import com.example.magrathea.storageengine.domain.valueobject.ChecksumAlgorithm;
@@ -48,6 +53,10 @@ public class PhaseEp5StorageMigrationSteps {
     private FileSystemManifestRepository repository;
     private ObjectManifest manifest;
     private String committedContent;
+    private Path multipartRoot;
+    private Path multipartStateFile;
+    private MultipartUpload multipartUpload;
+    private String committedMultipartContent;
 
     @Given("a sample storage-engine object manifest is saved through the filesystem manifest repository")
     public void sampleStorageEngineObjectManifestIsSaved() throws IOException {
@@ -87,6 +96,60 @@ public class PhaseEp5StorageMigrationSteps {
 
         assertThatThrownBy(() -> repository.findBy(manifest.manifestId()).block())
             .hasMessageContaining("Unsupported manifest schema version")
+            .hasMessageContaining(unsupportedVersion);
+    }
+
+    @Given("a sample multipart upload session is saved through the storage-engine repository")
+    public void sampleMultipartUploadSessionIsSavedThroughStorageEngineRepository() throws IOException {
+        multipartRoot = Files.createTempDirectory("magrathea-ep5-multipart-schema-");
+        StorageEngineReactiveMultipartUploadRepository multipartRepository =
+            new StorageEngineReactiveMultipartUploadRepository(null, multipartRoot.toString());
+        multipartUpload = MultipartUpload.create(
+            MultipartUpload.Id.generate(),
+            Bucket.Id.of("ep5-multipart-schema-bucket"),
+            ObjectKey.of("ep5-multipart-schema-bucket", "objects/schema-versioned.bin"),
+            UploadId.generate());
+        multipartRepository.save(multipartUpload).block();
+        Path stateRoot = multipartRoot.resolve("metadata/multipart-uploads");
+        try (var files = Files.list(stateRoot)) {
+            multipartStateFile = files.filter(path -> path.getFileName().toString().endsWith(".json"))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("multipart state JSON was not committed"));
+        }
+        committedMultipartContent = Files.readString(multipartStateFile);
+    }
+
+    @Then("the committed multipart upload state declares schema version {string}")
+    public void committedMultipartUploadStateDeclaresSchemaVersion(String version) {
+        assertThat(committedMultipartContent).contains("\"schemaVersion\":" + version);
+    }
+
+    @Then("the repository can read legacy multipart state that omits the schema version as compatibility version {string}")
+    public void repositoryCanReadLegacyMultipartStateThatOmitsSchemaVersion(String compatibilityVersion)
+            throws IOException {
+        assertThat(compatibilityVersion).isEqualTo("0");
+        String legacy = committedMultipartContent.replaceFirst("\"schemaVersion\":1,", "");
+        assertThat(legacy).doesNotContain("\"schemaVersion\"");
+        Files.writeString(multipartStateFile, legacy);
+
+        StorageEngineReactiveMultipartUploadRepository legacyRepository =
+            new StorageEngineReactiveMultipartUploadRepository(null, multipartRoot.toString());
+        MultipartUpload restored = legacyRepository.findById(multipartUpload.uploadId()).block();
+        assertThat(restored).isNotNull();
+        assertThat(restored.uploadId()).isEqualTo(multipartUpload.uploadId());
+        assertThat(restored.key()).isEqualTo(multipartUpload.key());
+    }
+
+    @Then("the repository rejects multipart state that declares unsupported schema version {string}")
+    public void repositoryRejectsMultipartStateThatDeclaresUnsupportedSchemaVersion(String unsupportedVersion)
+            throws IOException {
+        String unsupported = committedMultipartContent.replaceFirst(
+            "\"schemaVersion\":1", "\"schemaVersion\":" + unsupportedVersion);
+        Files.writeString(multipartStateFile, unsupported);
+
+        assertThatThrownBy(() -> new StorageEngineReactiveMultipartUploadRepository(
+                null, multipartRoot.toString()))
+            .hasMessageContaining("Unsupported multipart upload schema version")
             .hasMessageContaining(unsupportedVersion);
     }
 

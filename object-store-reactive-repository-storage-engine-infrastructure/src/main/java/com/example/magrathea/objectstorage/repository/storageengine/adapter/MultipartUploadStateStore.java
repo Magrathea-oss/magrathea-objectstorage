@@ -32,6 +32,8 @@ import java.util.concurrent.locks.ReentrantLock;
 final class MultipartUploadStateStore {
 
     private static final int LOCK_STRIPES = 64;
+    private static final int CURRENT_SCHEMA_VERSION = 1;
+    private static final int LEGACY_SCHEMA_VERSION = 0;
 
     private final Path uploadsRoot;
     private final ReentrantLock[] locks;
@@ -132,6 +134,7 @@ final class MultipartUploadStateStore {
 
     /** Persistence envelope: the durable form of a multipart upload session. */
     record StoredUpload(
+        Integer schemaVersion,
         String id,
         String bucketId,
         String bucket,
@@ -144,6 +147,7 @@ final class MultipartUploadStateStore {
 
         static StoredUpload from(MultipartUpload upload) {
             return new StoredUpload(
+                CURRENT_SCHEMA_VERSION,
                 upload.id().value(),
                 upload.bucketId().value(),
                 upload.key().bucket(),
@@ -156,6 +160,12 @@ final class MultipartUploadStateStore {
         }
 
         MultipartUpload toUpload() {
+            int effectiveSchemaVersion = schemaVersion == null ? LEGACY_SCHEMA_VERSION : schemaVersion;
+            if (effectiveSchemaVersion != LEGACY_SCHEMA_VERSION
+                    && effectiveSchemaVersion != CURRENT_SCHEMA_VERSION) {
+                throw new IllegalArgumentException(
+                    "Unsupported multipart upload schema version: " + effectiveSchemaVersion);
+            }
             return MultipartUpload.restore(
                 MultipartUpload.Id.of(id),
                 Bucket.Id.of(bucketId),

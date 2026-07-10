@@ -1,6 +1,6 @@
-# Runbook: Storage-engine manifest schema migration
+# Runbook: Storage-engine metadata schema migration
 
-Status: first validated EP-5 slice (`REQ-OPS-007`).
+Status: validated object-manifest and multipart-session slices (`REQ-OPS-007`, `REQ-OPS-016`).
 
 ## Current manifest compatibility contract
 
@@ -11,6 +11,14 @@ Status: first validated EP-5 slice (`REQ-OPS-007`).
 | Future/unknown manifest schema | `> 1` or invalid | Rejected instead of being parsed ambiguously. |
 
 The manifest checksum trailer remains mandatory. If operators edit a manifest manually, the checksum no longer matches and the read path rejects it as an integrity failure.
+
+## Multipart upload state compatibility contract
+
+| Format | Version | Runtime behavior |
+|---|---:|---|
+| Legacy multipart JSON without `schemaVersion` | `0` compatibility mode | Readable for backward compatibility. |
+| Current multipart upload state JSON | `1` | Written by `MultipartUploadStateStore`; readable after restart. |
+| Future/unknown multipart schema | `> 1` or invalid | Rejected during repository startup/reload instead of being interpreted ambiguously. |
 
 ## Operator procedure before upgrades
 
@@ -26,6 +34,8 @@ The manifest checksum trailer remains mandatory. If operators edit a manifest ma
 
 `PhaseEp5StorageMigrationSpecsCucumberTest` validates `REQ-OPS-007` by saving a sample storage-engine object manifest, asserting the committed file declares schema version `1`, verifying a legacy manifest with the schema version omitted remains readable as compatibility version `0`, and verifying a manifest that declares unsupported schema version `999` is rejected.
 
+The same runner validates `REQ-OPS-016` for durable multipart upload session JSON: current writes declare version `1`, omitted versions load as legacy version `0`, and future version `999` is rejected.
+
 Command:
 
 ```bash
@@ -40,4 +50,4 @@ The validation log must not contain `Using generated security password`.
 
 - No cross-version binary migration tool exists yet.
 - No online migration is claimed.
-- Only object manifest schema versioning is covered by this first slice; other metadata families still need explicit schema-version contracts.
+- Object manifests and multipart upload sessions are covered; bucket registries, object references, ACL/tag sidecars, and other durable metadata families still need explicit schema-version contracts.

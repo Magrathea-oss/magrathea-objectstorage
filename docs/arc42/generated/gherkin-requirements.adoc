@@ -19,7 +19,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 === Summary
 
 * Feature files scanned: 22
-* Scenarios discovered: 398
+* Scenarios discovered: 399
 * Protocol-smoke scenarios: 122
 
 ==== Status tag counts
@@ -29,7 +29,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |Tag |Scenario count
 |`@absent` |3
 |`@config-only` |69
-|`@implemented-and-validated` |110
+|`@implemented-and-validated` |111
 |`@implemented-not-e2e-validated` |22
 |`@not-implemented` |12
 |`@placeholder` |9
@@ -52,7 +52,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |`@static-architecture-required` |6
 |`@tracing-inspection-required` |2
 |`@webclient-required` |294
-|`unknown/not-tagged` |57
+|`unknown/not-tagged` |58
 |===
 
 ==== Classification tag counts
@@ -61,7 +61,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |===
 |Tag |Scenario count
 |`@functional-requirement` |183
-|`@non-functional-requirement` |94
+|`@non-functional-requirement` |95
 |`unknown/not-tagged` |202
 |===
 
@@ -12558,6 +12558,33 @@ so storage-engine files can be migrated safely instead of being parsed as ambigu
   Then the committed manifest file declares schema version "1"
   And the repository can read a legacy manifest that omits the schema version as compatibility version "0"
   And the repository rejects a manifest that declares unsupported schema version "999"
+----
+
+===== REQ-OPS-016
+
+====== Scenario: Multipart upload state declares the current schema and rejects unsupported future schemas
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep5-storage-migration.feature:16`
+|Rule |Manifest files declare supported schema versions and retain controlled legacy compatibility
+|Requirement ID(s) |`REQ-OPS-016`
+|Classification |`@non-functional-requirement`
+|Capability area tags |`@spec`, `@operability`, `@schema-migration`, `@storage-engine`, `@multipart-versioning`, `@migration`, `@durability`, `@restart-safety`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@non-functional-requirement`, `@operability`, `@schema-migration`, `@storage-engine`, `@implemented-and-validated`, `@REQ-OPS-016`, `@multipart-versioning`, `@migration`, `@durability`, `@restart-safety`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given a sample multipart upload session is saved through the storage-engine repository
+  Then the committed multipart upload state declares schema version "1"
+  And the repository can read legacy multipart state that omits the schema version as compatibility version "0"
+  And the repository rejects multipart state that declares unsupported schema version "999"
 ----
 
 ==== s3-reactive-api-adapter/src/test/features/specs/phase-ka5-distribution.feature

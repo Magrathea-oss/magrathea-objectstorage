@@ -11,3 +11,10 @@ Ability: EP-5 storage-engine manifest schema versioning
       Then the committed manifest file declares schema version "1"
       And the repository can read a legacy manifest that omits the schema version as compatibility version "0"
       And the repository rejects a manifest that declares unsupported schema version "999"
+
+    @implemented-and-validated @REQ-OPS-016 @multipart-versioning @migration @durability @restart-safety
+    Scenario: Multipart upload state declares the current schema and rejects unsupported future schemas
+      Given a sample multipart upload session is saved through the storage-engine repository
+      Then the committed multipart upload state declares schema version "1"
+      And the repository can read legacy multipart state that omits the schema version as compatibility version "0"
+      And the repository rejects multipart state that declares unsupported schema version "999"
