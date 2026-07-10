@@ -4,7 +4,10 @@ import com.example.magrathea.objectstore.domain.aggregate.Bucket;
 import com.example.magrathea.objectstore.domain.aggregate.MultipartUpload;
 import com.example.magrathea.objectstore.domain.valueobject.ObjectKey;
 import com.example.magrathea.objectstore.domain.valueobject.UploadId;
+import com.example.magrathea.objectstorage.repository.storageengine.adapter.StorageEngineReactiveBucketRepository;
 import com.example.magrathea.objectstorage.repository.storageengine.adapter.StorageEngineReactiveMultipartUploadRepository;
+import com.example.magrathea.objectstore.domain.valueobject.Region;
+import com.example.magrathea.objectstore.domain.valueobject.StorageClass;
 import com.example.magrathea.storageengine.domain.valueobject.BucketId;
 import com.example.magrathea.storageengine.domain.valueobject.BucketRef;
 import com.example.magrathea.storageengine.domain.valueobject.ChecksumAlgorithm;
@@ -57,6 +60,10 @@ public class PhaseEp5StorageMigrationSteps {
     private Path multipartStateFile;
     private MultipartUpload multipartUpload;
     private String committedMultipartContent;
+    private Path bucketRoot;
+    private Path bucketStateFile;
+    private Bucket bucket;
+    private String committedBucketContent;
 
     @Given("a sample storage-engine object manifest is saved through the filesystem manifest repository")
     public void sampleStorageEngineObjectManifestIsSaved() throws IOException {
@@ -150,6 +157,57 @@ public class PhaseEp5StorageMigrationSteps {
         assertThatThrownBy(() -> new StorageEngineReactiveMultipartUploadRepository(
                 null, multipartRoot.toString()))
             .hasMessageContaining("Unsupported multipart upload schema version")
+            .hasMessageContaining(unsupportedVersion);
+    }
+
+    @Given("a sample bucket is saved through the storage-engine repository")
+    public void sampleBucketIsSavedThroughStorageEngineRepository() throws IOException {
+        bucketRoot = Files.createTempDirectory("magrathea-ep5-bucket-schema-");
+        StorageEngineReactiveBucketRepository bucketRepository =
+            new StorageEngineReactiveBucketRepository(null, bucketRoot.toString());
+        bucket = Bucket.create(
+            Bucket.Id.generate(), "ep5-schema-registry-bucket", Region.EU_WEST_1, StorageClass.STANDARD);
+        bucketRepository.save(bucket).block();
+        Path stateRoot = bucketRoot.resolve("metadata/buckets");
+        try (var files = Files.list(stateRoot)) {
+            bucketStateFile = files.filter(path -> path.getFileName().toString().endsWith(".json"))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("bucket registry JSON was not committed"));
+        }
+        committedBucketContent = Files.readString(bucketStateFile);
+    }
+
+    @Then("the committed bucket registry state declares schema version {string}")
+    public void committedBucketRegistryStateDeclaresSchemaVersion(String version) {
+        assertThat(committedBucketContent).contains("\"schemaVersion\":" + version);
+    }
+
+    @Then("the repository can read legacy bucket state that omits the schema version as compatibility version {string}")
+    public void repositoryCanReadLegacyBucketStateThatOmitsSchemaVersion(String compatibilityVersion)
+            throws IOException {
+        assertThat(compatibilityVersion).isEqualTo("0");
+        String legacy = committedBucketContent.replaceFirst("\"schemaVersion\":1,", "");
+        assertThat(legacy).doesNotContain("\"schemaVersion\"");
+        Files.writeString(bucketStateFile, legacy);
+
+        StorageEngineReactiveBucketRepository legacyRepository =
+            new StorageEngineReactiveBucketRepository(null, bucketRoot.toString());
+        Bucket restored = legacyRepository.findByName(bucket.name()).block();
+        assertThat(restored).isNotNull();
+        assertThat(restored.id()).isEqualTo(bucket.id());
+        assertThat(restored.name()).isEqualTo(bucket.name());
+    }
+
+    @Then("the repository rejects bucket state that declares unsupported schema version {string}")
+    public void repositoryRejectsBucketStateThatDeclaresUnsupportedSchemaVersion(String unsupportedVersion)
+            throws IOException {
+        String unsupported = committedBucketContent.replaceFirst(
+            "\"schemaVersion\":1", "\"schemaVersion\":" + unsupportedVersion);
+        Files.writeString(bucketStateFile, unsupported);
+
+        assertThatThrownBy(() -> new StorageEngineReactiveBucketRepository(
+                null, bucketRoot.toString()))
+            .hasMessageContaining("Unsupported bucket registry schema version")
             .hasMessageContaining(unsupportedVersion);
     }
 

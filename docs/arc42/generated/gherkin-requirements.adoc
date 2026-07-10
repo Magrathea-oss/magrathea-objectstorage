@@ -19,7 +19,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 === Summary
 
 * Feature files scanned: 22
-* Scenarios discovered: 399
+* Scenarios discovered: 400
 * Protocol-smoke scenarios: 122
 
 ==== Status tag counts
@@ -29,7 +29,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |Tag |Scenario count
 |`@absent` |3
 |`@config-only` |69
-|`@implemented-and-validated` |111
+|`@implemented-and-validated` |112
 |`@implemented-not-e2e-validated` |22
 |`@not-implemented` |12
 |`@placeholder` |9
@@ -52,7 +52,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |`@static-architecture-required` |6
 |`@tracing-inspection-required` |2
 |`@webclient-required` |294
-|`unknown/not-tagged` |58
+|`unknown/not-tagged` |59
 |===
 
 ==== Classification tag counts
@@ -61,7 +61,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |===
 |Tag |Scenario count
 |`@functional-requirement` |183
-|`@non-functional-requirement` |95
+|`@non-functional-requirement` |96
 |`unknown/not-tagged` |202
 |===
 
@@ -12585,6 +12585,33 @@ so storage-engine files can be migrated safely instead of being parsed as ambigu
   Then the committed multipart upload state declares schema version "1"
   And the repository can read legacy multipart state that omits the schema version as compatibility version "0"
   And the repository rejects multipart state that declares unsupported schema version "999"
+----
+
+===== REQ-OPS-017
+
+====== Scenario: Bucket registry state declares the current schema and rejects unsupported future schemas
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep5-storage-migration.feature:23`
+|Rule |Manifest files declare supported schema versions and retain controlled legacy compatibility
+|Requirement ID(s) |`REQ-OPS-017`
+|Classification |`@non-functional-requirement`
+|Capability area tags |`@spec`, `@operability`, `@schema-migration`, `@storage-engine`, `@bucket-registry-versioning`, `@migration`, `@durability`, `@restart-safety`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@non-functional-requirement`, `@operability`, `@schema-migration`, `@storage-engine`, `@implemented-and-validated`, `@REQ-OPS-017`, `@bucket-registry-versioning`, `@migration`, `@durability`, `@restart-safety`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given a sample bucket is saved through the storage-engine repository
+  Then the committed bucket registry state declares schema version "1"
+  And the repository can read legacy bucket state that omits the schema version as compatibility version "0"
+  And the repository rejects bucket state that declares unsupported schema version "999"
 ----
 
 ==== s3-reactive-api-adapter/src/test/features/specs/phase-ka5-distribution.feature

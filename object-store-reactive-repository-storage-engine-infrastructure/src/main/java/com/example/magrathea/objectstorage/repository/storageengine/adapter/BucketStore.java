@@ -27,6 +27,8 @@ import java.util.concurrent.locks.ReentrantLock;
 final class BucketStore {
 
     private static final int LOCK_STRIPES = 64;
+    private static final int CURRENT_SCHEMA_VERSION = 1;
+    private static final int LEGACY_SCHEMA_VERSION = 0;
 
     private final Path bucketsRoot;
     private final ReentrantLock[] locks;
@@ -137,6 +139,7 @@ final class BucketStore {
      * bucket configuration family survives restarts.
      */
     record StoredBucket(
+        Integer schemaVersion,
         String id,
         String name,
         Region region,
@@ -148,6 +151,7 @@ final class BucketStore {
 
         static StoredBucket from(Bucket bucket) {
             return new StoredBucket(
+                CURRENT_SCHEMA_VERSION,
                 bucket.id().value(),
                 bucket.name(),
                 bucket.region(),
@@ -159,6 +163,12 @@ final class BucketStore {
         }
 
         Bucket toBucket() {
+            int effectiveSchemaVersion = schemaVersion == null ? LEGACY_SCHEMA_VERSION : schemaVersion;
+            if (effectiveSchemaVersion != LEGACY_SCHEMA_VERSION
+                    && effectiveSchemaVersion != CURRENT_SCHEMA_VERSION) {
+                throw new IllegalArgumentException(
+                    "Unsupported bucket registry schema version: " + effectiveSchemaVersion);
+            }
             return Bucket.restore(
                 Bucket.Id.of(id),
                 name,

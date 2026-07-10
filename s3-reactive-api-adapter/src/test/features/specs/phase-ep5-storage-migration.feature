@@ -18,3 +18,10 @@ Ability: EP-5 storage-engine manifest schema versioning
       Then the committed multipart upload state declares schema version "1"
       And the repository can read legacy multipart state that omits the schema version as compatibility version "0"
       And the repository rejects multipart state that declares unsupported schema version "999"
+
+    @implemented-and-validated @REQ-OPS-017 @bucket-registry-versioning @migration @durability @restart-safety
+    Scenario: Bucket registry state declares the current schema and rejects unsupported future schemas
+      Given a sample bucket is saved through the storage-engine repository
+      Then the committed bucket registry state declares schema version "1"
+      And the repository can read legacy bucket state that omits the schema version as compatibility version "0"
+      And the repository rejects bucket state that declares unsupported schema version "999"
