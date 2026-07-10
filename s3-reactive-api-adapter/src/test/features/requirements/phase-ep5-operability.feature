@@ -66,6 +66,20 @@ Business Need: EP-5 operational health probes
       When recovery starts the S3 process again with the same filesystem root
       Then object "objects/in-flight.bin" in bucket "ep5-graceful-drain-bucket" has 524288 bytes with the streamed content checksum
 
+    @implemented-and-validated @REQ-OPS-010 @functional-requirement @non-functional-requirement @observability @graceful-shutdown @request-draining @streaming @multipart @durability @restart-safety
+    Scenario: SIGTERM drains an in-flight multipart UploadPart that remains completable after restart
+      Given a storage-engine S3 process is running with graceful shutdown enabled and filesystem root "target/ep5-graceful-multipart-drain/current"
+      And bucket "ep5-graceful-multipart-drain-bucket" is created before in-flight shutdown validation
+      And a multipart upload is initiated for object "objects/in-flight-multipart.bin" in bucket "ep5-graceful-multipart-drain-bucket"
+      When an S3 client starts streaming 524288 deterministic bytes as part 1 of the recorded multipart upload
+      And operators send SIGTERM after request body delivery has started
+      Then the in-flight UploadPart completes with HTTP status 200 and records its ETag
+      And the process exits within 10 seconds without forced termination
+      And the shutdown log must not contain Spring Boot's generated security password banner
+      When recovery starts the S3 process again with the same filesystem root
+      And operators complete the recorded multipart upload using the drained part
+      Then object "objects/in-flight-multipart.bin" in bucket "ep5-graceful-multipart-drain-bucket" has 524288 bytes with the streamed content checksum
+
   Rule: Backup and restore rehearsals prove recoverability from storage-engine filesystem backups
 
     @implemented-and-validated @REQ-OPS-005 @functional-requirement @non-functional-requirement @backup @restore @disaster-recovery @durability @restart-safety

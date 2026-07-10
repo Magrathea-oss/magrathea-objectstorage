@@ -36,6 +36,11 @@ sends `SIGTERM`, and proves that:
 - the process exited within 10 seconds without forced termination;
 - after restart with the same filesystem root, `GetObject` returned 524,288 bytes with the original SHA-256 checksum.
 
+`REQ-OPS-010` applies the same active-request shutdown sequence to multipart upload state. It starts a
+524,288-byte streaming `UploadPart`, sends `SIGTERM` while the part body is still in flight, verifies HTTP 200
+and captures the part ETag, restarts with the same root, completes the multipart upload using that ETag, and
+verifies the final object's byte count and SHA-256 checksum.
+
 ## Recovery verification
 
 After restart:
@@ -48,5 +53,5 @@ After restart:
 ## Open gaps
 
 - Concurrent draining of multiple uploads and reads has not yet been load-tested.
-- Multipart completion and cancellation races during shutdown need dedicated evidence.
+- Multipart UploadPart draining is validated, but CompleteMultipartUpload and cancellation races during shutdown still need dedicated evidence.
 - Multi-node traffic shifting and rolling shutdown remain future distributed-operability work.

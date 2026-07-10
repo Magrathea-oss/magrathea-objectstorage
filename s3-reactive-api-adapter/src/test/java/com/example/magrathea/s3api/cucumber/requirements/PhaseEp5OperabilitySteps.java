@@ -22,6 +22,7 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.ServerSocket;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -57,6 +58,10 @@ public class PhaseEp5OperabilitySteps {
     private CompletableFuture<HttpResponse<String>> inFlightPutFuture;
     private CountDownLatch inFlightBodyStarted;
     private byte[] inFlightPayload;
+    private String multipartUploadId;
+    private String multipartBucket;
+    private String multipartKey;
+    private String drainedPartETag;
     private boolean gracefulProcessForced;
     private int declaredRtoSeconds;
     private String declaredRpo;
@@ -194,17 +199,28 @@ public class PhaseEp5OperabilitySteps {
 
     @When("an S3 client starts streaming {int} deterministic bytes to object {string} in bucket {string}")
     public void s3ClientStartsStreamingDeterministicBytes(int byteCount, String key, String bucket) {
+        startSlowStreamingPut("/" + bucket + "/" + key, byteCount);
+    }
+
+    @Given("a multipart upload is initiated for object {string} in bucket {string}")
+    public void multipartUploadIsInitiatedForObjectInBucket(String key, String bucket)
+            throws IOException, InterruptedException {
         requireGracefulProcess();
-        inFlightPayload = deterministicPayload(byteCount);
-        inFlightBodyStarted = new CountDownLatch(1);
-        HttpRequest request = HttpRequest.newBuilder(
-                URI.create("http://127.0.0.1:" + gracefulProcess.port() + "/" + bucket + "/" + key))
-            .timeout(Duration.ofSeconds(15))
-            .header("Content-Type", "application/octet-stream")
-            .PUT(HttpRequest.BodyPublishers.ofInputStream(
-                () -> new SlowInputStream(inFlightPayload, inFlightBodyStarted, 4096, 20)))
-            .build();
-        inFlightPutFuture = httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        HttpResponse<String> initiate = send(gracefulProcess, "POST", "/" + bucket + "/" + key + "?uploads", "");
+        assertThat(initiate.statusCode()).isBetween(200, 299);
+        multipartUploadId = xmlElement(initiate.body(), "UploadId");
+        multipartBucket = bucket;
+        multipartKey = key;
+        drainedPartETag = null;
+    }
+
+    @When("an S3 client starts streaming {int} deterministic bytes as part {int} of the recorded multipart upload")
+    public void s3ClientStartsStreamingDeterministicBytesAsRecordedMultipartPart(int byteCount, int partNumber) {
+        assertThat(multipartUploadId).as("recorded multipart upload ID").isNotBlank();
+        String path = "/" + multipartBucket + "/" + multipartKey
+            + "?partNumber=" + partNumber
+            + "&uploadId=" + URLEncoder.encode(multipartUploadId, StandardCharsets.UTF_8);
+        startSlowStreamingPut(path, byteCount);
     }
 
     @When("operators send SIGTERM after request body delivery has started")
@@ -224,9 +240,16 @@ public class PhaseEp5OperabilitySteps {
 
     @Then("the in-flight PutObject completes with HTTP status {int}")
     public void inFlightPutObjectCompletesWithHttpStatus(int expectedStatus) throws Exception {
-        assertThat(inFlightPutFuture).as("in-flight PutObject future").isNotNull();
-        HttpResponse<String> putResponse = inFlightPutFuture.get(15, TimeUnit.SECONDS);
+        HttpResponse<String> putResponse = awaitInFlightWrite();
         assertThat(putResponse.statusCode()).isEqualTo(expectedStatus);
+    }
+
+    @Then("the in-flight UploadPart completes with HTTP status {int} and records its ETag")
+    public void inFlightUploadPartCompletesWithHttpStatusAndRecordsEtag(int expectedStatus) throws Exception {
+        HttpResponse<String> uploadPartResponse = awaitInFlightWrite();
+        assertThat(uploadPartResponse.statusCode()).isEqualTo(expectedStatus);
+        drainedPartETag = uploadPartResponse.headers().firstValue("ETag").orElse(null);
+        assertThat(drainedPartETag).as("drained UploadPart ETag").isNotBlank();
     }
 
     @Then("the process exits within {int} seconds without forced termination")
@@ -265,6 +288,20 @@ public class PhaseEp5OperabilitySteps {
         assertThat(response.body()).isEqualTo(expectedBody);
         lastRecoveredBody = response.body();
         stopGracefulProcessIfRunning();
+    }
+
+    @When("operators complete the recorded multipart upload using the drained part")
+    public void operatorsCompleteRecordedMultipartUploadUsingDrainedPart() throws IOException, InterruptedException {
+        requireGracefulProcess();
+        assertThat(multipartUploadId).as("recorded multipart upload ID").isNotBlank();
+        assertThat(drainedPartETag).as("drained UploadPart ETag").isNotBlank();
+        String completionXml = "<CompleteMultipartUpload><Part><PartNumber>1</PartNumber><ETag>"
+            + drainedPartETag
+            + "</ETag></Part></CompleteMultipartUpload>";
+        String path = "/" + multipartBucket + "/" + multipartKey
+            + "?uploadId=" + URLEncoder.encode(multipartUploadId, StandardCharsets.UTF_8);
+        HttpResponse<String> completion = send(gracefulProcess, "POST", path, completionXml);
+        assertThat(completion.statusCode()).isBetween(200, 299);
     }
 
     @Then("object {string} in bucket {string} has {int} bytes with the streamed content checksum")
@@ -470,6 +507,35 @@ public class PhaseEp5OperabilitySteps {
             .method(method, publisher)
             .build();
         return httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+    }
+
+    private void startSlowStreamingPut(String path, int byteCount) {
+        requireGracefulProcess();
+        inFlightPayload = deterministicPayload(byteCount);
+        inFlightBodyStarted = new CountDownLatch(1);
+        HttpRequest request = HttpRequest.newBuilder(
+                URI.create("http://127.0.0.1:" + gracefulProcess.port() + path))
+            .timeout(Duration.ofSeconds(15))
+            .header("Content-Type", "application/octet-stream")
+            .PUT(HttpRequest.BodyPublishers.ofInputStream(
+                () -> new SlowInputStream(inFlightPayload, inFlightBodyStarted, 4096, 20)))
+            .build();
+        inFlightPutFuture = httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+    }
+
+    private HttpResponse<String> awaitInFlightWrite() throws Exception {
+        assertThat(inFlightPutFuture).as("in-flight S3 write future").isNotNull();
+        return inFlightPutFuture.get(15, TimeUnit.SECONDS);
+    }
+
+    private static String xmlElement(String xml, String name) {
+        String opening = "<" + name + ">";
+        String closing = "</" + name + ">";
+        int start = xml.indexOf(opening);
+        int end = xml.indexOf(closing);
+        assertThat(start).as("opening XML element %s in %s", name, xml).isGreaterThanOrEqualTo(0);
+        assertThat(end).as("closing XML element %s in %s", name, xml).isGreaterThan(start);
+        return xml.substring(start + opening.length(), end);
     }
 
     private HttpResponse<byte[]> sendBytes(ManagedProcess managedProcess, String method, String path)
