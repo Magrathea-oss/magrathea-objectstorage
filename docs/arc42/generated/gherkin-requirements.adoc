@@ -18,8 +18,8 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 
 === Summary
 
-* Feature files scanned: 21
-* Scenarios discovered: 389
+* Feature files scanned: 22
+* Scenarios discovered: 390
 * Protocol-smoke scenarios: 122
 
 ==== Status tag counts
@@ -29,7 +29,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |Tag |Scenario count
 |`@absent` |3
 |`@config-only` |69
-|`@implemented-and-validated` |102
+|`@implemented-and-validated` |103
 |`@implemented-not-e2e-validated` |21
 |`@not-implemented` |12
 |`@placeholder` |9
@@ -52,7 +52,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |`@static-architecture-required` |6
 |`@tracing-inspection-required` |2
 |`@webclient-required` |294
-|`unknown/not-tagged` |48
+|`unknown/not-tagged` |49
 |===
 
 ==== Classification tag counts
@@ -61,7 +61,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |===
 |Tag |Scenario count
 |`@functional-requirement` |175
-|`@non-functional-requirement` |85
+|`@non-functional-requirement` |86
 |`unknown/not-tagged` |202
 |===
 
@@ -12253,6 +12253,44 @@ production readiness. Completion must not be inferred from route inventories, pl
   And the reports distinguish modeled planner behavior from distributed-production readiness
 ----
 
+==== s3-reactive-api-adapter/src/test/features/specs/phase-ep5-storage-migration.feature
+
+* Feature title: Ability: EP-5 storage-engine manifest schema versioning
+* Feature tags: `@spec`, `@non-functional-requirement`, `@operability`, `@schema-migration`, `@storage-engine`
+* Feature description:
++
+----
+Maintainers need explicit manifest schema versions and bounded compatibility behavior
+so storage-engine files can be migrated safely instead of being parsed as ambiguous formats.
+----
+
+===== REQ-OPS-007
+
+====== Scenario: Storage-engine manifests declare the current schema and reject unsupported future schemas
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep5-storage-migration.feature:9`
+|Rule |Manifest files declare supported schema versions and retain controlled legacy compatibility
+|Requirement ID(s) |`REQ-OPS-007`
+|Classification |`@non-functional-requirement`
+|Capability area tags |`@spec`, `@operability`, `@schema-migration`, `@storage-engine`, `@manifest-versioning`, `@migration`, `@durability`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@non-functional-requirement`, `@operability`, `@schema-migration`, `@storage-engine`, `@implemented-and-validated`, `@REQ-OPS-007`, `@manifest-versioning`, `@migration`, `@durability`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given a sample storage-engine object manifest is saved through the filesystem manifest repository
+  Then the committed manifest file declares schema version "1"
+  And the repository can read a legacy manifest that omits the schema version as compatibility version "0"
+  And the repository rejects a manifest that declares unsupported schema version "999"
+----
+
 ==== s3-reactive-api-adapter/src/test/features/specs/phase-ka5-distribution.feature
 
 * Feature title: Ability: Native-image distribution packaging
@@ -12385,7 +12423,7 @@ so Magrathea Object Storage can run without requiring a Java runtime in the fina
   Then the CI workflow uses Java "25"
   And the CI workflow checks the Gherkin appendix freshness
   And the CI workflow checks source hygiene
-  And the CI workflow runs focused Cucumber validation for security, metadata durability, Phase 3 streaming, EP-5 operability, and Phase 5 S3 semantics
+  And the CI workflow runs focused Cucumber validation for security, metadata durability, Phase 3 streaming, EP-5 operability and migration, and Phase 5 S3 semantics
   And the CI workflow builds required reactor dependency modules for the focused Maven gate
   And the CI workflow writes focused validation logs to an existing directory
   And the CI workflow builds and smokes the root JVM Docker image

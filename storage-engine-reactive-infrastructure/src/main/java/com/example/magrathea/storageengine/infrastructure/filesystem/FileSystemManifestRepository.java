@@ -67,6 +67,12 @@ import java.util.UUID;
  */
 public class FileSystemManifestRepository implements ObjectManifestRepository {
 
+    /** Current storage-engine manifest properties schema version. */
+    static final int CURRENT_SCHEMA_VERSION = 1;
+    /** Legacy compatibility version assigned to manifests written before schemaVersion existed. */
+    static final int LEGACY_SCHEMA_VERSION = 0;
+    /** Property key used for the manifest format schema version. */
+    static final String SCHEMA_VERSION_KEY = "manifest.schemaVersion";
     /** Property key used for the manifest self-checksum trailer. */
     static final String CHECKSUM_KEY = "manifest.checksum";
     /** Separator that appears immediately before the checksum trailer line. */
@@ -210,6 +216,7 @@ public class FileSystemManifestRepository implements ObjectManifestRepository {
 
     private String serialize(ObjectManifest manifest) {
         Properties properties = new Properties();
+        properties.setProperty(SCHEMA_VERSION_KEY, Integer.toString(CURRENT_SCHEMA_VERSION));
         properties.setProperty("manifestId", manifest.manifestId().value().toString());
         properties.setProperty("objectId", manifest.objectId().value());
         properties.setProperty("versionId", manifest.versionId().value());
@@ -300,6 +307,7 @@ public class FileSystemManifestRepository implements ObjectManifestRepository {
         }
 
         ManifestId manifestId = ManifestId.of(UUID.fromString(required(properties, "manifestId")));
+        validateSchemaVersion(properties, manifestId);
         ObjectId objectId = ObjectId.of(required(properties, "objectId"));
         VersionId versionId = VersionId.of(required(properties, "versionId"));
         StorageClassId storageClassId = StorageClassId.of(required(properties, "storageClassId"));
@@ -423,6 +431,30 @@ public class FileSystemManifestRepository implements ObjectManifestRepository {
                 Optional.empty(),
                 ReplicationConfig.of(1));
         return new VirtualDevice.BucketDevice(bucketRef, policy);
+    }
+
+    private void validateSchemaVersion(Properties properties, ManifestId manifestId) {
+        String rawVersion = properties.getProperty(SCHEMA_VERSION_KEY);
+        if (rawVersion == null || rawVersion.isBlank()) {
+            // Compatibility mode for manifests written before EP-5 schema versioning.
+            return;
+        }
+        int version;
+        try {
+            version = Integer.parseInt(rawVersion.trim());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                    "Invalid manifest schema version '" + rawVersion + "' for manifest: " + manifestId.value(), e);
+        }
+        if (version == LEGACY_SCHEMA_VERSION) {
+            return;
+        }
+        if (version != CURRENT_SCHEMA_VERSION) {
+            throw new IllegalArgumentException(
+                    "Unsupported manifest schema version " + version
+                            + " for manifest: " + manifestId.value()
+                            + "; supported versions are " + LEGACY_SCHEMA_VERSION + " and " + CURRENT_SCHEMA_VERSION);
+        }
     }
 
     private String required(Properties properties, String key) {
