@@ -16,12 +16,14 @@ Add a GraalVM native-image packaging path for `bootstrap-application`:
 - Maven profile `native-musl` adds musl/static native-image arguments for container builds.
 - `Dockerfile.native` builds the native executable in a GraalVM 25 native-image builder and runs it from an Alpine runtime image without a JRE/JDK.
 - Keep the existing JVM `Dockerfile` as the canonical/general-purpose image while native packaging is evaluated and hardened.
+- Packaged JVM and native single-node containers activate the `storage-engine` profile by default, declare `magrathea.object-store.backend=storage-engine`, package YAML catalogs under `/app/config`, and persist storage-engine data under the runtime data directory.
 - Preserve the Docker-driven docs/UI source-of-truth: `Dockerfile.native` runs the Gherkin appendix freshness check and regenerates documentation/frontend assets inside the builder stage, just like the JVM image.
 
 ## Consequences
 
 - Operators get a JVM-free packaging path after native compilation and smoke validation with a Spring Boot 4 compatible GraalVM 25 toolchain.
-- The first Docker/Alpine musl image slice is validated by image build, Admin API health smoke testing, S3 ListBuckets XML/JSON plus bucket/object PUT/GET smoke testing, absence of Spring Boot's generated-password banner, absence of native reflection/shared-arena runtime errors in the smoke log, and runtime checks that no `java`/`javac` command exists in the final image; the native image path must not be claimed production-complete until runtime behavior for all selected production profile(s) is covered.
+- The first Docker/Alpine musl image slice is validated by image build, Admin API health/readiness smoke testing, S3 ListBuckets XML/JSON plus bucket/object PUT/GET smoke testing, absence of Spring Boot's generated-password banner, absence of native reflection/shared-arena runtime errors in the smoke log, and runtime checks that no `java`/`javac` command exists in the final image; the native image path must not be claimed production-complete until runtime behavior for all selected production profile(s) is covered.
+- CI Docker smoke must not accept `503 not-ready` for packaged single-node containers; fail-closed readiness remains validated separately for intentionally missing catalog wiring.
 - Host builds depend on a compatible GraalVM native-image version; old local native-image installations can fail even after Spring AOT succeeds, and Spring Boot 4 rejects Java 21 native images at startup. Netty on GraalVM 25 also requires shared Arena support for the native runtime path used by this application.
 - Alpine runtime requires musl/static native-image output; a normal glibc native executable is not sufficient for `alpine`.
 - The native Dockerfile intentionally duplicates the JVM Dockerfile's docs/frontend regeneration steps to preserve deterministic static asset boundaries.

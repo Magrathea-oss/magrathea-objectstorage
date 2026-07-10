@@ -24,6 +24,7 @@ Ability: Native-image distribution packaging
       And the final runtime image contains the "magrathea-objectstorage" executable
       And the final runtime image does not install a JRE or JDK
       And runtime smoke validation confirms the container starts and the Admin API health endpoint is healthy
+      And the final runtime image activates the storage-engine backend for single-node container deployments
       And runtime smoke validation confirms S3 ListBuckets XML and JSON plus bucket/object PUT/GET work without native reflection errors
 
   Rule: JVM Docker and CI packaging gates must avoid masked failures
@@ -38,6 +39,7 @@ Ability: Native-image distribution packaging
       And the final runtime image is based on an Eclipse Temurin JRE image
       And the final runtime image exposes the S3 and Admin API ports
       And the final runtime image owns a writable application data directory as the non-root user
+      And the final runtime image activates the storage-engine backend for single-node container deployments
       And the final runtime image starts the application with "java -jar /app.jar"
 
     @REQ-PKG-004 @ci @github-actions @implemented-not-e2e-validated
@@ -51,4 +53,5 @@ Ability: Native-image distribution packaging
       And the CI workflow builds required reactor dependency modules for the focused Maven gate
       And the CI workflow writes focused validation logs to an existing directory
       And the CI workflow builds and smokes the root JVM Docker image
+      And the CI workflow requires Docker readiness to be ready in storage-engine mode
       And the CI workflow keeps native Docker packaging available as an explicit manual validation job

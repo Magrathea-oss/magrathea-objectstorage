@@ -201,10 +201,26 @@ public class Ka5DistributionPackagingSteps {
     @Then("the final runtime image owns a writable application data directory as the non-root user")
     public void finalRuntimeImageOwnsWritableDataDirectory() {
         assertInspected();
-        assertTrue(inspectedSource.contains("mkdir -p /app/data"),
+        assertTrue(inspectedSource.contains("mkdir -p /app/data") || inspectedSource.contains("mkdir -p /data"),
             "Dockerfile should create the runtime data directory");
-        assertTrue(inspectedSource.contains("chown -R magrathea:magrathea /app"),
-            "Dockerfile should make /app writable by the non-root runtime user");
+        assertTrue(inspectedSource.contains("chown -R magrathea:magrathea /app")
+                || inspectedSource.contains("chown -R magrathea:magrathea /data /app"),
+            "Dockerfile should make the runtime data directory writable by the non-root runtime user");
+    }
+
+    @Then("the final runtime image activates the storage-engine backend for single-node container deployments")
+    public void finalRuntimeImageActivatesStorageEngineBackend() throws IOException {
+        String dockerfile = inspectedSource != null ? inspectedSource : readRelative("Dockerfile.native");
+        assertTrue(dockerfile.contains("SPRING_PROFILES_ACTIVE=storage-engine"),
+            "Container runtime should activate the storage-engine profile even for single-node deployments");
+        assertTrue(dockerfile.contains("MAGRATHEA_OBJECT_STORE_BACKEND=storage-engine"),
+            "Container runtime should declare the storage-engine object-store backend");
+        assertTrue(dockerfile.contains("STORAGE_ENGINE_FILESYSTEM_ROOT="),
+            "Container runtime should persist storage-engine data under a writable data root");
+        assertTrue(dockerfile.contains("STORAGE_ENGINE_POLICIES_DIR=")
+                && dockerfile.contains("STORAGE_ENGINE_DEVICES_DIR=")
+                && dockerfile.contains("STORAGE_ENGINE_DISKSETS_DIR="),
+            "Container runtime should point storage-engine catalogs at packaged YAML directories");
     }
 
     @Then("the final runtime image starts the application with {string}")
@@ -287,6 +303,17 @@ public class Ka5DistributionPackagingSteps {
             "CI workflow should smoke the Admin API readiness endpoint");
         assertTrue(inspectedSource.contains("ci-jvm-smoke-bucket/object.txt"),
             "CI workflow should smoke S3 bucket/object PUT/GET behavior");
+    }
+
+    @Then("the CI workflow requires Docker readiness to be ready in storage-engine mode")
+    public void ciWorkflowRequiresDockerReadinessReady() {
+        assertInspected();
+        assertTrue(inspectedSource.contains("curl -fsS http://127.0.0.1:8081/admin/ready"),
+            "CI Docker smoke should require /admin/ready to return a successful ready response");
+        assertFalse(inspectedSource.contains("ready_status=$(curl -sS -o"),
+            "CI Docker smoke must not tolerate not-ready responses for packaged single-node containers");
+        assertFalse(inspectedSource.contains("\"503\""),
+            "CI Docker smoke must not accept HTTP 503 readiness for packaged single-node containers");
     }
 
     @Then("the CI workflow keeps native Docker packaging available as an explicit manual validation job")

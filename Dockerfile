@@ -140,14 +140,24 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && addgroup --system magrathea \
     && adduser --system --ingroup magrathea --home /app --no-create-home magrathea \
-    && mkdir -p /app/data \
+    && mkdir -p /app/data/storage-engine /app/config \
     && chown -R magrathea:magrathea /app
 
 WORKDIR /app
 COPY --from=builder --chown=magrathea:magrathea /app.jar /app.jar
 COPY --from=builder --chown=magrathea:magrathea /build/docs /app/docs
+COPY --from=builder --chown=magrathea:magrathea /build/storage-engine-reactive-infrastructure/src/main/resources/storage-policies /app/config/storage-policies
+COPY --from=builder --chown=magrathea:magrathea /build/storage-engine-reactive-infrastructure/src/main/resources/storage-devices /app/config/storage-devices
+COPY --from=builder --chown=magrathea:magrathea /build/storage-engine-reactive-infrastructure/src/main/resources/disk-sets /app/config/disk-sets
 
 USER magrathea
+
+ENV SPRING_PROFILES_ACTIVE=storage-engine \
+    MAGRATHEA_OBJECT_STORE_BACKEND=storage-engine \
+    STORAGE_ENGINE_FILESYSTEM_ROOT=/app/data/storage-engine \
+    STORAGE_ENGINE_POLICIES_DIR=/app/config/storage-policies \
+    STORAGE_ENGINE_DEVICES_DIR=/app/config/storage-devices \
+    STORAGE_ENGINE_DISKSETS_DIR=/app/config/disk-sets
 
 EXPOSE 8080
 EXPOSE 8081

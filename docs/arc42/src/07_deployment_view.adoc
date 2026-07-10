@@ -17,11 +17,11 @@ ifndef::imagesdir[:imagesdir: ../images]
 |Static resources
 |Generated Vue/admin documentation assets, ARC42 JSON, ADR JSON, JaCoCo JSON exports, C4 PNGs, and ARC42 images served from classpath `static/**`
 
-|Default backend (`single-node` profile)
-|In-memory (ConcurrentHashMap), allocated in the same JVM heap as the server; does not persist across restarts
+|Bare local default backend (`single-node` profile)
+|In-memory (ConcurrentHashMap), allocated in the same JVM heap as the server; does not persist across restarts. This default is retained for unpackaged development/test compatibility.
 
 |Storage Engine backend (`storage-engine` profile)
-|Filesystem-durable: bucket registry, multipart upload state, per-object configuration, and S3 object manifest references are committed under a configurable filesystem root (`storage.engine.filesystem.root`) with crash-safe temp-file + atomic-rename writes; selected explicitly, never the default
+|Filesystem-durable: bucket registry, multipart upload state, per-object configuration, and S3 object manifest references are committed under a configurable filesystem root (`storage.engine.filesystem.root`) with crash-safe temp-file + atomic-rename writes; packaged JVM/native container images activate this backend by default for single-node deployments.
 
 |Java Runtime
 |JDK 21 bytecode for the normal JAR path; the optional Spring Boot 4 native executable is built with GraalVM 25 and removes the runtime JVM requirement
@@ -44,8 +44,9 @@ A JVM `Dockerfile`, a native-image `Dockerfile.native`, and `docker-compose.yml`
 * Packages with unmasked Maven failure semantics; Maven fail-never (`-fn` / `--fail-never`) is not used
 * Runtime stage: Eclipse Temurin 21 JRE, copies the packaged Spring Boot JAR from the builder
 * Runs as non-root user `magrathea` with writable `/app/data`
+* Copies YAML storage-policy, storage-device, and disk-set catalogs into `/app/config` and sets `SPRING_PROFILES_ACTIVE=storage-engine`, `MAGRATHEA_OBJECT_STORE_BACKEND=storage-engine`, and `STORAGE_ENGINE_*` paths so packaged single-node containers use the storage-engine backend rather than in-memory repositories
 * Exposes ports 8080 and 8081 and defines an Admin API healthcheck against `/admin/health`; EP-5 also exposes `/admin/live` and `/admin/ready` for process liveness and catalog readiness probes
-* Validated first slice: image build, Admin API health smoke, S3 ListBuckets XML and bucket/object PUT/GET smoke, and no Spring Boot generated-password banner in build/runtime logs
+* Validated first slice: image build, Admin API health/live/ready smoke with ready catalog status, S3 ListBuckets XML and bucket/object PUT/GET smoke, selected storage-engine backend log check, and no Spring Boot generated-password banner in build/runtime logs
 * Entrypoint: `java -jar /app.jar`
 
 **Dockerfile.native:**
@@ -53,8 +54,8 @@ A JVM `Dockerfile`, a native-image `Dockerfile.native`, and `docker-compose.yml`
 * Builder stage: GraalVM 25 `native-image` with musl support, Maven, Node.js and Python for the same documentation/frontend regeneration pipeline used by the JVM image
 * Runs the Gherkin requirements appendix quality gate (`--check`) before deterministic regeneration
 * Activates Maven profiles `native,native-musl` and compiles `bootstrap-application` into a `magrathea-objectstorage` native executable
-* Runtime stage: `alpine`, non-root user, no JRE/JDK installed, ports 8080 and 8081 exposed
-* Validated first slice: image build, Admin API health smoke, S3 ListBuckets XML/JSON and bucket/object PUT/GET smoke, no Spring Boot generated-password banner, no native reflection/shared-arena runtime errors, and no `java`/`javac` in the runtime image
+* Runtime stage: `alpine`, non-root user, no JRE/JDK installed, storage-engine profile/catalog environment configured, ports 8080 and 8081 exposed
+* Validated first slice: image build, Admin API health/readiness smoke, S3 ListBuckets XML/JSON and bucket/object PUT/GET smoke, no Spring Boot generated-password banner, no native reflection/shared-arena runtime errors, and no `java`/`javac` in the runtime image
 * Entrypoint: `/app/magrathea-objectstorage`
 
 **docker-compose.yml:**

@@ -10,10 +10,10 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |# |Risk |Impact |Mitigation |EP reference
 
 |1
-|**Default backend is in-memory** — the `single-node` profile's reactive in-memory repositories do not persist to disk. The Storage Engine backend (`storage-engine` profile) now durably persists object bytes/manifests/references AND (as of EP-2) the bucket registry, multipart upload state, and per-object/bucket configuration — but it must be explicitly selected and is not the default.
-|Data loss on restart when running the default profile
-|Keep the in-memory default explicit and documented; do not make the in-memory profile a production durability default without a new decision
-|EP-2 (`@implemented-and-validated` for the declared storage-engine metadata durability scope; the default in-memory profile remains explicitly exempt)
+|**Bare local default backend is in-memory** — the unpackaged `single-node` profile's reactive in-memory repositories do not persist to disk. The Storage Engine backend (`storage-engine` profile) now durably persists object bytes/manifests/references AND (as of EP-2) the bucket registry, multipart upload state, and per-object/bucket configuration. Packaged JVM/native single-node containers activate `storage-engine` by default with packaged YAML catalogs.
+|Data loss on restart when operators bypass the packaged container defaults and run the bare local `single-node` profile
+|Keep the in-memory profile explicitly documented as development/test compatibility; require packaged single-node deployment paths to activate storage-engine and keep CI Docker readiness expecting configured catalogs
+|EP-2 (`@implemented-and-validated` for the declared storage-engine metadata durability scope; the in-memory profile remains explicitly exempt for dev/test compatibility)
 
 |2
 |**S3 semantic depth** — the in-scope route surface is mapped, but route count is not semantic completion. AWS CLI parity has improved for the canonical object CRUD subset and metadata durability, but full S3 scenario parity is incomplete.

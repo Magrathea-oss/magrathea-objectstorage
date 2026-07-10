@@ -53,10 +53,10 @@ Two implementations of the Object Store repository interfaces coexist:
 
 | Profile | Backend | Module |
 |---|---|---|
-| `single-node` (default) | In-memory repositories | `object-store-reactive-infrastructure` |
+| `single-node` (default for unpackaged/dev runs) | In-memory repositories | `object-store-reactive-infrastructure` |
 | `storage-engine` | Storage Engine filesystem cluster | `object-store-reactive-repository-storage-engine-infrastructure` |
 
-The Storage Engine backend is selectable via Spring profile or Maven profile at deployment time.
+The packaged JVM and native container images activate `storage-engine` by default even for single-node deployments, and package the YAML storage-policy/device/disk-set catalogs under `/app/config`. The bare Spring Boot default remains `single-node` for development/test compatibility unless a deployment explicitly selects `storage-engine`.
 The ACL translation layer lives in `object-store-reactive-repository-storage-engine-infrastructure`,
 which translates Object Store concepts into Storage Engine commands and delegates persistence
 to the Storage Engine bounded context.
@@ -119,7 +119,7 @@ docker build --network=host -f Dockerfile -t magrathea-objectstorage:jvm .
 docker run --rm --network=host magrathea-objectstorage:jvm
 ```
 
-The JVM runtime image uses public ECR mirrored Maven/Temurin bases, runs as the non-root `magrathea` user with writable `/app/data`, exposes ports 8080/8081, and has an Admin API healthcheck. The 2026-07-10 validation used `--network=host` because the local Docker sandbox cannot create bridge networking; it passed Admin health, S3 ListBuckets XML, bucket/object PUT/GET, and generated-password log checks.
+The JVM runtime image uses public ECR mirrored Maven/Temurin bases, runs as the non-root `magrathea` user with writable `/app/data`, activates the `storage-engine` profile with packaged YAML catalogs, exposes ports 8080/8081, and has an Admin API healthcheck. The 2026-07-10 validation used `--network=host` because the local Docker sandbox cannot create bridge networking; it passed Admin health, `/admin/live`, `/admin/ready` with ready catalog status, S3 ListBuckets XML, bucket/object PUT/GET, selected-backend log verification, and generated-password log checks.
 
 A native-image path is also available for JVM-free deployment:
 
@@ -133,7 +133,7 @@ docker build -f Dockerfile.native -t magrathea-objectstorage:native .
 docker run --rm -p 8080:8080 -p 8081:8081 magrathea-objectstorage:native
 ```
 
-`Dockerfile.native` keeps the same Docker-driven documentation/frontend regeneration gates, then compiles a GraalVM native executable with the `native,native-musl` Maven profiles and runs it from Alpine without requiring Java in the final image. Use a GraalVM 25 native-image toolchain for Spring Boot 4 native builds; older GraalVM 21 native images can fail during link or produce a binary that Spring Boot rejects at startup. The native Docker slice is validated by Admin API health plus S3 ListBuckets XML/JSON and bucket/object PUT/GET smoke checks; the regular `Dockerfile` is now validated as the canonical JVM image while native packaging remains the JVM-free distribution path.
+`Dockerfile.native` keeps the same Docker-driven documentation/frontend regeneration gates, then compiles a GraalVM native executable with the `native,native-musl` Maven profiles and runs it from Alpine without requiring Java in the final image. The native runtime also activates `storage-engine` and uses packaged YAML catalogs. Use a GraalVM 25 native-image toolchain for Spring Boot 4 native builds; older GraalVM 21 native images can fail during link or produce a binary that Spring Boot rejects at startup. The native Docker slice is validated by Admin API health/readiness plus S3 ListBuckets XML/JSON and bucket/object PUT/GET smoke checks; the regular `Dockerfile` is now validated as the canonical JVM image while native packaging remains the JVM-free distribution path.
 
 ### S3 API activation
 
