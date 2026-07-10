@@ -44,7 +44,7 @@ A JVM `Dockerfile`, a native-image `Dockerfile.native`, and `docker-compose.yml`
 * Packages with unmasked Maven failure semantics; Maven fail-never (`-fn` / `--fail-never`) is not used
 * Runtime stage: Eclipse Temurin 21 JRE, copies the packaged Spring Boot JAR from the builder
 * Runs as non-root user `magrathea` with writable `/app/data`
-* Exposes ports 8080 and 8081 and defines an Admin API healthcheck against `/admin/health`
+* Exposes ports 8080 and 8081 and defines an Admin API healthcheck against `/admin/health`; EP-5 also exposes `/admin/live` and `/admin/ready` for process liveness and catalog readiness probes
 * Validated first slice: image build, Admin API health smoke, S3 ListBuckets XML and bucket/object PUT/GET smoke, and no Spring Boot generated-password banner in build/runtime logs
 * Entrypoint: `java -jar /app.jar`
 

@@ -353,13 +353,13 @@ KA dependencies: KA-2 (Ceph s3-tests requires SigV4), KA-3 (presigned URLs), and
 
 | Field | Plan |
 |---|---|
-| Focus | First CI packaging slice now exists in `.github/workflows/ci.yml`: appendix/source-hygiene checks, focused Cucumber/security/semantic gates, root JVM Docker build+smoke, and manual native Docker build+smoke. Broader EP-5 operability remains open. |
+| Focus | First CI/operability slice now exists: appendix/source-hygiene checks, focused Cucumber/security/semantic/EP-5 gates, root JVM Docker build+smoke, manual native Docker build+smoke, and Admin API liveness/readiness probes. Broader EP-5 operability remains open. |
 | Owner agents | `java-scaffolder`, `java-infra-coder`, `documenter`, `java-tester` |
-| Requirement feature file | `phase-ep5-operability.feature` (where executable; otherwise documented procedures tagged `@not-implemented` until automated) |
+| Requirement feature file | `s3-reactive-api-adapter/src/test/features/requirements/phase-ep5-operability.feature` (Business Need; remaining procedures stay tagged `@not-implemented` until automated) |
 | Key requirement IDs | REQ-OPS-* |
 | Expected outputs | CI pipeline running the full gate + appendix check + docker build; release/versioning strategy; backup/restore procedure; DR with declared RTO/RPO; enforced schema/manifest versioning and migration; runbooks; SLOs and alert rules; readiness/liveness probes beyond `/admin/health`; verified graceful shutdown draining. |
 | Acceptance gates | CI runs green on the full gate; backup/restore rehearsed; probes and shutdown behavior validated; versioning/migration enforced by tests. |
-| Status | `@partial`: CI packaging gates are wired; backup/restore, DR, schema migration/versioning, runbooks, SLO/alert rules, readiness/liveness beyond `/admin/health`, and graceful shutdown validation remain. |
+| Status | `@partial`: CI packaging gates are wired and Admin API `/admin/live` + `/admin/ready` are implemented and Cucumber-validated as `REQ-OPS-001/002`; backup/restore, DR, schema migration/versioning, runbooks, SLO/alert rules, and graceful shutdown validation remain. |
 
 ### EP-6 — Performance & Capacity Validation (HIGH)
 

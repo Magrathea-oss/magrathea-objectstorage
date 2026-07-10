@@ -33,7 +33,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
     "com.example.magrathea.objectstore",
     "com.example.magrathea.reactive",
     "com.example.magrathea.objectstorage.repository.storageengine",
-    "com.example.magrathea.storageengine"
+    "com.example.magrathea.storageengine",
+    "com.example.magrathea.admin"
 })
 public class RequirementsTestApp {
 
@@ -129,6 +130,14 @@ public class RequirementsTestApp {
             .handlerStrategies(strategies)
             .configureClient()
             .codecs(config -> config.defaultCodecs().maxInMemorySize(300 * 1024 * 1024))
+            .responseTimeout(Duration.ofMinutes(2))
+            .build();
+    }
+
+    @Bean
+    public WebTestClient adminWebTestClient(@Qualifier("adminRoutes") RouterFunction<ServerResponse> adminRoutes) {
+        return WebTestClient.bindToRouterFunction(adminRoutes)
+            .configureClient()
             .responseTimeout(Duration.ofMinutes(2))
             .build();
     }

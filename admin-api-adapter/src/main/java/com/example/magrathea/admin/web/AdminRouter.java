@@ -49,6 +49,8 @@ public class AdminRouter {
     @Bean
     public RouterFunction<ServerResponse> adminRoutes() {
         return route(GET("/admin/health"), this::health)
+            .andRoute(GET("/admin/live"), this::live)
+            .andRoute(GET("/admin/ready"), this::ready)
             .andRoute(GET("/admin/storage-policies"), this::listStoragePolicies)
             .andRoute(GET("/admin/storage-policies/{id}"), this::getStoragePolicy)
             .andRoute(POST("/admin/storage-policies/validate"), this::validateStoragePolicy)
@@ -67,6 +69,66 @@ public class AdminRouter {
             "message", "Admin API running",
             "mode", "configuration-as-code",
             "_links", adminLinks()));
+    }
+
+    private Mono<ServerResponse> live(ServerRequest request) {
+        return ok(Map.of(
+            "status", "ok",
+            "probe", "liveness",
+            "message", "Admin API process is live",
+            "_links", adminLinks()));
+    }
+
+    private Mono<ServerResponse> ready(ServerRequest request) {
+        StoragePolicyCatalog policies = storagePolicyCatalog.getIfAvailable();
+        StorageDeviceCatalog devices = storageDeviceCatalog.getIfAvailable();
+        DiskSetCatalog diskSets = diskSetCatalog.getIfAvailable();
+
+        return Mono.zip(
+                readinessComponent(STORAGE_POLICY_CATALOG, policies,
+                    policies == null ? Mono.empty() : policies.findAll().count()),
+                readinessComponent(STORAGE_DEVICE_CATALOG, devices,
+                    devices == null ? Mono.empty() : devices.findAll().count()),
+                readinessComponent(DISK_SET_CATALOG, diskSets,
+                    diskSets == null ? Mono.empty() : diskSets.findAll().count()))
+            .flatMap(tuple -> {
+                List<Map<String, Object>> components = List.of(tuple.getT1(), tuple.getT2(), tuple.getT3());
+                boolean ready = components.stream().allMatch(component -> "ready".equals(component.get("status")));
+                Map<String, Object> body = new LinkedHashMap<>();
+                body.put("status", ready ? "ready" : "not-ready");
+                body.put("probe", "readiness");
+                body.put("mode", "configuration-as-code");
+                body.put("components", components);
+                body.put("_links", adminLinks());
+                return ServerResponse.status(ready ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(body);
+            });
+    }
+
+    private Mono<Map<String, Object>> readinessComponent(String name, Object catalog, Mono<Long> itemCount) {
+        if (catalog == null) {
+            Map<String, Object> component = new LinkedHashMap<>();
+            component.put("name", name);
+            component.put("status", "not-configured");
+            component.put("reason", "Required catalog bean is not configured");
+            return Mono.just(component);
+        }
+        return itemCount
+            .map(count -> {
+                Map<String, Object> component = new LinkedHashMap<>();
+                component.put("name", name);
+                component.put("status", "ready");
+                component.put("items", count);
+                return component;
+            })
+            .onErrorResume(error -> {
+                Map<String, Object> component = new LinkedHashMap<>();
+                component.put("name", name);
+                component.put("status", "unavailable");
+                component.put("reason", error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage());
+                return Mono.just(component);
+            });
     }
 
     private Mono<ServerResponse> listStoragePolicies(ServerRequest request) {
@@ -290,6 +352,8 @@ public class AdminRouter {
     private Map<String, Object> adminLinks() {
         return Map.of(
             "self", link("/admin/health"),
+            "live", link("/admin/live"),
+            "ready", link("/admin/ready"),
             "policies", link("/admin/storage-policies"),
             "devices", link("/admin/storage-devices"),
             "diskSets", link("/admin/disk-sets"),

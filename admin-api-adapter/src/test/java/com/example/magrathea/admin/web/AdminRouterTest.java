@@ -47,6 +47,35 @@ class AdminRouterTest {
     }
 
     @Test
+    void livenessAndReadinessExposeOperationalProbeState() {
+        WebTestClient client = clientWith(fakePolicyCatalog(), fakeDeviceCatalog(), fakeDiskSetCatalog());
+
+        client.get().uri("/admin/live")
+            .exchange()
+            .expectStatus().isOk()
+            .expectHeader().contentType(MediaType.APPLICATION_JSON)
+            .expectBody()
+            .jsonPath("$.probe").isEqualTo("liveness")
+            .jsonPath("$.status").isEqualTo("ok")
+            .jsonPath("$._links.ready.href").isEqualTo("/admin/ready");
+
+        client.get().uri("/admin/ready")
+            .exchange()
+            .expectStatus().isOk()
+            .expectHeader().contentType(MediaType.APPLICATION_JSON)
+            .expectBody()
+            .jsonPath("$.probe").isEqualTo("readiness")
+            .jsonPath("$.status").isEqualTo("ready")
+            .jsonPath("$.components[0].name").isEqualTo("storage-policy-catalog")
+            .jsonPath("$.components[0].status").isEqualTo("ready")
+            .jsonPath("$.components[1].name").isEqualTo("storage-device-catalog")
+            .jsonPath("$.components[1].status").isEqualTo("ready")
+            .jsonPath("$.components[2].name").isEqualTo("disk-set-catalog")
+            .jsonPath("$.components[2].status").isEqualTo("ready")
+            .jsonPath("$._links.live.href").isEqualTo("/admin/live");
+    }
+
+    @Test
     void catalogEndpointReturnsServiceUnavailableWhenRequiredCatalogIsMissing() {
         WebTestClient client = clientWith(null, null, null);
 

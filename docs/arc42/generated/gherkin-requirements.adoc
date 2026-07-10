@@ -18,8 +18,8 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 
 === Summary
 
-* Feature files scanned: 20
-* Scenarios discovered: 383
+* Feature files scanned: 21
+* Scenarios discovered: 385
 * Protocol-smoke scenarios: 122
 
 ==== Status tag counts
@@ -29,7 +29,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |Tag |Scenario count
 |`@absent` |3
 |`@config-only` |69
-|`@implemented-and-validated` |96
+|`@implemented-and-validated` |98
 |`@implemented-not-e2e-validated` |21
 |`@not-implemented` |12
 |`@placeholder` |9
@@ -52,7 +52,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |`@static-architecture-required` |6
 |`@tracing-inspection-required` |2
 |`@webclient-required` |294
-|`unknown/not-tagged` |42
+|`unknown/not-tagged` |44
 |===
 
 ==== Classification tag counts
@@ -60,7 +60,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 [cols="1,1",options="header"]
 |===
 |Tag |Scenario count
-|`@functional-requirement` |169
+|`@functional-requirement` |171
 |`@non-functional-requirement` |82
 |`unknown/not-tagged` |202
 |===
@@ -2541,6 +2541,76 @@ state together across a single restart of the same filesystem root.
   And GetObjectTagging for key "combined/object.bin" returns tags "Env=prod"
   And GetObjectAcl for key "combined/object.bin" returns grant "FULL_CONTROL" for user "admin"
   And listing multipart uploads for bucket "ep2-combined-test" includes the recorded upload ID
+----
+
+==== s3-reactive-api-adapter/src/test/features/requirements/phase-ep5-operability.feature
+
+* Feature title: Business Need: EP-5 operational health probes
+* Feature tags: `@requirement`, `@phase-ep5`, `@operability`, `@admin-api`, `@business-need`
+* Feature description:
++
+----
+Operators need explicit Admin API liveness and readiness probes
+so container platforms and CI smoke gates can distinguish a running process from a deployment ready to serve configured storage operations.
+----
+
+===== REQ-OPS-001
+
+====== Scenario: Admin liveness reports that the process is running
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep5-operability.feature:9`
+|Rule |Admin API probes expose process liveness and catalog readiness without using S3 object routes
+|Requirement ID(s) |`REQ-OPS-001`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep5`, `@operability`, `@admin-api`, `@business-need`, `@observability`, `@liveness`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep5`, `@operability`, `@admin-api`, `@business-need`, `@implemented-and-validated`, `@REQ-OPS-001`, `@functional-requirement`, `@observability`, `@liveness`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the Admin API is configured with storage policy, storage device, and disk-set catalogs
+  When an Admin API client requests GET "/admin/live"
+  Then the Admin API response status is 200
+  And the Admin API response field "probe" is "liveness"
+  And the Admin API response field "status" is "ok"
+  And the Admin API response has a link named "ready" to "/admin/ready"
+----
+
+===== REQ-OPS-002
+
+====== Scenario: Admin readiness reports configured storage catalogs before accepting traffic
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep5-operability.feature:18`
+|Rule |Admin API probes expose process liveness and catalog readiness without using S3 object routes
+|Requirement ID(s) |`REQ-OPS-002`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep5`, `@operability`, `@admin-api`, `@business-need`, `@observability`, `@readiness`, `@storage-policy`, `@storage-device`, `@disk-set`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep5`, `@operability`, `@admin-api`, `@business-need`, `@implemented-and-validated`, `@REQ-OPS-002`, `@functional-requirement`, `@observability`, `@readiness`, `@storage-policy`, `@storage-device`, `@disk-set`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the Admin API is configured with storage policy, storage device, and disk-set catalogs
+  When an Admin API client requests GET "/admin/ready"
+  Then the Admin API response status is 200
+  And the Admin API response field "probe" is "readiness"
+  And the Admin API response field "status" is "ready"
+  And the Admin API readiness components are ready:
+  And the Admin API response has a link named "live" to "/admin/live"
 ----
 
 ==== s3-reactive-api-adapter/src/test/features/requirements/single-node-backend-bucket-configuration.feature
@@ -12189,7 +12259,7 @@ so Magrathea Object Storage can run without requiring a Java runtime in the fina
   Then the CI workflow uses Java "25"
   And the CI workflow checks the Gherkin appendix freshness
   And the CI workflow checks source hygiene
-  And the CI workflow runs focused Cucumber validation for security, metadata durability, Phase 3 streaming, and Phase 5 S3 semantics
+  And the CI workflow runs focused Cucumber validation for security, metadata durability, Phase 3 streaming, EP-5 operability, and Phase 5 S3 semantics
   And the CI workflow builds required reactor dependency modules for the focused Maven gate
   And the CI workflow writes focused validation logs to an existing directory
   And the CI workflow builds and smokes the root JVM Docker image

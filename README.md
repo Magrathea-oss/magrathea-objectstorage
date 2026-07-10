@@ -91,6 +91,8 @@ Current runtime mutability decision: storage policies, storage devices, and disk
 | Endpoint | Purpose | Runtime mutability |
 |---|---|---|
 | `GET /admin/health` | Admin API health and links | Read-only |
+| `GET /admin/live` | Liveness probe for the Admin API process | Read-only |
+| `GET /admin/ready` | Readiness probe for configured storage-policy, storage-device, and disk-set catalogs | Read-only |
 | `GET /admin/storage-policies` | List configured storage policies | Read-only YAML catalog |
 | `GET /admin/storage-policies/{id}` | Read one storage policy | Read-only YAML catalog |
 | `POST /admin/storage-policies/validate` | Validate a policy payload | Non-persistent validation only |

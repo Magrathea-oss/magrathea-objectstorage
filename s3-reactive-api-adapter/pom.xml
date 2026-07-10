@@ -73,6 +73,11 @@
         <!-- Testing -->
         <dependency>
             <groupId>com.example</groupId>
+            <artifactId>admin-api-adapter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.example</groupId>
             <artifactId>object-store-reactive-repository-storage-engine-infrastructure</artifactId>
             <scope>test</scope>
         </dependency>

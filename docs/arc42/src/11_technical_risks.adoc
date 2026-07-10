@@ -40,9 +40,9 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |EP-4 (`@absent`, high priority)
 
 |6
-|**Operability gaps** — the first CI packaging slice now runs appendix/source-hygiene checks, focused Cucumber/security/semantic gates, root JVM Docker build+smoke, and a manual native Docker build+smoke, but backup/restore and DR rehearsal are still undocumented and readiness/liveness probes beyond `/admin/health` are not verified.
+|**Operability gaps** — the first CI/operability slice now runs appendix/source-hygiene checks, focused Cucumber/security/semantic/EP-5 gates, root JVM Docker build+smoke, manual native Docker build+smoke, and Admin API `/admin/live` + `/admin/ready` probes, but backup/restore and DR rehearsal are still undocumented and graceful shutdown is not verified.
 |Recovery procedures are undocumented/unrehearsed; broader operational regressions outside the focused CI slice may still reach `main`
-|Expand CI toward the full Maven gate and release hardening; document and rehearse backup/restore and DR with declared RTO/RPO; add readiness/liveness and graceful-shutdown validation
+|Expand CI toward the full Maven gate and release hardening; document and rehearse backup/restore and DR with declared RTO/RPO; add graceful-shutdown validation
 |EP-5 (`@partial`, high priority)
 
 |7
