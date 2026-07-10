@@ -57,6 +57,11 @@ no active upload entry, and no multipart part directory or temporary part artifa
 before the completion body finishes; `SIGTERM` is then sent while completion remains active. Graceful draining returns
 S3 `NoSuchUpload` for completion, and restart verification proves that abort published no object or part artifacts.
 
+`REQ-OPS-015` adds a bounded mixed-load rehearsal: three concurrent 262,144-byte PutObjects and two concurrent
+GetObjects of a 2,097,152-byte fixture. Read consumers pause on their first response chunk so all five streams are
+provably active before `SIGTERM`; all responses must return HTTP 200, and restart verification checks every object by
+byte count and SHA-256. This is a deterministic shutdown gate, not a production-scale capacity benchmark.
+
 ## Recovery verification
 
 After restart:
@@ -68,6 +73,6 @@ After restart:
 
 ## Open gaps
 
-- Two concurrent PutObject drains are validated, but larger request sets and mixed upload/read draining have not yet been load-tested.
+- A bounded five-request mixed read/write drain is validated, but larger request sets, sustained arrival rates, and production-scale capacity have not been load-tested.
 - Multipart UploadPart and CompleteMultipartUpload draining, cancellation followed by abort, and the abort-wins completion overlap are validated; completion-wins races under repeated contention remain outside the current scope.
 - Multi-node traffic shifting and rolling shutdown remain future distributed-operability work.

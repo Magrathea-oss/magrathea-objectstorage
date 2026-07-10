@@ -26,6 +26,7 @@ import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -39,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Flow;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -67,6 +69,10 @@ public class PhaseEp5OperabilitySteps {
     private List<CompletableFuture<HttpResponse<String>>> concurrentPutFutures = List.of();
     private List<CountDownLatch> concurrentBodyStarted = List.of();
     private Map<String, byte[]> concurrentPayloads = Map.of();
+    private List<CompletableFuture<HttpResponse<byte[]>>> concurrentGetFutures = List.of();
+    private List<CountDownLatch> concurrentReadStarted = List.of();
+    private String mixedReadKey;
+    private byte[] mixedReadPayload;
     private String multipartUploadId;
     private String multipartBucket;
     private String multipartKey;
@@ -211,6 +217,17 @@ public class PhaseEp5OperabilitySteps {
         startSlowStreamingPut("/" + bucket + "/" + key, byteCount);
     }
 
+    @Given("object {string} in bucket {string} contains {int} deterministic bytes")
+    public void objectInBucketContainsDeterministicBytes(String key, String bucket, int byteCount)
+            throws IOException, InterruptedException {
+        requireGracefulProcess();
+        mixedReadKey = key;
+        mixedReadPayload = deterministicPayload(byteCount);
+        HttpResponse<String> put = sendBytes(
+            gracefulProcess, "PUT", "/" + bucket + "/" + key, mixedReadPayload);
+        assertThat(put.statusCode()).isEqualTo(200);
+    }
+
     @Given("a multipart upload is initiated for object {string} in bucket {string}")
     public void multipartUploadIsInitiatedForObjectInBucket(String key, String bucket)
             throws IOException, InterruptedException {
@@ -345,6 +362,48 @@ public class PhaseEp5OperabilitySteps {
         gracefulProcess.process().toHandle().destroy();
     }
 
+    @When("{int} S3 clients concurrently read object {string} from bucket {string} with throttled response consumption")
+    public void s3ClientsConcurrentlyReadObjectWithThrottledResponseConsumption(
+            int clientCount, String key, String bucket) {
+        requireGracefulProcess();
+        assertThat(key).isEqualTo(mixedReadKey);
+        List<CompletableFuture<HttpResponse<byte[]>>> futures = new ArrayList<>();
+        List<CountDownLatch> startedSignals = new ArrayList<>();
+        for (int index = 0; index < clientCount; index++) {
+            CountDownLatch started = new CountDownLatch(1);
+            HttpRequest request = HttpRequest.newBuilder(
+                    URI.create("http://127.0.0.1:" + gracefulProcess.port() + "/" + bucket + "/" + key))
+                .timeout(Duration.ofSeconds(15))
+                .GET()
+                .build();
+            startedSignals.add(started);
+            futures.add(httpClient.sendAsync(request,
+                responseInfo -> new SlowByteArrayBodySubscriber(started, 500)));
+        }
+        assertThat(futures).hasSizeGreaterThan(1);
+        concurrentGetFutures = List.copyOf(futures);
+        concurrentReadStarted = List.copyOf(startedSignals);
+    }
+
+    @When("operators send SIGTERM after every mixed read and write stream has started")
+    public void operatorsSendSigtermAfterEveryMixedReadAndWriteStreamHasStarted() throws InterruptedException {
+        requireGracefulProcess();
+        assertThat(concurrentBodyStarted).hasSizeGreaterThan(1);
+        assertThat(concurrentReadStarted).hasSizeGreaterThan(1);
+        for (CountDownLatch started : concurrentBodyStarted) {
+            assertThat(started.await(5, TimeUnit.SECONDS)).as("mixed write should start").isTrue();
+        }
+        for (CountDownLatch started : concurrentReadStarted) {
+            assertThat(started.await(5, TimeUnit.SECONDS)).as("mixed read should start").isTrue();
+        }
+        Thread.sleep(100);
+        assertThat(concurrentPutFutures).allMatch(future -> !future.isDone(),
+            "every mixed PutObject should remain active before SIGTERM");
+        assertThat(concurrentGetFutures).allMatch(future -> !future.isDone(),
+            "every mixed GetObject should remain active before SIGTERM");
+        gracefulProcess.process().toHandle().destroy();
+    }
+
     @When("operators send SIGTERM after multipart completion body delivery has started")
     public void operatorsSendSigtermAfterMultipartCompletionBodyDeliveryHasStarted() throws InterruptedException {
         requireGracefulProcess();
@@ -417,6 +476,19 @@ public class PhaseEp5OperabilitySteps {
         assertThat(concurrentPutFutures).hasSizeGreaterThan(1);
         for (CompletableFuture<HttpResponse<String>> future : concurrentPutFutures) {
             assertThat(future.get(15, TimeUnit.SECONDS).statusCode()).isEqualTo(expectedStatus);
+        }
+    }
+
+    @Then("every concurrent GetObject completes with HTTP status {int} and the read fixture checksum")
+    public void everyConcurrentGetObjectCompletesWithHttpStatusAndReadFixtureChecksum(int expectedStatus)
+            throws Exception {
+        assertThat(mixedReadPayload).as("mixed read fixture payload").isNotEmpty();
+        assertThat(concurrentGetFutures).hasSizeGreaterThan(1);
+        for (CompletableFuture<HttpResponse<byte[]>> future : concurrentGetFutures) {
+            HttpResponse<byte[]> get = future.get(15, TimeUnit.SECONDS);
+            assertThat(get.statusCode()).isEqualTo(expectedStatus);
+            assertThat(get.body()).hasSize(mixedReadPayload.length);
+            assertThat(sha256(get.body())).isEqualTo(sha256(mixedReadPayload));
         }
     }
 
@@ -516,6 +588,23 @@ public class PhaseEp5OperabilitySteps {
 
         Path partDirectory = gracefulStorageRoot.resolve("metadata/s3-multipart-parts").resolve(multipartUploadId);
         assertThat(Files.exists(partDirectory)).as("cancelled multipart part directory").isFalse();
+        stopGracefulProcessIfRunning();
+    }
+
+    @Then("the mixed-load objects in bucket {string} retain their streamed content:")
+    public void mixedLoadObjectsRetainTheirStreamedContent(String bucket, DataTable table)
+            throws IOException, InterruptedException {
+        requireGracefulProcess();
+        for (Map<String, String> row : table.asMaps()) {
+            String key = row.get("object key");
+            int expectedBytes = Integer.parseInt(row.get("bytes"));
+            byte[] expectedPayload = key.equals(mixedReadKey) ? mixedReadPayload : concurrentPayloads.get(key);
+            assertThat(expectedPayload).as("mixed-load payload for %s", key).hasSize(expectedBytes);
+            HttpResponse<byte[]> get = sendBytes(gracefulProcess, "GET", "/" + bucket + "/" + key);
+            assertThat(get.statusCode()).as("GET status for %s", key).isEqualTo(200);
+            assertThat(get.body()).hasSize(expectedBytes);
+            assertThat(sha256(get.body())).isEqualTo(sha256(expectedPayload));
+        }
         stopGracefulProcessIfRunning();
     }
 
@@ -894,6 +983,53 @@ public class PhaseEp5OperabilitySteps {
     }
 
     private record ManagedProcess(Process process, int port) {
+    }
+
+    private static final class SlowByteArrayBodySubscriber implements HttpResponse.BodySubscriber<byte[]> {
+        private final HttpResponse.BodySubscriber<byte[]> delegate = HttpResponse.BodySubscribers.ofByteArray();
+        private final CountDownLatch bodyStarted;
+        private final long delayMillis;
+        private boolean firstChunk = true;
+
+        private SlowByteArrayBodySubscriber(CountDownLatch bodyStarted, long delayMillis) {
+            this.bodyStarted = bodyStarted;
+            this.delayMillis = delayMillis;
+        }
+
+        @Override
+        public java.util.concurrent.CompletionStage<byte[]> getBody() {
+            return delegate.getBody();
+        }
+
+        @Override
+        public void onSubscribe(Flow.Subscription subscription) {
+            delegate.onSubscribe(subscription);
+        }
+
+        @Override
+        public void onNext(List<ByteBuffer> item) {
+            if (firstChunk) {
+                firstChunk = false;
+                bodyStarted.countDown();
+                try {
+                    Thread.sleep(delayMillis);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("Interrupted while consuming response body", e);
+                }
+            }
+            delegate.onNext(item);
+        }
+
+        @Override
+        public void onError(Throwable throwable) {
+            delegate.onError(throwable);
+        }
+
+        @Override
+        public void onComplete() {
+            delegate.onComplete();
+        }
     }
 
     private static final class SlowInputStream extends InputStream {

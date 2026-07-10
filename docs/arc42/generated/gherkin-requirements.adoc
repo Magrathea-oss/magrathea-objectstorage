@@ -19,7 +19,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 === Summary
 
 * Feature files scanned: 22
-* Scenarios discovered: 397
+* Scenarios discovered: 398
 * Protocol-smoke scenarios: 122
 
 ==== Status tag counts
@@ -29,7 +29,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |Tag |Scenario count
 |`@absent` |3
 |`@config-only` |69
-|`@implemented-and-validated` |109
+|`@implemented-and-validated` |110
 |`@implemented-not-e2e-validated` |22
 |`@not-implemented` |12
 |`@placeholder` |9
@@ -52,7 +52,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |`@static-architecture-required` |6
 |`@tracing-inspection-required` |2
 |`@webclient-required` |294
-|`unknown/not-tagged` |56
+|`unknown/not-tagged` |57
 |===
 
 ==== Classification tag counts
@@ -60,8 +60,8 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 [cols="1,1",options="header"]
 |===
 |Tag |Scenario count
-|`@functional-requirement` |182
-|`@non-functional-requirement` |93
+|`@functional-requirement` |183
+|`@non-functional-requirement` |94
 |`unknown/not-tagged` |202
 |===
 
@@ -2875,6 +2875,41 @@ so container platforms and CI smoke gates can distinguish a running process from
   Then the cancelled multipart upload has no committed object, active upload, or part artifacts
 ----
 
+===== REQ-OPS-015
+
+====== Scenario: SIGTERM drains a bounded mixed load of streaming reads and writes before process exit
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep5-operability.feature:146`
+|Rule |Graceful shutdown protects committed storage-engine state
+|Requirement ID(s) |`REQ-OPS-015`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep5`, `@operability`, `@admin-api`, `@business-need`, `@observability`, `@graceful-shutdown`, `@request-draining`, `@streaming`, `@concurrency`, `@load`, `@durability`, `@restart-safety`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep5`, `@operability`, `@admin-api`, `@business-need`, `@implemented-and-validated`, `@REQ-OPS-015`, `@functional-requirement`, `@non-functional-requirement`, `@observability`, `@graceful-shutdown`, `@request-draining`, `@streaming`, `@concurrency`, `@load`, `@durability`, `@restart-safety`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given a storage-engine S3 process is running with graceful shutdown enabled and filesystem root "target/ep5-graceful-mixed-load/current"
+  And bucket "ep5-graceful-mixed-load-bucket" is created before in-flight shutdown validation
+  And object "objects/read-fixture.bin" in bucket "ep5-graceful-mixed-load-bucket" contains 2097152 deterministic bytes
+  When S3 clients concurrently stream these deterministic objects to bucket "ep5-graceful-mixed-load-bucket":
+  And 2 S3 clients concurrently read object "objects/read-fixture.bin" from bucket "ep5-graceful-mixed-load-bucket" with throttled response consumption
+  And operators send SIGTERM after every mixed read and write stream has started
+  Then every concurrent PutObject completes with HTTP status 200
+  And every concurrent GetObject completes with HTTP status 200 and the read fixture checksum
+  And the process exits within 10 seconds without forced termination
+  And the shutdown log must not contain Spring Boot's generated security password banner
+  When recovery starts the S3 process again with the same filesystem root
+  Then the mixed-load objects in bucket "ep5-graceful-mixed-load-bucket" retain their streamed content:
+----
+
 ===== REQ-OPS-005
 
 ====== Scenario: Storage-engine filesystem backup restores committed S3 data after primary data loss
@@ -2882,7 +2917,7 @@ so container platforms and CI smoke gates can distinguish a running process from
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep5-operability.feature:148`
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep5-operability.feature:172`
 |Rule |Backup and restore rehearsals prove recoverability from storage-engine filesystem backups
 |Requirement ID(s) |`REQ-OPS-005`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -2913,7 +2948,7 @@ so container platforms and CI smoke gates can distinguish a running process from
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep5-operability.feature:159`
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep5-operability.feature:183`
 |Rule |Backup and restore rehearsals prove recoverability from storage-engine filesystem backups
 |Requirement ID(s) |`REQ-OPS-006`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -2946,7 +2981,7 @@ so container platforms and CI smoke gates can distinguish a running process from
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep5-operability.feature:174`
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep5-operability.feature:198`
 |Rule |Shipped SLO and alert rules give operators actionable first-response guidance
 |Requirement ID(s) |`REQ-OPS-008`
 |Classification |`@functional-requirement`, `@non-functional-requirement`

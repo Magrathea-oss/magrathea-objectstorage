@@ -142,6 +142,30 @@ Business Need: EP-5 operational health probes
       When recovery starts the S3 process again with the same filesystem root
       Then the cancelled multipart upload has no committed object, active upload, or part artifacts
 
+    @implemented-and-validated @REQ-OPS-015 @functional-requirement @non-functional-requirement @observability @graceful-shutdown @request-draining @streaming @concurrency @load @durability @restart-safety
+    Scenario: SIGTERM drains a bounded mixed load of streaming reads and writes before process exit
+      Given a storage-engine S3 process is running with graceful shutdown enabled and filesystem root "target/ep5-graceful-mixed-load/current"
+      And bucket "ep5-graceful-mixed-load-bucket" is created before in-flight shutdown validation
+      And object "objects/read-fixture.bin" in bucket "ep5-graceful-mixed-load-bucket" contains 2097152 deterministic bytes
+      When S3 clients concurrently stream these deterministic objects to bucket "ep5-graceful-mixed-load-bucket":
+        | object key                 | bytes  |
+        | objects/load-write-a.bin   | 262144 |
+        | objects/load-write-b.bin   | 262144 |
+        | objects/load-write-c.bin   | 262144 |
+      And 2 S3 clients concurrently read object "objects/read-fixture.bin" from bucket "ep5-graceful-mixed-load-bucket" with throttled response consumption
+      And operators send SIGTERM after every mixed read and write stream has started
+      Then every concurrent PutObject completes with HTTP status 200
+      And every concurrent GetObject completes with HTTP status 200 and the read fixture checksum
+      And the process exits within 10 seconds without forced termination
+      And the shutdown log must not contain Spring Boot's generated security password banner
+      When recovery starts the S3 process again with the same filesystem root
+      Then the mixed-load objects in bucket "ep5-graceful-mixed-load-bucket" retain their streamed content:
+        | object key                 | bytes   |
+        | objects/read-fixture.bin   | 2097152 |
+        | objects/load-write-a.bin   | 262144  |
+        | objects/load-write-b.bin   | 262144  |
+        | objects/load-write-c.bin   | 262144  |
+
   Rule: Backup and restore rehearsals prove recoverability from storage-engine filesystem backups
 
     @implemented-and-validated @REQ-OPS-005 @functional-requirement @non-functional-requirement @backup @restore @disaster-recovery @durability @restart-safety
