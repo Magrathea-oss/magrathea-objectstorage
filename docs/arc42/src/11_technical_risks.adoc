@@ -40,9 +40,9 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |EP-4 (`@absent`, high priority)
 
 |6
-|**Operability gaps** — the first CI/operability slice now runs appendix/source-hygiene checks, focused Cucumber/security/semantic/EP-5 gates, root JVM Docker build+smoke, manual native Docker build+smoke, Admin API `/admin/live` + `/admin/ready` probes, first SIGTERM shutdown/recovery validation for committed storage-engine objects, and first offline backup/restore rehearsal. DR with declared RTO/RPO is still undocumented and broader in-flight request draining is not verified.
-|Recovery procedures beyond offline single-node backup/restore remain undocumented/unrehearsed; broader operational regressions outside the focused CI slice may still reach `main`
-|Expand CI toward the full Maven gate and release hardening; document and rehearse DR with declared RTO/RPO; add broader graceful-shutdown in-flight draining validation
+|**Operability gaps** — the first CI/operability slice now runs appendix/source-hygiene checks, focused Cucumber/security/semantic/EP-5 gates, root JVM Docker build+smoke, manual native Docker build+smoke, Admin API `/admin/live` + `/admin/ready` probes, first SIGTERM shutdown/recovery validation for committed storage-engine objects, first offline backup/restore rehearsal, and first single-node DR rehearsal with declared RTO/RPO. Online/incremental DR, multi-node DR, and broader in-flight request draining are not verified.
+|Recovery procedures beyond offline single-node backup/restore and single-node DR remain undocumented/unrehearsed; broader operational regressions outside the focused CI slice may still reach `main`
+|Expand CI toward the full Maven gate and release hardening; document online/multi-node DR when supported; add broader graceful-shutdown in-flight draining validation
 |EP-5 (`@partial`, high priority)
 
 |7

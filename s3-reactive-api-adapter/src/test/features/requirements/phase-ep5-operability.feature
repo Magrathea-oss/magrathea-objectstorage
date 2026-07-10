@@ -66,3 +66,16 @@ Business Need: EP-5 operational health probes
       And operators restore the backup to the primary filesystem root
       And recovery starts the S3 process again with the same filesystem root
       Then object "objects/restored.txt" in bucket "ep5-backup-restore-bucket" can be read with body "restored from backup"
+
+    @implemented-and-validated @REQ-OPS-006 @functional-requirement @non-functional-requirement @disaster-recovery @rto @rpo @durability @restart-safety
+    Scenario: Single-node disaster recovery rehearsal meets the declared offline RTO and RPO
+      Given the single-node disaster recovery objective declares RTO 30 seconds and RPO "last completed offline backup"
+      And a storage-engine S3 process is running with graceful shutdown enabled and filesystem root "target/ep5-disaster-recovery/current"
+      And bucket "ep5-disaster-recovery-bucket" contains object "objects/rpo.txt" with body "inside the recovery point"
+      When operators stop the S3 process for a backup window
+      And operators copy the storage-engine filesystem root to backup location "target/ep5-disaster-recovery/backup"
+      And the primary storage-engine filesystem root is lost
+      And operators start disaster recovery from the backup location
+      Then disaster recovery completes within the declared RTO
+      And object "objects/rpo.txt" in bucket "ep5-disaster-recovery-bucket" can be read with body "inside the recovery point"
+      And the recovered data satisfies the declared RPO

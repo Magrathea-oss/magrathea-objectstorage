@@ -49,6 +49,11 @@ public class PhaseEp5OperabilitySteps {
     private Path backupRoot;
     private ManagedProcess gracefulProcess;
     private boolean gracefulProcessForced;
+    private int declaredRtoSeconds;
+    private String declaredRpo;
+    private long disasterRecoveryStartedNanos;
+    private long disasterRecoveryCompletedNanos;
+    private String lastRecoveredBody;
 
     public PhaseEp5OperabilitySteps(@Qualifier("adminWebTestClient") WebTestClient adminClient) {
         this.adminClient = adminClient;
@@ -129,6 +134,15 @@ public class PhaseEp5OperabilitySteps {
         table.asMaps().forEach(row -> assertReadinessComponentStatus(row.get("component"), row.get("status")));
     }
 
+    @Given("the single-node disaster recovery objective declares RTO {int} seconds and RPO {string}")
+    public void singleNodeDisasterRecoveryObjectiveDeclaresRtoAndRpo(int rtoSeconds, String rpo) {
+        declaredRtoSeconds = rtoSeconds;
+        declaredRpo = rpo;
+        disasterRecoveryStartedNanos = 0;
+        disasterRecoveryCompletedNanos = 0;
+        lastRecoveredBody = null;
+    }
+
     @Given("a storage-engine S3 process is running with graceful shutdown enabled and filesystem root {string}")
     public void storageEngineS3ProcessIsRunningWithGracefulShutdown(String root) throws IOException, InterruptedException {
         stopGracefulProcessIfRunning();
@@ -193,6 +207,7 @@ public class PhaseEp5OperabilitySteps {
         HttpResponse<String> response = send(gracefulProcess, "GET", "/" + bucket + "/" + key, "");
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.body()).isEqualTo(expectedBody);
+        lastRecoveredBody = response.body();
         stopGracefulProcessIfRunning();
     }
 
@@ -230,6 +245,35 @@ public class PhaseEp5OperabilitySteps {
 
     @When("operators restore the backup to the primary filesystem root")
     public void operatorsRestoreBackupToPrimaryFilesystemRoot() throws IOException {
+        restoreBackupToPrimaryFilesystemRoot();
+    }
+
+    @When("operators start disaster recovery from the backup location")
+    public void operatorsStartDisasterRecoveryFromBackupLocation() throws IOException, InterruptedException {
+        assertThat(declaredRtoSeconds).as("declared RTO seconds").isPositive();
+        disasterRecoveryStartedNanos = System.nanoTime();
+        restoreBackupToPrimaryFilesystemRoot();
+        recoveryStartsS3ProcessAgainWithSameFilesystemRoot();
+        disasterRecoveryCompletedNanos = System.nanoTime();
+    }
+
+    @Then("disaster recovery completes within the declared RTO")
+    public void disasterRecoveryCompletesWithinDeclaredRto() {
+        assertThat(disasterRecoveryStartedNanos).as("DR start timestamp").isPositive();
+        assertThat(disasterRecoveryCompletedNanos).as("DR completion timestamp").isPositive();
+        long elapsedSeconds = TimeUnit.NANOSECONDS.toSeconds(disasterRecoveryCompletedNanos - disasterRecoveryStartedNanos);
+        assertThat(elapsedSeconds).isLessThanOrEqualTo(declaredRtoSeconds);
+    }
+
+    @Then("the recovered data satisfies the declared RPO")
+    public void recoveredDataSatisfiesDeclaredRpo() {
+        assertThat(declaredRpo).isEqualTo("last completed offline backup");
+        assertThat(backupRoot).as("backup root").isNotNull();
+        assertThat(Files.exists(backupRoot)).as("backup root still exists for audit").isTrue();
+        assertThat(lastRecoveredBody).as("object restored from the recovery point").isNotBlank();
+    }
+
+    private void restoreBackupToPrimaryFilesystemRoot() throws IOException {
         assertThat(backupRoot).as("backup root").isNotNull();
         assertThat(Files.exists(backupRoot)).as("backup root must exist").isTrue();
         copyRecursively(backupRoot, gracefulStorageRoot);
