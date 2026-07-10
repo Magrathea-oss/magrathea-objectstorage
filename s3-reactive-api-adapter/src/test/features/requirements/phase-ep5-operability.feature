@@ -126,6 +126,22 @@ Business Need: EP-5 operational health probes
       When recovery starts the S3 process again with the same filesystem root
       Then the cancelled multipart upload has no committed object, active upload, or part artifacts
 
+    @implemented-and-validated @REQ-OPS-014 @functional-requirement @non-functional-requirement @observability @graceful-shutdown @request-draining @multipart @concurrency @abort @cleanup @durability @restart-safety
+    Scenario: Abort wins against an overlapping CompleteMultipartUpload during SIGTERM without publishing partial state
+      Given a storage-engine S3 process is running with graceful shutdown enabled and filesystem root "target/ep5-graceful-multipart-abort-complete/current"
+      And bucket "ep5-graceful-multipart-abort-complete-bucket" is created before in-flight shutdown validation
+      And a multipart upload is initiated for object "objects/aborted-while-completing.bin" in bucket "ep5-graceful-multipart-abort-complete-bucket"
+      And part 1 of the recorded multipart upload contains 524288 deterministic bytes
+      When an S3 client starts completing the recorded multipart upload with a throttled XML request body
+      And operators abort the recorded multipart upload after completion body delivery starts
+      And operators send SIGTERM to the S3 process
+      Then AbortMultipartUpload completes with HTTP status 204
+      And the overlapping CompleteMultipartUpload completes with HTTP status 404 and S3 error "NoSuchUpload"
+      And the process exits within 10 seconds without forced termination
+      And the shutdown log must not contain Spring Boot's generated security password banner
+      When recovery starts the S3 process again with the same filesystem root
+      Then the cancelled multipart upload has no committed object, active upload, or part artifacts
+
   Rule: Backup and restore rehearsals prove recoverability from storage-engine filesystem backups
 
     @implemented-and-validated @REQ-OPS-005 @functional-requirement @non-functional-requirement @backup @restore @disaster-recovery @durability @restart-safety

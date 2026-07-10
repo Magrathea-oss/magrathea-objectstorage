@@ -62,6 +62,7 @@ public class PhaseEp5OperabilitySteps {
     private CountDownLatch inFlightBodyStarted;
     private CompletableFuture<HttpResponse<String>> inFlightCompletionFuture;
     private CountDownLatch inFlightCompletionBodyStarted;
+    private HttpResponse<String> overlappingAbortResponse;
     private byte[] inFlightPayload;
     private List<CompletableFuture<HttpResponse<String>>> concurrentPutFutures = List.of();
     private List<CountDownLatch> concurrentBodyStarted = List.of();
@@ -311,6 +312,24 @@ public class PhaseEp5OperabilitySteps {
         assertThat(abort.statusCode()).isEqualTo(204);
     }
 
+    @When("operators abort the recorded multipart upload after completion body delivery starts")
+    public void operatorsAbortRecordedMultipartUploadAfterCompletionBodyDeliveryStarts()
+            throws IOException, InterruptedException {
+        requireGracefulProcess();
+        assertThat(inFlightCompletionBodyStarted).as("completion body start signal").isNotNull();
+        assertThat(inFlightCompletionBodyStarted.await(5, TimeUnit.SECONDS))
+            .as("multipart completion request body should start before abort")
+            .isTrue();
+        Thread.sleep(100);
+        assertThat(inFlightCompletionFuture).as("overlapping CompleteMultipartUpload future").isNotNull();
+        assertThat(inFlightCompletionFuture.isDone())
+            .as("CompleteMultipartUpload should still be active when abort is sent")
+            .isFalse();
+        String path = "/" + multipartBucket + "/" + multipartKey
+            + "?uploadId=" + URLEncoder.encode(multipartUploadId, StandardCharsets.UTF_8);
+        overlappingAbortResponse = send(gracefulProcess, "DELETE", path, "");
+    }
+
     @When("operators send SIGTERM after request body delivery has started")
     public void operatorsSendSigtermAfterRequestBodyDeliveryHasStarted() throws InterruptedException {
         requireGracefulProcess();
@@ -368,6 +387,21 @@ public class PhaseEp5OperabilitySteps {
         assertThat(uploadPartResponse.statusCode()).isEqualTo(expectedStatus);
         drainedPartETag = uploadPartResponse.headers().firstValue("ETag").orElse(null);
         assertThat(drainedPartETag).as("drained UploadPart ETag").isNotBlank();
+    }
+
+    @Then("AbortMultipartUpload completes with HTTP status {int}")
+    public void abortMultipartUploadCompletesWithHttpStatus(int expectedStatus) {
+        assertThat(overlappingAbortResponse).as("overlapping AbortMultipartUpload response").isNotNull();
+        assertThat(overlappingAbortResponse.statusCode()).isEqualTo(expectedStatus);
+    }
+
+    @Then("the overlapping CompleteMultipartUpload completes with HTTP status {int} and S3 error {string}")
+    public void overlappingCompleteMultipartUploadCompletesWithHttpStatusAndS3Error(
+            int expectedStatus, String expectedError) throws Exception {
+        assertThat(inFlightCompletionFuture).as("overlapping CompleteMultipartUpload future").isNotNull();
+        HttpResponse<String> completion = inFlightCompletionFuture.get(15, TimeUnit.SECONDS);
+        assertThat(completion.statusCode()).isEqualTo(expectedStatus);
+        assertThat(completion.body()).contains("<Code>" + expectedError + "</Code>");
     }
 
     @Then("the in-flight CompleteMultipartUpload completes with HTTP status {int}")

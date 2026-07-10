@@ -53,6 +53,10 @@ completion response to return HTTP 200, then restarts and verifies the assembled
 operators abort its multipart upload, and then send `SIGTERM`. After restart, the test requires no committed object,
 no active upload entry, and no multipart part directory or temporary part artifact for that upload ID.
 
+`REQ-OPS-014` overlaps `AbortMultipartUpload` with an active, throttled `CompleteMultipartUpload`. Abort returns HTTP 204
+before the completion body finishes; `SIGTERM` is then sent while completion remains active. Graceful draining returns
+S3 `NoSuchUpload` for completion, and restart verification proves that abort published no object or part artifacts.
+
 ## Recovery verification
 
 After restart:
@@ -65,5 +69,5 @@ After restart:
 ## Open gaps
 
 - Two concurrent PutObject drains are validated, but larger request sets and mixed upload/read draining have not yet been load-tested.
-- Multipart UploadPart and CompleteMultipartUpload draining plus cancellation followed by abort are validated; simultaneous abort/completion races remain outside the current scope.
+- Multipart UploadPart and CompleteMultipartUpload draining, cancellation followed by abort, and the abort-wins completion overlap are validated; completion-wins races under repeated contention remain outside the current scope.
 - Multi-node traffic shifting and rolling shutdown remain future distributed-operability work.
