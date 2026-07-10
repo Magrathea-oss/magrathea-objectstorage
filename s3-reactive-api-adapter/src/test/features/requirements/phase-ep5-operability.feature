@@ -54,6 +54,18 @@ Business Need: EP-5 operational health probes
       When recovery starts the S3 process again with the same filesystem root
       Then object "objects/shutdown-drain.txt" in bucket "ep5-graceful-shutdown-bucket" can be read with body "committed before shutdown"
 
+    @implemented-and-validated @REQ-OPS-009 @functional-requirement @non-functional-requirement @observability @graceful-shutdown @request-draining @streaming @durability
+    Scenario: SIGTERM drains an in-flight streaming PutObject before process exit
+      Given a storage-engine S3 process is running with graceful shutdown enabled and filesystem root "target/ep5-graceful-drain/current"
+      And bucket "ep5-graceful-drain-bucket" is created before in-flight shutdown validation
+      When an S3 client starts streaming 524288 deterministic bytes to object "objects/in-flight.bin" in bucket "ep5-graceful-drain-bucket"
+      And operators send SIGTERM after request body delivery has started
+      Then the in-flight PutObject completes with HTTP status 200
+      And the process exits within 10 seconds without forced termination
+      And the shutdown log must not contain Spring Boot's generated security password banner
+      When recovery starts the S3 process again with the same filesystem root
+      Then object "objects/in-flight.bin" in bucket "ep5-graceful-drain-bucket" has 524288 bytes with the streamed content checksum
+
   Rule: Backup and restore rehearsals prove recoverability from storage-engine filesystem backups
 
     @implemented-and-validated @REQ-OPS-005 @functional-requirement @non-functional-requirement @backup @restore @disaster-recovery @durability @restart-safety

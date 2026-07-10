@@ -18,6 +18,7 @@ import org.springframework.test.web.reactive.server.EntityExchangeResult;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.ServerSocket;
 import java.net.URI;
@@ -27,8 +28,13 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
+import java.util.HexFormat;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -48,6 +54,9 @@ public class PhaseEp5OperabilitySteps {
     private Path gracefulLog;
     private Path backupRoot;
     private ManagedProcess gracefulProcess;
+    private CompletableFuture<HttpResponse<String>> inFlightPutFuture;
+    private CountDownLatch inFlightBodyStarted;
+    private byte[] inFlightPayload;
     private boolean gracefulProcessForced;
     private int declaredRtoSeconds;
     private String declaredRpo;
@@ -176,6 +185,50 @@ public class PhaseEp5OperabilitySteps {
         gracefulProcess.process().toHandle().destroy();
     }
 
+    @Given("bucket {string} is created before in-flight shutdown validation")
+    public void bucketIsCreatedBeforeInFlightShutdownValidation(String bucket) throws IOException, InterruptedException {
+        requireGracefulProcess();
+        HttpResponse<String> createBucket = send(gracefulProcess, "PUT", "/" + bucket, "");
+        assertThat(createBucket.statusCode()).isBetween(200, 299);
+    }
+
+    @When("an S3 client starts streaming {int} deterministic bytes to object {string} in bucket {string}")
+    public void s3ClientStartsStreamingDeterministicBytes(int byteCount, String key, String bucket) {
+        requireGracefulProcess();
+        inFlightPayload = deterministicPayload(byteCount);
+        inFlightBodyStarted = new CountDownLatch(1);
+        HttpRequest request = HttpRequest.newBuilder(
+                URI.create("http://127.0.0.1:" + gracefulProcess.port() + "/" + bucket + "/" + key))
+            .timeout(Duration.ofSeconds(15))
+            .header("Content-Type", "application/octet-stream")
+            .PUT(HttpRequest.BodyPublishers.ofInputStream(
+                () -> new SlowInputStream(inFlightPayload, inFlightBodyStarted, 4096, 20)))
+            .build();
+        inFlightPutFuture = httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+    }
+
+    @When("operators send SIGTERM after request body delivery has started")
+    public void operatorsSendSigtermAfterRequestBodyDeliveryHasStarted() throws InterruptedException {
+        requireGracefulProcess();
+        assertThat(inFlightBodyStarted).as("streaming body start signal").isNotNull();
+        assertThat(inFlightBodyStarted.await(5, TimeUnit.SECONDS))
+            .as("streaming request body should start before SIGTERM")
+            .isTrue();
+        Thread.sleep(250);
+        assertThat(inFlightPutFuture).as("in-flight PutObject future").isNotNull();
+        assertThat(inFlightPutFuture.isDone())
+            .as("PutObject should still be in flight when SIGTERM is sent")
+            .isFalse();
+        gracefulProcess.process().toHandle().destroy();
+    }
+
+    @Then("the in-flight PutObject completes with HTTP status {int}")
+    public void inFlightPutObjectCompletesWithHttpStatus(int expectedStatus) throws Exception {
+        assertThat(inFlightPutFuture).as("in-flight PutObject future").isNotNull();
+        HttpResponse<String> putResponse = inFlightPutFuture.get(15, TimeUnit.SECONDS);
+        assertThat(putResponse.statusCode()).isEqualTo(expectedStatus);
+    }
+
     @Then("the process exits within {int} seconds without forced termination")
     public void processExitsWithinSecondsWithoutForcedTermination(int seconds) throws InterruptedException {
         requireGracefulProcess();
@@ -211,6 +264,18 @@ public class PhaseEp5OperabilitySteps {
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.body()).isEqualTo(expectedBody);
         lastRecoveredBody = response.body();
+        stopGracefulProcessIfRunning();
+    }
+
+    @Then("object {string} in bucket {string} has {int} bytes with the streamed content checksum")
+    public void objectHasBytesWithStreamedContentChecksum(String key, String bucket, int expectedBytes)
+            throws IOException, InterruptedException {
+        requireGracefulProcess();
+        assertThat(inFlightPayload).as("streamed payload").hasSize(expectedBytes);
+        HttpResponse<byte[]> response = sendBytes(gracefulProcess, "GET", "/" + bucket + "/" + key);
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body()).hasSize(expectedBytes);
+        assertThat(sha256(response.body())).isEqualTo(sha256(inFlightPayload));
         stopGracefulProcessIfRunning();
     }
 
@@ -407,6 +472,31 @@ public class PhaseEp5OperabilitySteps {
         return httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
     }
 
+    private HttpResponse<byte[]> sendBytes(ManagedProcess managedProcess, String method, String path)
+            throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + managedProcess.port() + path))
+            .timeout(Duration.ofSeconds(10))
+            .method(method, HttpRequest.BodyPublishers.noBody())
+            .build();
+        return httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
+    }
+
+    private static byte[] deterministicPayload(int byteCount) {
+        byte[] payload = new byte[byteCount];
+        for (int index = 0; index < payload.length; index++) {
+            payload[index] = (byte) ('a' + (index % 26));
+        }
+        return payload;
+    }
+
+    private static String sha256(byte[] value) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 digest is unavailable", e);
+        }
+    }
+
     private void requireGracefulProcess() {
         assertThat(gracefulProcess).as("managed graceful-shutdown process").isNotNull();
     }
@@ -520,5 +610,45 @@ public class PhaseEp5OperabilitySteps {
     }
 
     private record ManagedProcess(Process process, int port) {
+    }
+
+    private static final class SlowInputStream extends InputStream {
+        private final byte[] payload;
+        private final CountDownLatch bodyStarted;
+        private final int chunkSize;
+        private final long delayMillis;
+        private int position;
+
+        private SlowInputStream(byte[] payload, CountDownLatch bodyStarted, int chunkSize, long delayMillis) {
+            this.payload = payload;
+            this.bodyStarted = bodyStarted;
+            this.chunkSize = chunkSize;
+            this.delayMillis = delayMillis;
+        }
+
+        @Override
+        public int read() throws IOException {
+            byte[] single = new byte[1];
+            int read = read(single, 0, 1);
+            return read < 0 ? -1 : Byte.toUnsignedInt(single[0]);
+        }
+
+        @Override
+        public int read(byte[] target, int offset, int length) throws IOException {
+            if (position >= payload.length) {
+                return -1;
+            }
+            try {
+                Thread.sleep(delayMillis);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IOException("Interrupted while streaming request body", e);
+            }
+            int count = Math.min(Math.min(length, chunkSize), payload.length - position);
+            System.arraycopy(payload, position, target, offset, count);
+            position += count;
+            bodyStarted.countDown();
+            return count;
+        }
     }
 }
