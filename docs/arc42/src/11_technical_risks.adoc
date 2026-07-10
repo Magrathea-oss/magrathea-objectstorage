@@ -12,8 +12,8 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |1
 |**Default backend is in-memory** — the `single-node` profile's reactive in-memory repositories do not persist to disk. The Storage Engine backend (`storage-engine` profile) now durably persists object bytes/manifests/references AND (as of EP-2) the bucket registry, multipart upload state, and per-object/bucket configuration — but it must be explicitly selected and is not the default.
 |Data loss on restart when running the default profile
-|Keep the in-memory default explicit and documented; continue validating the storage-engine profile's durability guarantees end to end before any production default change
-|EP-2 (`@partial` — core metadata families durable and restart-tested; object tags/ACL durability and full Cucumber e2e runner wiring remain open)
+|Keep the in-memory default explicit and documented; do not make the in-memory profile a production durability default without a new decision
+|EP-2 (`@implemented-and-validated` for the declared storage-engine metadata durability scope; the default in-memory profile remains explicitly exempt)
 
 |2
 |**S3 semantic depth** — the in-scope route surface is mapped, but route count is not semantic completion. AWS CLI parity has improved for the canonical object CRUD subset and metadata durability, but full S3 scenario parity is incomplete.
@@ -22,16 +22,16 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |Ongoing (S3 API Semantic Completion Plan, `PLAN.md`)
 
 |3
-|**Streaming completeness gap** — `GetObject` (full-body and Range) still materializes the whole object via `collectList()`, and `S3MultipartHandler.uploadPart` still uses `DataBufferUtils.join` without persisting part bodies through the storage engine.
-|`OutOfMemoryError` risk for large objects on read; multipart uploads do not durably assemble the real object
-|Extend the streaming-tee pattern already used for PutObject (`UploadDigest`, single-pass ETag/length) to the read and multipart-part paths; extend `ReactiveUploadStreamingArchitectureTest` to forbid `join`/`collectList` in the fixed paths
-|EP-3 (`@partial` — write path fixed and guarded; read path and multipart part persistence open)
+|**Streaming completeness gap** — known full-body/full-part aggregation defects have been removed from PutObject, GetObject, UploadPart, UploadPartCopy, and multipart part-store paths, but runtime/backpressure evidence for large staged-pipeline workloads is still incomplete.
+|`OutOfMemoryError` risk remains for unvalidated large staged-pipeline workloads even after removing known full-body/full-part joins
+|Keep Cucumber static architecture coverage for PutObject, GetObject, UploadPart/UploadPartCopy, part-store streaming, final assembly, copied bytes, and XML error semantics; add runtime/backpressure validation for large staged pipeline workloads
+|EP-3 (`@partial` — PutObject/GetObject streaming and multipart semantic assembly/copy/error plus no-join part persistence are validated; broader staged pipeline/runtime backpressure evidence remains open)
 
 |4
-|**No authentication/authorization** — AWS SigV4 is accepted but not validated; there is no deny-by-default authorization or audit logging.
-|Usable only in trusted environments; anyone can write/read objects
-|Implement SigV4 verification middleware, deny-by-default authorization, audit logging, and real server-side encryption
-|EP-1 (`@absent`, blocker)
+|**Security must be explicitly enabled** — EP-1 secured mode now proves SigV4, exact payload hashes, deny-by-default, explicit deny, PublicAccessBlock/public ACL denial, expected-owner mismatch, durable redacted tamper-evident audit, durable credentials/policies, and SSE-S3 encrypted-at-rest inspection through Spring Security Reactive plus WebTestClient/AWS CLI/component specs. The remaining risk is operational: the default profile is still anonymous/permit-all for trusted environments.
+|Deployments that forget `s3.security.enabled=true` still allow anonymous writes/reads
+|Document secured-mode deployment defaults and keep CI gates for EP-1 WebTestClient, AWS CLI/e2e, and backing-service specs
+|EP-1 (`@implemented-and-validated` for local built-in scope)
 
 |5
 |**Space management and data hygiene absent** — no chunk garbage collection/reference counting beyond on-demand `FileSystemRecoveryScanner`, no quotas, no defined ENOSPC behavior, no background scrubbing.
@@ -40,10 +40,10 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |EP-4 (`@absent`, high priority)
 
 |6
-|**Operability gaps** — no CI pipeline runs the full gate/appendix-check/Docker build; no documented backup/restore or DR rehearsal; readiness/liveness probes beyond `/admin/health` are not verified.
-|Regressions may reach `main` undetected; recovery procedures are undocumented/unrehearsed
-|Wire CI to the full Maven gate + Gherkin appendix `--check` + Docker build; document and rehearse backup/restore and DR with declared RTO/RPO
-|EP-5 (`@absent`, high priority)
+|**Operability gaps** — the first CI packaging slice now runs appendix/source-hygiene checks, focused Cucumber/security/semantic gates, root JVM Docker build+smoke, and a manual native Docker build+smoke, but backup/restore and DR rehearsal are still undocumented and readiness/liveness probes beyond `/admin/health` are not verified.
+|Recovery procedures are undocumented/unrehearsed; broader operational regressions outside the focused CI slice may still reach `main`
+|Expand CI toward the full Maven gate and release hardening; document and rehearse backup/restore and DR with declared RTO/RPO; add readiness/liveness and graceful-shutdown validation
+|EP-5 (`@partial`, high priority)
 
 |7
 |**Distributed readiness is modeled, not executed** — placement, quorum, anti-entropy, and rebalance planning are unit-validated in `storage-engine-domain`, but there is no real networked membership, replication execution, or multi-node e2e validation.

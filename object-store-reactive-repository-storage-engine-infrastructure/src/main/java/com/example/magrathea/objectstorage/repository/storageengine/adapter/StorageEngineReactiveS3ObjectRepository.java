@@ -342,6 +342,22 @@ public class StorageEngineReactiveS3ObjectRepository
     }
 
     @Override
+    public Mono<EncryptionConfiguration> findEncryption(
+            String bucketName,
+            com.example.magrathea.objectstore.domain.valueobject.ObjectKey key) {
+        return findObjectConfig(bucketName, key)
+            .flatMap(config -> Mono.justOrEmpty(config.encryption()));
+    }
+
+    @Override
+    public Mono<RestoreConfiguration> findRestore(
+            String bucketName,
+            com.example.magrathea.objectstore.domain.valueobject.ObjectKey key) {
+        return findObjectConfig(bucketName, key)
+            .flatMap(config -> Mono.justOrEmpty(config.restore()));
+    }
+
+    @Override
     public Flux<DataBuffer> findTorrent(String bucketName,
                                          com.example.magrathea.objectstore.domain.valueobject.ObjectKey key) {
         return findObjectByBucketNameAndKey(bucketName, key)

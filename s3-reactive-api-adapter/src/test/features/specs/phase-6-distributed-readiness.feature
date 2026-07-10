@@ -1,4 +1,4 @@
-@requirement @phase-6 @distributed-readiness @storage-engine @implemented-not-e2e-validated
+@spec @phase-6 @distributed-readiness @storage-engine @implemented-not-e2e-validated
 Ability: Phase 6 distributed readiness model for storage-engine placement, quorum, membership, healing, and rebalancing
   As a storage-engine operator and system owner,
   I want distributed-readiness behavior to be modeled with explicit placement, quorum, membership, health, healing, and rebalancing decisions,

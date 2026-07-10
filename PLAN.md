@@ -24,7 +24,7 @@ This is the **single authoritative evidence table** for current test counts. Old
 
 ## Post-Audit Production Readiness Plan (PA-1 .. PA-6)
 
-The post-audit baseline is that Magrathea ObjectStore remains a prototype with an advanced architecture, not a production-ready object store. Declared PA-1/PA-2/PA-5 scopes are implemented and validated; restart-safety for the remaining metadata families, streaming completion, external observability, distributed readiness, and broader S3 semantics remain open and are tracked in the Enterprise Production Readiness Plan below.
+The post-audit baseline is that Magrathea ObjectStore remains a prototype with an advanced architecture, not a production-ready object store. Declared PA-1/PA-2/PA-5 scopes and EP-2 storage-engine metadata durability are implemented and validated; streaming completion, external observability, distributed readiness, and broader S3 semantics remain open and are tracked in the Enterprise Production Readiness Plan below.
 
 ### PA-1 — Reliable Upload and Restart Safety ✅ Implemented and validated for the declared Phase 1 scope
 
@@ -52,7 +52,7 @@ Completed scope (condensed): durable object metadata and key→manifest mapping 
 |---|---|
 | Focus | Replace the monolithic orchestrator flow with a staged reactive read/write pipeline. |
 | Current status | `@implemented-not-e2e-validated`. `StorageStage`/`StorageContext`/`StorageEvent`/`StoragePipelineExecutor` implemented; `ReactiveStorageOrchestrator` refactored into staged write/read pipelines with bounded demand, deterministic failure propagation, cancellation cleanup, and stage event publication. Unit/application validated (REQ-PIPELINE-001..006). |
-| Validation evidence | Feature: `phase-3-reactive-pipeline.feature`. `Phase3ReactivePipelineCucumberTest` runner exists but all `@phase-3 @webclient` scenarios carry `@not-implemented` and are excluded. `storage-engine-reactive-application` module gate 159/159. REQ-PIPELINE-007/008 (single-pass PutObject tee; incremental dedup windows) are enforced by `ReactiveUploadStreamingArchitectureTest`. |
+| Validation evidence | Feature: `phase-3-reactive-pipeline.feature`. `Phase3ReactivePipelineCucumberTest` runner exists but runtime `@phase-3 @webclient` scenarios still carry `@not-implemented` and are excluded. `storage-engine-reactive-application` module gate 159/159. REQ-PIPELINE-007/008 (single-pass PutObject tee; incremental dedup windows), REQ-PIPELINE-009 (non-range GetObject attaches `oc.content()` directly), REQ-PIPELINE-010 (ranged GetObject slices the content Flux), and REQ-PIPELINE-011/012 (UploadPart/UploadPartCopy and part-store DataBuffer streaming) are Cucumber-validated by `Phase3ReactivePipelineStaticArchitectureSpecsCucumberTest`; REQ-PIPELINE-007/008 remain fast-guarded by `ReactiveUploadStreamingArchitectureTest`. Latest targeted gates: `mvn -pl s3-reactive-api-adapter -Dtest=Phase3ReactivePipelineStaticArchitectureSpecsCucumberTest test`, `mvn -pl s3-reactive-api-adapter -Dtest=Phase5S3SemanticCompatibilityRequirementsCucumberTest test`, and `mvn -pl s3-reactive-api-adapter -Dtest=Phase5S3SemanticCompatibilityAwsCliCucumberTest test` passed with no generated-password banner. |
 | Remaining gap | Expose pipeline-event observability (stage transitions, event emission, backpressure counters) through an external HTTP/metrics surface, then add step implementations and remove `@not-implemented`. Read-path streaming completion is tracked as EP-3. |
 
 ### PA-4 — Observability ⚠️ Implemented and bootstrap-validated; no Cucumber e2e runner exists
@@ -69,9 +69,9 @@ Completed scope (condensed): durable object metadata and key→manifest mapping 
 | Field | Plan / Result |
 |---|---|
 | Focus | Move beyond mapped endpoints and protocol smoke tests toward semantically meaningful S3 behavior. |
-| Current status | `@implemented-and-validated` for 24 WebTestClient scenarios and 12 AWS CLI scenarios: ETag format/consistency (REQ-S3-001), multipart ETag semantics (REQ-S3-002-A/B), byte-range GET incl. 416 (REQ-S3-003), conditional requests (REQ-S3-004), CopyObject ETag (REQ-S3-005), object tagging lifecycle (REQ-S3-006), explicit unsupported/config-only classification for versioning/object lock/lifecycle (REQ-S3-007). `@implemented-not-e2e-validated` for REQ-S3-002-C multipart restart durability (validated via same-process filesystem inspection, not a full Spring restart). |
+| Current status | `@implemented-and-validated` for 32 WebTestClient scenarios, 14 AWS CLI scenarios, and 1 full-process restart scenario: ETag format/consistency (REQ-S3-001), multipart ETag semantics, completed-object ordered part assembly, UploadPartCopy copied-byte assembly, multipart XML error semantics, and part-body restart completion (REQ-S3-002-A/B/D/E/F/G/H/I/J/K), byte-range GET incl. 416 (REQ-S3-003), conditional requests (REQ-S3-004), CopyObject ETag (REQ-S3-005), object tagging lifecycle (REQ-S3-006), explicit unsupported/config-only classification for versioning/object lock/lifecycle (REQ-S3-007). `@implemented-not-e2e-validated` remains only for REQ-S3-002-C's same-process ListParts restart-simulation scenario, which is superseded for part-body/final-assembly durability by REQ-S3-002-E full-process evidence. |
 | Validation evidence | `Phase5S3SemanticCompatibilityRequirementsCucumberTest` 25/25; `Phase5S3SemanticCompatibilityAwsCliCucumberTest` 12 `@awscli-required` examples executed, non-required filtered. Feature: `phase-5-s3-semantic-compatibility.feature`. |
-| Remaining gaps | REQ-S3-002-C full-restart e2e validation; versioning/delete markers/object-lock/lifecycle/replication enforcement remains intentionally unsupported or config-only. |
+| Remaining gaps | REQ-S3-002-C full-restart e2e validation; broader staged pipeline/runtime backpressure evidence for large multipart objects; versioning/delete markers/object-lock/lifecycle/replication enforcement remains intentionally unsupported or config-only. |
 
 ### PA-6 — Distributed Readiness ⚠️ Modeled and unit-validated, not e2e/distributed-production-ready
 
@@ -95,7 +95,7 @@ Gherkin feature files are executable requirements. They must describe business/s
 
 ### Generated Requirements Appendix — status
 
-The appendix generator, freshness gate, ARC42 linkage, and Docker build integration are **done**: `scripts/generate-gherkin-requirements-appendix.py` writes `docs/arc42/generated/gherkin-requirements.adoc`; the Dockerfile builder stage runs `--check` (failing on staleness) and deterministically regenerates the appendix before docs/frontend asset conversion; no built static web assets are committed. Local gate: see Baseline Evidence table. Remaining: full `docker build` execution of the appendix gate is pending an environment with registry network access; CI wiring is tracked in EP-5.
+The appendix generator, freshness gate, ARC42 linkage, and Docker build integration are **done**: `scripts/generate-gherkin-requirements-appendix.py` writes `docs/arc42/generated/gherkin-requirements.adoc`; container builder stages run `--check` (failing on staleness) and deterministically regenerate the appendix before docs/frontend asset conversion; no built static web assets are committed. Local native-image Docker validation executed this appendix gate successfully via `Dockerfile.native` with host networking in the sandbox. Root JVM `Dockerfile` validation now also executes the freshness gate, regenerated docs/UI assets, unmasked Maven packaging, non-root runtime ownership, and container smoke validation.
 
 ## Project-Wide Correction Plan — Full Audit Findings
 
@@ -109,7 +109,7 @@ This section implements [ADR 0017](docs/adr/0017-course-correction-broaden-proje
 | Affected modules/files | Root and module `pom.xml`; generated/static asset boundaries; Dockerfiles; `.gitignore`/`.dockerignore`; `scripts/check-source-hygiene.sh` |
 | Acceptance gates | `mvn validate` from clean checkout; clean `git status` after builds; no committed `.class`/generated `META-INF`; one canonical coverage profile; Docker healthcheck dependencies present; admin POM validates |
 
-Done: plugin/coverage-profile centralization, hygiene ignores, `wget` healthcheck dependency, source-hygiene script, generated root output removal (`mvn validate` PASS, hygiene script PASS). Remaining: duplicate module-level `coverage` profile consolidation in `bootstrap-application/pom.xml`; full Docker build validation.
+Done: plugin/coverage-profile centralization, hygiene ignores, `wget` healthcheck dependency, source-hygiene script, generated root output removal (`mvn validate` PASS, hygiene script PASS), root JVM Docker build validation with unmasked Maven packaging and runtime smoke. Remaining: duplicate module-level `coverage` profile consolidation in `bootstrap-application/pom.xml`.
 
 ### B. Module/layering architecture
 
@@ -142,9 +142,9 @@ Done: defensive/immutable collection exposure across object-store and storage-en
 Done: `StorageEngineReactiveS3ObjectRepository#getContent` performs real read-through from persisted manifests with regression coverage incl. slash keys; `FileSystemManifestRepository` checksum round-trips; blocking filesystem I/O isolated on `Schedulers.boundedElastic()` via `BlockingFileSystemOperation` (targeted and full Maven gates PASS — see `docs/test-report.md`).
 
 Remaining gaps:
-- **Write path:** only `S3MultipartHandler.uploadPart` still uses `DataBufferUtils.join`. `S3ObjectOperationsHandler.putObject` (single-pass `UploadDigest` tee) and `FixedWindowDedupStep` (incremental windows) were fixed and are guarded by the static architecture test `ReactiveUploadStreamingArchitectureTest` (REQ-PIPELINE-007/008).
-- **Read path (newly identified, planner-verified):** `S3ObjectOperationsHandler.getObject` calls `oc.content().collectList()` for **both** range and non-range requests, materializing the whole object in memory on read. Open reactive-streaming defect — tracked as EP-3. Not claimed fixed.
-- Multipart part-body persistence and final object assembly remain incomplete (part bytes are currently discarded) — EP-3.
+- **Write path:** `S3ObjectOperationsHandler.putObject` (single-pass `UploadDigest` tee), `FixedWindowDedupStep` (incremental windows), and `S3MultipartHandler.uploadPart` / `uploadPartCopy` (part-store DataBuffer streaming) no longer use `DataBufferUtils.join` on full object/part bodies. These are guarded by `ReactiveUploadStreamingArchitectureTest` for REQ-PIPELINE-007/008 and Cucumber static specs REQ-PIPELINE-007..012.
+- **Read path:** `S3ObjectOperationsHandler.getObject` now streams non-range responses by attaching `oc.content()` directly to `S3ResponseBuilder.okWithBody` (REQ-PIPELINE-009) and streams ranged responses through `serveRange(obj, oc.content(), rangeHeader)` plus per-buffer `sliceRange(...)` without collecting the full object (REQ-PIPELINE-010).
+- Multipart part-body persistence and final object assembly are now implemented for uploaded and copied parts: `S3MultipartPartStore` persists part bodies under the configured storage root and `CompleteMultipartUpload` assembles ordered parts into the final object (`REQ-S3-002-D/F`, WebTestClient + AWS CLI validated). Part bodies also survive a full Spring stop/start and can be completed after restart into a readable object (`REQ-S3-002-E`, full-process restart validated). Multipart edge/error XML semantics are validated for malformed copy-source headers, missing upload IDs, malformed complete XML, invalid part references, and abort/complete conflicts (`REQ-S3-002-G..K`).
 - **Handler-local state in the web adapter (planner-verified 2026-07-02; RESOLVED 2026-07-03):** `S3BucketConfigHandler` originally held **6 `ConcurrentHashMap`s directly in the WEB ADAPTER**. All six families (object-lock, inventory-table, journal-table, ABAC, metadata config, metadata-table) have been moved onto the `Bucket` aggregate and are durable via `BucketStore`; the handler now holds no configuration state (`resetInMemoryConfigurations` is a retained no-op). Layering violation and durability gap closed.
 - Broader chunk identity consistency, dedup duplicate-hit short-circuit, and complete admin catalog-backed error semantics remain open (see CC-6).
 
@@ -193,7 +193,7 @@ Done: read-only configuration-as-code Admin API catalogs with non-persistent val
 | Priority | Correction focus | Status |
 |---|---|---|
 | P0 — Stop compounding false signals | Artifact boundaries, POM hygiene, documentation truth reset, JaCoCo baseline | ✅ Done 2026-06-12 (details in section A/G); remaining `mvn validate`-from-clean-checkout gate closed by section A evidence |
-| P1 — Restore architectural and runtime correctness | Dependency inversion fix, explicit backend selection, storage-engine wiring, runtime correctness | ⚠️ Layering/scanning/wiring done; runtime correctness gaps tracked in section D and EP-2/EP-3 |
+| P1 — Restore architectural and runtime correctness | Dependency inversion fix, explicit backend selection, storage-engine wiring, runtime correctness | ⚠️ Layering/scanning/wiring done; remaining runtime correctness gaps tracked in section D and EP-3+ |
 | P2 — Harden domain and configuration model | Domain tests, invariants, YAML catalogs, `MINIO_STANDARD`, topology | ✅ Bounded scope done (sections C/E); residual items listed there |
 | P3 — Parity, documentation, and UI maturation | AWS CLI parity, C4/ARC42/API coverage, admin UI handoff | ⚠️ Increments done (CC-9, section H); remainder tracked in CC-9 and EP-7 |
 
@@ -218,7 +218,7 @@ This section implements [ADR 0018](docs/adr/0018-course-correction-classify-s3-a
 |---|---|---|---|
 | Object CRUD baseline (`PutObject`, `GetObject`, `HeadObject`, `DeleteObject`, `CopyObject`) | S3-P1 | Full CRUD semantics: read-after-write, slash keys, metadata persistence, checksum/ETag, storage class, delete idempotency, copy, storage-engine backend read/write/delete. | WebTestClient + repository tests prove state transitions; storage-engine backend passes equivalent scenarios. |
 | Bucket baseline (`CreateBucket`, `HeadBucket`, `DeleteBucket`, `ListBuckets`, `ListObjects`, `ListObjectsV2`) | S3-P1 | Real bucket state, existence checks, list ordering, prefixes/delimiters/continuation tokens/markers/max keys, non-empty delete behavior. | Stateful bucket lifecycle tests; list V1/V2 tests; AWS CLI scenarios marked separately. |
-| Multipart upload | S3-P2 | Persisted part bodies and metadata, part listing, part-copy, final assembly, multipart ETag, abort/orphan cleanup, storage-engine integration. | Multipart state machine tests; completed object reads as assembled bytes; storage-engine backend passes. (Streaming/persistence gap tracked as EP-3.) |
+| Multipart upload | S3-P2 | Persisted part bodies and metadata, part listing, part-copy, final assembly, multipart ETag, abort/orphan cleanup, storage-engine integration. | Completed object reads as assembled bytes now pass WebTestClient and AWS CLI for uploaded and copied parts; uploaded part bodies also survive full Spring stop/start and can be completed after restart. Multipart XML error semantics are covered for the declared edge cases. UploadPart/UploadPartCopy now stream part bodies to the part store without `DataBufferUtils.join`; remaining work is broader staged pipeline/runtime backpressure evidence for large multipart objects and future advanced S3 semantics. |
 | Object metadata/configuration (ACLs, tags, attributes, legal hold, retention, restore) | S3-P2 persistence; S3-P4 enforcement | Distinguish persisted metadata from enforcement; document unsupported enforcement separately. | Put/get/delete metadata tests; metadata survives read/head/list; unsupported enforcement documented. |
 | Bucket configuration (CORS, lifecycle, website, logging, notification, replication, encryption, versioning, tagging, accelerate, location, ownership, request payment) | S3-P3 config; S3-P4 enforcement | Per-config classification as `config-only`/`enforced`/`unsupported`/`stub`. | Matrix row + get/put/delete tests per config; execution not claimed without tested background behavior. |
 | Versioning/delete markers | S3-P3 | Version IDs, latest resolution, delete markers, versioned list/get/head/delete, storage-engine persistence of version state. | Versioning state machine tests; delete markers affect unversioned reads S3-compatibly. |
@@ -265,7 +265,7 @@ Task list:
 
 - [ ] Write `phase-7-s3-ancillary-config.feature` per the structure above (`java-tester`).
 - [ ] Tag the 148 legacy `bucket-config.feature` status-code scenarios `@protocol-smoke` (`java-tester`).
-- [ ] Move the 6 handler-local config families behind repository ports (`java-infra-coder`; feeds EP-2).
+- [x] Move the 6 handler-local config families behind repository ports (`java-infra-coder`; feeds EP-2).
 - [ ] Generate `docs/api-coverage.md` as a machine-generated semantic matrix using the Required S3 Semantic Reporting Table Template (pattern: the Gherkin appendix generator), wired into the same freshness-check discipline. Closes the open S3-P0 semantic inventory.
 
 ### S3 Semantic Acceptance Criteria (summary)
@@ -303,13 +303,13 @@ This section defines the path from "validated prototype with honest gaps" to an 
 
 | Field | Plan |
 |---|---|
-| Focus | Authentication, authorization, audit, and real encryption. Planner-verified evidence: no SigV4 signature verification, no Spring Security dependency, the S3 API accepts anonymous requests; ACLs/policies are persisted but never enforced. |
+| Focus | Authentication, authorization, audit, and real encryption. Opt-in secured mode is wired through Spring Security Reactive (`SecurityWebFilterChain`, SigV4 `ServerAuthenticationConverter`, reactive authentication/authorization managers, and S3 XML security handlers) for all current EP-1 WebTestClient and EP-1 AWS CLI/e2e scenarios. It verifies SigV4 Authorization headers for configured access keys, verifies exact payload hashes, rejects anonymous/unknown-key/bad-signature/stale-date/payload-hash-mismatch requests before route mutation, enforces deny-by-default/explicit-deny, denies PublicAccessBlock/public ACL access, denies expected bucket owner mismatch, records durable redacted tamper-evident audit events, and proves an SSE-S3 encrypted-at-rest inspection slice using durable local key-management material. The built-in local credential store encrypts secrets at rest and supports revocation; the durable policy store reloads allow/deny decisions; the audit file is append/fsync-based with hash-chain integrity. Unsecured mode remains the default trusted-environment mode and is explicitly permit-all. |
 | Owner agents | `java-domain-coder` (policy model), `java-infra-coder` (filters/adapters), `java-tester` |
 | Requirement feature file | `s3-reactive-api-adapter/src/test/features/requirements/phase-ep1-security-identity.feature` |
 | Key requirement IDs | REQ-SEC-* |
-| Expected outputs | AWS SigV4 request authentication; durable credential/access-key store; deny-by-default authorization with bucket policy/ACL evaluation; audit logging of requests; real SSE (currently metadata-only) with pluggable key management; TLS deployment guidance. |
+| Expected outputs | AWS SigV4 request authentication; durable credential/access-key store; deny-by-default authorization with bucket policy/ACL evaluation; audit logging of requests; SSE-S3 with pluggable key management; TLS deployment guidance. |
 | Acceptance gates | Unauthenticated/incorrectly signed requests rejected; deny-by-default proven by tests; ACL/policy enforcement validated in both runner modes; audit events observable and durable; SSE round-trip proven at rest, not just headers. |
-| Status | `@absent`; ADR 0022 records the complete-S3 sequencing and EP-1 first-slice scope. |
+| Status | `@implemented-and-validated` for the declared EP-1 local built-in scope. REQ-SEC-001 through REQ-SEC-009 are validated by both `PhaseEp1SecurityIdentityRequirementsCucumberTest` and `PhaseEp1SecurityIdentityAwsCliCucumberTest`; `specs/sigv4-verifier.feature` preserves verifier/filter component evidence; `specs/ep1-security-services.feature` validates durable encrypted credentials/revocation (REQ-SEC-010), durable allow/deny policy reload (REQ-SEC-011), durable tamper-evident audit (REQ-SEC-012), and durable key-management/SSE encryption material (REQ-SEC-013). ADR 0023 Spring Security Reactive backbone carries the slice. External IdP/KDC/OIDC/LDAP/Kerberos federation remains KA-4 future scope, not an EP-1 blocker. |
 
 KA dependencies: KA-2 (Ceph s3-tests requires SigV4), KA-3 (presigned URLs), and KA-4 (identity federation incl. Kerberos) all depend on EP-1 — this raises EP-1's practical priority; identity work lands in the planned identity-access bounded context (see Bounded Context Evolution under the Killer-App Track).
 
@@ -317,25 +317,25 @@ KA dependencies: KA-2 (Ceph s3-tests requires SigV4), KA-3 (presigned URLs), and
 
 | Field | Plan |
 |---|---|
-| Focus | Close the in-memory metadata gap (see the qualified checklist items in CC below): bucket registry (`StorageEngineReactiveBucketRepository`), multipart upload state (`StorageEngineReactiveMultipartUploadRepository`), and per-object configuration metadata (ACL/legal hold/lock config/retention/encryption/restore maps in `StorageEngineReactiveS3ObjectRepository` lines 66–77) are still in-memory `ConcurrentHashMap` state even in storage-engine mode and are lost on restart. **Extended scope (2026-07-02):** the 6 handler-local bucket-config families in `S3BucketConfigHandler` (ABAC, object-lock config, metadata config, metadata-table, inventory-table, journal-table — see section D) and bucket configuration state generally must move behind repository ports AND become durable in storage-engine mode. |
+| Focus | Close the in-memory metadata gap (see the qualified checklist items in CC below): bucket registry, multipart upload state, per-object configuration metadata, object tags/ACLs, and bucket configuration families must survive restart in storage-engine mode. **Extended scope (2026-07-02):** the 6 handler-local bucket-config families in `S3BucketConfigHandler` (ABAC, object-lock config, metadata config, metadata-table, inventory-table, journal-table — see section D) and bucket configuration state generally must move behind repository ports AND become durable in storage-engine mode. |
 | Owner agents | `java-infra-coder` primary; `java-domain-coder`; `java-tester` |
 | Requirement feature file | `phase-ep2-metadata-durability.feature` |
 | Key requirement IDs | REQ-DUR-* |
 | Expected outputs | Durable bucket registry, durable multipart upload state, durable per-object configuration metadata (ACL, tags where not already durable, object lock, retention, legal hold, encryption config, restore state) in storage-engine mode; the 6 handler-local bucket-config families relocated behind repository ports and made durable, plus durable bucket configuration state generally. |
 | Acceptance gates | Restart-safety Cucumber scenarios per state family using the bootstrap restart harness pattern of REQ-UPLOAD-001/002; state survives full process stop/start. |
-| Status | `@partial` — **major progress 2026-07-03**: bucket registry (full `BucketConfig` document), multipart upload state (upload id + recorded parts), and per-object configuration (legal hold, lock config, retention, encryption, restore) are now durable JSON documents under `metadata/buckets`, `metadata/multipart-uploads`, `metadata/object-config` with crash-safe atomic commits (`BucketStore`, `MultipartUploadStateStore`, `ObjectConfigMetadataStore` + shared `DurableJson`). **All 6 handler-local families eliminated**: object-lock, inventory-table, journal-table (new `BucketConfig` VOs) plus ABAC, metadata config and metadata-table (existing VOs remodelled to the S3 API shape) now live on the `Bucket` aggregate and persist through `updateBucket` → `BucketStore`; `S3BucketConfigHandler` holds no configuration state. Validated by `MetadataDurabilityRestartTest` (7 restart-simulation unit tests incl. `$BucketConfigFamilies` covering all 6 families) and the upgraded `StorageEngineRestartSafetyTest` (real context restart: HeadBucket 200, ListBuckets includes bucket, re-create → 409). REQ-DUR-001 `@implemented-and-validated`; REQ-DUR-002/003 + all bucket-config families `@implemented-not-e2e-validated`. **Open:** object tags + ACL durability (`@partial`), the combined REQ-DUR-005 scenario, and Cucumber runner wiring for the EP-2 feature. Test-glue restart semantics split: `reset()` (wipe) vs `reloadFromDisk()` (restart simulation). |
+| Status | `@implemented-and-validated` for the declared storage-engine durability scope — **closed 2026-07-10**: bucket registry (full `BucketConfig` document), multipart upload state (upload id + recorded parts), per-object configuration (legal hold, lock config, retention, encryption, restore), object tags, object ACL sidecars, and bucket configuration families are durable under the storage-engine filesystem metadata root. **All 6 handler-local bucket config families eliminated**: object-lock, inventory-table, journal-table (new `BucketConfig` VOs) plus ABAC, metadata config and metadata-table (existing VOs remodelled to the S3 API shape) now live on the `Bucket` aggregate and persist through `updateBucket` → `BucketStore`; `S3BucketConfigHandler` holds no configuration state. Validated by `MetadataDurabilityRestartTest` (7 restart-simulation unit tests incl. `$BucketConfigFamilies`), upgraded `StorageEngineRestartSafetyTest` (real context restart evidence), `PhaseEp2MetadataDurabilityCucumberTest` (3 selected WebTestClient restart-simulation scenarios), and `PhaseEp2MetadataDurabilityFullRestartCucumberTest` (18 full Spring stop/start scenarios: bucket registry, multipart state, legal hold, object lock configuration, retention, encryption, restore, tags, ACL, CORS, notification, bucket object-lock, inventory-table, journal-table, ABAC, metadata, metadata-table, and combined metadata). The remaining EP-2 scenarios are explicit `@in-memory-exemption` checks and are not storage-engine durability gaps. Test-glue restart semantics split: `reset()` (wipe) vs `reloadFromDisk()` (restart simulation). |
 
 ### EP-3 — Reactive Streaming Completion (BLOCKER)
 
 | Field | Plan |
 |---|---|
-| Focus | (a) GetObject read path streams without `collectList()` — full-body and Range requests served with bounded memory (fixes the read-path defect recorded in section D); (b) multipart `uploadPart` persists part bodies through the storage engine WITHOUT `DataBufferUtils.join`, and `completeMultipartUpload` assembles the real object (currently part bytes are discarded); (c) extend the static architecture test to forbid `join`/`collectList` in the fixed paths. |
+| Focus | (a) GetObject read path streams without `collectList()` — full-body and Range requests served with bounded memory; (b) multipart `uploadPart` and `uploadPartCopy` persist part bodies through the part store without `DataBufferUtils.join`, and `completeMultipartUpload` assembles the real object; (c) static architecture Cucumber specs forbid `join`/`collectList` regressions in the fixed paths; (d) remaining future work is runtime/backpressure validation for the broader staged pipeline. |
 | Owner agents | `java-infra-coder`, `java-domain-coder`, `java-tester` |
 | Requirement feature file | extend `phase-3-reactive-pipeline.feature` + new `phase-ep3-multipart-streaming.feature` |
 | Key requirement IDs | REQ-PIPELINE-009+, REQ-MPU-* |
 | Expected outputs | Streaming GetObject (full + Range); streaming multipart part persistence and real assembly; extended `ReactiveUploadStreamingArchitectureTest`-style guards. |
 | Acceptance gates | Large-object read/multipart scenarios pass in both runner modes with bounded memory; architecture test forbids regressions; completed multipart object reads back as assembled bytes. |
-| Status | `@partial` (write path largely fixed and guarded; read path and multipart persistence open) |
+| Status | `@partial` (write path static streaming constraints `REQ-PIPELINE-007/008`, non-range GetObject streaming `REQ-PIPELINE-009`, ranged GetObject streaming `REQ-PIPELINE-010`, multipart UploadPart/UploadPartCopy and part-store static streaming constraints `REQ-PIPELINE-011/012`, completed multipart object assembly `REQ-S3-002-D`, UploadPartCopy copied-byte assembly `REQ-S3-002-F`, multipart XML error semantics `REQ-S3-002-G..K`, and multipart part-body full-process restart completion `REQ-S3-002-E` are `@implemented-and-validated`; remaining work is deeper staged pipeline/runtime backpressure validation) |
 
 ### EP-4 — Space Management & Data Hygiene (HIGH)
 
@@ -353,13 +353,13 @@ KA dependencies: KA-2 (Ceph s3-tests requires SigV4), KA-3 (presigned URLs), and
 
 | Field | Plan |
 |---|---|
-| Focus | Evidence: no CI pipeline exists in the repo (no `.github`, no GitLab CI, no Jenkinsfile); gates are local/Podman only. |
+| Focus | First CI packaging slice now exists in `.github/workflows/ci.yml`: appendix/source-hygiene checks, focused Cucumber/security/semantic gates, root JVM Docker build+smoke, and manual native Docker build+smoke. Broader EP-5 operability remains open. |
 | Owner agents | `java-scaffolder`, `java-infra-coder`, `documenter`, `java-tester` |
 | Requirement feature file | `phase-ep5-operability.feature` (where executable; otherwise documented procedures tagged `@not-implemented` until automated) |
 | Key requirement IDs | REQ-OPS-* |
 | Expected outputs | CI pipeline running the full gate + appendix check + docker build; release/versioning strategy; backup/restore procedure; DR with declared RTO/RPO; enforced schema/manifest versioning and migration; runbooks; SLOs and alert rules; readiness/liveness probes beyond `/admin/health`; verified graceful shutdown draining. |
 | Acceptance gates | CI runs green on the full gate; backup/restore rehearsed; probes and shutdown behavior validated; versioning/migration enforced by tests. |
-| Status | `@absent` |
+| Status | `@partial`: CI packaging gates are wired; backup/restore, DR, schema migration/versioning, runbooks, SLO/alert rules, readiness/liveness beyond `/admin/health`, and graceful shutdown validation remain. |
 
 ### EP-6 — Performance & Capacity Validation (HIGH)
 
@@ -471,9 +471,9 @@ Owner rule (2026-07-02): any gRPC used by the SMB/VFS gateway follows the same r
 
 | Order | Phase | Priority | Status |
 |---|---|---|---|
-| 1 | EP-2 Metadata durability | Blocker | `@partial` (registry/multipart/object-config durable; tags/ACL + 6 handler-local families open) |
+| 1 | EP-2 Metadata durability | Blocker | `@implemented-and-validated` for declared storage-engine scope (in-memory profile explicitly exempt) |
 | 2 | EP-3 Reactive streaming completion | Blocker | `@partial` |
-| 3 | EP-1 Security & identity | Blocker | `@absent` |
+| 3 | EP-1 Security & identity | Blocker | `@implemented-and-validated` — current S3 security slice plus built-in durable credential, policy, audit, and key-management services validated |
 | 4 | EP-4 Space management & data hygiene | High | `@absent` |
 | 5 | EP-5 Operability & delivery | High | `@absent` |
 | 6 | EP-6 Performance & capacity | High | `@absent` |
@@ -487,8 +487,8 @@ EP-0 governance applies continuously from the start.
 
 ### Definition of Production Ready (EP-0 checklist — all unchecked)
 
-- [ ] EP-1: SigV4 authentication, deny-by-default authorization, audit logging, and real SSE are `@implemented-and-validated`.
-- [ ] EP-2: all metadata families (bucket registry, multipart state, per-object configuration) survive restart in storage-engine mode, validated by restart harness scenarios.
+- [x] EP-1: SigV4 authentication, deny-by-default authorization, audit logging, and real SSE are `@implemented-and-validated` for the declared local built-in scope.
+- [x] EP-2: all declared storage-engine metadata families (bucket registry, multipart state, per-object configuration, object tags/ACLs, and bucket configuration) survive restart in storage-engine mode, validated by restart harness scenarios.
 - [ ] EP-3: GetObject and multipart paths stream with bounded memory; architecture tests guard all fixed paths.
 - [ ] EP-4: chunk GC, dedup refcounting, quotas, ENOSPC behavior, and scrubbing are validated.
 - [ ] EP-5: CI pipeline green on full gate + appendix check + docker build; backup/restore and DR rehearsed; probes/shutdown validated.
@@ -563,11 +563,11 @@ Market-window note (factual): MinIO removed features from its community console,
 |---|---|
 | Focus | (1) **SINGLE BINARY / self-contained artifact (top priority):** ADR evaluating GraalVM native-image vs jlink+CDS vs self-contained fat-jar, with honest trade-offs (native-image vs reflection/Netty/WebFlux); air-gapped offline install bundle; Maven-built. (2) **Grafana dashboards (second):** per INV-5 the built-in admin-panel metrics view comes first; Prometheus endpoint + shipped dashboards are optional integration. (3) **Own CLI (VERY LOW priority):** the tool must work first with aws cli/mc/rclone (KA-2); a `magrathea-cli` is a later convenience, decision-gated. (4) **Helm/operator (VERY LOW priority):** plain container + compose + documented K8s manifests suffice initially; Helm chart later, operator only if demand proves it. |
 | Owner agents | `java-scaffolder`, `java-infra-coder`, `documenter` (ADR), `java-tester` |
-| Requirement feature file | `phase-ka5-distribution.feature` (where executable; ADR-first for the single-binary decision) |
+| Requirement feature file | `s3-reactive-api-adapter/src/test/features/specs/phase-ka5-distribution.feature` (maintainer-facing packaging Ability; ADR 0024 records the native-image decision) |
 | Key requirement IDs | REQ-PKG-* |
 | Acceptance gates | Self-contained artifact built by Maven and installable air-gapped; built-in admin-panel metrics view precedes external dashboards; CLI and Helm/operator items stay decision-gated backlog until demand evidence exists. |
 | Prerequisites | EP-5 (CI); the single-binary ADR can start earlier. |
-| Status | `@absent` |
+| Status | `@partial` for KA-5 overall. Native-image/Alpine packaging slice is `@implemented-and-validated` on 2026-07-10: `bootstrap-application` has Maven profiles `native` and `native-musl`, and `Dockerfile.native` builds a JVM-free Alpine runtime image while preserving Docker-driven docs/UI regeneration. Root JVM Docker packaging is also validated: the Dockerfile uses public ECR mirrored Maven/Temurin bases, copies the full `scripts/` gate set, avoids Maven fail-never mode, creates a writable `/app/data` owned by the non-root `magrathea` user, exposes S3/Admin ports, and defines an Admin healthcheck. Validation: local toolchain aligned to Oracle GraalVM 25 native-image because Spring Boot 4 rejects Java 21 native images at startup; `mvn -Pnative -pl bootstrap-application -am -DskipTests native:compile` succeeds; `docker build --network=host -f Dockerfile.native -t magrathea-objectstorage:native .` succeeds; `docker build --network=host -f Dockerfile -t magrathea-objectstorage:jvm .` succeeds; both container paths have no Spring Security generated-password banner in build/runtime logs; root JVM runtime smoke validates `/admin/health`, S3 ListBuckets XML, and bucket/object PUT/GET. Remaining KA-5 backlog: broader air-gapped install bundle, dashboards, own CLI, and Helm/operator decision-gated items. |
 
 ### KA-6 — Public Proof
 
@@ -589,7 +589,7 @@ Market-window note (factual): MinIO removed features from its community console,
 | 2 | KA-2 Ecosystem conformance | After minimal EP-1 (SigV4) | `@absent` |
 | 3 | KA-3 Data-lake readiness & S3 Tables | After EP-1 + EP-3 | `@absent` |
 | 4 | KA-4 Eventing, tiering, multi-site, federation | After EP-1/EP-2/EP-4; multi-site after EP-10 | `@absent` |
-| 5 | KA-5 Distribution | After EP-5 (single-binary ADR may start earlier) | `@absent` |
+| 5 | KA-5 Distribution | After EP-5 (single-binary ADR may start earlier) | `@partial` (native/Alpine and root JVM Docker slices validated; broader air-gap/dashboard/CLI/Helm backlog remains) |
 | 6 | KA-6 Public proof | Last; after EP-6 + KA-2 | `@absent` |
 
 ### Definition of Killer App (checklist — all unchecked)
@@ -607,7 +607,7 @@ Market-window note (factual): MinIO removed features from its community console,
 
 Planner assessment (2026-07-02): three new bounded contexts plus one integration point are warranted. All entries are PLANNED / `@absent`.
 
-1. **identity-access BC** (EP-1/KA-4): credentials, access keys, policies, STS, OIDC/LDAP/Kerberos federation, audit trail. Own domain/application/infrastructure modules; the S3 adapter consumes it via ports; it must not live inside object-store.
+1. **identity-access BC** (KA-4 extension after EP-1): the built-in EP-1 local backend covers credentials, access-key revocation, policy reload, audit, and key management for self-contained deployments. Future STS, OIDC/LDAP/Kerberos federation, and external IdP/KDC adapters get their own domain/application/infrastructure modules; the S3 adapter consumes them via ports and they must not live inside object-store.
 2. **table-store BC** (KA-3): table buckets, namespaces, tables, Iceberg metadata, maintenance policies; exposed by the separate `s3tables-api-adapter`; persists through the storage-engine plane; the S3 Metadata bucket routes bridge into it.
 3. **event-delivery BC** (KA-4): durable embedded event log + dispatchers (webhook built-in; Kafka/NATS optional plugins per INV-5); consumed by object-store domain events.
 4. **PKI integration point** (Magrathea suite): a certificate-provisioning port (node mTLS for EP-10, TLS server certificates, Kerberos/PKINIT credentials) with a simplified local-CA fallback per INV-5; the real backend will be the separate Magrathea PKI project. No PKI implementation in this repo beyond the port + fallback.
@@ -664,7 +664,7 @@ Chunking stays inside `DedupConfig`, configurable via `StoragePolicy`; one YAML 
 
 ### CC-7 — Storage-Engine Backend Wiring — done with a scope qualifier
 
-Backend selection, mutually exclusive beans, fail-fast on missing config, and S3 write/read through the storage engine are delivered **for object bytes, manifests, and object references only**. The remaining in-memory metadata families are tracked as **EP-2** (see the qualified checklist items below).
+Backend selection, mutually exclusive beans, fail-fast on missing config, and S3 write/read through the storage engine are delivered for object bytes, manifests, object references, and EP-2 storage-engine metadata durability. Remaining runtime gaps are tracked in EP-3 and later roadmap phases.
 
 ### CC-8 — Web/Admin API and UI — remaining open items
 
@@ -692,8 +692,8 @@ Phase CC-10 quality gates were completed 2026-06-12 (HEAD `351d088`): `mvn valid
 - [x] `StoragePolicy` owns dedup/chunk configuration through `DedupConfig` (verified 2026-07-02; `FixedWindowDedupStep` takes chunk size from the policy spec, commit `9a50ae6`).
 - [x] One YAML file per `StoragePolicy` and per `StorageDevice`/disk set/topology entity; catalogs validate IDs, schemas, and references.
 - [x] `MINIO_STANDARD` explicitly defined, loaded from YAML, and testable (verified 2026-07-02).
-- [x] Storage-engine backend can be selected at runtime without duplicate repositories. **Qualifier:** true for object bytes, manifests, and object references only — see next item.
-- [x] S3 write/read path works end to end with the selected storage-engine backend **for object bytes + manifests + object references only.** Bucket registry (`StorageEngineReactiveBucketRepository`), multipart upload state (`StorageEngineReactiveMultipartUploadRepository`), and per-object configuration metadata (ACL/legal hold/lock config/retention/encryption/restore maps in `StorageEngineReactiveS3ObjectRepository` lines 66–77) are still in-memory `ConcurrentHashMap` state even in storage-engine mode and are lost on restart. Tracked as enterprise gap **EP-2**.
+- [x] Storage-engine backend can be selected at runtime without duplicate repositories. **Qualifier:** full-process restart validation now covers bucket registry, multipart state, legal hold, object lock, retention, object encryption, object restore state, object tags, object ACLs, bucket configuration families, and the combined EP-2 bucket/object-tag/object-ACL/multipart scenario.
+- [x] S3 write/read path works end to end with the selected storage-engine backend for object bytes, manifests, object references, bucket registry, multipart upload state, per-object configuration metadata, object tags, and object ACL metadata. EP-2 is closed for the declared storage-engine durability scope; remaining metadata work moves to later roadmap phases rather than EP-2 closure.
 - [x] Backend Admin API exposes read-only policy/device/disk-set catalogs and non-persistent validation as configuration-as-code.
 - [x] Admin UI plan covers policy/device/disk-set/backend-status screens and awaits frontend workflow ownership (`docs/admin-ui-plan.md`, 2026-07-02).
 - [ ] AWS CLI Cucumber parity for all canonical scenarios (increments delivered; remainder tracked in CC-9).
@@ -713,8 +713,8 @@ Phase CC-10 quality gates were completed 2026-06-12 (HEAD `351d088`): `mvn valid
 | Frontend workflow availability | Vue UI work blocked because current workflow is Java-focused | Backend contracts first; frontend workflow handoff before `magrathea-ui` changes | `documenter`, `java-infra-coder` |
 | WebDAV scope creep / protocol divergence | Second protocol facade drifts from S3 semantics or grows a parallel persistence path | S3-internal-core invariant **INV-4**; ADR-gated protocol subset at EP-9 start; adapter reviews reject direct storage-engine access | `documenter`, `java-infra-coder` |
 | Admin panel drifting into an alternate object API | Admin API/UI grows object CRUD semantics, violating the storage-engine boundary | AGENTS.md B.3 gate enforced in every EP-7 review; admin-side S3 diagnostics must call the S3 API | `documenter`, `java-infra-coder` |
-| Unauthenticated exposure until EP-1 lands | The S3 API accepts anonymous requests today; exposure to untrusted networks means full data compromise | The service **must not be exposed to untrusted networks** until EP-1 is `@implemented-and-validated`; document this in deployment guidance | `documenter`, `java-infra-coder` |
-| In-memory metadata loss on restart until EP-2 lands | Buckets, multipart state, and per-object configuration metadata are lost on restart even in storage-engine mode | EP-2 is first in the EP sequence; restart-safety scenarios per state family; no durability claims for these families until validated | `java-infra-coder`, `java-tester` |
+| Unauthenticated exposure in default mode | The default profile remains explicitly unsecured/permit-all for trusted environments; secured deployments must enable `s3.security.enabled=true` and provide durable credential/policy/audit/key files | Deployment guidance must state that default unsecured mode is not for untrusted networks; CI keeps secured-mode WebTestClient/AWS CLI gates green | `documenter`, `java-infra-coder` |
+| In-memory metadata loss on restart in the default profile | The default single-node profile remains intentionally non-durable; storage-engine mode now persists EP-2 metadata families | Keep the in-memory exemption explicit in requirements and docs; require `storage-engine` profile for restart durability | `java-infra-coder`, `java-tester` |
 | Internal gRPC surfaces drifting into a parallel public object API | Cluster transport (EP-10) or protocol gateway (EP-11) becomes an alternate object API bypassing the S3 facade | **INV-4** governance; internal-only network exposure; adapter/transport reviews reject public object semantics | `documenter`, `java-infra-coder` |
 | Split-brain / consistency overclaims in cluster mode | Data loss or false durability/availability claims under partitions | EP-8 ADR consistency model; quorum tests; fault-injection scenarios before any claim | `java-domain-coder`, `java-tester` |
 | C module memory safety and Samba version coupling | `vfs_magrathea` crashes `smbd` or breaks across Samba releases | C workflow ownership; sanitizers (ASan/UBSan) in the C CI; pinned Samba versions in containerized builds | C workflow agents, `documenter` |
@@ -739,9 +739,9 @@ magrathea-objectstorage/
 ├── smb-vfs-module/                             # PLANNED — Samba VFS C module (non-Maven, container build; EP-11)
 ├── object-gateway-grpc-adapter/                # PLANNED — optional internal gRPC gateway (EP-11, decision-gated)
 ├── s3tables-api-adapter/                       # PLANNED — separate S3 Tables API surface: table buckets, namespaces, tables (KA-3)
-├── identity-access-domain/                     # PLANNED — identity-access BC: credentials, policies, STS, federation (EP-1/KA-4)
-├── identity-access-application/                # PLANNED — identity-access services/ports incl. PKI certificate-provisioning port (EP-1/KA-4)
-├── identity-access-infrastructure/             # PLANNED — credential store, IdP/KDC adapters, local-CA fallback per INV-5 (EP-1/KA-4)
+├── identity-access-domain/                     # PLANNED — identity-access BC extension: STS/federation/external IdP (KA-4)
+├── identity-access-application/                # PLANNED — identity-access extension services/ports incl. PKI certificate-provisioning port (KA-4)
+├── identity-access-infrastructure/             # PLANNED — external IdP/KDC adapters and local-CA fallback per INV-5 (KA-4)
 ├── table-store-domain/                         # PLANNED — table-store BC: namespaces, tables, Iceberg metadata (KA-3)
 ├── table-store-application/                    # PLANNED — table-store services and ports (KA-3)
 ├── table-store-infrastructure/                 # PLANNED — table-store persistence via the storage-engine plane (KA-3)

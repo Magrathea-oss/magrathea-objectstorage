@@ -33,6 +33,7 @@
         <junit-platform.version>1.11.0</junit-platform.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>21</maven.compiler.release>
+        <graalvm.buildtools.version>0.10.6</graalvm.buildtools.version>
     </properties>
 
     <build>

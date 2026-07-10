@@ -126,14 +126,14 @@ Business Need: PutObject header, metadata, and checksum handling against the sin
       And HEAD response contains SSE header "x-amz-server-side-encryption" with value "aws:kms"
       And HEAD response contains SSE header "x-amz-server-side-encryption-aws-kms-key-id" with value "test-key"
 
-  Rule: SigV4 request signature headers are accepted without validation
+  Rule: SigV4 request signature headers are accepted without validation in default unsecured mode
 
-    SigV4 signature verification is a documented, planner-verified gap tracked as
-    part of PLAN.md EP-1 ("Authentication, authorization, audit, and real
-    encryption" — "no SigV4 signature verification, no Spring Security dependency,
-    the S3 API accepts anonymous requests"). These scenarios document the current,
-    intentionally unauthenticated behavior so that client integrations do not
-    mistake header presence for signature enforcement.
+    Opt-in secured mode (`s3.security.enabled=true`) now verifies SigV4 Authorization
+    headers for configured in-process access keys. These scenarios document the
+    default unsecured compatibility mode, where SigV4-related headers are tolerated
+    without enabling authentication so that existing trusted-environment client
+    integrations continue to work. Full EP-1 security remains incomplete until
+    authorization, audit, real SSE, and AWS CLI/e2e validation are implemented.
 
     @REQ-SINGLENODE-PUTHDR-012 @protocol-smoke @not-implemented @webclient-required
     Scenario Outline: Put object accepts SigV4-related headers without validating them

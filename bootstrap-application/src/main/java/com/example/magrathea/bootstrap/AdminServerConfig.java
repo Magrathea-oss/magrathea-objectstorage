@@ -4,6 +4,7 @@ import com.example.magrathea.admin.web.AdminRouter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.server.WebServer;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.SmartLifecycle;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
@@ -25,8 +26,8 @@ import static org.springframework.web.reactive.function.server.RouterFunctions.r
  * This allows the admin API + frontend to run alongside the main S3 API on port 8080
  * within the same bootstrap-application JAR.
  * 
- * Lifecycle is managed explicitly via initMethod="start" and destroyMethod="stop"
- * so Spring starts the server after the application context is fully initialized.
+ * Lifecycle is managed via {@link SmartLifecycle} so Spring starts the server after
+ * the application context is fully initialized without reflective init-method lookup.
  * 
  * Port is configurable via the {@code admin.server.port} property (default: 8081).
  */
@@ -39,8 +40,8 @@ public class AdminServerConfig {
         this.adminRouter = adminRouter;
     }
 
-    @Bean(initMethod = "start", destroyMethod = "stop")
-    public WebServer adminWebServer(
+    @Bean
+    public AdminNettyWebServer adminWebServer(
             @Value("${admin.server.port:8081}") int adminPort) {
 
         // Combine admin routes from AdminRouter with static resource routes
@@ -82,11 +83,11 @@ public class AdminServerConfig {
      * Spring calls start() after full context initialization.
      * The HttpHandler is provided at construction time from the combined router.
      */
-    static class AdminNettyWebServer implements WebServer {
+    public static class AdminNettyWebServer implements WebServer, SmartLifecycle {
         private final int port;
         private final ReactorHttpHandlerAdapter adapter;
         private DisposableServer disposableServer;
-        private volatile boolean started = false;
+        private volatile boolean running = false;
 
         AdminNettyWebServer(int port, ReactorHttpHandlerAdapter adapter) {
             this.port = port;
@@ -95,8 +96,8 @@ public class AdminServerConfig {
 
         @Override
         public void start() {
-            if (started) return;
-            started = true;
+            if (running) return;
+            running = true;
 
             disposableServer = HttpServer.create()
                 .port(port)
@@ -109,6 +110,17 @@ public class AdminServerConfig {
             if (disposableServer != null) {
                 disposableServer.dispose();
             }
+            running = false;
+        }
+
+        @Override
+        public boolean isRunning() {
+            return running;
+        }
+
+        @Override
+        public boolean isAutoStartup() {
+            return true;
         }
 
         @Override

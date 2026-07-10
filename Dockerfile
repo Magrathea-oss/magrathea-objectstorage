@@ -1,5 +1,5 @@
 # Stage 1: Build with Maven + Node.js
-FROM maven:3.9-eclipse-temurin-21 AS builder
+FROM public.ecr.aws/docker/library/maven:3.9-eclipse-temurin-21 AS builder
 
 ARG NODE_VERSION=26.1.0
 ARG NODE_DIST=node-v${NODE_VERSION}-linux-x64
@@ -51,7 +51,7 @@ RUN npm ci --prefix magrathea-ui && \
     npm ci --prefix bootstrap-application/src/main/scripts
 
 # Download Maven dependencies (skip unavailable plugins)
-RUN mvn -B dependency:go-offline -DskipTests -Dmaven.plugin.skip=true -fn 2>/dev/null || echo 'Warning: some plugins unavailable, continuing'
+RUN mvn -B --no-transfer-progress dependency:go-offline -DskipTests -Dmaven.plugin.skip=true 2>/dev/null || echo 'Warning: some plugins unavailable during cache warm-up, continuing'
 
 # Copy all source code
 COPY docs ./docs/
@@ -73,7 +73,7 @@ COPY bootstrap-application/src ./bootstrap-application/src/
 #    relative to the shared requirement feature files (Docker quality gate).
 # 2) The generator is then re-run so the documentation assets below are always
 #    built from a deterministically regenerated appendix, not host-generated state.
-COPY scripts/generate-gherkin-requirements-appendix.py ./scripts/generate-gherkin-requirements-appendix.py
+COPY scripts ./scripts/
 RUN python3 scripts/generate-gherkin-requirements-appendix.py --check && \
     python3 scripts/generate-gherkin-requirements-appendix.py
 
@@ -126,23 +126,33 @@ RUN set -eux; \
     find bootstrap-application/src/main/resources/static/docs/c4/images -maxdepth 1 -type f -name '*.png' -print -quit | grep -q .; \
     find bootstrap-application/src/main/resources/static/docs/arc42/images -maxdepth 1 -type f -print -quit | grep -q .
 
-# Build final JAR packaging with Maven.
+# Build final JAR packaging with Maven. Do not use Maven fail-never here:
+# a Docker image is valid only when the bootstrap package actually succeeds.
 ENV NODE_PATH=/build/magrathea-ui/node_modules
-RUN mvn -B clean package -DskipTests -fn && \
+RUN mvn -B --no-transfer-progress clean package -DskipTests && \
     cp bootstrap-application/target/*.jar /app.jar
 
 # Stage 2: Runtime
-FROM docker.io/eclipse-temurin:21-jre
+FROM public.ecr.aws/docker/library/eclipse-temurin:21-jre
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends wget \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && addgroup --system magrathea \
+    && adduser --system --ingroup magrathea --home /app --no-create-home magrathea \
+    && mkdir -p /app/data \
+    && chown -R magrathea:magrathea /app
 
 WORKDIR /app
-COPY --from=builder /app.jar /app.jar
-COPY --from=builder /build/docs /app/docs
+COPY --from=builder --chown=magrathea:magrathea /app.jar /app.jar
+COPY --from=builder --chown=magrathea:magrathea /build/docs /app/docs
+
+USER magrathea
 
 EXPOSE 8080
 EXPOSE 8081
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=5 \
+    CMD wget -q --spider http://127.0.0.1:8081/admin/health || exit 1
 
 ENTRYPOINT ["java", "-jar", "/app.jar"]

@@ -190,11 +190,19 @@ public class ReactiveObjectService {
 
     // ── Phase F: Restore ──
 
+    public Mono<RestoreConfiguration> getObjectRestore(String bucketName, ObjectKey key) {
+        return queryRepository.findRestore(bucketName, key);
+    }
+
     public Mono<Void> restoreObject(String bucketName, ObjectKey key, RestoreConfiguration config) {
         return commandRepository.saveRestore(bucketName, key, config);
     }
 
     // ── Phase F: Encryption update ──
+
+    public Mono<EncryptionConfiguration> getObjectEncryption(String bucketName, ObjectKey key) {
+        return queryRepository.findEncryption(bucketName, key);
+    }
 
     public Mono<Void> updateObjectEncryption(String bucketName, ObjectKey key, EncryptionConfiguration encryption) {
         return commandRepository.saveEncryption(bucketName, key, encryption);

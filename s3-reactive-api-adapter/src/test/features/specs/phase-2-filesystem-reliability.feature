@@ -1,4 +1,4 @@
-@requirement @phase-2 @filesystem-reliability @storage-engine @implemented-and-validated
+@spec @phase-2 @filesystem-reliability @storage-engine @implemented-and-validated
 Ability: Phase 2 filesystem reliability for the storage-engine backend
   As a storage-engine operator, S3-compatible client, and system owner,
   I want filesystem-backed chunks, manifests, and object references to be protected

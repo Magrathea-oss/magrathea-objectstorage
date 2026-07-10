@@ -14,7 +14,7 @@ Business Need: EP-2 Complete Metadata Durability
     Buckets created through the S3 API, including their full configuration document,
     are reloaded from the filesystem when the process restarts.
 
-    @REQ-DUR-001 @functional-requirement @non-functional-requirement @durability @restart-safety @bootstrap-integration-required @implemented-and-validated
+    @REQ-DUR-001 @functional-requirement @non-functional-requirement @durability @restart-safety @bootstrap-integration-required @ep2-full-process-restart @implemented-and-validated
     Scenario: Bucket registry survives restart in storage-engine mode
       Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-001-bucket-registry"
       And bucket "ep2-bucket-registry-test" is created through the S3 CreateBucket API
@@ -36,7 +36,7 @@ Business Need: EP-2 Complete Metadata Durability
     (part number, ETag, size) are reloaded from the filesystem after a restart,
     so in-progress uploads can be listed and aborted after recovery.
 
-    @REQ-DUR-002 @functional-requirement @non-functional-requirement @durability @restart-safety @implemented-not-e2e-validated
+    @REQ-DUR-002 @functional-requirement @non-functional-requirement @durability @restart-safety @ep2-full-process-restart @implemented-and-validated
     Scenario: Multipart upload state survives restart in storage-engine mode
       Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-002-multipart-state"
       And a multipart upload is initiated for bucket "ep2-mpu-durability-test" and key "backups/2026-07/large-file.dat" with the upload ID recorded
@@ -58,7 +58,7 @@ Business Need: EP-2 Complete Metadata Durability
     configuration and restore state for one bucket/key are committed together as one
     durable, self-consistent document under "metadata/object-config".
 
-    @REQ-DUR-003 @functional-requirement @non-functional-requirement @durability @restart-safety @implemented-not-e2e-validated
+    @REQ-DUR-003 @functional-requirement @non-functional-requirement @durability @restart-safety @ep2-full-process-restart @implemented-and-validated
     Scenario: Object legal hold survives restart in storage-engine mode
       Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-003-legal-hold"
       And an object exists at bucket "ep2-obj-meta-test" and key "records/case-4711/legal-hold.dat"
@@ -66,7 +66,7 @@ Business Need: EP-2 Complete Metadata Durability
       When the application process is stopped and started again with the same filesystem root
       Then GetObjectLegalHold for key "records/case-4711/legal-hold.dat" returns status "ON"
 
-    @REQ-DUR-003 @functional-requirement @non-functional-requirement @durability @restart-safety @implemented-not-e2e-validated
+    @REQ-DUR-003 @functional-requirement @non-functional-requirement @durability @restart-safety @ep2-full-process-restart @implemented-and-validated
     Scenario: Object lock configuration survives restart in storage-engine mode
       Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-003-lock-config"
       And an object exists at bucket "ep2-obj-meta-test" and key "records/case-4711/locked-file.doc"
@@ -74,7 +74,7 @@ Business Need: EP-2 Complete Metadata Durability
       When the application process is stopped and started again with the same filesystem root
       Then GetObjectLockConfiguration for key "records/case-4711/locked-file.doc" returns mode "COMPLIANCE" and a retention period of 60 days
 
-    @REQ-DUR-003 @functional-requirement @non-functional-requirement @durability @restart-safety @implemented-not-e2e-validated
+    @REQ-DUR-003 @functional-requirement @non-functional-requirement @durability @restart-safety @ep2-full-process-restart @implemented-and-validated
     Scenario: Object retention period survives restart in storage-engine mode
       Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-003-retention"
       And an object exists at bucket "ep2-obj-meta-test" and key "records/case-4711/retained.log"
@@ -82,7 +82,7 @@ Business Need: EP-2 Complete Metadata Durability
       When the application process is stopped and started again with the same filesystem root
       Then GetObjectRetention for key "records/case-4711/retained.log" returns a retention period of 365 days
 
-    @REQ-DUR-003 @functional-requirement @non-functional-requirement @durability @restart-safety @implemented-not-e2e-validated
+    @REQ-DUR-003 @functional-requirement @non-functional-requirement @durability @restart-safety @ep2-full-process-restart @implemented-and-validated
     Scenario: Object encryption configuration survives restart in storage-engine mode
       Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-003-encryption"
       And an object exists at bucket "ep2-obj-meta-test" and key "records/case-4711/encrypted.bin"
@@ -90,7 +90,7 @@ Business Need: EP-2 Complete Metadata Durability
       When the application process is stopped and started again with the same filesystem root
       Then the object encryption configuration for key "records/case-4711/encrypted.bin" returns algorithm "AES256"
 
-    @REQ-DUR-003 @functional-requirement @non-functional-requirement @durability @restart-safety @implemented-not-e2e-validated
+    @REQ-DUR-003 @functional-requirement @non-functional-requirement @durability @restart-safety @ep2-full-process-restart @implemented-and-validated
     Scenario: Object restore state survives restart in storage-engine mode
       Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-003-restore"
       And an object exists at bucket "ep2-obj-meta-test" and key "archives/2026/restored.zip"
@@ -98,7 +98,7 @@ Business Need: EP-2 Complete Metadata Durability
       When the application process is stopped and started again with the same filesystem root
       Then the object restore state for key "archives/2026/restored.zip" returns the recorded request and expiry timestamps
 
-    @REQ-DUR-003 @functional-requirement @durability @restart-safety @partial
+    @REQ-DUR-003 @functional-requirement @durability @restart-safety @ep2-webclient-restart @ep2-full-process-restart @implemented-and-validated
     Scenario: Object tags survive restart in storage-engine mode
       Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-003-tags"
       And an object exists at bucket "ep2-obj-meta-test" and key "documents/tags-doc.pdf"
@@ -106,7 +106,7 @@ Business Need: EP-2 Complete Metadata Durability
       When the application process is stopped and started again with the same filesystem root
       Then GetObjectTagging for key "documents/tags-doc.pdf" returns tags "Project=Alpha" and "Version=2"
 
-    @REQ-DUR-003 @functional-requirement @durability @restart-safety @partial
+    @REQ-DUR-003 @functional-requirement @durability @restart-safety @ep2-webclient-restart @ep2-full-process-restart @implemented-and-validated
     Scenario: Object ACL survives restart in storage-engine mode
       Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-003-acl"
       And an object exists at bucket "ep2-obj-meta-test" and key "documents/acl-file.txt"
@@ -129,35 +129,35 @@ Business Need: EP-2 Complete Metadata Durability
     inventory, metrics, intelligent tiering, encryption, ABAC, metadata and
     metadata-table configuration) are part of the durable bucket registry document.
 
-    @REQ-DUR-004 @functional-requirement @non-functional-requirement @durability @restart-safety @implemented-not-e2e-validated
+    @REQ-DUR-004 @functional-requirement @non-functional-requirement @durability @restart-safety @ep2-full-process-restart @implemented-and-validated
     Scenario: Bucket CORS configuration survives restart
       Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-cors"
       And bucket "ep2-bucket-config-test" has a CORS rule allowing origin "https://app.example.com" with methods "GET,PUT"
       When the application process is stopped and started again with the same filesystem root
       Then GetBucketCors for bucket "ep2-bucket-config-test" includes the rule allowing origin "https://app.example.com"
 
-    @REQ-DUR-004 @functional-requirement @non-functional-requirement @durability @restart-safety @implemented-not-e2e-validated
+    @REQ-DUR-004 @functional-requirement @non-functional-requirement @durability @restart-safety @ep2-full-process-restart @implemented-and-validated
     Scenario: Bucket notification configuration survives restart
       Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-notification"
       And bucket "ep2-bucket-config-test" has a notification configuration with topic destination "arn:aws:sns:eu-west-1:000000000000:ep2-topic"
       When the application process is stopped and started again with the same filesystem root
       Then GetBucketNotificationConfiguration for bucket "ep2-bucket-config-test" returns the topic destination "arn:aws:sns:eu-west-1:000000000000:ep2-topic"
 
-    @REQ-DUR-004 @functional-requirement @non-functional-requirement @durability @restart-safety @implemented-not-e2e-validated
+    @REQ-DUR-004 @functional-requirement @non-functional-requirement @durability @restart-safety @ep2-full-process-restart @implemented-and-validated
     Scenario: Bucket object-lock configuration survives restart
       Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-object-lock"
       And bucket "ep2-bucket-config-test" has an object-lock configuration with retention mode "GOVERNANCE" and a period of 30 days
       When the application process is stopped and started again with the same filesystem root
       Then GetObjectLockConfiguration for bucket "ep2-bucket-config-test" returns retention mode "GOVERNANCE" and a period of 30 days
 
-    @REQ-DUR-004 @functional-requirement @non-functional-requirement @durability @restart-safety @implemented-not-e2e-validated
+    @REQ-DUR-004 @functional-requirement @non-functional-requirement @durability @restart-safety @ep2-full-process-restart @implemented-and-validated
     Scenario: Bucket inventory-table configuration survives restart
       Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-inventory-table"
       And bucket "ep2-bucket-config-test" has an inventory-table configuration with id "ep2-inventory-table" format "Parquet" and schedule "Daily"
       When the application process is stopped and started again with the same filesystem root
       Then the inventory-table configuration for bucket "ep2-bucket-config-test" returns id "ep2-inventory-table"
 
-    @REQ-DUR-004 @functional-requirement @non-functional-requirement @durability @restart-safety @implemented-not-e2e-validated
+    @REQ-DUR-004 @functional-requirement @non-functional-requirement @durability @restart-safety @ep2-full-process-restart @implemented-and-validated
     Scenario: Bucket journal-table configuration survives restart
       Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-journal-table"
       And bucket "ep2-bucket-config-test" has a journal-table configuration with id "ep2-journal-table" format "Parquet" and schedule "Hourly"
@@ -171,21 +171,21 @@ Business Need: EP-2 Complete Metadata Durability
     through the durable bucket registry document, so no bucket configuration family
     remains as handler-local web-adapter state.
 
-    @REQ-DUR-004 @functional-requirement @non-functional-requirement @durability @restart-safety @implemented-not-e2e-validated
+    @REQ-DUR-004 @functional-requirement @non-functional-requirement @durability @restart-safety @ep2-full-process-restart @implemented-and-validated
     Scenario: Bucket ABAC configuration survives restart
       Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-abac"
       And bucket "ep2-bucket-config-test" has an ABAC rule granting "s3:GetObject" to principal "user/admin" gated by tag "role" equal to "admin"
       When the application process is stopped and started again with the same filesystem root
       Then the bucket ABAC configuration for "ep2-bucket-config-test" includes the rule granting "s3:GetObject" gated by tag "role" equal to "admin"
 
-    @REQ-DUR-004 @functional-requirement @non-functional-requirement @durability @restart-safety @implemented-not-e2e-validated
+    @REQ-DUR-004 @functional-requirement @non-functional-requirement @durability @restart-safety @ep2-full-process-restart @implemented-and-validated
     Scenario: Bucket metadata configuration survives restart
       Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-metadata"
       And bucket "ep2-bucket-config-test" has a metadata configuration rule "md-1" with status "Enabled" for resource type "OBJECT" subtype "TAGS"
       When the application process is stopped and started again with the same filesystem root
       Then the metadata configuration for bucket "ep2-bucket-config-test" includes rule "md-1" for resource type "OBJECT"
 
-    @REQ-DUR-004 @functional-requirement @non-functional-requirement @durability @restart-safety @implemented-not-e2e-validated
+    @REQ-DUR-004 @functional-requirement @non-functional-requirement @durability @restart-safety @ep2-full-process-restart @implemented-and-validated
     Scenario: Bucket metadata-table configuration survives restart
       Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-004-metadata-table"
       And bucket "ep2-bucket-config-test" has a metadata-table configuration rule "mdt-1" with table name "ep2-metadata-table" in database "analytics-db"
@@ -196,7 +196,7 @@ Business Need: EP-2 Complete Metadata Durability
     One scenario exercises the bucket registry, per-object metadata and multipart
     state together across a single restart of the same filesystem root.
 
-    @REQ-DUR-005 @functional-requirement @non-functional-requirement @durability @restart-safety @absent
+    @REQ-DUR-005 @functional-requirement @non-functional-requirement @durability @restart-safety @ep2-webclient-restart @ep2-full-process-restart @implemented-and-validated
     Scenario: All EP-2 metadata families survive one combined restart
       Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-DUR-005-combined"
       And bucket "ep2-combined-test" is created through the S3 CreateBucket API

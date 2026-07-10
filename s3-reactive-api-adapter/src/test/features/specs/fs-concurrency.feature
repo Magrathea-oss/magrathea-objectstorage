@@ -1,5 +1,4 @@
-Feature: Filesystem concurrency — torn reference prevention (REQ-FS-006)
-  Ability
+Ability: Filesystem concurrency — torn reference prevention (REQ-FS-006)
   Business need: concurrent PUTs to the same object key must not produce a torn
   reference that mixes fields from different writes. The storage-engine backend
   guards each per-key commit with a striped ReentrantLock and atomic temp-file

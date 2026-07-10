@@ -238,6 +238,20 @@ public class InMemoryReactiveS3ObjectRepository implements S3ObjectCommandReposi
     }
 
     @Override
+    public Mono<EncryptionConfiguration> findEncryption(String bucketName, ObjectKey key) {
+        return Mono.defer(() -> Mono.justOrEmpty(
+            encryptionByKey.get(storeKey(bucketName, key))
+        ));
+    }
+
+    @Override
+    public Mono<RestoreConfiguration> findRestore(String bucketName, ObjectKey key) {
+        return Mono.defer(() -> Mono.justOrEmpty(
+            restoreByKey.get(storeKey(bucketName, key))
+        ));
+    }
+
+    @Override
     public Flux<DataBuffer> findTorrent(String bucketName, ObjectKey key) {
         return findObjectByBucketNameAndKey(bucketName, key)
             .flatMapMany(obj -> {

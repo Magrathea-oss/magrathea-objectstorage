@@ -54,6 +54,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>
         </dependency>
+        <!-- Spring Security Reactive — EP-1 security backbone (ADR 0023) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
         <!-- Jackson 3 XML — S3 XML responses -->
         <dependency>
             <groupId>tools.jackson.dataformat</groupId>

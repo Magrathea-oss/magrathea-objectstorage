@@ -140,13 +140,56 @@ public class Phase5S3SemanticCompatibilitySteps {
             .uri(URI.create("/" + bucket + "/" + key)));
     }
 
+    @When("part number {int} is uploaded by copying object {string} from bucket {string}")
+    public void partNumberIsUploadedByCopyingObjectFromBucket(int partNumber, String sourceKey, String sourceBucket) {
+        assertNotNull(state.uploadId, "uploadId should be available before copying parts");
+        state.lastResponse = exchangeBytes(webTestClient.put()
+            .uri(URI.create("/" + state.bucket + "/" + state.objectKey + "?uploadId=" + state.uploadId + "&partNumber=" + partNumber))
+            .header("x-amz-copy-source", "/" + sourceBucket + "/" + sourceKey)
+            .accept(MediaType.APPLICATION_XML));
+        String etag = state.lastResponse.header("ETag");
+        assertNotNull(etag, "UploadPartCopy should return ETag");
+        state.uploadedParts.put(partNumber, UploadPart.create(PartNumber.of(partNumber), etag,
+            state.lastResponse.body().length));
+    }
+
+    @When("part number {int} is uploaded by copying with x-amz-copy-source header {string}")
+    public void partNumberIsUploadedByCopyingWithCopySourceHeader(int partNumber, String copySourceHeader) {
+        assertNotNull(state.uploadId, "uploadId should be available before copying parts");
+        state.lastResponse = exchangeBytes(webTestClient.put()
+            .uri(URI.create("/" + state.bucket + "/" + state.objectKey + "?uploadId=" + state.uploadId + "&partNumber=" + partNumber))
+            .header("x-amz-copy-source", copySourceHeader)
+            .accept(MediaType.APPLICATION_XML));
+    }
+
     @When("the multipart upload is completed with all uploaded parts in order")
     public void theMultipartUploadIsCompletedWithAllUploadedPartsInOrder() {
-        assertNotNull(state.uploadId, "uploadId should be available");
-        state.lastResponse = exchangeBytes(webTestClient.post()
+        completeMultipartUpload(state.uploadId, "<CompleteMultipartUpload/>");
+    }
+
+    @When("CompleteMultipartUpload is requested with upload ID {string} and body {string}")
+    public void completeMultipartUploadIsRequestedWithUploadIdAndBody(String uploadId, String body) {
+        completeMultipartUpload(uploadId, body);
+    }
+
+    @When("CompleteMultipartUpload is requested with body {string}")
+    public void completeMultipartUploadIsRequestedWithBody(String body) {
+        assertNotNull(state.uploadId, "uploadId should be available before completing multipart upload");
+        completeMultipartUpload(state.uploadId, body);
+    }
+
+    @When("CompleteMultipartUpload is requested with the following XML:")
+    public void completeMultipartUploadIsRequestedWithTheFollowingXml(String xml) {
+        assertNotNull(state.uploadId, "uploadId should be available before completing multipart upload");
+        completeMultipartUpload(state.uploadId, xml);
+    }
+
+    @When("the multipart upload is aborted")
+    public void multipartUploadIsAborted() {
+        assertNotNull(state.uploadId, "uploadId should be available before aborting multipart upload");
+        state.lastResponse = exchangeBytes(webTestClient.delete()
             .uri(URI.create("/" + state.bucket + "/" + state.objectKey + "?uploadId=" + state.uploadId))
-            .contentType(MediaType.APPLICATION_XML)
-            .bodyValue("<CompleteMultipartUpload/>"));
+            .accept(MediaType.APPLICATION_XML));
     }
 
     @When("the application is restarted with the same storage configuration")
@@ -323,6 +366,15 @@ public class Phase5S3SemanticCompatibilitySteps {
         assertEquals(state.savedValues.get(savedName), requireHeader(header));
     }
 
+    @Then("the upload part copy response ETag is a quoted 32-character lowercase hex string")
+    public void uploadPartCopyResponseEtagIsQuotedMd5Hex() {
+        String headerEtag = requireHeader("ETag");
+        String bodyEtag = extractXmlValue(state.lastResponse.bodyAsString(), "ETag");
+        assertTrue(isQuotedMd5Etag(headerEtag), "UploadPartCopy ETag header should be quoted lowercase MD5 hex: " + headerEtag);
+        assertEquals(headerEtag, bodyEtag, "UploadPartCopy XML ETag should match response header");
+        assertNotEquals("\"placeholder-etag\"", headerEtag);
+    }
+
     @Then("the upload part response ETag is a quoted 32-character lowercase hex string")
     public void uploadPartResponseEtagIsQuotedMd5Hex() {
         String headerEtag = requireHeader("ETag");
@@ -401,9 +453,28 @@ public class Phase5S3SemanticCompatibilitySteps {
         assertTrue(body.toLowerCase().contains("false") || body.toLowerCase().contains("disabled"), body);
     }
 
+    @Then("the XML error code is {string}")
+    public void xmlErrorCodeIs(String expectedCode) {
+        String body = state.lastResponse.bodyAsString();
+        String actual = extractXmlValue(body, "Code");
+        if (actual.isBlank()) {
+            actual = extractXmlValue(body, "code");
+        }
+        assertEquals(expectedCode, actual, body);
+    }
+
     @Then("the response body contains {string}")
     public void responseBodyContains(String expected) {
         assertTrue(state.lastResponse.bodyAsString().contains(expected), state.lastResponse.bodyAsString());
+    }
+
+    private void completeMultipartUpload(String uploadId, String body) {
+        assertNotNull(uploadId, "uploadId should be available");
+        state.lastResponse = exchangeBytes(webTestClient.post()
+            .uri(URI.create("/" + state.bucket + "/" + state.objectKey + "?uploadId=" + uploadId))
+            .contentType(MediaType.APPLICATION_XML)
+            .accept(MediaType.APPLICATION_XML)
+            .bodyValue(body));
     }
 
     private void uploadPart(int partNumber, String content) {

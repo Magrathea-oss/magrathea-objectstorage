@@ -106,9 +106,32 @@ Current runtime mutability decision: storage policies, storage devices, and disk
 
 Planned Vue screens are policy list/detail/validation report, device list/detail, disk-set/topology overview/detail, and backend/status dashboard. Frontend implementation requires an appropriate frontend workflow/agent before changing `magrathea-ui`; the current Java workflow only documents the plan and backend contracts.
 
-### Container build and generated static assets
+### Container build, native image and generated static assets
 
-Generated bootstrap static resources are not expected to be committed or copied from the host into the image. `.dockerignore` excludes generated `bootstrap-application/src/main/resources/static/**` docs, assets, and entry files. The `Dockerfile` installs the frontend/documentation toolchains in the builder stage, regenerates ARC42/ADR/test-report JSON, copies source-controlled documentation images, builds `magrathea-ui`, and packages those regenerated static assets into the Spring Boot JAR.
+Generated bootstrap static resources are not expected to be committed or copied from the host into the image. `.dockerignore` excludes generated `bootstrap-application/src/main/resources/static/**` docs, assets, and entry files. The JVM `Dockerfile` installs the frontend/documentation toolchains in the builder stage, checks/regenerates the Gherkin appendix, regenerates ARC42/ADR/test-report JSON, copies source-controlled documentation images, builds `magrathea-ui`, and packages those regenerated static assets into the Spring Boot JAR without Maven fail-never mode.
+
+The canonical JVM container path is:
+
+```bash
+docker build --network=host -f Dockerfile -t magrathea-objectstorage:jvm .
+docker run --rm --network=host magrathea-objectstorage:jvm
+```
+
+The JVM runtime image uses public ECR mirrored Maven/Temurin bases, runs as the non-root `magrathea` user with writable `/app/data`, exposes ports 8080/8081, and has an Admin API healthcheck. The 2026-07-10 validation used `--network=host` because the local Docker sandbox cannot create bridge networking; it passed Admin health, S3 ListBuckets XML, bucket/object PUT/GET, and generated-password log checks.
+
+A native-image path is also available for JVM-free deployment:
+
+```bash
+# host build; Spring Boot 4 native runtime requires GraalVM 25 native-image on PATH
+mvn -Pnative -pl bootstrap-application -am -DskipTests native:compile
+./bootstrap-application/target/magrathea-objectstorage
+
+# optimized Alpine runtime image; native build happens in the Docker builder stage
+docker build -f Dockerfile.native -t magrathea-objectstorage:native .
+docker run --rm -p 8080:8080 -p 8081:8081 magrathea-objectstorage:native
+```
+
+`Dockerfile.native` keeps the same Docker-driven documentation/frontend regeneration gates, then compiles a GraalVM native executable with the `native,native-musl` Maven profiles and runs it from Alpine without requiring Java in the final image. Use a GraalVM 25 native-image toolchain for Spring Boot 4 native builds; older GraalVM 21 native images can fail during link or produce a binary that Spring Boot rejects at startup. The native Docker slice is validated by Admin API health plus S3 ListBuckets XML/JSON and bucket/object PUT/GET smoke checks; the regular `Dockerfile` is now validated as the canonical JVM image while native packaging remains the JVM-free distribution path.
 
 ### S3 API activation
 
@@ -134,6 +157,10 @@ s3-reactive-api-adapter/src/main/resources/META-INF/spring/org.springframework.b
 mvn clean test
 mvn -pl bootstrap-application -am package -DskipTests
 java -jar bootstrap-application/target/bootstrap-application-1.0.0-SNAPSHOT.jar
+
+# optional JVM-free native executable
+mvn -Pnative -pl bootstrap-application -am -DskipTests native:compile
+./bootstrap-application/target/magrathea-objectstorage
 ```
 
 In another shell:

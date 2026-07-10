@@ -334,7 +334,7 @@ def parse_feature_file(path: Path, repo_root: Path) -> tuple[FeatureInfo, list[S
 
 
 def parse_features(features_dir: Path, repo_root: Path) -> tuple[list[FeatureInfo], list[ScenarioInfo]]:
-    feature_files = sorted(features_dir.glob("*.feature"), key=lambda item: item.as_posix())
+    feature_files = sorted(features_dir.rglob("*.feature"), key=lambda item: item.as_posix())
     if not feature_files:
         raise ValueError(f"no .feature files found under {features_dir}")
 
@@ -401,6 +401,14 @@ def render_examples_table(examples: ExamplesBlock) -> list[str]:
     return lines
 
 
+def audience_for(feature: FeatureInfo) -> tuple[str, str]:
+    if feature.keyword == "Business Need":
+        return "Requirements — Business Need", "Externally observable S3/Admin API behavior for product owners, S3 API consumers, operators, and documentation readers."
+    if feature.keyword == "Ability":
+        return "Specs — Ability", "Maintainer-facing internal mechanisms, architecture constraints, and operational contracts with no separate external S3 API equivalent."
+    return "Other executable Gherkin", "Feature files that still use the generic `Feature` keyword; review and classify these paths as `Business Need` or `Ability`."
+
+
 def render_appendix(features: list[FeatureInfo], scenarios: list[ScenarioInfo], features_dir: Path, output_path: Path) -> str:
     status_counts: Counter[str] = Counter()
     validation_counts: Counter[str] = Counter()
@@ -431,8 +439,13 @@ def render_appendix(features: list[FeatureInfo], scenarios: list[ScenarioInfo], 
 
     scenarios_by_feature: OrderedDict[Path, list[ScenarioInfo]] = OrderedDict()
     feature_by_path = {feature.path: feature for feature in features}
+    features_by_audience: OrderedDict[str, list[Path]] = OrderedDict()
+    audience_descriptions: dict[str, str] = {}
     for feature in features:
         scenarios_by_feature[feature.path] = []
+        audience, description = audience_for(feature)
+        features_by_audience.setdefault(audience, []).append(feature.path)
+        audience_descriptions[audience] = description
     for scenario in scenarios:
         scenarios_by_feature[scenario.feature.path].append(scenario)
 
@@ -446,9 +459,9 @@ def render_appendix(features: list[FeatureInfo], scenarios: list[ScenarioInfo], 
         "",
         "[[appendix-gherkin-requirements]]",
         "[appendix]",
-        "== Gherkin Requirements",
+        "== Gherkin Requirements and Specs",
         "",
-        "The `.feature` files under `s3-reactive-api-adapter/src/test/features/requirements` are the source of truth for executable requirements. This generated appendix reproduces, for every declared scenario:",
+        "The `.feature` files under `s3-reactive-api-adapter/src/test/features/requirements` and `s3-reactive-api-adapter/src/test/features/specs` are the source of truth for executable requirements and maintainer-facing executable specifications. This generated appendix reproduces, for every declared scenario:",
         "",
         "* the requirement metadata (tags, validation modes, declared status);",
         "* the full Gherkin step text (`Given`/`When`/`Then`/`And`/`But`);",
@@ -456,7 +469,7 @@ def render_appendix(features: list[FeatureInfo], scenarios: list[ScenarioInfo], 
         "",
         "so that the appendix can be reviewed independently from the source repository while remaining synchronized with the executable feature files.",
         "",
-        f"Generated from `{escape_adoc(features_dir.as_posix())}` using `python3 scripts/generate-gherkin-requirements-appendix.py`. Implementation/validation status is taken verbatim from explicit scenario tags; missing tags are reported as `unknown/not-tagged` and must not be upgraded by this report.",
+        f"Generated from `{escape_adoc(features_dir.as_posix())}` using `python3 scripts/generate-gherkin-requirements-appendix.py`. Implementation/validation status is taken verbatim from explicit scenario tags; missing tags are reported as `unknown/not-tagged` and must not be upgraded by this report. Scenarios are grouped by stakeholder audience according to ADR 0020 Gherkin keyword (`Business Need` vs `Ability`); feature paths should also follow the `requirements/` vs `specs/` folder convention.",
         "",
         "=== Summary",
         "",
@@ -470,90 +483,98 @@ def render_appendix(features: list[FeatureInfo], scenarios: list[ScenarioInfo], 
     lines.extend(counter_table("Classification tag counts", classification_counts, heading_level=4))
 
     lines.extend([
-        "=== Scenarios by Feature and Requirement ID",
+        "=== Scenarios by Stakeholder Audience, Feature, and Requirement ID",
         "",
-        "Scenario entries are grouped first by feature file/title, then by requirement group. When a scenario ID uses a final letter suffix such as `REQ-S3-001-A`, the requirement group is shown as `REQ-S3-001` while the full scenario ID remains listed under requirement IDs.",
+        "Scenario entries are grouped first by ADR 0020 stakeholder audience, then by feature file/title, then by requirement group. When a scenario ID uses a final letter suffix such as `REQ-S3-001-A`, the requirement group is shown as `REQ-S3-001` while the full scenario ID remains listed under requirement IDs.",
         "",
     ])
 
-    for feature_path, feature_scenarios in scenarios_by_feature.items():
-        feature = feature_by_path[feature_path]
+    for audience, feature_paths in features_by_audience.items():
         lines.extend([
-            f"==== {escape_adoc(feature.path.as_posix())}",
+            f"=== {escape_adoc(audience)}",
             "",
-            f"* Feature title: {escape_adoc(feature.keyword)}: {escape_adoc(feature.title)}",
-            f"* Feature tags: {tags_or_unknown(feature.tags)}",
+            audience_descriptions[audience],
+            "",
         ])
-        if feature.description:
-            lines.append("* Feature description:")
-            lines.append("+")
-            lines.append("----")
-            for desc_line in feature.description:
-                lines.append(desc_line)
-            lines.append("----")
-        lines.append("")
-
-        groups: OrderedDict[str, list[ScenarioInfo]] = OrderedDict()
-        for scenario in feature_scenarios:
-            groups.setdefault(scenario.requirement_group, []).append(scenario)
-
-        for requirement_group, group_scenarios in groups.items():
+        for feature_path in feature_paths:
+            feature_scenarios = scenarios_by_feature[feature_path]
+            feature = feature_by_path[feature_path]
             lines.extend([
-                f"===== {escape_adoc(requirement_group)}",
+                f"==== {escape_adoc(feature.path.as_posix())}",
                 "",
+                f"* Feature title: {escape_adoc(feature.keyword)}: {escape_adoc(feature.title)}",
+                f"* Feature tags: {tags_or_unknown(feature.tags)}",
             ])
-            for scenario in group_scenarios:
-                protocol_smoke = "yes" if scenario.protocol_smoke else "no"
+            if feature.description:
+                lines.append("* Feature description:")
+                lines.append("+")
+                lines.append("----")
+                for desc_line in feature.description:
+                    lines.append(desc_line)
+                lines.append("----")
+            lines.append("")
+
+            groups: OrderedDict[str, list[ScenarioInfo]] = OrderedDict()
+            for scenario in feature_scenarios:
+                groups.setdefault(scenario.requirement_group, []).append(scenario)
+
+            for requirement_group, group_scenarios in groups.items():
                 lines.extend([
-                    f"====== {escape_adoc(scenario.kind)}: {escape_adoc(scenario.name)}",
-                    "",
-                    "[cols=\"1h,3\",options=\"header\"]",
-                    "|===",
-                    "|Metadata |Value",
-                    f"|Source line |`{scenario.feature.path.as_posix()}:{scenario.line}`",
-                    f"|Rule |{text_or_unknown(scenario.rule)}",
-                    f"|Requirement ID(s) |{tags_or_unknown(scenario.requirement_ids, UNKNOWN_REQUIREMENT)}",
-                    f"|Classification |{tags_or_unknown(scenario.classification_tags, UNKNOWN_CLASSIFICATION)}",
-                    f"|Capability area tags |{tags_or_unknown(scenario.capability_area_tags)}",
-                    f"|Validation mode tags |{tags_or_unknown(scenario.validation_mode_tags, UNKNOWN_VALIDATION_MODE)}",
-                    f"|Declared/validated status |{tags_or_unknown(scenario.status_tags, UNKNOWN_STATUS)}",
-                    f"|Protocol smoke |`{protocol_smoke}`",
-                    f"|All tags |{tags_or_unknown(scenario.all_tags)}",
-                    "|===",
+                    f"===== {escape_adoc(requirement_group)}",
                     "",
                 ])
-                if scenario.rule_description:
-                    lines.append(".Rule description")
-                    lines.append("----")
-                    for desc_line in scenario.rule_description:
-                        lines.append(desc_line)
-                    lines.append("----")
-                    lines.append("")
+                for scenario in group_scenarios:
+                    protocol_smoke = "yes" if scenario.protocol_smoke else "no"
+                    lines.extend([
+                        f"====== {escape_adoc(scenario.kind)}: {escape_adoc(scenario.name)}",
+                        "",
+                        "[cols=\"1h,3\",options=\"header\"]",
+                        "|===",
+                        "|Metadata |Value",
+                        f"|Source line |`{scenario.feature.path.as_posix()}:{scenario.line}`",
+                        f"|Rule |{text_or_unknown(scenario.rule)}",
+                        f"|Requirement ID(s) |{tags_or_unknown(scenario.requirement_ids, UNKNOWN_REQUIREMENT)}",
+                        f"|Classification |{tags_or_unknown(scenario.classification_tags, UNKNOWN_CLASSIFICATION)}",
+                        f"|Capability area tags |{tags_or_unknown(scenario.capability_area_tags)}",
+                        f"|Validation mode tags |{tags_or_unknown(scenario.validation_mode_tags, UNKNOWN_VALIDATION_MODE)}",
+                        f"|Declared/validated status |{tags_or_unknown(scenario.status_tags, UNKNOWN_STATUS)}",
+                        f"|Protocol smoke |`{protocol_smoke}`",
+                        f"|All tags |{tags_or_unknown(scenario.all_tags)}",
+                        "|===",
+                        "",
+                    ])
+                    if scenario.rule_description:
+                        lines.append(".Rule description")
+                        lines.append("----")
+                        for desc_line in scenario.rule_description:
+                            lines.append(desc_line)
+                        lines.append("----")
+                        lines.append("")
 
-                # Gherkin steps as a literal block (preserves Given/When/Then formatting)
-                if scenario.steps:
-                    lines.append(".Gherkin steps")
-                    lines.append("[source,gherkin]")
-                    lines.append("----")
-                    for step in scenario.steps:
-                        lines.append(f"  {step.keyword} {step.text}")
-                    lines.append("----")
-                    lines.append("")
+                    # Gherkin steps as a literal block (preserves Given/When/Then formatting)
+                    if scenario.steps:
+                        lines.append(".Gherkin steps")
+                        lines.append("[source,gherkin]")
+                        lines.append("----")
+                        for step in scenario.steps:
+                            lines.append(f"  {step.keyword} {step.text}")
+                        lines.append("----")
+                        lines.append("")
 
-                # Each Examples block as its own table
-                for examples in scenario.examples:
-                    lines.extend(render_examples_table(examples))
+                    # Each Examples block as its own table
+                    for examples in scenario.examples:
+                        lines.extend(render_examples_table(examples))
 
     return "\n".join(lines).rstrip() + "\n"
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
     repo_root = Path(__file__).resolve().parents[1]
-    parser = argparse.ArgumentParser(description="Generate or check the ARC42 Gherkin requirements appendix.")
+    parser = argparse.ArgumentParser(description="Generate or check the ARC42 Gherkin requirements/specs appendix.")
     parser.add_argument(
         "--features-dir",
-        default="s3-reactive-api-adapter/src/test/features/requirements",
-        help="Directory containing requirement .feature files (default: %(default)s)",
+        default="s3-reactive-api-adapter/src/test/features",
+        help="Directory containing requirement/spec .feature files; scanned recursively (default: %(default)s)",
     )
     parser.add_argument(
         "--output",

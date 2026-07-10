@@ -1,5 +1,6 @@
 package com.example.magrathea.s3api.dto.query;
 
+import tools.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
 
 /**
@@ -7,7 +8,10 @@ import tools.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
  */
 @JacksonXmlRootElement(localName = "Error")
 public record ErrorQuery(
+    @JacksonXmlProperty(localName = "Code")
     String code,
+
+    @JacksonXmlProperty(localName = "Message")
     String message
 ) {
     public static ErrorQuery from(String code, String message) {

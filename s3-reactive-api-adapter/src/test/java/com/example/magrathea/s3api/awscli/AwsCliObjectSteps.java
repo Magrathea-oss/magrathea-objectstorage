@@ -8,16 +8,23 @@ import io.cucumber.java.Before;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.When;
 import io.cucumber.java.en.Then;
+import org.junit.jupiter.api.Assumptions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 
+import java.io.IOException;
 import java.nio.file.*;
+import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 public class AwsCliObjectSteps {
+
+    private static final Duration AWS_CLI_PREFLIGHT_TIMEOUT = Duration.ofSeconds(5);
+    private static final AwsCliPreflight AWS_CLI_PREFLIGHT = checkAwsCliPreflight();
 
     @LocalServerPort
     private int port;
@@ -73,6 +80,28 @@ public class AwsCliObjectSteps {
         return exitCode;
     }
 
+    private static AwsCliPreflight checkAwsCliPreflight() {
+        try {
+            Process process = new ProcessBuilder("aws", "--version").start();
+            boolean finished = process.waitFor(AWS_CLI_PREFLIGHT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+            if (!finished) {
+                process.destroyForcibly();
+                return new AwsCliPreflight(false, "AWS CLI binary not available on PATH: `aws --version` timed out");
+            }
+            if (process.exitValue() != 0) {
+                String stderr = new String(process.getErrorStream().readAllBytes());
+                return new AwsCliPreflight(false, "AWS CLI preflight failed with exit " + process.exitValue() + ": " + stderr);
+            }
+            String stdout = new String(process.getInputStream().readAllBytes());
+            return new AwsCliPreflight(true, stdout.trim());
+        } catch (IOException e) {
+            return new AwsCliPreflight(false, "AWS CLI binary not available on PATH: " + e.getMessage());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return new AwsCliPreflight(false, "AWS CLI preflight interrupted");
+        }
+    }
+
     private Path writeTempFile(String content) throws Exception {
         var path = Files.createTempFile("magrathea-", ".txt");
         Files.writeString(path, content);
@@ -81,6 +110,7 @@ public class AwsCliObjectSteps {
 
     @Before
     public void resetRepositories() {
+        Assumptions.assumeTrue(AWS_CLI_PREFLIGHT.available(), AWS_CLI_PREFLIGHT.reason());
         bucketRepository.reset();
         objectRepository.reset();
         multipartUploadRepository.reset();
@@ -572,5 +602,8 @@ public class AwsCliObjectSteps {
         assertEquals(0, exitCode, "HEAD should succeed");
         assertTrue(stdout.contains(headerName + " = " + expectedValue) || stdout.contains(headerName + ": " + expectedValue),
             "HEAD response should contain header '" + headerName + "' with value '" + expectedValue + "'");
+    }
+
+    private record AwsCliPreflight(boolean available, String reason) {
     }
 }

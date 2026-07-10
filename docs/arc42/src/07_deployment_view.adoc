@@ -24,7 +24,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 |Filesystem-durable: bucket registry, multipart upload state, per-object configuration, and S3 object manifest references are committed under a configurable filesystem root (`storage.engine.filesystem.root`) with crash-safe temp-file + atomic-rename writes; selected explicitly, never the default
 
 |Java Runtime
-|JDK 21
+|JDK 21 bytecode for the normal JAR path; the optional Spring Boot 4 native executable is built with GraalVM 25 and removes the runtime JVM requirement
 
 |Build Tool
 |Apache Maven 3.9+
@@ -32,17 +32,30 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 === Docker Deployment
 
-A `Dockerfile` and `docker-compose.yml` are present at the project root for containerized execution:
+A JVM `Dockerfile`, a native-image `Dockerfile.native`, and `docker-compose.yml` are present at the project root for containerized execution:
 
 **Dockerfile:**
 
-* Builder stage: Maven 3.9 + Eclipse Temurin 21 with Node.js installed for documentation/frontend generation
+* Builder stage: Maven 3.9 + Eclipse Temurin 21 from public ECR mirrored Docker Hub images, with Node.js installed for documentation/frontend generation
 * Regenerates web documentation and admin UI static assets inside the builder stage from source-controlled docs and `magrathea-ui` sources
 * Runs the Gherkin requirements appendix quality gate (`--check` against the committed appendix) before regenerating it deterministically, so the image build fails if the ARC42 appendix is stale relative to the shared requirement feature files
+* Copies the full `scripts/` gate set so root Maven validation can run module-layering checks during packaging
 * Does not copy host-generated `bootstrap-application/src/main/resources/static/**` assets; `.dockerignore` excludes those generated resources from the build context
+* Packages with unmasked Maven failure semantics; Maven fail-never (`-fn` / `--fail-never`) is not used
 * Runtime stage: Eclipse Temurin 21 JRE, copies the packaged Spring Boot JAR from the builder
-* Exposes ports 8080 and 8081
+* Runs as non-root user `magrathea` with writable `/app/data`
+* Exposes ports 8080 and 8081 and defines an Admin API healthcheck against `/admin/health`
+* Validated first slice: image build, Admin API health smoke, S3 ListBuckets XML and bucket/object PUT/GET smoke, and no Spring Boot generated-password banner in build/runtime logs
 * Entrypoint: `java -jar /app.jar`
+
+**Dockerfile.native:**
+
+* Builder stage: GraalVM 25 `native-image` with musl support, Maven, Node.js and Python for the same documentation/frontend regeneration pipeline used by the JVM image
+* Runs the Gherkin requirements appendix quality gate (`--check`) before deterministic regeneration
+* Activates Maven profiles `native,native-musl` and compiles `bootstrap-application` into a `magrathea-objectstorage` native executable
+* Runtime stage: `alpine`, non-root user, no JRE/JDK installed, ports 8080 and 8081 exposed
+* Validated first slice: image build, Admin API health smoke, S3 ListBuckets XML/JSON and bucket/object PUT/GET smoke, no Spring Boot generated-password banner, no native reflection/shared-arena runtime errors, and no `java`/`javac` in the runtime image
+* Entrypoint: `/app/magrathea-objectstorage`
 
 **docker-compose.yml:**
 
@@ -83,7 +96,7 @@ Every document under `metadata/**` is committed with the same crash-safe discipl
 The current single-process deployment is intentionally monolithic for single-node operation. Enterprise Production Readiness phases (`PLAN.md`, EP-0..EP-11) sequence the path to production, including:
 
 * EP-1 (Security & Identity): SigV4 authentication, deny-by-default authorization, audit logging, real SSE
-* EP-2 (Complete Metadata Durability): bucket registry, multipart state, and per-object/bucket configuration are durable in storage-engine mode (delivered for these families; object tags/ACL durability and end-to-end Cucumber runner wiring remain open)
+* EP-2 (Complete Metadata Durability): bucket registry, multipart state, and per-object/bucket configuration are durable in storage-engine mode (`@implemented-and-validated` for the declared storage-engine scope; in-memory profile explicitly exempt)
 * EP-3 (Reactive Streaming Completion): bounded-memory GetObject and multipart part-body streaming
 * EP-4 (Space Management & Data Hygiene): chunk GC, dedup refcounting, quotas, ENOSPC behavior, scrubbing
 * EP-5 (Operability & Delivery): CI pipeline, backup/restore, DR, probes, graceful shutdown

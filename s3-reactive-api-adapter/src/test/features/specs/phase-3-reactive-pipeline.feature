@@ -1,4 +1,4 @@
-@requirement @phase-3 @reactive-pipeline @storage-engine @not-implemented
+@spec @phase-3 @reactive-pipeline @storage-engine
 Ability: Phase 3 staged reactive read and write pipeline
   As a storage-engine operator, S3-compatible client, and system owner,
   I want object writes and reads to flow through explicit reactive stages with shared
@@ -19,8 +19,10 @@ Ability: Phase 3 staged reactive read and write pipeline
   cancellation, and timing without carrying object payload bytes.
 
   Until the Stage 3 abstractions, staged pipelines, and runner glue are implemented,
-  these shared requirement scenarios remain @not-implemented. Keep every
-  requirement IDs with the REQ-PIPELINE-* prefix unchanged when the scenarios become executable.
+  scenarios that require runtime StorageStage/StorageContext/StorageEvent evidence remain
+  marked not-implemented. Static architecture scenarios may be promoted independently when they
+  validate code-level streaming constraints without a full pipeline-unit runner. Keep every
+  requirement ID with the REQ-PIPELINE-* prefix unchanged when scenarios become executable.
 
   Validation roles:
     - Pipeline unit runner validates StorageStage ordering, StorageContext evolution,
@@ -149,7 +151,7 @@ Ability: Phase 3 staged reactive read and write pipeline
     FileUnit DataBuffers incrementally and emit configured-size windows without first
     materializing the complete FileUnit.
 
-    @REQ-PIPELINE-007 @functional-requirement @non-functional-requirement @streaming @integrity @bounded-memory @static-architecture-required @s3-api @not-implemented
+    @implemented-and-validated @REQ-PIPELINE-007 @functional-requirement @non-functional-requirement @streaming @integrity @bounded-memory @static-architecture-required @s3-api
     Scenario: PutObject computes ETag while teeing the request body into storage
       Given validation mode "static-architecture" is selected for requirement "REQ-PIPELINE-007"
       And production source path "s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/adapter/web/S3ObjectOperationsHandler.java" implements the S3 PutObject route
@@ -161,7 +163,7 @@ Ability: Phase 3 staged reactive read and write pipeline
       And the implementation computes the single-part ETag and supported checksum headers while teeing the DataBuffer stream into saveObjectWithContent
       And the S3 PutObject response can expose the computed ETag without requiring a second full-body aggregation
 
-    @REQ-PIPELINE-008 @non-functional-requirement @streaming @deduplication @bounded-memory @static-architecture-required @storage-engine @not-implemented
+    @implemented-and-validated @REQ-PIPELINE-008 @non-functional-requirement @streaming @deduplication @bounded-memory @static-architecture-required @storage-engine
     Scenario: Fixed-window deduplication emits configured windows without joining the FileUnit
       Given validation mode "static-architecture" is selected for requirement "REQ-PIPELINE-008"
       And production source path "storage-engine-reactive-infrastructure/src/main/java/com/example/magrathea/storageengine/infrastructure/pipeline/FixedWindowDedupStep.java" implements fixed-window deduplication
@@ -177,6 +179,58 @@ Ability: Phase 3 staged reactive read and write pipeline
     verifies read preconditions, reads chunks in manifest order, and streams them to the
     S3 response according to subscriber demand. The read path MUST NOT collect all chunks
     before response streaming begins.
+
+    @implemented-and-validated @REQ-PIPELINE-009 @functional-requirement @non-functional-requirement @streaming @bounded-memory @static-architecture-required @s3-api
+    Scenario: Non-range GetObject attaches the content Flux directly to the S3 response without collecting chunks
+      Given validation mode "static-architecture" is selected for requirement "REQ-PIPELINE-009"
+      And production source path "s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/adapter/web/S3ObjectOperationsHandler.java" implements the S3 GetObject route
+      When the static architecture runner inspects method "getObject" in the production source path
+      Then method "getObject" does not collect object content before a non-range response
+      And method "getObject" passes "oc.content()" directly to "S3ResponseBuilder.okWithBody"
+      And range handling streams through the explicit Range header branch
+
+    @implemented-and-validated @REQ-PIPELINE-010 @functional-requirement @non-functional-requirement @streaming @bounded-memory @range @static-architecture-required @s3-api
+    Scenario: Ranged GetObject slices the content Flux without collecting the full object
+      Given validation mode "static-architecture" is selected for requirement "REQ-PIPELINE-010"
+      And production source path "s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/adapter/web/S3ObjectOperationsHandler.java" implements the S3 GetObject route
+      When the static architecture runner inspects method "getObject" in the production source path
+      Then method "getObject" does not invoke "collectList"
+      And method "getObject" passes "oc.content()" directly to range helper "serveRange"
+      When the static architecture runner inspects the production source path
+      Then helper "serveRange" accepts streaming content as "Flux<DataBuffer> content" instead of a collected buffer list
+      And helper "serveRange" attaches "sliceRange(content, start, effectiveEnd)" to "BodyInserters.fromDataBuffers"
+      And helper "sliceRange" emits per-buffer range slices without building a full-object array
+
+  Rule: Multipart part persistence streams upload and copy inputs without complete-part aggregation
+    UploadPart and UploadPartCopy MUST persist part bytes as a stream while computing the
+    part ETag and size incrementally. The multipart part store MUST write and read part
+    files as DataBuffer streams so CompleteMultipartUpload can concatenate part streams
+    without loading each part file as one byte array.
+
+    @implemented-and-validated @REQ-PIPELINE-011 @functional-requirement @non-functional-requirement @streaming @bounded-memory @multipart @static-architecture-required @s3-api
+    Scenario: UploadPart persists request DataBuffers without joining the complete part body
+      Given validation mode "static-architecture" is selected for requirement "REQ-PIPELINE-011"
+      And production source path "s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/adapter/web/S3MultipartHandler.java" implements the S3 multipart handler
+      When the static architecture runner inspects method "uploadPart" in the production source path
+      Then method "uploadPart" does not invoke "DataBufferUtils.join"
+      And method "uploadPart" does not materialize the request body into a whole-object "byte[] bytes" array
+      And method "uploadPart" passes "request.bodyToFlux(DataBuffer.class)" directly to multipart part storage
+      When the static architecture runner inspects method "uploadPartCopy" in the production source path
+      Then method "uploadPartCopy" does not invoke "DataBufferUtils.join"
+      And method "uploadPartCopy" streams copied source content directly to multipart part storage
+
+    @implemented-and-validated @REQ-PIPELINE-012 @non-functional-requirement @streaming @bounded-memory @multipart @static-architecture-required @s3-api
+    Scenario: Multipart part store writes and reads part files as bounded DataBuffer streams
+      Given validation mode "static-architecture" is selected for requirement "REQ-PIPELINE-012"
+      And production source path "s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/adapter/web/S3MultipartPartStore.java" implements multipart part body storage
+      When the static architecture runner inspects method "savePart" in the production source path
+      Then method "savePart" accepts multipart content as "Flux<DataBuffer> content"
+      And method "savePart" writes multipart content with "DataBufferUtils.write"
+      And method "savePart" computes part measurements incrementally for each DataBuffer
+      And method "savePart" does not materialize the request body into a whole-object "byte[] bytes" array
+      When the static architecture runner inspects method "readPart" in the production source path
+      Then method "readPart" reads multipart content with "DataBufferUtils.read"
+      And method "readPart" does not invoke "Files.readAllBytes"
 
     @REQ-PIPELINE-003 @functional-requirement @non-functional-requirement @streaming @backpressure @integrity @pipeline-unit-required @webclient-required @not-implemented
     Scenario Outline: GetObject streams manifest-ordered chunks without collecting the whole object

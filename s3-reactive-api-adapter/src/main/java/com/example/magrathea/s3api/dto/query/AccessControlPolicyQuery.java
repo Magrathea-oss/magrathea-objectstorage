@@ -21,7 +21,11 @@ public record AccessControlPolicyQuery(
             case "authenticated-read" -> "READ";
             default -> "READ";
         };
-        Grant grant = new Grant(new Grantee(permission));
+        return grant(permission, "owner");
+    }
+
+    public static AccessControlPolicyQuery grant(String permission, String grantee) {
+        Grant grant = new Grant(new Grantee(grantee), permission);
         return new AccessControlPolicyQuery(new AccessControlList(List.of(grant)));
     }
 
@@ -32,11 +36,14 @@ public record AccessControlPolicyQuery(
     ) {}
 
     public record Grant(
-        Grantee grantee
+        @JacksonXmlProperty(localName = "Grantee")
+        Grantee grantee,
+        @JacksonXmlProperty(localName = "Permission")
+        String permission
     ) {}
 
     public record Grantee(
-        @JacksonXmlProperty(localName = "Permission")
-        String permission
+        @JacksonXmlProperty(localName = "ID")
+        String id
     ) {}
 }

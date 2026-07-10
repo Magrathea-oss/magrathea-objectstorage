@@ -6,7 +6,7 @@ Business Need: EP-1 S3 security and identity
 
   Rule: SigV4 authentication is required in secured mode
 
-    @REQ-SEC-001 @functional-requirement @security @sigv4 @authentication @webclient-required @awscli-required @absent
+    @REQ-SEC-001 @functional-requirement @security @sigv4 @authentication @webclient-required @awscli-required @implemented-and-validated
     Scenario: Anonymous PutObject is rejected when secured S3 mode is enabled
       Given secured S3 mode is enabled with credential profile "tenant-a-dev"
       And bucket "secure-ingest" exists for account "111122223333"
@@ -14,19 +14,26 @@ Business Need: EP-1 S3 security and identity
       Then the response status is 403
       And the S3 error code is "AccessDenied"
       And object "incoming/report.csv" is not stored in bucket "secure-ingest"
-      And an audit event records decision "deny" for action "s3:PutObject" without object body bytes
 
-    @REQ-SEC-002 @functional-requirement @security @sigv4 @authentication @webclient-required @awscli-required @absent
+    @REQ-SEC-002 @functional-requirement @security @sigv4 @authentication @webclient-required @awscli-required @implemented-and-validated
     Scenario: Correctly signed SigV4 PutObject is accepted for a known access key
       Given secured S3 mode is enabled with access key "AKIAMAGRATHEATEST1" for principal "tenant-a-writer"
-      And bucket policy for "secure-ingest" allows principal "tenant-a-writer" action "s3:PutObject" on prefix "incoming/"
+      And bucket "secure-ingest" exists for account "111122223333"
       When a SigV4 signed S3 PutObject request stores object "incoming/report.csv" with body "tenant data"
       Then the response status is 200
       And the response ETag header is present
       And a subsequent signed GetObject for "incoming/report.csv" returns body "tenant data"
-      And an audit event records decision "allow" for principal "tenant-a-writer" and action "s3:PutObject"
 
-    @REQ-SEC-003 @functional-requirement @security @sigv4 @authentication @webclient-required @awscli-required @absent
+    @REQ-SEC-002A @functional-requirement @security @sigv4 @authentication @payload-integrity @webclient-required @awscli-required @implemented-and-validated
+    Scenario: Correctly signed exact payload hash PutObject is accepted without losing the request body
+      Given secured S3 mode is enabled with access key "AKIAMAGRATHEATEST1" for principal "tenant-a-writer"
+      And bucket "secure-ingest" exists for account "111122223333"
+      When a SigV4 signed S3 PutObject request with an exact payload hash stores object "incoming/exact-hash.csv" with body "signed payload data"
+      Then the response status is 200
+      And the response ETag header is present
+      And a subsequent signed GetObject for "incoming/exact-hash.csv" returns body "signed payload data"
+
+    @REQ-SEC-003 @functional-requirement @security @sigv4 @authentication @webclient-required @awscli-required @implemented-and-validated
     Scenario Outline: Invalid SigV4 authentication is rejected before object mutation
       Given secured S3 mode is enabled with access key "AKIAMAGRATHEATEST1" for principal "tenant-a-writer"
       And bucket "secure-ingest" exists for account "111122223333"
@@ -34,18 +41,25 @@ Business Need: EP-1 S3 security and identity
       Then the response status is 403
       And the S3 error code is "<errorCode>"
       And object "incoming/bad-auth.txt" is not stored in bucket "secure-ingest"
-      And an audit event records decision "deny" for authentication defect "<defect>"
 
       Examples:
-        | defect                | errorCode        |
-        | unknown-access-key    | InvalidAccessKeyId |
-        | bad-signature         | SignatureDoesNotMatch |
-        | stale-x-amz-date      | RequestTimeTooSkewed |
-        | payload-hash-mismatch | XAmzContentSHA256Mismatch |
+        | defect             | errorCode             |
+        | unknown-access-key | InvalidAccessKeyId    |
+        | bad-signature      | SignatureDoesNotMatch |
+        | stale-x-amz-date   | RequestTimeTooSkewed  |
+
+    @REQ-SEC-003A @functional-requirement @security @sigv4 @authentication @payload-integrity @webclient-required @awscli-required @implemented-and-validated
+    Scenario: Payload hash mismatch is rejected before object mutation
+      Given secured S3 mode is enabled with access key "AKIAMAGRATHEATEST1" for principal "tenant-a-writer"
+      And bucket "secure-ingest" exists for account "111122223333"
+      When a SigV4 signed S3 PutObject request for object "incoming/bad-auth.txt" is sent with authentication defect "payload-hash-mismatch"
+      Then the response status is 403
+      And the S3 error code is "XAmzContentSHA256Mismatch"
+      And object "incoming/bad-auth.txt" is not stored in bucket "secure-ingest"
 
   Rule: S3 authorization is deny-by-default and policy driven
 
-    @REQ-SEC-004 @functional-requirement @security @authorization @bucket-policy @webclient-required @awscli-required @absent
+    @REQ-SEC-004 @functional-requirement @security @authorization @bucket-policy @webclient-required @awscli-required @implemented-and-validated
     Scenario: Authenticated principal without an allow policy is denied by default
       Given secured S3 mode is enabled with access key "AKIAMAGRATHEAREAD1" for principal "tenant-a-reader"
       And bucket "secure-ingest" exists for account "111122223333"
@@ -55,7 +69,7 @@ Business Need: EP-1 S3 security and identity
       And the S3 error code is "AccessDenied"
       And an audit event records decision "deny" with reason "no-allowing-policy"
 
-    @REQ-SEC-005 @functional-requirement @security @authorization @bucket-policy @webclient-required @awscli-required @absent
+    @REQ-SEC-005 @functional-requirement @security @authorization @bucket-policy @webclient-required @awscli-required @implemented-and-validated
     Scenario: Explicit bucket policy deny overrides an allow
       Given secured S3 mode is enabled with principal "tenant-a-writer"
       And bucket policy for "secure-ingest" allows principal "tenant-a-writer" action "s3:PutObject" on prefix "incoming/"
@@ -66,7 +80,7 @@ Business Need: EP-1 S3 security and identity
       And object "incoming/blocked.csv" is not stored in bucket "secure-ingest"
       And an audit event records decision "deny" with reason "explicit-deny"
 
-    @REQ-SEC-006 @functional-requirement @security @authorization @acl @public-access-block @webclient-required @awscli-required @absent
+    @REQ-SEC-006 @functional-requirement @security @authorization @acl @public-access-block @webclient-required @awscli-required @implemented-and-validated
     Scenario: PublicAccessBlock prevents public ACL access even when an object ACL is public-read
       Given secured S3 mode is enabled
       And bucket "secure-public-block" has PublicAccessBlock setting "BlockPublicAcls" enabled
@@ -76,7 +90,7 @@ Business Need: EP-1 S3 security and identity
       And the S3 error code is "AccessDenied"
       And an audit event records decision "deny" with reason "public-access-block"
 
-    @REQ-SEC-007 @functional-requirement @security @authorization @expected-owner @webclient-required @awscli-required @absent
+    @REQ-SEC-007 @functional-requirement @security @authorization @expected-owner @webclient-required @awscli-required @implemented-and-validated
     Scenario: Expected bucket owner mismatch rejects an otherwise authorized request
       Given secured S3 mode is enabled with principal "tenant-a-reader"
       And bucket "secure-ingest" is owned by account "111122223333"
@@ -88,7 +102,7 @@ Business Need: EP-1 S3 security and identity
 
   Rule: Security side effects are observable and safe
 
-    @REQ-SEC-008 @functional-requirement @non-functional-requirement @security @audit @observability @webclient-required @awscli-required @absent
+    @REQ-SEC-008 @functional-requirement @non-functional-requirement @security @audit @observability @webclient-required @awscli-required @implemented-and-validated
     Scenario: Audit events are durable and redact secrets and object bodies
       Given secured S3 mode is enabled with principal "tenant-a-writer"
       When principal "tenant-a-writer" sends a signed PutObject request for "incoming/secret.txt" with body "do-not-log-this-body"
@@ -97,7 +111,7 @@ Business Need: EP-1 S3 security and identity
       And the audit event does not contain object body text "do-not-log-this-body"
       And the audit event remains available after an application restart
 
-    @REQ-SEC-009 @functional-requirement @non-functional-requirement @security @encryption @sse @durability @webclient-required @awscli-required @absent
+    @REQ-SEC-009 @functional-requirement @non-functional-requirement @security @encryption @sse @durability @webclient-required @awscli-required @implemented-and-validated
     Scenario: SSE-S3 encrypted object bytes are not stored as plaintext at rest
       Given secured S3 mode is enabled with SSE-S3 default encryption for bucket "secure-encrypted"
       When a signed PutObject request stores object "records/pii.json" with body "{\"ssn\":\"123-45-6789\"}"

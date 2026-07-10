@@ -144,15 +144,18 @@ At the end of Phase 3 the `object-store/` directory is empty and removed.
 
 ### Runner class naming convention
 
-For each new shared feature file `phase-N-*.feature` (or a domain-specific
-file), create:
+For each new shared `Business Need` feature file under `requirements/` (for example
+`phase-N-*.feature` or a domain-specific S3 API file), create:
 
 - `PhaseN*RequirementsCucumberTest.java` in
   `cucumber/requirements/` — `@SelectClasspathResource("requirements/phase-*")`
 - `PhaseN*AwsCliCucumberTest.java` in
   `phaseNawscli/` — same `@SelectClasspathResource`
 
-This follows the existing pattern from phase-1, phase-2, and phase-5.
+For an `Ability` feature file under `specs/`, the runner must select
+`@SelectClasspathResource("specs/...")`; existing historical runner class/package
+names may remain until a dedicated rename is planned, but the selected feature path
+must follow ADR 0020.
 
 ## Consequences
 
@@ -280,11 +283,13 @@ concerns:
    disabled, CopyObject metadata directive, Object Lock/Archive route reachability,
    and — most notably — explicit documentation that SigV4-related headers
    (`X-Amz-Date`, `X-Amz-Content-SHA256`, `Authorization`) are accepted without
-   signature validation. This SigV4 gap is independently confirmed in `PLAN.md` EP-1
-   ("no SigV4 signature verification ... the S3 API accepts anonymous requests"), so
-   these scenarios are tagged `@not-implemented` in addition to `@protocol-smoke`,
-   consistent with the project's own documented roadmap status rather than inventing
-   a new claim.
+   signature validation in the default unsecured compatibility mode. At ADR time this
+   matched the then-absent EP-1 SigV4 implementation; current `PLAN.md` status is more
+   precise: an opt-in secured mode verifies configured SigV4 credentials, while
+   default unsecured mode and the broader authorization/audit/SSE scope remain open.
+   These scenarios stay tagged `@not-implemented` in addition to `@protocol-smoke`
+   because they document the unsecured compatibility behavior rather than completing
+   EP-1 security.
 
 This content was extracted into a new, honestly-named file,
 `single-node-backend-put-object-header-handling.feature` (`Business Need`, 18
@@ -459,10 +464,11 @@ original scenarios were migrated, merged, or (in the case of the 3 confirmed
 in-file duplicates: 1 from put_object.feature's D1 scenario dropped as
 non-observable, 2 from object-crud.feature dropped as exact duplicates of another
 scenario in the same legacy file) intentionally not carried forward. `features/awscli/`
-was fully migrated in Phase 2. The `requirements/` folder now contains, in addition
-to the six original phase-*/EP2 shared feature files, seven new single-node-backend-*
-feature files covering the same S3 operations against the single-node/development
-backend, each explicitly declaring its backend scope per AGENTS.md §B.4.
+was fully migrated in Phase 2. The `requirements/` folder contains the external
+`Business Need` S3/API feature files, including the single-node-backend-* features
+covering the same S3 operations against the single-node/development backend, each
+explicitly declaring its backend scope per AGENTS.md §B.4. The storage-engine
+Phase 2/3/4/6 `Ability` feature files now live under `specs/` per ADR 0020.
 
 ## Outcome
 
@@ -498,7 +504,8 @@ regenerated using the canonical Docker-driven generator
 repository `Dockerfile` runs as a `--check` quality gate before the deterministic
 regeneration step), per AGENTS.md §B.6. The previously committed appendix was stale
 (7 feature files / 87 scenarios, predating this ADR's migrations); the regenerated
-appendix reflects 15 feature files / 344 scenarios.
+appendix was later extended to include both `requirements/` and `specs/`; the current
+appendix reflects 18 feature files / 363 scenarios.
 
 Regenerating surfaced one additional migration defect: `validation_mode_tags` in
 the generator reads only **scenario-level** tags ending in `-required`, not

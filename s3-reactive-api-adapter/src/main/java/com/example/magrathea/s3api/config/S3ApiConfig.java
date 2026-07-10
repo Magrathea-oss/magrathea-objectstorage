@@ -7,6 +7,8 @@ import com.example.magrathea.s3api.adapter.web.S3BucketConfigHandler;
 import com.example.magrathea.s3api.adapter.web.S3BucketMetadataHandler;
 import com.example.magrathea.s3api.adapter.web.S3BucketOperationsHandler;
 import com.example.magrathea.s3api.adapter.web.S3MultipartHandler;
+import com.example.magrathea.s3api.adapter.web.S3MultipartPartStore;
+import com.example.magrathea.s3api.adapter.web.S3ObjectAclStore;
 import com.example.magrathea.s3api.adapter.web.S3ObjectMetadataHandler;
 import com.example.magrathea.s3api.adapter.web.S3ObjectOperationsHandler;
 import com.example.magrathea.s3api.adapter.web.S3PathRouter;
@@ -14,7 +16,10 @@ import com.example.magrathea.s3api.adapter.web.S3SessionHandler;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
+
+import java.nio.file.Path;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerResponse;
 
@@ -49,8 +54,15 @@ public class S3ApiConfig {
     }
 
     @Bean
-    public S3ObjectMetadataHandler s3ObjectMetadataHandler(ReactiveObjectService objectService) {
-        return new S3ObjectMetadataHandler(objectService);
+    public S3ObjectAclStore s3ObjectAclStore(
+            @Value("${storage.engine.filesystem.root:${java.io.tmpdir}/magrathea-objectstorage/storage-engine}") String storageRoot) {
+        return new S3ObjectAclStore(Path.of(storageRoot).resolve("metadata/s3-object-acls"));
+    }
+
+    @Bean
+    public S3ObjectMetadataHandler s3ObjectMetadataHandler(ReactiveObjectService objectService,
+                                                           S3ObjectAclStore objectAclStore) {
+        return new S3ObjectMetadataHandler(objectService, objectAclStore);
     }
 
     @Bean
@@ -59,8 +71,16 @@ public class S3ApiConfig {
     }
 
     @Bean
-    public S3MultipartHandler s3MultipartHandler(ReactiveMultipartUploadService multipartUploadService) {
-        return new S3MultipartHandler(multipartUploadService);
+    public S3MultipartPartStore s3MultipartPartStore(
+            @Value("${storage.engine.filesystem.root:${java.io.tmpdir}/magrathea-objectstorage/storage-engine}") String storageRoot) {
+        return new S3MultipartPartStore(Path.of(storageRoot).resolve("metadata/s3-multipart-parts"));
+    }
+
+    @Bean
+    public S3MultipartHandler s3MultipartHandler(ReactiveMultipartUploadService multipartUploadService,
+                                                 ReactiveObjectService objectService,
+                                                 S3MultipartPartStore multipartPartStore) {
+        return new S3MultipartHandler(multipartUploadService, objectService, multipartPartStore);
     }
 
     @Bean

@@ -100,9 +100,8 @@ public final class S3SigV4Verifier {
         if (payloadHash == null || payloadHash.isBlank()) {
             payloadHash = "UNSIGNED-PAYLOAD";
         }
-        // Streaming body replay is intentionally not implemented in this first slice; exact payload
-        // hashes are accepted as a signed header value and will be body-verified in the next EP-1 increment.
-        // Bad signatures caused by tampering with this value are rejected by the signature check below.
+        // The header value participates in the SigV4 canonical request here. Exact request-body
+        // replay validation is performed by S3SecurityWebFilter after the signature has been accepted.
 
         List<String> signedHeaderNames = Arrays.stream(signedHeaders.split(";"))
             .map(s -> s.toLowerCase(Locale.ROOT).trim())

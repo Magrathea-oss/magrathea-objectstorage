@@ -103,6 +103,97 @@ Business Need: Phase 5 S3 semantic compatibility — ETag integrity, byte-range 
       Then the response status is 200
       And the complete multipart upload ETag ends with "-2" indicating the two-part composition
 
+    @implemented-and-validated @REQ-S3-002-D @functional-requirement @s3-api @multipart @webclient-required @awscli-required
+    Scenario: CompleteMultipartUpload persists an object readable as the ordered concatenation of uploaded parts
+      Given bucket "multipart-etag-bucket" exists
+      And an object key "uploads/assembled-object.bin"
+      And a multipart upload is initiated for the bucket
+      And part number 1 is uploaded with content "first-part-data-segment"
+      And part number 2 is uploaded with content "second-part-data-segment"
+      When the multipart upload is completed with all uploaded parts in order
+      Then the response status is 200
+      When the S3 GetObject API fetches object "uploads/assembled-object.bin" from bucket "multipart-etag-bucket" without a Range header
+      Then the response status is 200
+      And the response body is "first-part-data-segmentsecond-part-data-segment"
+
+    @implemented-and-validated @REQ-S3-002-F @functional-requirement @s3-api @multipart @copy @webclient-required @awscli-required
+    Scenario: UploadPartCopy copies source object bytes into a multipart upload part
+      Given bucket "multipart-etag-bucket" exists
+      And object "source/copy-source.txt" is stored in bucket "multipart-etag-bucket" with body "copied-part-body"
+      And an object key "uploads/upload-part-copy-object.bin"
+      And a multipart upload is initiated for the bucket
+      When part number 1 is uploaded by copying object "source/copy-source.txt" from bucket "multipart-etag-bucket"
+      Then the response status is 200
+      And the upload part copy response ETag is a quoted 32-character lowercase hex string
+      When the multipart upload is completed with all uploaded parts in order
+      Then the response status is 200
+      When the S3 GetObject API fetches object "uploads/upload-part-copy-object.bin" from bucket "multipart-etag-bucket" without a Range header
+      Then the response status is 200
+      And the response body is "copied-part-body"
+
+    @implemented-and-validated @REQ-S3-002-G @functional-requirement @s3-api @multipart @error-semantics @webclient-required
+    Scenario: UploadPartCopy with a malformed copy source header returns an InvalidArgument XML error
+      Given bucket "multipart-error-bucket" exists
+      And an object key "uploads/malformed-copy-source.bin"
+      And a multipart upload is initiated for the bucket
+      When part number 1 is uploaded by copying with x-amz-copy-source header "not-a-valid-copy-source"
+      Then the response status is 400
+      And the XML error code is "InvalidArgument"
+      And the response body contains "Invalid x-amz-copy-source header"
+
+    @implemented-and-validated @REQ-S3-002-H @functional-requirement @s3-api @multipart @error-semantics @webclient-required
+    Scenario: CompleteMultipartUpload with an unknown upload ID returns a NoSuchUpload XML error
+      Given bucket "multipart-error-bucket" exists
+      And an object key "uploads/missing-upload-id.bin"
+      When CompleteMultipartUpload is requested with upload ID "missinguploadid0001" and body "<CompleteMultipartUpload/>"
+      Then the response status is 404
+      And the XML error code is "NoSuchUpload"
+
+    @implemented-and-validated @REQ-S3-002-I @functional-requirement @s3-api @multipart @error-semantics @webclient-required
+    Scenario: CompleteMultipartUpload with malformed XML returns a MalformedXML error
+      Given bucket "multipart-error-bucket" exists
+      And an object key "uploads/malformed-complete.bin"
+      And a multipart upload is initiated for the bucket
+      When CompleteMultipartUpload is requested with body "not xml"
+      Then the response status is 400
+      And the XML error code is "MalformedXML"
+
+    @implemented-and-validated @REQ-S3-002-J @functional-requirement @s3-api @multipart @error-semantics @webclient-required
+    Scenario: CompleteMultipartUpload that references a missing part returns an InvalidPart XML error
+      Given bucket "multipart-error-bucket" exists
+      And an object key "uploads/missing-part-reference.bin"
+      And a multipart upload is initiated for the bucket
+      And part number 1 is uploaded with content "only-part-body"
+      When CompleteMultipartUpload is requested with the following XML:
+        """
+        <CompleteMultipartUpload><Part><PartNumber>2</PartNumber><ETag>"00000000000000000000000000000000"</ETag></Part></CompleteMultipartUpload>
+        """
+      Then the response status is 400
+      And the XML error code is "InvalidPart"
+
+    @implemented-and-validated @REQ-S3-002-K @functional-requirement @s3-api @multipart @error-semantics @webclient-required
+    Scenario: CompleteMultipartUpload after abort returns a NoSuchUpload XML error
+      Given bucket "multipart-error-bucket" exists
+      And an object key "uploads/aborted-before-complete.bin"
+      And a multipart upload is initiated for the bucket
+      And part number 1 is uploaded with content "aborted-body"
+      When the multipart upload is aborted
+      Then the response status is 204
+      When CompleteMultipartUpload is requested with body "<CompleteMultipartUpload/>"
+      Then the response status is 404
+      And the XML error code is "NoSuchUpload"
+
+    @implemented-and-validated @REQ-S3-002-E @functional-requirement @non-functional-requirement @s3-api @multipart @durability @restart-safety @phase5-full-process-restart @full-process-restart-required
+    Scenario: Uploaded part bodies survive restart and can be completed into a readable object
+      Given the storage-engine profile is active with filesystem root "target/storage-engine-it/REQ-S3-002-E-multipart-part-bodies"
+      And bucket "multipart-restart-assembly-bucket" is created through the S3 CreateBucket API
+      And a multipart upload is initiated for bucket "multipart-restart-assembly-bucket" and key "uploads/restart-assembled.bin" with the upload ID recorded
+      And multipart part number 1 is uploaded with body "restart-first-part-"
+      And multipart part number 2 is uploaded with body "restart-second-part"
+      When the application process is stopped and started again with the same filesystem root
+      And the recorded multipart upload is completed after restart
+      Then GetObject for bucket "multipart-restart-assembly-bucket" and key "uploads/restart-assembled.bin" returns body "restart-first-part-restart-second-part"
+
     @implemented-not-e2e-validated @REQ-S3-002-C @functional-requirement @non-functional-requirement @s3-api @multipart @durability @restart-safety @webclient-required @filesystem-inspection-required
     Scenario: Uploaded parts remain accessible via ListParts after the application is restarted
       Given bucket "multipart-restart-bucket" exists

@@ -17,6 +17,7 @@ These instructions apply to all future agents working in this repository. The re
 - Gherkin scenarios must describe real requirements and business or technical intent.
 - Requirement scenarios must be written or refreshed before implementation work for the corresponding phase begins.
 - Avoid anemic request/status-code checks when writing production requirements.
+- **Documentation-value test rule:** before adding any new test, explicitly evaluate whether the test description would enrich project documentation for any stakeholder (product owner, S3/API consumer, operator, maintainer, reviewer, or future agent). If the description adds durable understanding, the test belongs in Cucumber and must be placed in the most accurate section (`requirements/` as `Business Need` for externally observable S3/Admin behavior, `specs/` as `Ability` for maintainer-facing internal mechanisms/architecture/operational contracts). Add a new feature section/file when no accurate section exists. Use pure JUnit only for narrow algorithmic/unit edge cases whose description would not improve documentation; when JUnit remains useful, keep or add the corresponding Cucumber requirement/spec scenario whenever the behavior is externally promised, architecturally significant, or maintainer-relevant.
 
 ### A.3 Evidence-based completion and requirement status policy
 

@@ -22,7 +22,10 @@ import org.springframework.context.annotation.ComponentScan;
  * Profile {@code storage-engine} activates storage-engine backend beans.
  * Profile {@code single-node} (default) activates in-memory backend beans.
  */
-@SpringBootApplication
+@SpringBootApplication(excludeName = {
+    "org.springframework.boot.security.autoconfigure.ReactiveUserDetailsServiceAutoConfiguration",
+    "org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration"
+})
 @ComponentScan(basePackages = {
     "com.example.magrathea.bootstrap",
     "com.example.magrathea.objectstore",

@@ -1,20 +1,23 @@
 package com.example.magrathea.s3api.adapter.web;
 
+import com.example.magrathea.objectstore.domain.aggregate.ActiveS3Object;
 import com.example.magrathea.objectstore.domain.aggregate.Bucket;
 import com.example.magrathea.objectstore.domain.aggregate.MultipartUpload;
+import com.example.magrathea.objectstore.domain.valueobject.ObjectChecksum;
 import com.example.magrathea.objectstore.domain.valueobject.ObjectKey;
 import com.example.magrathea.objectstore.domain.valueobject.PartNumber;
 import com.example.magrathea.objectstore.domain.valueobject.UploadId;
 import com.example.magrathea.reactive.application.service.ReactiveMultipartUploadService;
+import com.example.magrathea.reactive.application.service.ReactiveObjectService;
 import com.example.magrathea.s3api.adapter.web.headers.S3RequestExtractor;
 import com.example.magrathea.s3api.dto.query.ErrorQuery;
 import com.example.magrathea.s3api.dto.query.InitiateMultipartUploadQuery;
 import com.example.magrathea.s3api.dto.query.UploadPartResultQuery;
+import com.example.magrathea.s3api.dto.query.UploadPartCopyResultQuery;
 import com.example.magrathea.s3api.dto.query.CompleteMultipartUploadQuery;
 import com.example.magrathea.s3api.dto.query.ListMultipartUploadsQuery;
 import com.example.magrathea.s3api.dto.query.ListPartsQuery;
 import org.springframework.core.io.buffer.DataBuffer;
-import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.server.ServerRequest;
@@ -22,8 +25,15 @@ import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
+import javax.xml.parsers.DocumentBuilderFactory;
 
 /**
  * Multipart upload S3 operations handler.
@@ -40,9 +50,15 @@ import java.util.stream.Collectors;
 public class S3MultipartHandler {
 
     private final ReactiveMultipartUploadService multipartUploadService;
+    private final ReactiveObjectService objectService;
+    private final S3MultipartPartStore partStore;
 
-    public S3MultipartHandler(ReactiveMultipartUploadService multipartUploadService) {
+    public S3MultipartHandler(ReactiveMultipartUploadService multipartUploadService,
+                              ReactiveObjectService objectService,
+                              S3MultipartPartStore partStore) {
         this.multipartUploadService = multipartUploadService;
+        this.objectService = objectService;
+        this.partStore = partStore;
     }
 
     /** POST /{bucket}/{key}?uploads — Initiate multipart upload */
@@ -73,18 +89,35 @@ public class S3MultipartHandler {
                 .contentType(MediaType.APPLICATION_XML)
                 .bodyValue(ErrorQuery.from("InvalidArgument", "x-amz-copy-source header required"));
         }
+        var source = S3WebSupport.decodeCopySource(copySource);
+        if (source.isEmpty()) {
+            return ServerResponse.status(HttpStatus.BAD_REQUEST)
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(ErrorQuery.from("InvalidArgument", "Invalid x-amz-copy-source header"));
+        }
+        var sourceObjectKey = ObjectKey.of(source.get()[0], source.get()[1]);
+        var targetPartNumber = PartNumber.of(partNumber);
+
         return multipartUploadService.findById(uploadId)
             .flatMap(upload -> {
-                // TODO: ETag computation postponed — use placeholder
-                var etag = "\"placeholder-etag\"";
-                var part = com.example.magrathea.objectstore.domain.valueobject.UploadPart.create(
-                    PartNumber.of(partNumber), etag, 0
-                );
-                var updated = upload.withPart(part);
-                return multipartUploadService.saveUpload(updated)
-                    .then(ServerResponse.ok()
-                        .contentType(MediaType.APPLICATION_XML)
-                        .bodyValue(UploadPartResultQuery.from(etag)));
+                if (!upload.isActive()) {
+                    return xmlError(HttpStatus.NOT_FOUND, "NoSuchUpload", "UploadId not found");
+                }
+                return objectService.getObject(sourceObjectKey)
+                .flatMap(sourceObject -> partStore.savePart(uploadId, targetPartNumber, objectService.getContent(sourceObjectKey))
+                    .flatMap(storedPart -> {
+                        var part = com.example.magrathea.objectstore.domain.valueobject.UploadPart.create(
+                            targetPartNumber, storedPart.etag(), storedPart.size());
+                        var updated = upload.withPart(part);
+                        return multipartUploadService.saveUpload(updated)
+                            .then(ServerResponse.ok()
+                                .header("ETag", storedPart.etag())
+                                .contentType(MediaType.APPLICATION_XML)
+                                .bodyValue(UploadPartCopyResultQuery.from(storedPart.etag())));
+                    }))
+                .switchIfEmpty(ServerResponse.status(HttpStatus.NOT_FOUND)
+                    .contentType(MediaType.APPLICATION_XML)
+                    .bodyValue(ErrorQuery.from("NoSuchKey", "Copy source not found")));
             })
             .switchIfEmpty(ServerResponse.status(HttpStatus.NOT_FOUND)
                 .contentType(MediaType.APPLICATION_XML)
@@ -99,26 +132,23 @@ public class S3MultipartHandler {
         int partNumber = Integer.parseInt(partNumberStr);
 
         return multipartUploadService.findById(uploadId)
-            .flatMap(upload ->
-                // Collect the part body to compute a real MD5 ETag
-                DataBufferUtils.join(request.bodyToFlux(DataBuffer.class))
-                    .defaultIfEmpty(new org.springframework.core.io.buffer.DefaultDataBufferFactory().wrap(new byte[0]))
-                    .flatMap(joined -> {
-                        byte[] bytes = new byte[joined.readableByteCount()];
-                        joined.read(bytes);
-                        DataBufferUtils.release(joined);
-                        var etag = ETagComputer.computeETag(bytes);
+            .flatMap(upload -> {
+                if (!upload.isActive()) {
+                    return xmlError(HttpStatus.NOT_FOUND, "NoSuchUpload", "UploadId not found");
+                }
+                return partStore.savePart(uploadId, PartNumber.of(partNumber), request.bodyToFlux(DataBuffer.class))
+                    .flatMap(storedPart -> {
                         var part = com.example.magrathea.objectstore.domain.valueobject.UploadPart.create(
-                            PartNumber.of(partNumber), etag, bytes.length
+                            PartNumber.of(partNumber), storedPart.etag(), storedPart.size()
                         );
                         var updated = upload.withPart(part);
                         return multipartUploadService.saveUpload(updated)
                             .then(ServerResponse.ok()
-                                .header("ETag", etag)
+                                .header("ETag", storedPart.etag())
                                 .contentType(MediaType.APPLICATION_XML)
-                                .bodyValue(UploadPartResultQuery.from(etag)));
-                    })
-            )
+                                .bodyValue(UploadPartResultQuery.from(storedPart.etag())));
+                    });
+            })
             .switchIfEmpty(ServerResponse.status(HttpStatus.NOT_FOUND)
                 .contentType(MediaType.APPLICATION_XML)
                 .bodyValue(ErrorQuery.from("NoSuchUpload", "UploadId not found")));
@@ -131,15 +161,25 @@ public class S3MultipartHandler {
         var uploadIdStr = request.queryParam("uploadId").orElse("");
         var uploadId = UploadId.of(uploadIdStr);
 
-        return multipartUploadService.findById(uploadId)
-            .flatMap(upload -> {
-                var completed = upload.withCompleted();
-                return multipartUploadService.saveUpload(completed)
-                    .then(Mono.defer(() -> {
-                        // Compute multipart ETag from all parts sorted by part number
-                        var sortedParts = upload.parts().stream()
-                            .sorted(Comparator.comparingInt(p -> p.partNumber().value()))
-                            .collect(Collectors.toList());
+        return request.bodyToMono(String.class)
+            .defaultIfEmpty("")
+            .flatMap(body -> {
+                List<CompletePartSpec> requestedParts;
+                try {
+                    requestedParts = parseCompleteMultipartUploadParts(body);
+                } catch (IllegalArgumentException ex) {
+                    return xmlError(HttpStatus.BAD_REQUEST, "MalformedXML", "The XML you provided was not well-formed or did not validate against our published schema");
+                }
+
+                return multipartUploadService.findById(uploadId)
+                    .flatMap(upload -> {
+                        if (!upload.isActive()) {
+                            return xmlError(HttpStatus.NOT_FOUND, "NoSuchUpload", "UploadId not found");
+                        }
+                        var sortedParts = resolveCompleteParts(upload, requestedParts);
+                        if (sortedParts == null) {
+                            return xmlError(HttpStatus.BAD_REQUEST, "InvalidPart", "One or more of the specified parts could not be found or had an invalid ETag");
+                        }
                         String finalEtag;
                         if (sortedParts.isEmpty()) {
                             finalEtag = "\"\"";
@@ -149,15 +189,32 @@ public class S3MultipartHandler {
                                 .collect(Collectors.toList());
                             finalEtag = ETagComputer.computeMultipartETag(partEtags);
                         }
+
+                        var objectKey = ObjectKey.of(bucket, key);
+                        long totalSize = sortedParts.stream().mapToLong(part -> part.size()).sum();
+                        var completedObject = ActiveS3Object.create(
+                                objectKey,
+                                "STANDARD",
+                                Map.of(),
+                                null,
+                                ObjectChecksum.of(Set.of()),
+                                totalSize)
+                            .withEtag(finalEtag);
+                        var assembledContent = Flux.concat(sortedParts.stream()
+                            .map(part -> partStore.readPart(uploadId, part.partNumber()))
+                            .toList());
+                        var completed = upload.withCompleted();
                         var result = CompleteMultipartUploadQuery.from(bucket, key, finalEtag);
-                        return ServerResponse.ok()
-                            .contentType(MediaType.APPLICATION_XML)
-                            .bodyValue(result);
-                    }));
-            })
-            .switchIfEmpty(ServerResponse.status(HttpStatus.NOT_FOUND)
-                .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(ErrorQuery.from("NoSuchUpload", "UploadId not found")));
+
+                        return objectService.saveObjectWithContent(completedObject, assembledContent, "STANDARD")
+                            .then(multipartUploadService.saveUpload(completed))
+                            .then(partStore.deleteUpload(uploadId))
+                            .then(ServerResponse.ok()
+                                .contentType(MediaType.APPLICATION_XML)
+                                .bodyValue(result));
+                    })
+                    .switchIfEmpty(xmlError(HttpStatus.NOT_FOUND, "NoSuchUpload", "UploadId not found"));
+            });
     }
 
     /** DELETE /{bucket}/{key}?uploadId=... — Abort multipart upload */
@@ -169,6 +226,7 @@ public class S3MultipartHandler {
             .flatMap(upload -> {
                 var aborted = upload.withAborted();
                 return multipartUploadService.saveUpload(aborted)
+                    .then(partStore.deleteUpload(uploadId))
                     .then(ServerResponse.noContent().build());
             })
             .switchIfEmpty(ServerResponse.status(HttpStatus.NOT_FOUND)
@@ -181,6 +239,7 @@ public class S3MultipartHandler {
         var bucket = request.pathVariable("bucket");
         // TODO: bucket check postponed — service/repository handles bucket resolution
         Flux<ListMultipartUploadsQuery.UploadEntry> entries = multipartUploadService.findByBucket(Bucket.Id.of(bucket))
+            .filter(MultipartUpload::isActive)
             .map(u -> ListMultipartUploadsQuery.UploadEntry.from(
                 u.key().key(), u.uploadId().value(), u.initiated()
             ));
@@ -211,5 +270,92 @@ public class S3MultipartHandler {
             .switchIfEmpty(ServerResponse.status(HttpStatus.NOT_FOUND)
                 .contentType(MediaType.APPLICATION_XML)
                 .bodyValue(ErrorQuery.from("NoSuchUpload", "UploadId not found")));
+    }
+
+    private static Mono<ServerResponse> xmlError(HttpStatus status, String code, String message) {
+        return ServerResponse.status(status)
+            .contentType(MediaType.APPLICATION_XML)
+            .bodyValue(ErrorQuery.from(code, message));
+    }
+
+    private static List<CompletePartSpec> parseCompleteMultipartUploadParts(String body) {
+        if (body == null || body.isBlank()) {
+            return List.of();
+        }
+        var trimmed = body.trim();
+        if (!trimmed.startsWith("<")) {
+            throw new IllegalArgumentException("CompleteMultipartUpload body is not XML");
+        }
+        try {
+            var factory = DocumentBuilderFactory.newInstance();
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+            factory.setExpandEntityReferences(false);
+            var document = factory.newDocumentBuilder()
+                .parse(new ByteArrayInputStream(trimmed.getBytes(StandardCharsets.UTF_8)));
+            var root = document.getDocumentElement();
+            if (root == null || !"CompleteMultipartUpload".equals(root.getNodeName())) {
+                throw new IllegalArgumentException("Unexpected root element");
+            }
+            var nodes = root.getElementsByTagName("Part");
+            var parts = new ArrayList<CompletePartSpec>();
+            for (int i = 0; i < nodes.getLength(); i++) {
+                var partNode = nodes.item(i);
+                var children = partNode.getChildNodes();
+                String partNumber = null;
+                String etag = null;
+                for (int j = 0; j < children.getLength(); j++) {
+                    var child = children.item(j);
+                    if ("PartNumber".equals(child.getNodeName())) {
+                        partNumber = child.getTextContent();
+                    } else if ("ETag".equals(child.getNodeName())) {
+                        etag = child.getTextContent();
+                    }
+                }
+                if (partNumber == null || partNumber.isBlank()) {
+                    throw new IllegalArgumentException("PartNumber is required");
+                }
+                parts.add(new CompletePartSpec(Integer.parseInt(partNumber.trim()), etag));
+            }
+            return parts;
+        } catch (IllegalArgumentException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("Malformed CompleteMultipartUpload XML", ex);
+        }
+    }
+
+    private static List<com.example.magrathea.objectstore.domain.valueobject.UploadPart> resolveCompleteParts(
+        MultipartUpload upload,
+        List<CompletePartSpec> requestedParts
+    ) {
+        var availableByNumber = upload.parts().stream()
+            .collect(Collectors.toMap(part -> part.partNumber().value(), part -> part, (left, right) -> right));
+        if (requestedParts == null || requestedParts.isEmpty()) {
+            return upload.parts().stream()
+                .sorted(Comparator.comparingInt(part -> part.partNumber().value()))
+                .collect(Collectors.toList());
+        }
+        var resolved = new ArrayList<com.example.magrathea.objectstore.domain.valueobject.UploadPart>();
+        for (var requested : requestedParts) {
+            var actual = availableByNumber.get(requested.partNumber());
+            if (actual == null) {
+                return null;
+            }
+            if (requested.etag() != null && !requested.etag().isBlank()
+                && !normalizeEtag(requested.etag()).equals(normalizeEtag(actual.etag()))) {
+                return null;
+            }
+            resolved.add(actual);
+        }
+        return resolved;
+    }
+
+    private static String normalizeEtag(String etag) {
+        return etag == null ? "" : etag.trim().replace("&quot;", "\"");
+    }
+
+    private record CompletePartSpec(int partNumber, String etag) {
     }
 }

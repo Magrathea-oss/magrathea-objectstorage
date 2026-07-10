@@ -17,6 +17,7 @@ import com.example.magrathea.s3api.dto.query.CopyObjectResultQuery;
 import com.example.magrathea.s3api.dto.query.DeleteResultQuery;
 import com.example.magrathea.s3api.dto.query.SelectObjectContentQuery;
 import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -241,11 +242,9 @@ public class S3ObjectOperationsHandler {
                 // Evaluate conditional headers first
                 return evaluateConditionals(obj, request, () -> {
                     if (rangeHeader != null && !rangeHeader.isBlank()) {
-                        return oc.content().collectList()
-                            .flatMap(buffers -> serveRange(obj, buffers, rangeHeader));
+                        return serveRange(obj, oc.content(), rangeHeader);
                     }
-                    return oc.content().collectList()
-                        .flatMap(buffers -> S3ResponseBuilder.okWithBody(obj, Flux.fromIterable(buffers)));
+                    return S3ResponseBuilder.okWithBody(obj, oc.content());
                 });
             })
             .switchIfEmpty(S3WebSupport.xmlError(
@@ -259,7 +258,7 @@ public class S3ObjectOperationsHandler {
     }
 
     private Mono<ServerResponse> serveRange(S3Object obj,
-            java.util.List<DataBuffer> buffers, String rangeHeader) {
+            Flux<DataBuffer> content, String rangeHeader) {
         var matcher = RANGE_PATTERN.matcher(rangeHeader);
         if (!matcher.matches()) {
             return S3WebSupport.xmlError(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE,
@@ -274,23 +273,41 @@ public class S3ObjectOperationsHandler {
                 "InvalidRange", "Range not satisfiable");
         }
         long effectiveEnd = Math.min(end, total - 1);
-
-        // Collect all buffer bytes
-        int totalBytes = buffers.stream().mapToInt(DataBuffer::readableByteCount).sum();
-        byte[] fullBody = new byte[totalBytes];
-        int offset = 0;
-        for (var buf : buffers) {
-            int readable = buf.readableByteCount();
-            buf.read(fullBody, offset, readable);
-            offset += readable;
-        }
-        byte[] rangeBody = Arrays.copyOfRange(fullBody, (int) start, (int) effectiveEnd + 1);
-        var rangeDataBuffer = DefaultDataBufferFactory.sharedInstance.wrap(rangeBody);
+        long rangeLength = effectiveEnd - start + 1;
 
         return ServerResponse.status(HttpStatus.PARTIAL_CONTENT)
             .header("Content-Range", "bytes " + start + "-" + effectiveEnd + "/" + total)
-            .header("Content-Length", String.valueOf(rangeBody.length))
-            .body(BodyInserters.fromDataBuffers(Flux.just(rangeDataBuffer)));
+            .header("Content-Length", String.valueOf(rangeLength))
+            .body(BodyInserters.fromDataBuffers(sliceRange(content, start, effectiveEnd)));
+    }
+
+    private Flux<DataBuffer> sliceRange(Flux<DataBuffer> content, long start, long endInclusive) {
+        var position = new AtomicLong(0);
+        return content.handle((buffer, sink) -> {
+            long bufferStart = position.get();
+            int readable = buffer.readableByteCount();
+            long bufferEndExclusive = bufferStart + readable;
+            try {
+                if (bufferStart > endInclusive) {
+                    sink.complete();
+                    return;
+                }
+                if (bufferEndExclusive > start && bufferStart <= endInclusive) {
+                    byte[] bufferBytes = new byte[readable];
+                    buffer.read(bufferBytes);
+                    int sliceStart = (int) Math.max(0, start - bufferStart);
+                    int sliceEndExclusive = (int) Math.min(readable, endInclusive - bufferStart + 1);
+                    byte[] rangeSlice = Arrays.copyOfRange(bufferBytes, sliceStart, sliceEndExclusive);
+                    sink.next(DefaultDataBufferFactory.sharedInstance.wrap(rangeSlice));
+                }
+                if (bufferEndExclusive > endInclusive) {
+                    sink.complete();
+                }
+            } finally {
+                position.addAndGet(readable);
+                DataBufferUtils.release(buffer);
+            }
+        });
     }
 
     // ─────────────────────────────────────────────────────
@@ -435,9 +452,30 @@ public class S3ObjectOperationsHandler {
         var objectKey = S3RequestExtractor.extractObjectKey(request);
         return objectService.getObject(objectKey)
             .flatMap(obj -> request.bodyToMono(RestoreObjectCommand.class)
-                .flatMap(cmd -> objectService.saveObject(obj)
-                    .then(ServerResponse.ok().build()))
-                .switchIfEmpty(Mono.defer(() -> ServerResponse.ok().build())))
+                .defaultIfEmpty(new RestoreObjectCommand(
+                    new RestoreObjectCommand.RestoreRequest(null, "STANDARD", 7, null, null)))
+                .flatMap(cmd -> {
+                    var restoreRequest = cmd.restoreRequest();
+                    var now = java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+                    var requestedAt = restoreRequest != null && restoreRequest.requestedAt() != null
+                        ? java.time.Instant.parse(restoreRequest.requestedAt())
+                        : now;
+                    var expirationAt = restoreRequest != null && restoreRequest.expirationAt() != null
+                        ? java.time.Instant.parse(restoreRequest.expirationAt())
+                        : requestedAt.plus(java.time.Duration.ofDays(
+                            restoreRequest != null && restoreRequest.days() > 0 ? restoreRequest.days() : 7));
+                    var tierName = restoreRequest != null && restoreRequest.tier() != null
+                        ? restoreRequest.tier()
+                        : (restoreRequest != null && restoreRequest.glacierJobParameters() != null
+                            ? restoreRequest.glacierJobParameters().tier()
+                            : "STANDARD");
+                    var tier = com.example.magrathea.objectstore.domain.valueobject.RestoreConfiguration.RestoreTier.valueOf(
+                        tierName.toUpperCase(java.util.Locale.ROOT));
+                    var restore = com.example.magrathea.objectstore.domain.valueobject.RestoreConfiguration.of(
+                        requestedAt, expirationAt, tier);
+                    return objectService.restoreObject(objectKey.bucket(), objectKey, restore)
+                        .then(ServerResponse.ok().build());
+                }))
             .switchIfEmpty(S3WebSupport.xmlError(
                 HttpStatus.NOT_FOUND, "NoSuchKey", "Object not found"))
             .onErrorResume(Throwable.class,

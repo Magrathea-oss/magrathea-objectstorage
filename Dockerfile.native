@@ -1,0 +1,161 @@
+# syntax=docker/dockerfile:1
+# Native-image container build for Magrathea Object Storage.
+#
+# Produces a GraalVM native executable and runs it from Alpine without a JVM.
+# The regular Dockerfile remains the canonical JVM image; this file is the
+# optimized native alternative while native-image support is evaluated.
+
+FROM ghcr.io/graalvm/native-image-community:25-muslib AS native-builder
+
+ARG NODE_VERSION=26.1.0
+ARG NODE_DIST=node-v${NODE_VERSION}-linux-x64
+ARG NODE_URL=https://nodejs.org/dist/v${NODE_VERSION}/${NODE_DIST}.tar.xz
+ARG MAVEN_VERSION=3.9.9
+ARG MAVEN_DIST=apache-maven-${MAVEN_VERSION}
+ARG MAVEN_URL=https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/${MAVEN_DIST}-bin.tar.gz
+
+ENV NODE_HOME=/opt/node
+ENV MAVEN_HOME=/opt/maven
+ENV PATH="${MAVEN_HOME}/bin:${NODE_HOME}/bin:${PATH}"
+
+RUN microdnf install -y \
+        bash \
+        ca-certificates \
+        curl \
+        findutils \
+        gzip \
+        libatomic \
+        python3 \
+        tar \
+        xz \
+    && microdnf clean all \
+    && curl -fsSL "${MAVEN_URL}" -o /tmp/maven.tar.gz \
+    && mkdir -p "${MAVEN_HOME}" \
+    && tar -xzf /tmp/maven.tar.gz -C "${MAVEN_HOME}" --strip-components=1 \
+    && curl -fsSL "${NODE_URL}" -o /tmp/node.tar.xz \
+    && mkdir -p "${NODE_HOME}" \
+    && tar -xJf /tmp/node.tar.xz -C "${NODE_HOME}" --strip-components=1 \
+    && ln -sf "${MAVEN_HOME}/bin/mvn" /usr/local/bin/mvn \
+    && ln -sf "${NODE_HOME}/bin/node" /usr/local/bin/node \
+    && ln -sf "${NODE_HOME}/bin/npm" /usr/local/bin/npm \
+    && ln -sf "${NODE_HOME}/bin/npx" /usr/local/bin/npx \
+    && mvn --version \
+    && node --version \
+    && npm --version \
+    && native-image --version \
+    && rm -f /tmp/node.tar.xz /tmp/maven.tar.gz
+
+WORKDIR /build
+
+# Copy POMs first for dependency caching.
+COPY pom.xml .
+COPY object-store-domain/pom.xml ./object-store-domain/
+COPY storage-engine-domain/pom.xml ./storage-engine-domain/
+COPY storage-engine-reactive-repository-application/pom.xml ./storage-engine-reactive-repository-application/
+COPY storage-engine-reactive-application/pom.xml ./storage-engine-reactive-application/
+COPY storage-engine-reactive-infrastructure/pom.xml ./storage-engine-reactive-infrastructure/
+COPY object-store-reactive-repository-application/pom.xml ./object-store-reactive-repository-application/
+COPY object-store-reactive-application/pom.xml ./object-store-reactive-application/
+COPY object-store-reactive-infrastructure/pom.xml ./object-store-reactive-infrastructure/
+COPY object-store-reactive-repository-storage-engine-infrastructure/pom.xml ./object-store-reactive-repository-storage-engine-infrastructure/
+COPY s3-reactive-api-adapter/pom.xml ./s3-reactive-api-adapter/
+COPY admin-api-adapter/pom.xml ./admin-api-adapter/
+COPY bootstrap-application/pom.xml ./bootstrap-application/
+
+# Frontend and documentation script manifests for dependency caching.
+COPY magrathea-ui/package.json magrathea-ui/package-lock.json magrathea-ui/vite.config.js ./magrathea-ui/
+COPY magrathea-ui/index.html ./magrathea-ui/
+COPY magrathea-ui/public ./magrathea-ui/public/
+COPY magrathea-ui/src ./magrathea-ui/src/
+COPY bootstrap-application/src/main/scripts/package.json bootstrap-application/src/main/scripts/package-lock.json ./bootstrap-application/src/main/scripts/
+
+RUN npm ci --prefix magrathea-ui \
+    && npm ci --prefix bootstrap-application/src/main/scripts
+
+RUN mvn -B -pl bootstrap-application -am dependency:go-offline -DskipTests -Dmaven.plugin.skip=true -fn 2>/dev/null \
+    || echo 'Warning: some plugins unavailable, continuing'
+
+# Copy source code and docs after dependency warm-up.
+COPY docs ./docs/
+COPY scripts/generate-gherkin-requirements-appendix.py ./scripts/generate-gherkin-requirements-appendix.py
+COPY scripts/check-module-layering.sh ./scripts/check-module-layering.sh
+COPY admin-api-adapter/src ./admin-api-adapter/src/
+COPY object-store-domain/src ./object-store-domain/src/
+COPY storage-engine-domain/src ./storage-engine-domain/src/
+COPY storage-engine-reactive-repository-application/src ./storage-engine-reactive-repository-application/src/
+COPY storage-engine-reactive-application/src ./storage-engine-reactive-application/src/
+COPY storage-engine-reactive-infrastructure/src ./storage-engine-reactive-infrastructure/src/
+COPY object-store-reactive-repository-application/src ./object-store-reactive-repository-application/src/
+COPY object-store-reactive-application/src ./object-store-reactive-application/src/
+COPY object-store-reactive-infrastructure/src ./object-store-reactive-infrastructure/src/
+COPY object-store-reactive-repository-storage-engine-infrastructure/src ./object-store-reactive-repository-storage-engine-infrastructure/src/
+COPY s3-reactive-api-adapter/src ./s3-reactive-api-adapter/src/
+COPY bootstrap-application/src ./bootstrap-application/src/
+
+# Preserve the existing Docker-driven documentation/frontend source-of-truth:
+# fail if the committed appendix is stale, then deterministically regenerate
+# docs/UI assets inside the builder before native compilation.
+RUN python3 scripts/generate-gherkin-requirements-appendix.py --check \
+    && python3 scripts/generate-gherkin-requirements-appendix.py
+
+RUN set -eux; \
+    for required in \
+      docs/usermanual/en/index.adoc \
+      docs/usermanual/it/index.adoc \
+      docs/usermanual/es/index.adoc \
+      docs/usermanual/de/index.adoc \
+      docs/usermanual/cn/index.adoc \
+      docs/arc42/arc42-template.adoc \
+      docs/arc42/images \
+      docs/c4/images \
+      docs/test-report.md \
+      docs/adr \
+      magrathea-ui/public/favicon.svg \
+      magrathea-ui/public/icons.svg; \
+    do \
+      test -e "$required"; \
+    done; \
+    mkdir -p bootstrap-application/src/main/resources/static/docs/c4/images \
+             bootstrap-application/src/main/resources/static/docs/arc42/images; \
+    cp docs/c4/images/*.png bootstrap-application/src/main/resources/static/docs/c4/images/; \
+    cp -R docs/arc42/images/. bootstrap-application/src/main/resources/static/docs/arc42/images/; \
+    node bootstrap-application/src/main/scripts/asciidoc-to-json.mjs; \
+    node bootstrap-application/src/main/scripts/asciidoc-to-arc42-json.mjs; \
+    node bootstrap-application/src/main/scripts/markdown-to-json.mjs; \
+    node bootstrap-application/src/main/scripts/adr-to-json.mjs; \
+    npm run build --prefix magrathea-ui; \
+    cp -R magrathea-ui/dist/. bootstrap-application/src/main/resources/static/; \
+    test -f bootstrap-application/src/main/resources/static/index.html; \
+    test -f bootstrap-application/src/main/resources/static/docs/arc42.json
+
+# Native executable for Alpine.  The native-musl profile adds --static --libc=musl.
+ENV NODE_PATH=/build/magrathea-ui/node_modules
+RUN rm -rf /root/.m2/repository/net/bytebuddy \
+    && mvn -B -U -Pnative,native-musl -pl bootstrap-application -am -DskipTests -Dmaven.test.skip=true package install:install \
+    && mvn -B -U -Pnative,native-musl -pl bootstrap-application -DskipTests -Dmaven.test.skip=true native:compile \
+    && cp bootstrap-application/target/magrathea-objectstorage /magrathea-objectstorage
+
+# Do not require a CLI parser; only verify the executable was produced.
+RUN test -x /magrathea-objectstorage
+
+FROM public.ecr.aws/docker/library/alpine:3.21 AS runtime
+
+RUN apk add --no-cache ca-certificates \
+    && addgroup -S magrathea \
+    && adduser -S -G magrathea -h /app magrathea \
+    && mkdir -p /data \
+    && chown -R magrathea:magrathea /data /app
+
+WORKDIR /app
+COPY --from=native-builder /magrathea-objectstorage /app/magrathea-objectstorage
+
+USER magrathea
+ENV STORAGE_ENGINE_FILESYSTEM_ROOT=/data
+
+EXPOSE 8080
+EXPOSE 8081
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
+    CMD wget -qO- http://127.0.0.1:8081/admin/health >/dev/null || exit 1
+
+ENTRYPOINT ["/app/magrathea-objectstorage"]

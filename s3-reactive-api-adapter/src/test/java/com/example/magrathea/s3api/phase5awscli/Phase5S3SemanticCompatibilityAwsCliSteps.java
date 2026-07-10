@@ -252,6 +252,23 @@ public class Phase5S3SemanticCompatibilityAwsCliSteps {
         }
     }
 
+    @When("part number {int} is uploaded by copying object {string} from bucket {string}")
+    public void partNumberIsUploadedByCopyingObjectFromBucket(int partNumber, String sourceKey, String sourceBucket) throws Exception {
+        assertNotNull(uploadId, "uploadId should be available before copying parts");
+        AwsResult result = runAws("upload-part-copy",
+            "--bucket", bucket,
+            "--key", objectKey,
+            "--upload-id", uploadId,
+            "--part-number", String.valueOf(partNumber),
+            "--copy-source", sourceBucket + "/" + sourceKey);
+        assertEquals(0, result.exitCode(),
+            () -> "upload-part-copy " + partNumber + " should succeed: " + result.combined());
+        lastStatusCode = 200;
+        String etag = extractJsonStringValue(result.stdout(), "ETag");
+        lastPartEtag = etag;
+        partEtags.put(partNumber, etag);
+    }
+
     /**
      * Completes the multipart upload in part-number order via
      * {@code aws s3api complete-multipart-upload}. Captures the multipart ETag.
@@ -374,6 +391,11 @@ public class Phase5S3SemanticCompatibilityAwsCliSteps {
     public void contentRangeResponseHeaderIs(String expected) {
         assertEquals(expected, lastContentRange,
             "Content-Range response header mismatch");
+    }
+
+    @Then("the upload part copy response ETag is a quoted 32-character lowercase hex string")
+    public void uploadPartCopyResponseEtagIsQuotedMd5Hex() {
+        uploadPartResponseEtagIsQuotedMd5Hex();
     }
 
     @Then("the upload part response ETag is a quoted 32-character lowercase hex string")

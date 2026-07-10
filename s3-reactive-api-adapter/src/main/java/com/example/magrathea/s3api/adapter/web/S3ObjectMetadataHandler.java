@@ -8,9 +8,12 @@ import com.example.magrathea.s3api.dto.command.LegalHoldCommand;
 import com.example.magrathea.s3api.dto.command.RetentionCommand;
 import com.example.magrathea.s3api.dto.command.TaggingCommand;
 import com.example.magrathea.s3api.dto.query.AccessControlPolicyQuery;
+import com.example.magrathea.s3api.dto.query.BucketEncryptionQuery;
 import com.example.magrathea.s3api.dto.query.ErrorQuery;
 import com.example.magrathea.s3api.dto.query.GetObjectAttributesQuery;
 import com.example.magrathea.s3api.dto.query.LegalHoldQuery;
+import com.example.magrathea.s3api.dto.query.ObjectLockConfigurationQuery;
+import com.example.magrathea.s3api.dto.query.ObjectRestoreQuery;
 import com.example.magrathea.s3api.dto.query.RetentionQuery;
 import com.example.magrathea.s3api.dto.query.TaggingQuery;
 import org.springframework.http.HttpStatus;
@@ -32,9 +35,11 @@ import java.util.Map;
 public class S3ObjectMetadataHandler {
 
     private final ReactiveObjectService objectService;
+    private final S3ObjectAclStore objectAclStore;
 
-    public S3ObjectMetadataHandler(ReactiveObjectService objectService) {
+    public S3ObjectMetadataHandler(ReactiveObjectService objectService, S3ObjectAclStore objectAclStore) {
         this.objectService = objectService;
+        this.objectAclStore = objectAclStore;
     }
 
     /** GET /{bucket}/{key}?acl — GetObjectAcl */
@@ -42,9 +47,13 @@ public class S3ObjectMetadataHandler {
         var bucketName = request.pathVariable("bucket");
         var key = S3RequestExtractor.extractObjectKeyValue(request);
         return objectService.getObject(ObjectKey.of(bucketName, key))
-            .flatMap(obj -> ServerResponse.ok()
-                .contentType(MediaType.APPLICATION_XML)
-                .bodyValue(AccessControlPolicyQuery.canned("private")))
+            .flatMap(obj -> {
+                var acl = objectAclStore.find(bucketName, key)
+                    .orElse(new S3ObjectAclStore.ObjectAcl("READ", "owner"));
+                return ServerResponse.ok()
+                    .contentType(MediaType.APPLICATION_XML)
+                    .bodyValue(AccessControlPolicyQuery.grant(acl.permission(), acl.grantee()));
+            })
             .switchIfEmpty(ServerResponse.status(HttpStatus.NOT_FOUND)
                 .contentType(MediaType.APPLICATION_XML)
                 .bodyValue(ErrorQuery.from("NoSuchKey", "Object not found")));
@@ -56,13 +65,30 @@ public class S3ObjectMetadataHandler {
         var key = S3RequestExtractor.extractObjectKeyValue(request);
         return objectService.getObject(ObjectKey.of(bucketName, key))
             .flatMap(obj -> {
-                // TODO: ACL persistence postponed → repository
+                var grantFullControl = request.headers().firstHeader("x-amz-grant-full-control");
                 var acl = request.headers().firstHeader("x-amz-acl");
+                String permission = grantFullControl != null && !grantFullControl.isBlank()
+                    ? "FULL_CONTROL"
+                    : permissionForCannedAcl(acl);
+                String grantee = grantFullControl != null && !grantFullControl.isBlank()
+                    ? grantFullControl
+                    : "owner";
+                objectAclStore.save(bucketName, key, permission, grantee);
                 return ServerResponse.ok().build();
             })
             .switchIfEmpty(ServerResponse.status(HttpStatus.NOT_FOUND)
                 .contentType(MediaType.APPLICATION_XML)
                 .bodyValue(ErrorQuery.from("NoSuchKey", "Object not found")));
+    }
+
+    private static String permissionForCannedAcl(String acl) {
+        return switch (acl == null ? "private" : acl) {
+            case "public-read" -> "READ";
+            case "public-write" -> "WRITE";
+            case "public-read-write" -> "FULL_CONTROL";
+            case "authenticated-read" -> "READ";
+            default -> "READ";
+        };
     }
 
     /** GET /{bucket}/{key}?tagging — GetObjectTagging */
@@ -167,6 +193,35 @@ public class S3ObjectMetadataHandler {
                 .bodyValue(ErrorQuery.from("NoSuchKey", "Object not found")));
     }
 
+    /** GET /{bucket}/{key}?encryption — GetObjectEncryption */
+    public Mono<ServerResponse> getObjectEncryption(ServerRequest request) {
+        var bucketName = request.pathVariable("bucket");
+        var key = S3RequestExtractor.extractObjectKeyValue(request);
+        return objectService.getObjectEncryption(bucketName, ObjectKey.of(bucketName, key))
+            .flatMap(encryption -> ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(new BucketEncryptionQuery("object-encryption", encryption.algorithm().name(),
+                    encryption.keyReference() != null ? encryption.keyReference().keyId() : null)))
+            .switchIfEmpty(ServerResponse.status(HttpStatus.NOT_FOUND)
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(ErrorQuery.from("NoSuchEncryptionConfiguration",
+                    "The encryption configuration does not exist")));
+    }
+
+    /** GET /{bucket}/{key}?restore — GetObjectRestoreState */
+    public Mono<ServerResponse> getObjectRestore(ServerRequest request) {
+        var bucketName = request.pathVariable("bucket");
+        var key = S3RequestExtractor.extractObjectKeyValue(request);
+        return objectService.getObjectRestore(bucketName, ObjectKey.of(bucketName, key))
+            .flatMap(restore -> ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(ObjectRestoreQuery.from(restore)))
+            .switchIfEmpty(ServerResponse.status(HttpStatus.NOT_FOUND)
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(ErrorQuery.from("NoSuchRestoreState",
+                    "The restore state does not exist")));
+    }
+
     /** PUT /{bucket}/{key}?encryption — UpdateObjectEncryption */
     public Mono<ServerResponse> updateObjectEncryption(ServerRequest request) {
         var bucketName = request.pathVariable("bucket");
@@ -237,6 +292,22 @@ public class S3ObjectMetadataHandler {
     // ─────────────────────────────────────────────────────
     //  Retention (delegated to service)
     // ─────────────────────────────────────────────────────
+
+    /** GET /{bucket}/{key}?object-lock — GetObjectLockConfiguration for object metadata */
+    public Mono<ServerResponse> getObjectLockConfiguration(ServerRequest request) {
+        var bucketName = request.pathVariable("bucket");
+        var key = S3RequestExtractor.extractObjectKeyValue(request);
+        return objectService.getObjectLockConfiguration(bucketName, ObjectKey.of(bucketName, key))
+            .flatMap(lockConfig -> ServerResponse.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(ObjectLockConfigurationQuery.from(
+                    lockConfig.mode().name(),
+                    Math.toIntExact(Math.max(1, lockConfig.retention().duration().toDays())))))
+            .switchIfEmpty(ServerResponse.status(HttpStatus.NOT_FOUND)
+                .contentType(MediaType.APPLICATION_XML)
+                .bodyValue(ErrorQuery.from("NoSuchObjectLockConfiguration",
+                    "The object lock configuration does not exist")));
+    }
 
     /** GET /{bucket}/{key}?retention — GetObjectRetention */
     public Mono<ServerResponse> getObjectRetention(ServerRequest request) {

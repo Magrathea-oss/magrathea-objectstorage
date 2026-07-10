@@ -21,7 +21,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Real HTTP test application for Phase 2 storage-engine AWS CLI requirements.
+ * Real HTTP test application for Phase 2 storage-engine AWS CLI Ability specs.
  */
 @SpringBootApplication
 @ComponentScan({

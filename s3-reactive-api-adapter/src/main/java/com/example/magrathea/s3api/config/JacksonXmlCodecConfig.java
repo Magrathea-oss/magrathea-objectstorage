@@ -1,5 +1,8 @@
 package com.example.magrathea.s3api.config;
 
+import com.example.magrathea.s3api.dto.query.ListAllMyBucketsResultQuery;
+import com.example.magrathea.s3api.dto.query.UploadPartCopyResultQuery;
+import org.springframework.aot.hint.annotation.RegisterReflectionForBinding;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.AbstractJacksonDecoder;
@@ -14,6 +17,12 @@ import tools.jackson.dataformat.xml.XmlMapper;
  * XmlMapper. This config adds application/xml request/response support to WebFlux codecs.
  */
 @Configuration
+@RegisterReflectionForBinding({
+    ListAllMyBucketsResultQuery.class,
+    ListAllMyBucketsResultQuery.OwnerEntry.class,
+    ListAllMyBucketsResultQuery.BucketEntry.class,
+    UploadPartCopyResultQuery.class
+})
 public class JacksonXmlCodecConfig implements WebFluxConfigurer {
 
     @Override

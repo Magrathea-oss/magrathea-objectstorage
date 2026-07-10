@@ -18,7 +18,11 @@ public record RestoreObjectCommand(
         @JacksonXmlProperty(localName = "Tier")
         String tier,
         @JacksonXmlProperty(localName = "Days")
-        int days
+        int days,
+        @JacksonXmlProperty(localName = "RequestedAt")
+        String requestedAt,
+        @JacksonXmlProperty(localName = "ExpirationAt")
+        String expirationAt
     ) {
         public record GlacierJobParameters(
             @JacksonXmlProperty(localName = "Tier")

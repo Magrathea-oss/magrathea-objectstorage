@@ -58,11 +58,15 @@ Rules:
 **Accepted** (2026-07-07). AGENTS.md §B.8 documents this convention. The two-folder
 layout is in active use:
 
-- `requirements/` contains 11 `Business Need` feature files, including the phase-1
-  through phase-6/EP2 shared requirement features and the single-node-backend-*
-  features migrated from the legacy `awscli/` folder under ADR 0021 Phase 2.
-- `specs/` contains `fs-concurrency.feature` (`Ability`), with further specs planned
-  under ADR 0021 Phase 3 (e.g. `runtime-effects.feature` candidate).
+- `requirements/` contains 12 `Business Need` feature files: externally observable
+  phase/EP S3 behavior plus the single-node-backend-* features migrated from the
+  legacy `awscli/` and `object-store/` folders under ADR 0021.
+- `specs/` contains 6 maintainer-facing `Ability` files: `fs-concurrency.feature`,
+  `sigv4-verifier.feature`, and the Phase 2/3/4/6 storage-engine operational specs
+  (`phase-2-filesystem-reliability.feature`, `phase-3-reactive-pipeline.feature`,
+  `phase-4-observability.feature`, `phase-6-distributed-readiness.feature`).
+  These files were moved out of `requirements/` after the ADR 0020 taxonomy audit
+  so folder location and Gherkin keyword now agree.
 
 ADR 0021 tracks the ongoing migration of the remaining legacy `features/object-store/`
 directory (239 scenarios) into this structure. Rule 3 (shared `@business-need`/`@spec`

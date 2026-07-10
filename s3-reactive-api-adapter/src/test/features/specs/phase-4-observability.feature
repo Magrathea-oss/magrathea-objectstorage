@@ -1,4 +1,4 @@
-@requirement @phase-4 @observability @storage-engine @implemented-not-e2e-validated
+@spec @phase-4 @observability @storage-engine @implemented-not-e2e-validated
 Ability: Phase 4 storage observability for reactive pipelines and recovery
   As a storage-engine operator, S3-compatible client, and system owner,
   I want storage pipeline activity, failures, recovery findings, and redaction decisions

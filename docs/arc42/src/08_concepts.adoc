@@ -59,6 +59,12 @@ The public object API exposes AWS S3-compatible endpoints. Internal/admin endpoi
 - Pluggable via Spring Boot auto-configuration (s3-reactive-api-adapter attaches as an optional module)
 - Toggle with `s3.api.enabled=false`
 
+=== S3 Security Backbone (EP-1)
+
+Opt-in secured S3 mode (`s3.security.enabled=true`) uses Spring Security Reactive / WebFlux Security as the production backbone per ADR 0023. The adapter contributes a `SecurityWebFilterChain` with CSRF, HTTP Basic, form login, logout, and anonymous authentication disabled for secured mode. SigV4 request validation enters through a `ServerAuthenticationConverter` and reactive authentication manager; deny-by-default and explicit-deny authorization enter through a reactive authorization manager; authentication and access-denied failures are serialized as S3 XML errors by Spring Security handlers. A downstream request decoration filter exposes the authenticated Magrathea principal to existing handlers via `x-magrathea-principal` and replays cached request bodies when exact `X-Amz-Content-SHA256` validation consumes the body.
+
+Unsecured mode remains the default trusted-environment behavior and is explicitly configured as permit-all so adding Spring Security does not accidentally enable generated-login defaults or block existing S3 routes. Secured mode now has validated local backing services: encrypted durable access-key storage with revocation, durable policy reload, append/fsync tamper-evident audit, and durable local key-management material for SSE. WebTestClient and AWS CLI/e2e validation cover REQ-SEC-001..009; component specs cover REQ-SEC-010..013. External identity federation remains future KA-4 scope.
+
 === Admin API and Static Documentation Assets
 
 `admin-api-adapter` exposes internal `/admin/**` JSON endpoints for health, read-only storage policy catalogs, read-only storage device catalogs, read-only disk-set/topology catalogs, and non-persistent storage policy validation. `bootstrap-application` also serves generated UI/documentation assets from classpath `static/**` resources, including ARC42 JSON and copied C4/ARC42 image files. These resources support operations and documentation; they are not part of the S3-compatible object API.
@@ -160,7 +166,7 @@ The following cross-cutting concerns are intentionally absent from handlers and 
 |Single-pass streaming tee on store (`UploadDigest`), not a separate materialization pass
 
 |ACL/grants/tagging state
-|Aggregate (`S3Object`/`Bucket`) + repository; object tags/ACL restart-durability remains open (EP-2)
+|Aggregate (`S3Object`/`Bucket`) + repository/metadata sidecar; bucket registry, multipart state, legal hold, object lock, retention, object encryption, object restore state, object tags, object ACLs, bucket configuration families and combined bucket/object-tag/object-ACL/multipart full-process restart coverage exist for storage-engine mode
 
 |CORS validation
 |Repository/Service
@@ -287,7 +293,7 @@ ObjectStoreEvent (sealed interface)
 
 === AWS CLI Header Compatibility
 
-The system must handle headers that the AWS CLI v2 sends by default on every `aws s3api put-object` request. Phase 9 first-increment AWS CLI Cucumber now verifies that `put-object` succeeds with the default AWS CLI headers. Compatibility is still partial: checksum and SigV4 headers are accepted/ignored for this scope, but not validated.
+The system must handle headers that the AWS CLI v2 sends by default on every `aws s3api put-object` request. Phase 9 first-increment AWS CLI Cucumber now verifies that `put-object` succeeds with the default AWS CLI headers. Compatibility is still partial: checksum headers are accepted/ignored for this scope, while SigV4 validation exists only when the opt-in `s3.security.enabled=true` secured mode is active.
 
 ==== Default Headers Sent by AWS CLI v2
 
@@ -297,9 +303,9 @@ The system must handle headers that the AWS CLI v2 sends by default on every `aw
 
 |`x-amz-sdk-checksum-algorithm` |`crc64nvme` (default) |Identifies the checksum algorithm used |[yellow]#Accepted; not validated#
 |`x-amz-checksum-crc64nvme` |BASE64 CRC64-NVME hash |Payload integrity hash computed automatically by AWS CLI |[yellow]#Accepted; not validated#
-|`X-Amz-Date` |ISO 8601 timestamp |SigV4 signing timestamp |[yellow]#Accepted; not validated (no SigV4 middleware yet — EP-1)#
-|`X-Amz-Content-SHA256` |SHA256 hex string |SigV4 payload hash |[yellow]#Accepted; not validated (EP-1)#
-|`Authorization` |SigV4 signature string |SigV4 signature |[yellow]#Accepted; not validated (EP-1)#
+|`X-Amz-Date` |ISO 8601 timestamp |SigV4 signing timestamp |[yellow]#Accepted without validation in default unsecured mode; validated for clock skew in opt-in secured mode#
+|`X-Amz-Content-SHA256` |SHA256 hex string or `UNSIGNED-PAYLOAD` |SigV4 payload hash |[yellow]#Accepted without validation in default unsecured mode; exact SHA256 values are body-verified in opt-in secured mode after SigV4 signature validation; `UNSIGNED-PAYLOAD` remains accepted for trusted clients#
+|`Authorization` |SigV4 signature string |SigV4 signature |[yellow]#Accepted without validation in default unsecured mode; verified against configured in-process credentials in opt-in secured mode#
 |`User-Agent` |SDK identifier string |Client identification |[yellow]#Accepted; not used#
 |`Expect` |`100-continue` |Hop-by-hop header for large payloads |[yellow]#Accepted; not optimized#
 |===
@@ -339,8 +345,8 @@ AWS CLI v2 does NOT send `Content-Type` by default unless `--content-type` is ex
 |Data integrity validation is still absent — corrupted payloads may be accepted silently
 |[red]#High#
 
-|SigV4 headers accepted but not validated
-|Authentication is still absent — anyone can write/read objects in trusted deployments; tracked as EP-1 (Security & Identity, blocker)
+|SigV4 validation is opt-in and incomplete
+|Default unsecured mode still accepts anonymous/header-bearing requests; secured mode is validated but must be explicitly enabled with durable credential, policy, audit, and key files
 |[red]#High#
 
 |Content-Type not sent by AWS CLI

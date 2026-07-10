@@ -48,11 +48,10 @@ public class S3BucketOperationsHandler {
 
     /** GET / — ListBuckets (JSON, test convenience only) */
     public Mono<ServerResponse> listBucketsJson(ServerRequest request) {
-        return bucketService.findAllBuckets()
-            .collectList()
-            .flatMap(buckets -> ServerResponse.ok()
+        return ListAllMyBucketsResultQuery.from(bucketService.findAllBuckets())
+            .flatMap(result -> ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(buckets));
+                .bodyValue(result));
     }
 
     /** PUT /{bucket} — CreateBucket */
