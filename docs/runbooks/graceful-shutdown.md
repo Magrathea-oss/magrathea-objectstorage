@@ -49,6 +49,10 @@ requests to return HTTP 200, restarts with the same root, and verifies both obje
 part, starts `CompleteMultipartUpload` with a throttled XML body, sends `SIGTERM` after body delivery begins, requires the
 completion response to return HTTP 200, then restarts and verifies the assembled object by byte count and SHA-256.
 
+`REQ-OPS-013` covers the non-success path. A client cancels an active UploadPart after body delivery starts,
+operators abort its multipart upload, and then send `SIGTERM`. After restart, the test requires no committed object,
+no active upload entry, and no multipart part directory or temporary part artifact for that upload ID.
+
 ## Recovery verification
 
 After restart:
@@ -61,5 +65,5 @@ After restart:
 ## Open gaps
 
 - Two concurrent PutObject drains are validated, but larger request sets and mixed upload/read draining have not yet been load-tested.
-- Multipart UploadPart and CompleteMultipartUpload draining are validated, but abort and client-cancellation races during shutdown still need dedicated evidence.
+- Multipart UploadPart and CompleteMultipartUpload draining plus cancellation followed by abort are validated; simultaneous abort/completion races remain outside the current scope.
 - Multi-node traffic shifting and rolling shutdown remain future distributed-operability work.

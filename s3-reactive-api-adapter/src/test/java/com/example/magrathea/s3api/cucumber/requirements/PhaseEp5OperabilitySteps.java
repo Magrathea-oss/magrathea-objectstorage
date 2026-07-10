@@ -289,6 +289,28 @@ public class PhaseEp5OperabilitySteps {
         concurrentPayloads = Map.copyOf(payloads);
     }
 
+    @When("the client cancels the in-flight UploadPart after body delivery starts")
+    public void clientCancelsInFlightUploadPartAfterBodyDeliveryStarts() throws InterruptedException {
+        requireGracefulProcess();
+        assertThat(inFlightBodyStarted).as("UploadPart body start signal").isNotNull();
+        assertThat(inFlightBodyStarted.await(5, TimeUnit.SECONDS))
+            .as("UploadPart request body should start before cancellation")
+            .isTrue();
+        Thread.sleep(100);
+        assertThat(inFlightPutFuture).as("in-flight UploadPart future").isNotNull();
+        assertThat(inFlightPutFuture.isDone()).as("UploadPart should be active before cancellation").isFalse();
+        assertThat(inFlightPutFuture.cancel(true)).as("HTTP client cancellation should be accepted").isTrue();
+    }
+
+    @When("operators abort the recorded multipart upload before sending SIGTERM")
+    public void operatorsAbortRecordedMultipartUploadBeforeSendingSigterm() throws IOException, InterruptedException {
+        requireGracefulProcess();
+        String path = "/" + multipartBucket + "/" + multipartKey
+            + "?uploadId=" + URLEncoder.encode(multipartUploadId, StandardCharsets.UTF_8);
+        HttpResponse<String> abort = send(gracefulProcess, "DELETE", path, "");
+        assertThat(abort.statusCode()).isEqualTo(204);
+    }
+
     @When("operators send SIGTERM after request body delivery has started")
     public void operatorsSendSigtermAfterRequestBodyDeliveryHasStarted() throws InterruptedException {
         requireGracefulProcess();
@@ -443,6 +465,23 @@ public class PhaseEp5OperabilitySteps {
             assertThat(response.body()).hasSize(expectedBytes);
             assertThat(sha256(response.body())).isEqualTo(sha256(expectedPayload));
         }
+        stopGracefulProcessIfRunning();
+    }
+
+    @Then("the cancelled multipart upload has no committed object, active upload, or part artifacts")
+    public void cancelledMultipartUploadHasNoCommittedObjectActiveUploadOrPartArtifacts()
+            throws IOException, InterruptedException {
+        requireGracefulProcess();
+        HttpResponse<String> object = send(
+            gracefulProcess, "GET", "/" + multipartBucket + "/" + multipartKey, "");
+        assertThat(object.statusCode()).isEqualTo(404);
+
+        HttpResponse<String> uploads = send(gracefulProcess, "GET", "/" + multipartBucket + "?uploads", "");
+        assertThat(uploads.statusCode()).isEqualTo(200);
+        assertThat(uploads.body()).doesNotContain(multipartUploadId);
+
+        Path partDirectory = gracefulStorageRoot.resolve("metadata/s3-multipart-parts").resolve(multipartUploadId);
+        assertThat(Files.exists(partDirectory)).as("cancelled multipart part directory").isFalse();
         stopGracefulProcessIfRunning();
     }
 

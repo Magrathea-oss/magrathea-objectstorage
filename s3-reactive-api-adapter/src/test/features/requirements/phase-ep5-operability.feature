@@ -112,6 +112,20 @@ Business Need: EP-5 operational health probes
       When recovery starts the S3 process again with the same filesystem root
       Then object "objects/completing-at-shutdown.bin" in bucket "ep5-graceful-multipart-completion-bucket" has 524288 bytes with the streamed content checksum
 
+    @implemented-and-validated @REQ-OPS-013 @functional-requirement @non-functional-requirement @observability @graceful-shutdown @multipart @cancellation @cleanup @durability @restart-safety
+    Scenario: Client cancellation and multipart abort before SIGTERM leave no committed object or part artifacts
+      Given a storage-engine S3 process is running with graceful shutdown enabled and filesystem root "target/ep5-graceful-multipart-cancellation/current"
+      And bucket "ep5-graceful-multipart-cancellation-bucket" is created before in-flight shutdown validation
+      And a multipart upload is initiated for object "objects/cancelled-at-shutdown.bin" in bucket "ep5-graceful-multipart-cancellation-bucket"
+      When an S3 client starts streaming 524288 deterministic bytes as part 1 of the recorded multipart upload
+      And the client cancels the in-flight UploadPart after body delivery starts
+      And operators abort the recorded multipart upload before sending SIGTERM
+      And operators send SIGTERM to the S3 process
+      Then the process exits within 10 seconds without forced termination
+      And the shutdown log must not contain Spring Boot's generated security password banner
+      When recovery starts the S3 process again with the same filesystem root
+      Then the cancelled multipart upload has no committed object, active upload, or part artifacts
+
   Rule: Backup and restore rehearsals prove recoverability from storage-engine filesystem backups
 
     @implemented-and-validated @REQ-OPS-005 @functional-requirement @non-functional-requirement @backup @restore @disaster-recovery @durability @restart-safety

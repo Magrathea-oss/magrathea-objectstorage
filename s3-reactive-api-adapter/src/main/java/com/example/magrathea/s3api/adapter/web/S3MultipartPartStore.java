@@ -7,6 +7,7 @@ import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.SignalType;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
@@ -59,7 +60,12 @@ public class S3MultipartPartStore {
                     moveAtomically(tmp, target);
                     return new StoredPart("\"" + ETagComputer.toHex(digest.digest()) + "\"", size.get());
                 }).subscribeOn(Schedulers.boundedElastic()))
-                .doOnError(error -> deleteIfExists(tmp));
+                .doOnError(error -> deleteIfExists(tmp))
+                .doFinally(signal -> {
+                    if (signal == SignalType.CANCEL) {
+                        deleteIfExists(tmp);
+                    }
+                });
         });
     }
 
