@@ -32,8 +32,11 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -58,6 +61,9 @@ public class PhaseEp5OperabilitySteps {
     private CompletableFuture<HttpResponse<String>> inFlightPutFuture;
     private CountDownLatch inFlightBodyStarted;
     private byte[] inFlightPayload;
+    private List<CompletableFuture<HttpResponse<String>>> concurrentPutFutures = List.of();
+    private List<CountDownLatch> concurrentBodyStarted = List.of();
+    private Map<String, byte[]> concurrentPayloads = Map.of();
     private String multipartUploadId;
     private String multipartBucket;
     private String multipartKey;
@@ -223,6 +229,27 @@ public class PhaseEp5OperabilitySteps {
         startSlowStreamingPut(path, byteCount);
     }
 
+    @When("S3 clients concurrently stream these deterministic objects to bucket {string}:")
+    public void s3ClientsConcurrentlyStreamDeterministicObjects(String bucket, DataTable table) {
+        requireGracefulProcess();
+        List<CompletableFuture<HttpResponse<String>>> futures = new ArrayList<>();
+        List<CountDownLatch> bodyStartedSignals = new ArrayList<>();
+        Map<String, byte[]> payloads = new LinkedHashMap<>();
+        table.asMaps().forEach(row -> {
+            String key = row.get("object key");
+            int byteCount = Integer.parseInt(row.get("bytes"));
+            byte[] payload = deterministicPayload(byteCount);
+            CountDownLatch bodyStarted = new CountDownLatch(1);
+            payloads.put(key, payload);
+            bodyStartedSignals.add(bodyStarted);
+            futures.add(startSlowStreamingPut("/" + bucket + "/" + key, payload, bodyStarted));
+        });
+        assertThat(futures).hasSizeGreaterThan(1);
+        concurrentPutFutures = List.copyOf(futures);
+        concurrentBodyStarted = List.copyOf(bodyStartedSignals);
+        concurrentPayloads = Map.copyOf(payloads);
+    }
+
     @When("operators send SIGTERM after request body delivery has started")
     public void operatorsSendSigtermAfterRequestBodyDeliveryHasStarted() throws InterruptedException {
         requireGracefulProcess();
@@ -238,6 +265,21 @@ public class PhaseEp5OperabilitySteps {
         gracefulProcess.process().toHandle().destroy();
     }
 
+    @When("operators send SIGTERM after every concurrent request body has started")
+    public void operatorsSendSigtermAfterEveryConcurrentRequestBodyHasStarted() throws InterruptedException {
+        requireGracefulProcess();
+        assertThat(concurrentBodyStarted).hasSizeGreaterThan(1);
+        for (CountDownLatch bodyStarted : concurrentBodyStarted) {
+            assertThat(bodyStarted.await(5, TimeUnit.SECONDS))
+                .as("every concurrent request body should start before SIGTERM")
+                .isTrue();
+        }
+        Thread.sleep(250);
+        assertThat(concurrentPutFutures).allMatch(future -> !future.isDone(),
+            "every PutObject should still be in flight when SIGTERM is sent");
+        gracefulProcess.process().toHandle().destroy();
+    }
+
     @Then("the in-flight PutObject completes with HTTP status {int}")
     public void inFlightPutObjectCompletesWithHttpStatus(int expectedStatus) throws Exception {
         HttpResponse<String> putResponse = awaitInFlightWrite();
@@ -250,6 +292,14 @@ public class PhaseEp5OperabilitySteps {
         assertThat(uploadPartResponse.statusCode()).isEqualTo(expectedStatus);
         drainedPartETag = uploadPartResponse.headers().firstValue("ETag").orElse(null);
         assertThat(drainedPartETag).as("drained UploadPart ETag").isNotBlank();
+    }
+
+    @Then("every concurrent PutObject completes with HTTP status {int}")
+    public void everyConcurrentPutObjectCompletesWithHttpStatus(int expectedStatus) throws Exception {
+        assertThat(concurrentPutFutures).hasSizeGreaterThan(1);
+        for (CompletableFuture<HttpResponse<String>> future : concurrentPutFutures) {
+            assertThat(future.get(15, TimeUnit.SECONDS).statusCode()).isEqualTo(expectedStatus);
+        }
     }
 
     @Then("the process exits within {int} seconds without forced termination")
@@ -313,6 +363,24 @@ public class PhaseEp5OperabilitySteps {
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.body()).hasSize(expectedBytes);
         assertThat(sha256(response.body())).isEqualTo(sha256(inFlightPayload));
+        stopGracefulProcessIfRunning();
+    }
+
+    @Then("the concurrently drained objects in bucket {string} retain their streamed content:")
+    public void concurrentlyDrainedObjectsRetainTheirStreamedContent(String bucket, DataTable table)
+            throws IOException, InterruptedException {
+        requireGracefulProcess();
+        assertThat(concurrentPayloads).hasSizeGreaterThan(1);
+        for (Map<String, String> row : table.asMaps()) {
+            String key = row.get("object key");
+            int expectedBytes = Integer.parseInt(row.get("bytes"));
+            byte[] expectedPayload = concurrentPayloads.get(key);
+            assertThat(expectedPayload).as("streamed payload for %s", key).hasSize(expectedBytes);
+            HttpResponse<byte[]> response = sendBytes(gracefulProcess, "GET", "/" + bucket + "/" + key);
+            assertThat(response.statusCode()).as("GET status for %s", key).isEqualTo(200);
+            assertThat(response.body()).hasSize(expectedBytes);
+            assertThat(sha256(response.body())).isEqualTo(sha256(expectedPayload));
+        }
         stopGracefulProcessIfRunning();
     }
 
@@ -513,14 +581,19 @@ public class PhaseEp5OperabilitySteps {
         requireGracefulProcess();
         inFlightPayload = deterministicPayload(byteCount);
         inFlightBodyStarted = new CountDownLatch(1);
+        inFlightPutFuture = startSlowStreamingPut(path, inFlightPayload, inFlightBodyStarted);
+    }
+
+    private CompletableFuture<HttpResponse<String>> startSlowStreamingPut(
+            String path, byte[] payload, CountDownLatch bodyStarted) {
         HttpRequest request = HttpRequest.newBuilder(
                 URI.create("http://127.0.0.1:" + gracefulProcess.port() + path))
             .timeout(Duration.ofSeconds(15))
             .header("Content-Type", "application/octet-stream")
             .PUT(HttpRequest.BodyPublishers.ofInputStream(
-                () -> new SlowInputStream(inFlightPayload, inFlightBodyStarted, 4096, 20)))
+                () -> new SlowInputStream(payload, bodyStarted, 4096, 20)))
             .build();
-        inFlightPutFuture = httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
     }
 
     private HttpResponse<String> awaitInFlightWrite() throws Exception {

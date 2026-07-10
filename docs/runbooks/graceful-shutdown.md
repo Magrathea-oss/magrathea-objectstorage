@@ -41,6 +41,10 @@ sends `SIGTERM`, and proves that:
 and captures the part ETag, restarts with the same root, completes the multipart upload using that ETag, and
 verifies the final object's byte count and SHA-256 checksum.
 
+`REQ-OPS-011` expands the drain evidence to concurrent requests. Two clients stream separate 262,144-byte
+PutObject bodies at the same time; the test waits until both bodies are active, sends one `SIGTERM`, requires both
+requests to return HTTP 200, restarts with the same root, and verifies both objects by byte count and SHA-256.
+
 ## Recovery verification
 
 After restart:
@@ -52,6 +56,6 @@ After restart:
 
 ## Open gaps
 
-- Concurrent draining of multiple uploads and reads has not yet been load-tested.
+- Two concurrent PutObject drains are validated, but larger request sets and mixed upload/read draining have not yet been load-tested.
 - Multipart UploadPart draining is validated, but CompleteMultipartUpload and cancellation races during shutdown still need dedicated evidence.
 - Multi-node traffic shifting and rolling shutdown remain future distributed-operability work.
