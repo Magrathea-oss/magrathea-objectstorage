@@ -49,19 +49,32 @@ Ability: Type-aware storage reclamation and integrity hygiene
       Then all six shard artifacts and checksum metadata are removed
       And no whole-object unit or unrelated dedup chunk is removed
 
-  Rule: Periodic scrubbing verifies typed artifacts without changing valid data
-    @REQ-SCRUB-001 @non-functional-requirement @integrity @scrubbing @observability @not-implemented
-    Scenario Outline: Scrubbing reports and quarantines corrupt storage artifacts by type
-      Given a committed "<artifact_type>" artifact has a mismatching checksum
-      When the periodic scrub job inspects the configured storage root
-      Then one integrity finding identifies artifact type, identifier, owning manifest when known, and checksum failure
-      And the corrupt artifact is quarantined according to the configured repair policy
-      And healthy artifacts remain byte-for-byte unchanged
-      And a second scrub run is deterministic and does not duplicate the finding
+  Rule: Periodic scrubbing verifies typed and transformed artifacts without changing valid data
+    Scrubbing MUST hash the final persisted representation before any read-time decompression or
+    decryption. The manifest transformation chain identifies compressed and encrypted artifacts,
+    while the final checksum protects compressed bytes, authenticated ciphertext, and EC shards
+    without requiring plaintext or encryption keys in the background job.
+
+    @REQ-SCRUB-001 @non-functional-requirement @integrity @scrubbing @observability @compression @encryption @implemented-and-validated
+    Scenario Outline: Scrubbing reports and quarantines corrupt typed artifacts after compression and encryption
+      Given a committed "<artifact_type>" artifact with applied transformations "<transformations>" has a mismatching final persisted checksum
+      And another committed healthy artifact exists in the same manifest
+      When the periodic scrub job inspects the configured storage root with repair policy "QUARANTINE"
+      Then one integrity finding identifies artifact type, identifier, owning manifest, checksum failure, and transformations "<transformations>"
+      And the corrupt artifact and checksum sidecar are quarantined according to the configured repair policy
+      And the healthy artifact remains byte-for-byte unchanged
+      And a second scrub run is deterministic and does not duplicate the quarantined finding
 
       Examples:
-        | artifact_type    |
-        | whole-object     |
-        | dedup-chunk      |
-        | multipart-part   |
-        | ec-shard         |
+        | artifact_type  | transformations |
+        | whole-object   | NONE            |
+        | dedup-chunk    | COMPRESS        |
+        | multipart-part | CRYPT           |
+        | ec-data-shard  | COMPRESS,CRYPT  |
+
+    @REQ-SCRUB-002 @non-functional-requirement @integrity @scrubbing @scheduling @implemented-and-validated
+    Scenario: Periodic scrubbing is opt-in and retains its latest report
+      Given periodic integrity scrubbing is disabled by default
+      When property "storage.engine.integrity.scrub.enabled" is set to true
+      Then the storage-engine scheduler runs the scrub job with configurable initial delay, interval, and repair policy
+      And each completed run atomically replaces the latest operator-readable scrub report

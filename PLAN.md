@@ -348,7 +348,7 @@ KA dependencies: KA-2 (Ceph s3-tests requires SigV4), KA-3 (presigned URLs), and
 | Key requirement IDs | REQ-GC-*, REQ-QUOTA-* |
 | Expected outputs | Type-aware reclamation for whole-object units and segmented artifacts; chunk garbage collection for multipart/dedup/EC only; dedup reference counting; defined disk-full (ENOSPC) behavior; per-bucket/tenant quotas; periodic integrity scrubbing job. |
 | Acceptance gates | Deleted-object chunks reclaimed without corrupting shared dedup chunks; quota enforcement observable via S3 errors; scrubbing findings reported/quarantined; ENOSPC yields defined S3 errors, not corruption. |
-| Status | `@not-implemented`: ADR 0025 and Cucumber requirement baselines now define conditional chunking, typed whole-object/multipart/dedup/EC artifacts, reclamation, scrubbing, quotas, and ENOSPC behavior. Production artifact-taxonomy migration and all EP-4 runtime behavior remain open. |
+| Status | `@partial`: REQ-SCRUB-001/002 are implemented and validated. A disabled-by-default periodic filesystem scrub job incrementally hashes final persisted representations in bounded 64 KiB blocks, correlates findings with typed artifacts and owning manifests, records applied COMPRESS/CRYPT transformations without requiring plaintext or keys, supports REPORT_ONLY and QUARANTINE policies, preserves healthy bytes, avoids duplicate findings after quarantine, and retains the latest run report. GC/reference counting, quota enforcement, ENOSPC mapping, transform-level decrypt/decompress semantic probes, and repair/reconstruction remain open. |
 
 ### EP-5 — Operability & Delivery (HIGH)
 

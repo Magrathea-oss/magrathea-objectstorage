@@ -58,7 +58,7 @@ The source-of-truth executable requirements are:
 - `REQ-PIPELINE-014`: plain uploads remain whole-object units;
 - `REQ-PIPELINE-015`: EC policies own stripe/shard segmentation;
 - `REQ-GC-001..004`: type-aware reclamation;
-- `REQ-SCRUB-001`: type-aware integrity scrubbing;
+- `REQ-SCRUB-001/002`: type-aware and transform-aware integrity scrubbing plus opt-in periodic scheduling;
 - `REQ-QUOTA-001/002` and `REQ-CAPACITY-001`: atomic capacity protection.
 
-REQ-PIPELINE-014 and REQ-PIPELINE-015 have pipeline-unit and WebTestClient evidence for the whole-object namespace and physical EC shard persistence. The GetObject decision is single-pass payload streaming after metadata-only validation: upload commit verifies temporary-file bytes against the incoming digest before atomic publication, clients validate later reads against committed checksum/ETag metadata, and periodic at-rest detection/repair belongs to EP-4 scrubbing. The EP-4 lifecycle requirements remain pending.
+REQ-PIPELINE-014 and REQ-PIPELINE-015 have pipeline-unit and WebTestClient evidence for the whole-object namespace and physical EC shard persistence. The GetObject decision is single-pass payload streaming after metadata-only validation: upload commit verifies temporary-file bytes against the incoming digest before atomic publication, clients validate later reads against committed checksum/ETag metadata, and periodic at-rest detection/repair belongs to EP-4 scrubbing. REQ-SCRUB-001/002 now validate the first EP-4 slice: incremental checksums over final persisted representations, including compressed bytes and encrypted ciphertext, with manifest/transform correlation and report-only or quarantine policy. GC, reference counting, quotas, ENOSPC handling, deep transform probes, and repair remain pending.

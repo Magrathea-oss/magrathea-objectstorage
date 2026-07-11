@@ -19,7 +19,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 === Summary
 
 * Feature files scanned: 25
-* Scenarios discovered: 423
+* Scenarios discovered: 424
 * Protocol-smoke scenarios: 122
 
 ==== Status tag counts
@@ -29,9 +29,9 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |Tag |Scenario count
 |`@absent` |3
 |`@config-only` |69
-|`@implemented-and-validated` |133
+|`@implemented-and-validated` |135
 |`@implemented-not-e2e-validated` |22
-|`@not-implemented` |14
+|`@not-implemented` |13
 |`@placeholder` |9
 |`unknown/not-tagged` |178
 |===
@@ -54,7 +54,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |`@static-architecture-required` |7
 |`@tracing-inspection-required` |2
 |`@webclient-required` |300
-|`unknown/not-tagged` |68
+|`unknown/not-tagged` |69
 |===
 
 ==== Classification tag counts
@@ -63,7 +63,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |===
 |Tag |Scenario count
 |`@functional-requirement` |200
-|`@non-functional-requirement` |114
+|`@non-functional-requirement` |115
 |`unknown/not-tagged` |202
 |===
 
@@ -13260,42 +13260,86 @@ And the scenario starts with no pending reclamation or scrub findings
 
 ===== REQ-SCRUB-001
 
-====== Scenario Outline: Scrubbing reports and quarantines corrupt storage artifacts by type
+====== Scenario Outline: Scrubbing reports and quarantines corrupt typed artifacts after compression and encryption
 
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep4-space-management.feature:54`
-|Rule |Periodic scrubbing verifies typed artifacts without changing valid data
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep4-space-management.feature:59`
+|Rule |Periodic scrubbing verifies typed and transformed artifacts without changing valid data
 |Requirement ID(s) |`REQ-SCRUB-001`
 |Classification |`@non-functional-requirement`
-|Capability area tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@integrity`, `@scrubbing`, `@observability`
+|Capability area tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@integrity`, `@scrubbing`, `@observability`, `@compression`, `@encryption`
 |Validation mode tags |unknown/not-tagged
-|Declared/validated status |`@not-implemented`
+|Declared/validated status |`@implemented-and-validated`
 |Protocol smoke |`no`
-|All tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@REQ-SCRUB-001`, `@non-functional-requirement`, `@integrity`, `@scrubbing`, `@observability`, `@not-implemented`
+|All tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@REQ-SCRUB-001`, `@non-functional-requirement`, `@integrity`, `@scrubbing`, `@observability`, `@compression`, `@encryption`, `@implemented-and-validated`
 |===
+
+.Rule description
+----
+Scrubbing MUST hash the final persisted representation before any read-time decompression or
+decryption. The manifest transformation chain identifies compressed and encrypted artifacts,
+while the final checksum protects compressed bytes, authenticated ciphertext, and EC shards
+without requiring plaintext or encryption keys in the background job.
+----
 
 .Gherkin steps
 [source,gherkin]
 ----
-  Given a committed "<artifact_type>" artifact has a mismatching checksum
-  When the periodic scrub job inspects the configured storage root
-  Then one integrity finding identifies artifact type, identifier, owning manifest when known, and checksum failure
-  And the corrupt artifact is quarantined according to the configured repair policy
-  And healthy artifacts remain byte-for-byte unchanged
-  And a second scrub run is deterministic and does not duplicate the finding
+  Given a committed "<artifact_type>" artifact with applied transformations "<transformations>" has a mismatching final persisted checksum
+  And another committed healthy artifact exists in the same manifest
+  When the periodic scrub job inspects the configured storage root with repair policy "QUARANTINE"
+  Then one integrity finding identifies artifact type, identifier, owning manifest, checksum failure, and transformations "<transformations>"
+  And the corrupt artifact and checksum sidecar are quarantined according to the configured repair policy
+  And the healthy artifact remains byte-for-byte unchanged
+  And a second scrub run is deterministic and does not duplicate the quarantined finding
 ----
 
 .Examples
-[cols="1",options="header"]
+[cols="1,1",options="header"]
 |===
-| artifact_type
-| whole-object
-| dedup-chunk
-| multipart-part
-| ec-shard
+| artifact_type | transformations
+| whole-object | NONE
+| dedup-chunk | COMPRESS
+| multipart-part | CRYPT
+| ec-data-shard | COMPRESS,CRYPT
 |===
+
+===== REQ-SCRUB-002
+
+====== Scenario: Periodic scrubbing is opt-in and retains its latest report
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep4-space-management.feature:76`
+|Rule |Periodic scrubbing verifies typed and transformed artifacts without changing valid data
+|Requirement ID(s) |`REQ-SCRUB-002`
+|Classification |`@non-functional-requirement`
+|Capability area tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@integrity`, `@scrubbing`, `@scheduling`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@REQ-SCRUB-002`, `@non-functional-requirement`, `@integrity`, `@scrubbing`, `@scheduling`, `@implemented-and-validated`
+|===
+
+.Rule description
+----
+Scrubbing MUST hash the final persisted representation before any read-time decompression or
+decryption. The manifest transformation chain identifies compressed and encrypted artifacts,
+while the final checksum protects compressed bytes, authenticated ciphertext, and EC shards
+without requiring plaintext or encryption keys in the background job.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given periodic integrity scrubbing is disabled by default
+  When property "storage.engine.integrity.scrub.enabled" is set to true
+  Then the storage-engine scheduler runs the scrub job with configurable initial delay, interval, and repair policy
+  And each completed run atomically replaces the latest operator-readable scrub report
+----
 
 ==== s3-reactive-api-adapter/src/test/features/specs/phase-ep5-storage-migration.feature
 
