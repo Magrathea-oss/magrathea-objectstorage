@@ -36,6 +36,7 @@ import com.example.magrathea.storageengine.domain.valueobject.UploadMode;
 import com.example.magrathea.storageengine.domain.valueobject.VersionId;
 import com.example.magrathea.storageengine.domain.valueobject.VirtualDevice;
 import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemManifestRepository;
+import com.example.magrathea.s3api.adapter.web.S3ObjectAclStore;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -83,6 +84,11 @@ public class PhaseEp5StorageMigrationSteps {
     private Path objectReferenceStateFile;
     private ObjectKey objectReferenceKey;
     private String committedObjectReferenceContent;
+    private Path objectAclRoot;
+    private Path objectAclStateFile;
+    private String objectAclBucket;
+    private String objectAclKey;
+    private String committedObjectAclContent;
 
     @Given("a sample storage-engine object manifest is saved through the filesystem manifest repository")
     public void sampleStorageEngineObjectManifestIsSaved() throws IOException {
@@ -339,6 +345,53 @@ public class PhaseEp5StorageMigrationSteps {
             new StorageEngineReactiveS3ObjectRepository(null, null, objectReferenceRoot.toString());
         assertThatThrownBy(() -> unsupportedRepository.findByBucketAndKey(objectReferenceKey).block())
             .hasMessageContaining("Unsupported object manifest reference schema version")
+            .hasMessageContaining(unsupportedVersion);
+    }
+
+    @Given("a sample object ACL is saved through the durable ACL store")
+    public void sampleObjectAclIsSavedThroughDurableAclStore() throws IOException {
+        objectAclRoot = Files.createTempDirectory("magrathea-ep5-object-acl-schema-");
+        objectAclBucket = "ep5-object-acl-bucket";
+        objectAclKey = "records/versioned-acl.txt";
+        S3ObjectAclStore aclStore = new S3ObjectAclStore(objectAclRoot);
+        aclStore.save(objectAclBucket, objectAclKey, "FULL_CONTROL", "admin");
+
+        objectAclStateFile = objectAclRoot.resolve(base64Url(objectAclBucket))
+            .resolve(base64Url(objectAclKey) + ".properties");
+        assertThat(objectAclStateFile).exists();
+        committedObjectAclContent = Files.readString(objectAclStateFile);
+    }
+
+    @Then("the committed object ACL sidecar declares schema version {string}")
+    public void committedObjectAclSidecarDeclaresSchemaVersion(String version) {
+        assertThat(committedObjectAclContent).contains("acl.schemaVersion=" + version);
+    }
+
+    @Then("the ACL store can read a legacy sidecar that omits the schema version as compatibility version {string}")
+    public void aclStoreCanReadLegacySidecarThatOmitsSchemaVersion(String compatibilityVersion)
+            throws IOException {
+        assertThat(compatibilityVersion).isEqualTo("0");
+        String legacy = committedObjectAclContent.replaceFirst(
+            "(?m)^acl\\.schemaVersion=1\\R", "");
+        assertThat(legacy).doesNotContain("acl.schemaVersion");
+        Files.writeString(objectAclStateFile, legacy);
+
+        S3ObjectAclStore legacyStore = new S3ObjectAclStore(objectAclRoot);
+        var restored = legacyStore.find(objectAclBucket, objectAclKey).orElseThrow();
+        assertThat(restored.permission()).isEqualTo("FULL_CONTROL");
+        assertThat(restored.grantee()).isEqualTo("admin");
+    }
+
+    @Then("the ACL store rejects a sidecar that declares unsupported schema version {string}")
+    public void aclStoreRejectsSidecarThatDeclaresUnsupportedSchemaVersion(String unsupportedVersion)
+            throws IOException {
+        String unsupported = committedObjectAclContent.replaceFirst(
+            "acl\\.schemaVersion=1", "acl.schemaVersion=" + unsupportedVersion);
+        Files.writeString(objectAclStateFile, unsupported);
+
+        S3ObjectAclStore unsupportedStore = new S3ObjectAclStore(objectAclRoot);
+        assertThatThrownBy(() -> unsupportedStore.find(objectAclBucket, objectAclKey))
+            .hasMessageContaining("Unsupported object ACL schema version")
             .hasMessageContaining(unsupportedVersion);
     }
 

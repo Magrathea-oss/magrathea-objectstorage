@@ -1,6 +1,6 @@
 # Runbook: Storage-engine metadata schema migration
 
-Status: validated object-manifest, multipart-session, bucket-registry, object-configuration, and object-reference slices (`REQ-OPS-007`, `REQ-OPS-016..019`).
+Status: validated object-manifest, multipart-session, bucket-registry, object-configuration, object-reference, and object-ACL slices (`REQ-OPS-007`, `REQ-OPS-016..020`).
 
 ## Current manifest compatibility contract
 
@@ -48,6 +48,14 @@ The object configuration document contains legal hold, encryption, object-lock, 
 
 The reference atomically maps an S3 bucket/key to one committed manifest/version pair and its associated object metadata and tags.
 
+## Object ACL sidecar compatibility contract
+
+| Format | Version | Runtime behavior |
+|---|---:|---|
+| Legacy ACL properties without `acl.schemaVersion` | `0` compatibility mode | Readable for backward compatibility. |
+| Current object ACL sidecar properties | `1` | Written by `S3ObjectAclStore`; readable after restart. |
+| Future/unknown object ACL schema | `> 1` or invalid | Rejected when the sidecar is loaded instead of being interpreted ambiguously. |
+
 ## Operator procedure before upgrades
 
 1. Complete an offline backup of `storage.engine.filesystem.root`.
@@ -62,7 +70,7 @@ The reference atomically maps an S3 bucket/key to one committed manifest/version
 
 `PhaseEp5StorageMigrationSpecsCucumberTest` validates `REQ-OPS-007` by saving a sample storage-engine object manifest, asserting the committed file declares schema version `1`, verifying a legacy manifest with the schema version omitted remains readable as compatibility version `0`, and verifying a manifest that declares unsupported schema version `999` is rejected.
 
-The same runner validates `REQ-OPS-016` for durable multipart upload session JSON, `REQ-OPS-017` for bucket registry JSON, `REQ-OPS-018` for object configuration JSON, and `REQ-OPS-019` for object manifest reference properties: current writes declare version `1`, omitted versions load as legacy version `0`, and future version `999` is rejected.
+The same runner validates `REQ-OPS-016` for durable multipart upload session JSON, `REQ-OPS-017` for bucket registry JSON, `REQ-OPS-018` for object configuration JSON, `REQ-OPS-019` for object manifest reference properties, and `REQ-OPS-020` for object ACL sidecars: current writes declare version `1`, omitted versions load as legacy version `0`, and future version `999` is rejected.
 
 Command:
 
@@ -78,4 +86,4 @@ The validation log must not contain `Using generated security password`.
 
 - No cross-version binary migration tool exists yet.
 - No online migration is claimed.
-- Object manifests, multipart upload sessions, bucket registries, object configuration records, and object manifest references are covered; ACL sidecars and other durable metadata families still need explicit schema-version contracts.
+- The declared EP-2 durable metadata families now have explicit schema-version contracts. Any newly introduced durable metadata family must add its own current/legacy/future-version contract before it can be considered migration-safe.

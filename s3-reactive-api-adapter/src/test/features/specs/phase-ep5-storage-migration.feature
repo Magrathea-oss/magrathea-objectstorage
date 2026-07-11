@@ -39,3 +39,10 @@ Ability: EP-5 storage-engine manifest schema versioning
       Then the committed object manifest reference declares schema version "1"
       And the repository can read a legacy object reference that omits the schema version as compatibility version "0"
       And the repository rejects an object reference that declares unsupported schema version "999"
+
+    @implemented-and-validated @REQ-OPS-020 @object-acl-versioning @migration @durability @restart-safety
+    Scenario: Object ACL sidecars declare the current schema and reject unsupported future schemas
+      Given a sample object ACL is saved through the durable ACL store
+      Then the committed object ACL sidecar declares schema version "1"
+      And the ACL store can read a legacy sidecar that omits the schema version as compatibility version "0"
+      And the ACL store rejects a sidecar that declares unsupported schema version "999"

@@ -18,6 +18,10 @@ import java.util.Properties;
  */
 public final class S3ObjectAclStore {
 
+    private static final String SCHEMA_VERSION_PROPERTY = "acl.schemaVersion";
+    private static final int CURRENT_SCHEMA_VERSION = 1;
+    private static final int LEGACY_SCHEMA_VERSION = 0;
+
     private final Path root;
 
     public S3ObjectAclStore(Path root) {
@@ -34,6 +38,7 @@ public final class S3ObjectAclStore {
             Path path = path(bucket, key);
             Files.createDirectories(path.getParent());
             Properties properties = new Properties();
+            properties.setProperty(SCHEMA_VERSION_PROPERTY, Integer.toString(CURRENT_SCHEMA_VERSION));
             properties.setProperty("bucket", bucket);
             properties.setProperty("key", key);
             properties.setProperty("permission", permission == null || permission.isBlank() ? "private" : permission);
@@ -54,6 +59,12 @@ public final class S3ObjectAclStore {
         try (var reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
             Properties properties = new Properties();
             properties.load(reader);
+            int schemaVersion = Integer.parseInt(properties.getProperty(
+                SCHEMA_VERSION_PROPERTY, Integer.toString(LEGACY_SCHEMA_VERSION)));
+            if (schemaVersion != LEGACY_SCHEMA_VERSION && schemaVersion != CURRENT_SCHEMA_VERSION) {
+                throw new IllegalArgumentException(
+                    "Unsupported object ACL schema version: " + schemaVersion);
+            }
             return Optional.of(new ObjectAcl(
                 properties.getProperty("permission", "private"),
                 properties.getProperty("grantee", "owner")));
