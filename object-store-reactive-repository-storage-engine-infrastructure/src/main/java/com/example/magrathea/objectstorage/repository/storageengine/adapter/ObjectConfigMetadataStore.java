@@ -27,6 +27,8 @@ import java.util.function.UnaryOperator;
  */
 final class ObjectConfigMetadataStore {
 
+    private static final int CURRENT_SCHEMA_VERSION = 1;
+    private static final int LEGACY_SCHEMA_VERSION = 0;
     private static final int LOCK_STRIPES = 64;
 
     private final Path configRoot;
@@ -100,6 +102,7 @@ final class ObjectConfigMetadataStore {
      * self-consistent snapshot.
      */
     record StoredObjectConfig(
+        Integer schemaVersion,
         LegalHold legalHold,
         EncryptionConfiguration encryption,
         ObjectLockConfiguration lockConfiguration,
@@ -107,26 +110,40 @@ final class ObjectConfigMetadataStore {
         RestoreConfiguration restore) {
 
         static final StoredObjectConfig EMPTY =
-            new StoredObjectConfig(null, null, null, null, null);
+            new StoredObjectConfig(CURRENT_SCHEMA_VERSION, null, null, null, null, null);
+
+        StoredObjectConfig {
+            int effectiveSchemaVersion = schemaVersion == null ? LEGACY_SCHEMA_VERSION : schemaVersion;
+            if (effectiveSchemaVersion != LEGACY_SCHEMA_VERSION
+                    && effectiveSchemaVersion != CURRENT_SCHEMA_VERSION) {
+                throw new IllegalArgumentException(
+                    "Unsupported object configuration schema version: " + effectiveSchemaVersion);
+            }
+        }
 
         StoredObjectConfig withLegalHold(LegalHold value) {
-            return new StoredObjectConfig(value, encryption, lockConfiguration, retention, restore);
+            return new StoredObjectConfig(CURRENT_SCHEMA_VERSION, value, encryption,
+                lockConfiguration, retention, restore);
         }
 
         StoredObjectConfig withEncryption(EncryptionConfiguration value) {
-            return new StoredObjectConfig(legalHold, value, lockConfiguration, retention, restore);
+            return new StoredObjectConfig(CURRENT_SCHEMA_VERSION, legalHold, value,
+                lockConfiguration, retention, restore);
         }
 
         StoredObjectConfig withLockConfiguration(ObjectLockConfiguration value) {
-            return new StoredObjectConfig(legalHold, encryption, value, retention, restore);
+            return new StoredObjectConfig(CURRENT_SCHEMA_VERSION, legalHold, encryption,
+                value, retention, restore);
         }
 
         StoredObjectConfig withRetention(ObjectLockConfiguration.RetentionPeriod value) {
-            return new StoredObjectConfig(legalHold, encryption, lockConfiguration, value, restore);
+            return new StoredObjectConfig(CURRENT_SCHEMA_VERSION, legalHold, encryption,
+                lockConfiguration, value, restore);
         }
 
         StoredObjectConfig withRestore(RestoreConfiguration value) {
-            return new StoredObjectConfig(legalHold, encryption, lockConfiguration, retention, value);
+            return new StoredObjectConfig(CURRENT_SCHEMA_VERSION, legalHold, encryption,
+                lockConfiguration, retention, value);
         }
     }
 }

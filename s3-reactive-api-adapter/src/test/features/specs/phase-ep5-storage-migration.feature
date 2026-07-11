@@ -25,3 +25,10 @@ Ability: EP-5 storage-engine manifest schema versioning
       Then the committed bucket registry state declares schema version "1"
       And the repository can read legacy bucket state that omits the schema version as compatibility version "0"
       And the repository rejects bucket state that declares unsupported schema version "999"
+
+    @implemented-and-validated @REQ-OPS-018 @object-config-versioning @migration @durability @restart-safety
+    Scenario: Object configuration state declares the current schema and rejects unsupported future schemas
+      Given sample object configuration is saved through the storage-engine repository
+      Then the committed object configuration state declares schema version "1"
+      And the repository can read legacy object configuration that omits the schema version as compatibility version "0"
+      And the repository rejects object configuration that declares unsupported schema version "999"

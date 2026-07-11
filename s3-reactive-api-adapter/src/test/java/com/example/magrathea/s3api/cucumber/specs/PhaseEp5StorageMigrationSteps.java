@@ -2,12 +2,14 @@ package com.example.magrathea.s3api.cucumber.specs;
 
 import com.example.magrathea.objectstore.domain.aggregate.Bucket;
 import com.example.magrathea.objectstore.domain.aggregate.MultipartUpload;
+import com.example.magrathea.objectstore.domain.valueobject.LegalHold;
 import com.example.magrathea.objectstore.domain.valueobject.ObjectKey;
+import com.example.magrathea.objectstore.domain.valueobject.Region;
+import com.example.magrathea.objectstore.domain.valueobject.StorageClass;
 import com.example.magrathea.objectstore.domain.valueobject.UploadId;
 import com.example.magrathea.objectstorage.repository.storageengine.adapter.StorageEngineReactiveBucketRepository;
 import com.example.magrathea.objectstorage.repository.storageengine.adapter.StorageEngineReactiveMultipartUploadRepository;
-import com.example.magrathea.objectstore.domain.valueobject.Region;
-import com.example.magrathea.objectstore.domain.valueobject.StorageClass;
+import com.example.magrathea.objectstorage.repository.storageengine.adapter.StorageEngineReactiveS3ObjectRepository;
 import com.example.magrathea.storageengine.domain.valueobject.BucketId;
 import com.example.magrathea.storageengine.domain.valueobject.BucketRef;
 import com.example.magrathea.storageengine.domain.valueobject.ChecksumAlgorithm;
@@ -43,6 +45,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
@@ -64,6 +67,11 @@ public class PhaseEp5StorageMigrationSteps {
     private Path bucketStateFile;
     private Bucket bucket;
     private String committedBucketContent;
+    private Path objectConfigRoot;
+    private Path objectConfigStateFile;
+    private ObjectKey objectConfigKey;
+    private LegalHold objectLegalHold;
+    private String committedObjectConfigContent;
 
     @Given("a sample storage-engine object manifest is saved through the filesystem manifest repository")
     public void sampleStorageEngineObjectManifestIsSaved() throws IOException {
@@ -208,6 +216,60 @@ public class PhaseEp5StorageMigrationSteps {
         assertThatThrownBy(() -> new StorageEngineReactiveBucketRepository(
                 null, bucketRoot.toString()))
             .hasMessageContaining("Unsupported bucket registry schema version")
+            .hasMessageContaining(unsupportedVersion);
+    }
+
+    @Given("sample object configuration is saved through the storage-engine repository")
+    public void sampleObjectConfigurationIsSavedThroughStorageEngineRepository() throws IOException {
+        objectConfigRoot = Files.createTempDirectory("magrathea-ep5-object-config-schema-");
+        StorageEngineReactiveS3ObjectRepository objectRepository =
+            new StorageEngineReactiveS3ObjectRepository(null, null, objectConfigRoot.toString());
+        objectConfigKey = ObjectKey.of("ep5-object-config-bucket", "records/versioned.json");
+        objectLegalHold = LegalHold.restore(true, Instant.parse("2026-07-11T00:00:00Z"));
+        objectRepository.saveLegalHold(objectConfigKey.bucket(), objectConfigKey, objectLegalHold).block();
+
+        Path stateRoot = objectConfigRoot.resolve("metadata/object-config");
+        try (var files = Files.walk(stateRoot)) {
+            objectConfigStateFile = files.filter(Files::isRegularFile)
+                .filter(path -> path.getFileName().toString().endsWith(".json"))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("object configuration JSON was not committed"));
+        }
+        committedObjectConfigContent = Files.readString(objectConfigStateFile);
+    }
+
+    @Then("the committed object configuration state declares schema version {string}")
+    public void committedObjectConfigurationStateDeclaresSchemaVersion(String version) {
+        assertThat(committedObjectConfigContent).contains("\"schemaVersion\":" + version);
+    }
+
+    @Then("the repository can read legacy object configuration that omits the schema version as compatibility version {string}")
+    public void repositoryCanReadLegacyObjectConfigurationThatOmitsSchemaVersion(String compatibilityVersion)
+            throws IOException {
+        assertThat(compatibilityVersion).isEqualTo("0");
+        String legacy = committedObjectConfigContent.replaceFirst("\"schemaVersion\":1,", "");
+        assertThat(legacy).doesNotContain("\"schemaVersion\"");
+        Files.writeString(objectConfigStateFile, legacy);
+
+        StorageEngineReactiveS3ObjectRepository legacyRepository =
+            new StorageEngineReactiveS3ObjectRepository(null, null, objectConfigRoot.toString());
+        LegalHold restored = legacyRepository.findLegalHold(
+            objectConfigKey.bucket(), objectConfigKey).block();
+        assertThat(restored).isEqualTo(objectLegalHold);
+    }
+
+    @Then("the repository rejects object configuration that declares unsupported schema version {string}")
+    public void repositoryRejectsObjectConfigurationThatDeclaresUnsupportedSchemaVersion(String unsupportedVersion)
+            throws IOException {
+        String unsupported = committedObjectConfigContent.replaceFirst(
+            "\"schemaVersion\":1", "\"schemaVersion\":" + unsupportedVersion);
+        Files.writeString(objectConfigStateFile, unsupported);
+
+        StorageEngineReactiveS3ObjectRepository unsupportedRepository =
+            new StorageEngineReactiveS3ObjectRepository(null, null, objectConfigRoot.toString());
+        assertThatThrownBy(() -> unsupportedRepository.findLegalHold(
+                objectConfigKey.bucket(), objectConfigKey).block())
+            .hasMessageContaining("Unsupported object configuration schema version")
             .hasMessageContaining(unsupportedVersion);
     }
 

@@ -1,6 +1,6 @@
 # Runbook: Storage-engine metadata schema migration
 
-Status: validated object-manifest, multipart-session, and bucket-registry slices (`REQ-OPS-007`, `REQ-OPS-016`, `REQ-OPS-017`).
+Status: validated object-manifest, multipart-session, bucket-registry, and object-configuration slices (`REQ-OPS-007`, `REQ-OPS-016..018`).
 
 ## Current manifest compatibility contract
 
@@ -28,6 +28,16 @@ The manifest checksum trailer remains mandatory. If operators edit a manifest ma
 | Current bucket registry JSON | `1` | Written by `BucketStore`; readable after restart. |
 | Future/unknown bucket schema | `> 1` or invalid | Rejected during repository startup/reload instead of being interpreted ambiguously. |
 
+## Object configuration compatibility contract
+
+| Format | Version | Runtime behavior |
+|---|---:|---|
+| Legacy object configuration JSON without `schemaVersion` | `0` compatibility mode | Readable for backward compatibility. |
+| Current object configuration JSON | `1` | Written by `ObjectConfigMetadataStore`; readable after restart. |
+| Future/unknown object configuration schema | `> 1` or invalid | Rejected when the document is loaded instead of being interpreted ambiguously. |
+
+The object configuration document contains legal hold, encryption, object-lock, retention, and restore state as one atomic record.
+
 ## Operator procedure before upgrades
 
 1. Complete an offline backup of `storage.engine.filesystem.root`.
@@ -42,7 +52,7 @@ The manifest checksum trailer remains mandatory. If operators edit a manifest ma
 
 `PhaseEp5StorageMigrationSpecsCucumberTest` validates `REQ-OPS-007` by saving a sample storage-engine object manifest, asserting the committed file declares schema version `1`, verifying a legacy manifest with the schema version omitted remains readable as compatibility version `0`, and verifying a manifest that declares unsupported schema version `999` is rejected.
 
-The same runner validates `REQ-OPS-016` for durable multipart upload session JSON and `REQ-OPS-017` for bucket registry JSON: current writes declare version `1`, omitted versions load as legacy version `0`, and future version `999` is rejected.
+The same runner validates `REQ-OPS-016` for durable multipart upload session JSON, `REQ-OPS-017` for bucket registry JSON, and `REQ-OPS-018` for object configuration JSON: current writes declare version `1`, omitted versions load as legacy version `0`, and future version `999` is rejected.
 
 Command:
 
@@ -58,4 +68,4 @@ The validation log must not contain `Using generated security password`.
 
 - No cross-version binary migration tool exists yet.
 - No online migration is claimed.
-- Object manifests, multipart upload sessions, and bucket registries are covered; object references, ACL/tag sidecars, object configuration, and other durable metadata families still need explicit schema-version contracts.
+- Object manifests, multipart upload sessions, bucket registries, and object configuration records are covered; object references, ACL sidecars, and other durable metadata families still need explicit schema-version contracts.
