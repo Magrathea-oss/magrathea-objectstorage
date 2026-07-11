@@ -71,6 +71,8 @@ import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -201,6 +203,11 @@ public class Phase3PipelineUnitSteps {
             }
         }
         assertThat(Files.size(fixture)).isEqualTo(LARGE_OBJECT_SIZE);
+    }
+
+    @Given("storage class {string} selects the bounded streaming policy for this upload")
+    public void boundedStreamingStorageClass(String storageClass) {
+        assertThat(storageClass).isEqualTo("PIPELINE");
     }
 
     @Given("the write pipeline chunk size is {string} with at most {string} in-flight chunks")
@@ -338,10 +345,10 @@ public class Phase3PipelineUnitSteps {
     public void uploadThroughStagedPipeline(String expectedFixture) {
         assertThat(expectedFixture).isEqualTo(fixtureFile);
         if ("REQ-PIPELINE-002".equals(requirementId)) {
-            configureOrchestrator(dedupPolicy(configuredChunkSizeBytes));
+            configureOrchestrator(dedupPolicy(configuredChunkSizeBytes, StorageClassId.of("PIPELINE")));
             assembledStages = orchestrator.writePipelineStages();
             completedContext = new StoragePipelineExecutor(eventPublisher)
-                    .execute(StorageContext.write(command(bucket, objectKey, LARGE_OBJECT_SIZE),
+                    .execute(StorageContext.write(command(bucket, objectKey, LARGE_OBJECT_SIZE, StorageClassId.of("PIPELINE")),
                             largeDemandUpload.flux()), assembledStages)
                     .block();
             assertThat(completedContext).isNotNull();
@@ -376,7 +383,7 @@ public class Phase3PipelineUnitSteps {
                 LARGE_OBJECT_SIZE / LargeDemandUpload.BUFFER_SIZE);
     }
 
-    @Then("the number of payload chunks retained in memory never exceeds the configured in-flight chunk limit")
+    @Then("the number of payload buffers retained in memory never exceeds the configured in-flight chunk limit")
     public void retainedPayloadChunksStayBounded() {
         assertThat(largeDemandUpload.maxLivePayloadBuffers()).isLessThanOrEqualTo(configuredInFlightChunks);
         assertThat(largeDemandUpload.allPayloadBuffersReleased()).isTrue();
@@ -863,7 +870,11 @@ public class Phase3PipelineUnitSteps {
     }
 
     private static StoragePolicy dedupPolicy(long chunkSize) {
-        return StoragePolicy.of(STORAGE_CLASS,
+        return dedupPolicy(chunkSize, STORAGE_CLASS);
+    }
+
+    private static StoragePolicy dedupPolicy(long chunkSize, StorageClassId storageClass) {
+        return StoragePolicy.of(storageClass,
                 Optional.of(DedupConfig.of(DedupScope.BUCKET_LEVEL, FingerprintAlgorithm.SHA256,
                         chunkSize, ChunkAlignment.NONE)),
                 Optional.empty(), Optional.empty(), Optional.empty(),
@@ -876,11 +887,16 @@ public class Phase3PipelineUnitSteps {
     }
 
     private static CompleteUploadCommand command(String bucketName, String key, long size) {
+        return command(bucketName, key, size, STORAGE_CLASS);
+    }
+
+    private static CompleteUploadCommand command(
+            String bucketName, String key, long size, StorageClassId storageClass) {
         BucketRef bucketRef = BucketRef.of(BucketId.of(bucketName), bucketName);
         UploadRequestContext context = UploadRequestContext.of(
                 ObjectKey.of(bucketName, key),
                 bucketRef,
-                STORAGE_CLASS,
+                storageClass,
                 ObjectContentDescriptor.of("text/plain", size),
                 ObjectMetadataDescriptor.empty(),
                 EncryptionRequest.none(),
@@ -1083,10 +1099,11 @@ public class Phase3PipelineUnitSteps {
         private static final int BUFFER_SIZE = 65_536;
         private final NettyDataBufferFactory factory =
                 new NettyDataBufferFactory(PooledByteBufAllocator.DEFAULT);
-        private final List<NettyDataBuffer> allocated = new CopyOnWriteArrayList<>();
+        private final Queue<NettyDataBuffer> liveBuffers = new ConcurrentLinkedQueue<>();
         private final AtomicLong maxSingleRequest = new AtomicLong();
         private final AtomicLong maxLivePayloadBuffers = new AtomicLong();
         private final AtomicLong emittedBuffers = new AtomicLong();
+        private final AtomicLong releasedBuffers = new AtomicLong();
 
         private Flux<DataBuffer> flux() {
             long totalBuffers = LARGE_OBJECT_SIZE / BUFFER_SIZE;
@@ -1095,11 +1112,9 @@ public class Phase3PipelineUnitSteps {
                             sink.complete();
                             return index;
                         }
-                        long liveBeforeEmission = allocated.stream()
-                                .filter(buffer -> buffer.getNativeBuffer().refCnt() > 0)
-                                .count();
+                        long liveBeforeEmission = pruneReleasedBuffers();
                         NettyDataBuffer buffer = (NettyDataBuffer) factory.wrap(new byte[BUFFER_SIZE]);
-                        allocated.add(buffer);
+                        liveBuffers.add(buffer);
                         maxLivePayloadBuffers.accumulateAndGet(liveBeforeEmission + 1, Math::max);
                         emittedBuffers.incrementAndGet();
                         sink.next(buffer);
@@ -1117,7 +1132,19 @@ public class Phase3PipelineUnitSteps {
         }
 
         private boolean allPayloadBuffersReleased() {
-            return allocated.stream().allMatch(buffer -> buffer.getNativeBuffer().refCnt() == 0);
+            pruneReleasedBuffers();
+            return liveBuffers.isEmpty() && releasedBuffers.get() == emittedBuffers.get();
+        }
+
+        private long pruneReleasedBuffers() {
+            liveBuffers.removeIf(buffer -> {
+                if (buffer.getNativeBuffer().refCnt() == 0) {
+                    releasedBuffers.incrementAndGet();
+                    return true;
+                }
+                return false;
+            });
+            return liveBuffers.size();
         }
 
         private long emittedBuffers() {

@@ -1,0 +1,27 @@
+policyId: pipeline-streaming
+version: "1.0"
+storageClassId: PIPELINE
+
+dedup:
+  enabled: true
+  scope: BUCKET
+  chunkSizeBytes: 1048576
+  algorithm: SHA256
+  alignment: NONE
+
+compression:
+  enabled: false
+  algorithm: ZSTD
+  level: 0
+
+encryption:
+  enabled: false
+  mode: NONE
+
+replication:
+  factor: 1
+
+erasureCoding:
+  enabled: false
+  dataBlocks: 1
+  parityBlocks: 0

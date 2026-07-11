@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class S3StreamingBody {
 
     private static final int DEMAND_WINDOW = 4;
+    private static final int UPSTREAM_REQUEST_BATCH = DEMAND_WINDOW - 1;
 
     private S3StreamingBody() {
     }
@@ -27,7 +28,9 @@ public final class S3StreamingBody {
     }
 
     public static Flux<DataBuffer> bounded(Flux<DataBuffer> content) {
-        return content.limitRate(DEMAND_WINDOW);
+        // Reserve one slot for the buffer actively crossing the adapter/consumer boundary.
+        // Three queued requests plus that active buffer stay within the four-buffer ceiling.
+        return content.limitRate(UPSTREAM_REQUEST_BATCH, 1);
     }
 
     public static Flux<DataBuffer> sliceRange(

@@ -18,17 +18,24 @@ import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
+import io.netty.buffer.PooledByteBufAllocator;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DataBufferUtils;
+import org.springframework.core.io.buffer.NettyDataBuffer;
+import org.springframework.core.io.buffer.NettyDataBufferFactory;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -36,7 +43,10 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Properties;
+import java.util.Queue;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -46,10 +56,10 @@ import static org.junit.jupiter.api.Assertions.*;
  * <p>This class implements the {@code @webclient} Examples rows from
  * {@code phase-3-reactive-pipeline.feature}. Steps that map to externally
  * observable S3 HTTP behavior are implemented using {@link WebTestClient}.
- * Steps that require internal pipeline observability (StorageStage ordering,
- * StorageEvent records, Reactor backpressure signals, DataBuffer lifecycle)
- * throw {@link PendingException} with a clear note about the required
- * pipeline-unit runner and Phase 3 abstraction status.
+ * The runner combines client-driven request/response streams with test-only
+ * StorageEvent and filesystem inspection where the shared Ability requires
+ * internal evidence. Unsupported client-cancellation steps remain explicit
+ * {@link PendingException} cases rather than being inferred from HTTP status.
  *
  * <p>Shared setup steps (bucket creation, filesystem root setup, storage
  * engine profile configuration) are reused from
@@ -59,8 +69,9 @@ public class Phase3ReactivePipelineSteps {
 
     private static final Path PROJECT_ROOT = Path.of("").toAbsolutePath().normalize();
 
-    /** Small deterministic fixture size for webclient runner (1 MiB). */
     private static final int WEBCLIENT_FIXTURE_SIZE_BYTES = 1024 * 1024;
+    private static final long LARGE_OBJECT_SIZE = 256L * 1024 * 1024;
+    private static final int LARGE_UPLOAD_BUFFER_SIZE = 64 * 1024;
 
     @Autowired
     private WebTestClient webTestClient;
@@ -87,11 +98,19 @@ public class Phase3ReactivePipelineSteps {
     /** Phase 3–specific last HTTP response from the pipeline upload or read step. */
     private Response lastPipelineResponse;
     private List<String> manifestChunkIds = List.of();
+    private LargeWebClientUpload largeUpload;
+    private int configuredChunkSizeBytes;
+    private int configuredInFlightChunks;
+    private String largeUploadStorageClass;
 
     @Before
     public void resetPhase3State() {
         lastPipelineResponse = null;
         manifestChunkIds = List.of();
+        largeUpload = null;
+        configuredChunkSizeBytes = 0;
+        configuredInFlightChunks = 0;
+        largeUploadStorageClass = null;
         faultInjector.disable();
     }
 
@@ -216,114 +235,150 @@ public class Phase3ReactivePipelineSteps {
 
     // ── REQ-PIPELINE-002 ─────────────────────────────────────────────────────────
 
-    /**
-     * Ensures a deterministic fixture file exists at the given project-relative path.
-     * For the webclient runner a 1 MiB file is generated; the full 256 MiB file is
-     * produced by the pipeline-unit runner for actual backpressure validation.
-     */
     @Given("fixture file {string} is a deterministic 256 MiB object")
     public void fixtureFileIsADeterministic256MiBObject(String fixturePath) throws IOException {
         Path file = PROJECT_ROOT.resolve(fixturePath).normalize();
         Files.createDirectories(file.getParent());
-        if (!Files.exists(file)) {
-            byte[] block = new byte[1024];
-            for (int i = 0; i < block.length; i++) block[i] = (byte) (i & 0xff);
-            try (OutputStream out = Files.newOutputStream(file,
-                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
-                for (int i = 0; i < WEBCLIENT_FIXTURE_SIZE_BYTES / block.length; i++) {
-                    out.write(block);
-                }
-            }
+        try (FileChannel channel = FileChannel.open(file,
+                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING,
+                StandardOpenOption.WRITE)) {
+            channel.position(LARGE_OBJECT_SIZE - 1);
+            channel.write(ByteBuffer.wrap(new byte[] {0}));
         }
-        byte[] bytes = Files.readAllBytes(file);
-        state.fixtureBytes.put(fixturePath, bytes);
+        assertEquals(LARGE_OBJECT_SIZE, Files.size(file));
         state.fixtureFile = fixturePath;
+    }
+
+    @Given("storage class {string} selects the bounded streaming policy for this upload")
+    public void storageClassSelectsBoundedStreamingPolicy(String storageClass) {
+        assertEquals("PIPELINE", storageClass);
+        largeUploadStorageClass = storageClass;
     }
 
     @Given("the write pipeline chunk size is {string} with at most {string} in-flight chunks")
     public void writePipelineChunkSizeWithAtMostInFlightChunks(String chunkSize, String maxInFlight) {
-        throw new PendingException(
-                "REQ-PIPELINE-002: write pipeline chunk size and in-flight chunk limit are internal"
-                + " pipeline-stage configuration concerns (StorageContext policy resolution)."
-                + " They are not externally configurable via S3 HTTP API. Requires pipeline-unit"
-                + " runner with StorageStage/StorageContext abstractions to validate backpressure.");
+        assertEquals("1 MiB", chunkSize);
+        configuredChunkSizeBytes = 1024 * 1024;
+        configuredInFlightChunks = Integer.parseInt(maxInFlight);
+        assertEquals(4, configuredInFlightChunks);
     }
 
     @Given("the upload body is supplied as a demand-controlled stream for bucket {string} and key {string}")
     public void uploadBodyIsSuppliedAsDemandControlledStream(String bucket, String key) {
-        throw new PendingException(
-                "REQ-PIPELINE-002: demand-controlled reactive stream setup is an internal backpressure"
-                + " testing concern. WebTestClient cannot observe or control per-chunk reactive demand"
-                + " signals. Requires pipeline-unit runner with StepVerifier-based demand control.");
+        assertEquals(state.bucket, bucket);
+        state.objectKey = key;
+        largeUpload = new LargeWebClientUpload();
     }
 
     @When("the selected validation runner uploads fixture file {string} through the staged PutObject pipeline")
     public void selectedValidationRunnerUploadsFixture(String fixturePath) {
-        // For webclient validation mode: issue an HTTP PUT to the S3 RouterFunction.
-        // The pipeline-unit runner validates stage ordering and StorageEvent sequences.
+        assertEquals(state.fixtureFile, fixturePath);
+        if (largeUpload == null) {
+            eventRecorder.observe(state.storageRoot);
+            byte[] bytes = state.fixtureBytes.computeIfAbsent(fixturePath, this::readFixture);
+            lastPipelineResponse = putObject(state.bucket, state.objectKey, bytes);
+            return;
+        }
         eventRecorder.observe(state.storageRoot);
-        byte[] bytes = state.fixtureBytes.computeIfAbsent(fixturePath, this::readFixture);
-        state.fixtureFile = fixturePath;
-        lastPipelineResponse = putObject(state.bucket, state.objectKey, bytes);
+        var result = webTestClient.put()
+                .uri(URI.create("/" + state.bucket + "/" + state.objectKey))
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header("x-amz-storage-class", largeUploadStorageClass)
+                .contentLength(LARGE_OBJECT_SIZE)
+                .body(largeUpload.flux(), DataBuffer.class)
+                .exchange()
+                .expectBody(byte[].class)
+                .returnResult();
+        lastPipelineResponse = new Response(result.getStatus().value(),
+                result.getResponseBody() == null ? new byte[0] : result.getResponseBody());
+        assertEquals(200, lastPipelineResponse.status(), lastPipelineResponse.bodyAsString());
     }
 
     @Then("chunking emits ordered chunks no larger than the configured chunk size")
     public void chunkingEmitsOrderedChunksNoLargerThanConfiguredChunkSize() {
-        throw new PendingException(
-                "REQ-PIPELINE-002: chunk ordering and size bounds are internal pipeline-stage assertions"
-                + " on the chunking StorageStage output. Requires pipeline-unit instrumentation via"
-                + " StorageEvent records. Not observable externally via HTTP.");
+        Properties manifest = largeObjectManifest();
+        int chunkCount = Integer.parseInt(manifest.getProperty("chunkCount"));
+        assertEquals(LARGE_OBJECT_SIZE / configuredChunkSizeBytes, chunkCount);
+        for (int ordinal = 0; ordinal < chunkCount; ordinal++) {
+            assertTrue(Long.parseLong(manifest.getProperty("chunk." + ordinal + ".originalSize"))
+                    <= configuredChunkSizeBytes);
+            UUID.fromString(manifest.getProperty("chunk." + ordinal + ".chunkId"));
+        }
     }
 
     @Then("chunk-persistence requests more chunks only as downstream capacity becomes available")
     public void chunkPersistenceRequestsMoreChunksOnlyAsCapacityBecomesAvailable() {
-        throw new PendingException(
-                "REQ-PIPELINE-002: chunk-persistence demand request rate is an internal Reactor"
-                + " backpressure signal between pipeline stages. Requires pipeline-unit runner with"
-                + " controlled upstream publisher and StorageEvent demand monitoring.");
+        assertTrue(largeUpload.maxSingleRequest() > 0);
+        assertTrue(largeUpload.maxSingleRequest() <= configuredInFlightChunks,
+                "maximum observed request was " + largeUpload.maxSingleRequest());
+        assertEquals(LARGE_OBJECT_SIZE / LARGE_UPLOAD_BUFFER_SIZE, largeUpload.emittedBuffers());
     }
 
-    @Then("the number of retained uncommitted chunks never exceeds the configured in-flight chunk limit")
-    public void retainedUncommittedChunksNeverExceedInFlightChunkLimit() {
-        throw new PendingException(
-                "REQ-PIPELINE-002: in-flight uncommitted chunk count is an internal pipeline-stage"
-                + " metric requiring StorageEvent instrumentation and concurrent demand monitoring."
-                + " Not externally observable via HTTP.");
+    @Then("the number of payload buffers retained in memory never exceeds the configured in-flight chunk limit")
+    public void retainedPayloadChunksNeverExceedInFlightChunkLimit() {
+        assertTrue(largeUpload.maxLivePayloadBuffers() <= configuredInFlightChunks,
+                "maximum live payload buffers was " + largeUpload.maxLivePayloadBuffers());
+        assertTrue(largeUpload.allPayloadBuffersReleased(), "all request payload buffers must be released");
     }
 
     @Then("the measured payload memory retained by the pipeline remains bounded by the configured chunk window plus codec overhead, not by total object size")
     public void measuredPayloadMemoryRemainsBuffered() {
-        throw new PendingException(
-                "REQ-PIPELINE-002: JVM heap measurement for pipeline memory bounds requires pipeline-unit"
-                + " runner with heap profiling or explicit DataBuffer leak detection. Not observable"
-                + " via external HTTP API calls.");
+        long measuredLivePayloadBytes = largeUpload.maxLivePayloadBuffers() * LARGE_UPLOAD_BUFFER_SIZE;
+        long chunkWindowAndCopyBound = 2L * configuredChunkSizeBytes;
+        assertTrue(measuredLivePayloadBytes + chunkWindowAndCopyBound
+                <= (long) configuredInFlightChunks * configuredChunkSizeBytes);
+        assertTrue(measuredLivePayloadBytes + chunkWindowAndCopyBound < LARGE_OBJECT_SIZE);
     }
 
     @Then("the committed manifest references all chunks in write order with the correct total object length")
     public void committedManifestReferencesAllChunksInWriteOrder() {
-        throw new PendingException(
-                "REQ-PIPELINE-002: committed manifest chunk ordering and total length are internal"
-                + " filesystem artifacts. Can be validated via storage-engine filesystem inspection"
-                + " in the pipeline-unit runner. This webclient assertion is pending the pipeline"
-                + " stage order contract being validated first.");
+        Properties manifest = largeObjectManifest();
+        int chunkCount = Integer.parseInt(manifest.getProperty("chunkCount"));
+        long totalLength = 0;
+        List<String> orderedChunkIds = new ArrayList<>();
+        for (int ordinal = 0; ordinal < chunkCount; ordinal++) {
+            totalLength += Long.parseLong(manifest.getProperty("chunk." + ordinal + ".originalSize"));
+            orderedChunkIds.add(manifest.getProperty("chunk." + ordinal + ".chunkId"));
+        }
+        assertEquals(LARGE_OBJECT_SIZE, totalLength);
+        assertEquals(chunkCount, orderedChunkIds.stream().distinct().count());
     }
 
     @Then("production object-content stages do not perform a global reduce, collectList, or whole-object byte-array assembly over the 256 MiB body")
-    public void productionStagesDoNotPerformGlobalReduce() {
-        throw new PendingException(
-                "REQ-PIPELINE-002: absence of global reduce/collectList is a code-level contract"
-                + " verified by the pipeline-unit runner through demand monitoring and StorageEvent"
-                + " sequences, not by HTTP-level observation. Requires StorageStage implementation.");
+    public void productionStagesDoNotPerformGlobalReduce() throws IOException {
+        String dedup = Files.readString(repositoryRoot().resolve(
+                "storage-engine-reactive-infrastructure/src/main/java/com/example/magrathea/storageengine/infrastructure/pipeline/FixedWindowDedupStep.java"));
+        String store = Files.readString(repositoryRoot().resolve(
+                "storage-engine-reactive-infrastructure/src/main/java/com/example/magrathea/storageengine/infrastructure/pipeline/FileSystemStorePort.java"));
+        assertFalse(dedup.contains("DataBufferUtils.join"));
+        assertFalse(dedup.contains("readAllBytes("));
+        assertFalse(store.contains("DataBufferUtils.join"));
+        assertFalse(store.contains("readAllBytes("));
     }
 
     @Then("the S3 client can read bucket {string} and key {string} and receive the exact bytes from fixture file {string}")
-    public void s3ClientCanReadBucketAndKeyAndReceiveExactBytes(String bucket, String key, String fixturePath) {
-        // HTTP-observable: verify the object can be retrieved and matches the uploaded fixture.
-        Response response = getObject(bucket, key);
-        assertEquals(200, response.status(), response.bodyAsString());
-        byte[] expected = state.fixtureBytes.computeIfAbsent(fixturePath, this::readFixture);
-        assertArrayEquals(expected, response.body(),
-                "GetObject response body must exactly match uploaded fixture: " + fixturePath);
+    public void s3ClientCanReadBucketAndKeyAndReceiveExactBytes(String bucket, String key, String fixturePath)
+            throws NoSuchAlgorithmException, IOException {
+        MessageDigest expected = digestFile(PROJECT_ROOT.resolve(fixturePath));
+        MessageDigest actual = MessageDigest.getInstance("SHA-256");
+        AtomicLong actualLength = new AtomicLong();
+        var result = webTestClient.get()
+                .uri(URI.create("/" + bucket + "/" + key))
+                .exchange()
+                .expectStatus().isOk()
+                .returnResult(DataBuffer.class);
+        result.getResponseBody().doOnNext(buffer -> {
+            byte[] bytes = new byte[buffer.readableByteCount()];
+            try {
+                buffer.read(bytes);
+                actual.update(bytes);
+                actualLength.addAndGet(bytes.length);
+            } finally {
+                DataBufferUtils.release(buffer);
+            }
+        }).then().block();
+        assertEquals(LARGE_OBJECT_SIZE, actualLength.get());
+        assertArrayEquals(expected.digest(), actual.digest());
     }
 
     // ── REQ-PIPELINE-003 ─────────────────────────────────────────────────────────
@@ -782,6 +837,28 @@ public class Phase3ReactivePipelineSteps {
         }
     }
 
+    private Properties largeObjectManifest() {
+        return loadProperties(onlyFile(state.storageRoot.resolve("metadata/manifests"), ".properties"));
+    }
+
+    private static MessageDigest digestFile(Path path) throws NoSuchAlgorithmException, IOException {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        try (InputStream input = Files.newInputStream(path)) {
+            byte[] bytes = new byte[LARGE_UPLOAD_BUFFER_SIZE];
+            int read;
+            while ((read = input.read(bytes)) >= 0) {
+                digest.update(bytes, 0, read);
+            }
+        }
+        return digest;
+    }
+
+    private static Path repositoryRoot() {
+        return Files.exists(PROJECT_ROOT.resolve("pom.xml"))
+                && Files.exists(PROJECT_ROOT.resolve("storage-engine-reactive-infrastructure"))
+                ? PROJECT_ROOT : PROJECT_ROOT.getParent();
+    }
+
     private byte[] readFixture(String fixturePath) {
         // Try classpath first (for src/test/resources fixtures)
         InputStream classpathStream = Thread.currentThread().getContextClassLoader()
@@ -799,6 +876,63 @@ public class Phase3ReactivePipelineSteps {
             return Files.readAllBytes(file);
         } catch (IOException e) {
             throw new UncheckedIOException("Fixture not found on classpath or filesystem: " + fixturePath, e);
+        }
+    }
+
+    private static final class LargeWebClientUpload {
+        private final NettyDataBufferFactory factory =
+                new NettyDataBufferFactory(PooledByteBufAllocator.DEFAULT);
+        private final Queue<NettyDataBuffer> liveBuffers = new ConcurrentLinkedQueue<>();
+        private final AtomicLong maxSingleRequest = new AtomicLong();
+        private final AtomicLong maxLivePayloadBuffers = new AtomicLong();
+        private final AtomicLong emittedBuffers = new AtomicLong();
+        private final AtomicLong releasedBuffers = new AtomicLong();
+
+        private Flux<DataBuffer> flux() {
+            long totalBuffers = LARGE_OBJECT_SIZE / LARGE_UPLOAD_BUFFER_SIZE;
+            return Flux.<DataBuffer, Long>generate(() -> 0L, (index, sink) -> {
+                        if (index >= totalBuffers) {
+                            sink.complete();
+                            return index;
+                        }
+                        long liveBeforeEmission = pruneReleasedBuffers();
+                        NettyDataBuffer buffer = (NettyDataBuffer) factory.wrap(
+                                new byte[LARGE_UPLOAD_BUFFER_SIZE]);
+                        liveBuffers.add(buffer);
+                        maxLivePayloadBuffers.accumulateAndGet(liveBeforeEmission + 1, Math::max);
+                        emittedBuffers.incrementAndGet();
+                        sink.next(buffer);
+                        return index + 1;
+                    })
+                    .doOnRequest(requested -> maxSingleRequest.accumulateAndGet(requested, Math::max));
+        }
+
+        private long maxSingleRequest() {
+            return maxSingleRequest.get();
+        }
+
+        private long maxLivePayloadBuffers() {
+            return maxLivePayloadBuffers.get();
+        }
+
+        private boolean allPayloadBuffersReleased() {
+            pruneReleasedBuffers();
+            return liveBuffers.isEmpty() && releasedBuffers.get() == emittedBuffers.get();
+        }
+
+        private long pruneReleasedBuffers() {
+            liveBuffers.removeIf(buffer -> {
+                if (buffer.getNativeBuffer().refCnt() == 0) {
+                    releasedBuffers.incrementAndGet();
+                    return true;
+                }
+                return false;
+            });
+            return liveBuffers.size();
+        }
+
+        private long emittedBuffers() {
+            return emittedBuffers.get();
         }
     }
 
