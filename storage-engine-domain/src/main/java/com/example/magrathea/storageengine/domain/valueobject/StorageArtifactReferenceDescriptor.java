@@ -2,7 +2,9 @@ package com.example.magrathea.storageengine.domain.valueobject;
 
 import java.util.List;
 
-public record ChunkReferenceDescriptor(
+/** A typed reference to one persisted unit in an object manifest. */
+public record StorageArtifactReferenceDescriptor(
+        StorageArtifactKind artifactKind,
         ChunkId chunkId,
         Fingerprint fingerprint,
         long originalSize,
@@ -11,7 +13,8 @@ public record ChunkReferenceDescriptor(
         ContentHash finalChecksum,
         List<NodeId> locations) {
 
-    public ChunkReferenceDescriptor {
+    public StorageArtifactReferenceDescriptor {
+        java.util.Objects.requireNonNull(artifactKind, "artifactKind must not be null");
         java.util.Objects.requireNonNull(chunkId, "chunkId must not be null");
         java.util.Objects.requireNonNull(fingerprint, "fingerprint must not be null");
         if (originalSize < 0) {
@@ -23,8 +26,23 @@ public record ChunkReferenceDescriptor(
         java.util.Objects.requireNonNull(stepChecksums, "stepChecksums must not be null");
         java.util.Objects.requireNonNull(finalChecksum, "finalChecksum must not be null");
         java.util.Objects.requireNonNull(locations, "locations must not be null");
-        // Defensive copies — public API must never expose mutable collections.
         stepChecksums = List.copyOf(stepChecksums);
         locations = List.copyOf(locations);
+    }
+
+    /**
+     * Compatibility constructor for callers that construct historical, untyped references.
+     * Production schema-2 writes must use the canonical constructor with an explicit kind.
+     */
+    public StorageArtifactReferenceDescriptor(
+            ChunkId chunkId,
+            Fingerprint fingerprint,
+            long originalSize,
+            long storedSize,
+            List<StepChecksumDescriptor> stepChecksums,
+            ContentHash finalChecksum,
+            List<NodeId> locations) {
+        this(StorageArtifactKind.LEGACY_CHUNK, chunkId, fingerprint, originalSize, storedSize,
+                stepChecksums, finalChecksum, locations);
     }
 }

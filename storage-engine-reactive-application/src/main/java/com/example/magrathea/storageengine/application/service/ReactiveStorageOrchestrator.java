@@ -28,7 +28,8 @@ import com.example.magrathea.storageengine.domain.valueobject.ChecksumCalculatio
 import com.example.magrathea.storageengine.domain.valueobject.ChecksumVerificationResult;
 import com.example.magrathea.storageengine.domain.valueobject.ChunkId;
 import com.example.magrathea.storageengine.domain.valueobject.ChunkPersistenceTrace;
-import com.example.magrathea.storageengine.domain.valueobject.ChunkReferenceDescriptor;
+import com.example.magrathea.storageengine.domain.valueobject.StorageArtifactKind;
+import com.example.magrathea.storageengine.domain.valueobject.StorageArtifactReferenceDescriptor;
 import com.example.magrathea.storageengine.domain.valueobject.CompleteUploadCommand;
 import com.example.magrathea.storageengine.domain.valueobject.ChecksumAlgorithm;
 import com.example.magrathea.storageengine.domain.valueobject.ContentHash;
@@ -328,7 +329,7 @@ public class ReactiveStorageOrchestrator {
                                 Fingerprint fingerprint = trace.fingerprint().orElseThrow();
                                 return contentAddressIndex.find(plan.deviceHash(), fingerprint)
                                         .map(optional -> {
-                                            ChunkReferenceDescriptor existing = optional.orElseThrow(() ->
+                                            StorageArtifactReferenceDescriptor existing = optional.orElseThrow(() ->
                                                     new IllegalStateException(
                                                             "Dedup reuse but fingerprint not found in index"));
                                             return toChunkPersistenceTrace(trace, plan, existing.chunkId());
@@ -558,12 +559,12 @@ public class ReactiveStorageOrchestrator {
 
     private Mono<StorageContext> persistManifest(StorageContext context) {
         return Mono.fromCallable(() -> {
-                    List<ChunkReferenceDescriptor> descriptors = buildDescriptors(context.chunkTraces());
+                    List<StorageArtifactReferenceDescriptor> descriptors = buildDescriptors(context);
                     long totalOriginalSize = descriptors.stream()
-                            .mapToLong(ChunkReferenceDescriptor::originalSize)
+                            .mapToLong(StorageArtifactReferenceDescriptor::originalSize)
                             .sum();
                     long totalStoredSize = descriptors.stream()
-                            .mapToLong(ChunkReferenceDescriptor::storedSize)
+                            .mapToLong(StorageArtifactReferenceDescriptor::storedSize)
                             .sum();
 
                     List<PolicyDecision> policyDecisions = buildPolicyDecisions(context.plan().orElseThrow());
@@ -664,7 +665,7 @@ public class ReactiveStorageOrchestrator {
                 .index()
                 .concatMap(indexed -> {
                     int ordinal = Math.toIntExact(indexed.getT1());
-                    ChunkReferenceDescriptor chunk = indexed.getT2();
+                    StorageArtifactReferenceDescriptor chunk = indexed.getT2();
                     return Mono.defer(() -> {
                         readPipelineObserver.chunkReadRequested(
                                 context.correlationId(), ordinal, chunk.chunkId());
@@ -722,14 +723,14 @@ public class ReactiveStorageOrchestrator {
         }
     }
 
-    private static byte[] restoreReadableChunk(byte[] storedData, ChunkReferenceDescriptor chunk) {
+    private static byte[] restoreReadableChunk(byte[] storedData, StorageArtifactReferenceDescriptor chunk) {
         if (!hasAppliedErasureCoding(chunk) || storedData.length <= chunk.originalSize()) {
             return storedData;
         }
         return Arrays.copyOf(storedData, Math.toIntExact(chunk.originalSize()));
     }
 
-    private static boolean hasAppliedErasureCoding(ChunkReferenceDescriptor chunk) {
+    private static boolean hasAppliedErasureCoding(StorageArtifactReferenceDescriptor chunk) {
         return chunk.stepChecksums().stream()
                 .anyMatch(checksum -> checksum.stepId() == StepId.ERASURE_CODING
                         && !checksum.inputChecksum().equals(checksum.outputChecksum()));
@@ -761,9 +762,10 @@ public class ReactiveStorageOrchestrator {
                 Optional.of(inputHash));
     }
 
-    private List<ChunkReferenceDescriptor> buildDescriptors(List<ChunkPersistenceTrace> traces) {
-        List<ChunkReferenceDescriptor> descriptors = new ArrayList<>();
-        for (ChunkPersistenceTrace trace : traces) {
+    private List<StorageArtifactReferenceDescriptor> buildDescriptors(StorageContext context) {
+        StorageArtifactKind artifactKind = artifactKindFor(context);
+        List<StorageArtifactReferenceDescriptor> descriptors = new ArrayList<>();
+        for (ChunkPersistenceTrace trace : context.chunkTraces()) {
             List<StepChecksumDescriptor> stepChecksums = new ArrayList<>();
             for (StepExecutionRecord step : trace.steps()) {
                 stepChecksums.add(StepChecksumDescriptor.of(
@@ -785,7 +787,8 @@ public class ReactiveStorageOrchestrator {
                     .map(o -> ((StepOutcome.StoreOutcome) o).storedSize())
                     .orElse(trace.originalSize());
 
-            descriptors.add(new ChunkReferenceDescriptor(
+            descriptors.add(new StorageArtifactReferenceDescriptor(
+                    artifactKind,
                     trace.chunkId(),
                     trace.fingerprint(),
                     trace.originalSize(),
@@ -795,6 +798,23 @@ public class ReactiveStorageOrchestrator {
                     locations));
         }
         return descriptors;
+    }
+
+    private StorageArtifactKind artifactKindFor(StorageContext context) {
+        CompleteUploadCommand command = context.command().orElseThrow();
+        PersistencePlan plan = context.plan().orElseThrow();
+        if (command.uploadMode() == com.example.magrathea.storageengine.domain.valueobject.UploadMode.MULTIPART) {
+            return StorageArtifactKind.MULTIPART_PART;
+        }
+        if (stepIsExecuted(plan, StepId.DEDUP)) {
+            return StorageArtifactKind.DEDUP_CHUNK;
+        }
+        if (stepIsExecuted(plan, StepId.ERASURE_CODING)) {
+            // Physical EC stripe/shard persistence is REQ-PIPELINE-015. Do not mislabel
+            // the current modeled single artifact as physical EC evidence.
+            return StorageArtifactKind.LEGACY_CHUNK;
+        }
+        return StorageArtifactKind.WHOLE_OBJECT;
     }
 
     private List<PolicyDecision> buildPolicyDecisions(PersistencePlan plan) {

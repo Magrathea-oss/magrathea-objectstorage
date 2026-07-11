@@ -286,6 +286,36 @@ public class Phase3PipelineUnitSteps {
                 && (path.toString().contains("ec-shard") || path.toString().contains("multipart")))).isZero();
     }
 
+    @Then("the committed manifest uses schema version 2 and typed artifact properties")
+    public void committedManifestUsesTypedSchemaVersion() throws IOException {
+        Path manifestFile = storageRoot.resolve("metadata/manifests")
+                .resolve(completedContext.manifestId().orElseThrow().value() + ".properties");
+        String manifest = Files.readString(manifestFile);
+        assertThat(manifest).contains("manifest.schemaVersion=2");
+        assertThat(manifest).contains("artifactCount=1");
+        assertThat(manifest).contains("artifact.0.kind=WHOLE_OBJECT");
+        assertThat(manifest).contains("artifact.0.artifactId=");
+    }
+
+    @Then("the manifest references one artifact of kind {string} and zero chunk properties")
+    public void manifestReferencesTypedArtifactOnly(String expectedKind) throws IOException {
+        var manifest = completedContext.manifest().orElseThrow();
+        assertThat(manifest.artifactCount()).isOne();
+        assertThat(manifest.artifacts()).singleElement()
+                .satisfies(artifact -> assertThat(artifact.artifactKind().name()).isEqualTo(expectedKind));
+        String serialized = Files.readString(storageRoot.resolve("metadata/manifests")
+                .resolve(completedContext.manifestId().orElseThrow().value() + ".properties"));
+        assertThat(serialized.lines()
+                .filter(line -> !line.startsWith("#"))
+                .filter(line -> line.startsWith("chunk.") || line.startsWith("chunkCount=")))
+                .isEmpty();
+    }
+
+    @Then("the typed manifest remains readable through the production read path")
+    public void typedManifestRemainsReadable() throws NoSuchAlgorithmException, IOException {
+        exactPlainStreamedReadback();
+    }
+
     @Then("exact streamed readback matches the 8 MiB fixture")
     public void exactPlainStreamedReadback() throws NoSuchAlgorithmException, IOException {
         MessageDigest actual = MessageDigest.getInstance("SHA-256");

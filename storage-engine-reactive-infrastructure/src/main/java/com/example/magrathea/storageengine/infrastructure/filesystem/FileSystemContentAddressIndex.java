@@ -3,7 +3,8 @@ package com.example.magrathea.storageengine.infrastructure.filesystem;
 import com.example.magrathea.storageengine.application.port.ContentAddressIndex;
 import com.example.magrathea.storageengine.domain.valueobject.ChecksumAlgorithm;
 import com.example.magrathea.storageengine.domain.valueobject.ChunkId;
-import com.example.magrathea.storageengine.domain.valueobject.ChunkReferenceDescriptor;
+import com.example.magrathea.storageengine.domain.valueobject.StorageArtifactKind;
+import com.example.magrathea.storageengine.domain.valueobject.StorageArtifactReferenceDescriptor;
 import com.example.magrathea.storageengine.domain.valueobject.ContentHash;
 import com.example.magrathea.storageengine.domain.valueobject.DeviceConfigurationHash;
 import com.example.magrathea.storageengine.domain.valueobject.Fingerprint;
@@ -35,7 +36,7 @@ public class FileSystemContentAddressIndex implements ContentAddressIndex {
     }
 
     @Override
-    public Mono<Optional<ChunkReferenceDescriptor>> find(DeviceConfigurationHash deviceHash, Fingerprint fingerprint) {
+    public Mono<Optional<StorageArtifactReferenceDescriptor>> find(DeviceConfigurationHash deviceHash, Fingerprint fingerprint) {
         return BlockingFileSystemOperation.fromCallable(() -> {
             Path entryPath = indexRoot
                     .resolve(deviceHash.value())
@@ -44,8 +45,8 @@ public class FileSystemContentAddressIndex implements ContentAddressIndex {
                 String chunkIdStr = Files.readString(entryPath).trim();
                 // Return a minimal descriptor — full descriptor would require reading chunk metadata
                 ChunkId chunkId = ChunkId.of(java.util.UUID.fromString(chunkIdStr));
-                return Optional.of(new ChunkReferenceDescriptor(
-                        chunkId, fingerprint, 0, 0,
+                return Optional.of(new StorageArtifactReferenceDescriptor(
+                        StorageArtifactKind.DEDUP_CHUNK, chunkId, fingerprint, 0, 0,
                         java.util.List.of(),
                         ContentHash.of(ChecksumAlgorithm.SHA256, fingerprint.value()),
                         java.util.List.of()));

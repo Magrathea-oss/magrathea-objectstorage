@@ -5,7 +5,7 @@ import com.example.magrathea.storageengine.domain.valueobject.BucketId;
 import com.example.magrathea.storageengine.domain.valueobject.BucketRef;
 import com.example.magrathea.storageengine.domain.valueobject.ChecksumAlgorithm;
 import com.example.magrathea.storageengine.domain.valueobject.ChunkId;
-import com.example.magrathea.storageengine.domain.valueobject.ChunkReferenceDescriptor;
+import com.example.magrathea.storageengine.domain.valueobject.StorageArtifactReferenceDescriptor;
 import com.example.magrathea.storageengine.domain.valueobject.ContentHash;
 import com.example.magrathea.storageengine.domain.valueobject.DeviceConfigurationHash;
 import com.example.magrathea.storageengine.domain.valueobject.EffectiveStoragePolicy;
@@ -231,7 +231,7 @@ class FileSystemManifestRepositoryAtomicWriteTest {
 
         ContentHash contentHash = ContentHash.of(ChecksumAlgorithm.SHA256, "abc123def456");
         ChunkId chunkId = ChunkId.generate();
-        ChunkReferenceDescriptor chunk = new ChunkReferenceDescriptor(
+        StorageArtifactReferenceDescriptor chunk = new StorageArtifactReferenceDescriptor(
                 chunkId,
                 Fingerprint.of(FingerprintAlgorithm.SHA256, "fp-abc123"),
                 42L,

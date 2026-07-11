@@ -6,7 +6,8 @@ import com.example.magrathea.storageengine.domain.valueobject.BucketId;
 import com.example.magrathea.storageengine.domain.valueobject.BucketRef;
 import com.example.magrathea.storageengine.domain.valueobject.ChecksumAlgorithm;
 import com.example.magrathea.storageengine.domain.valueobject.ChunkId;
-import com.example.magrathea.storageengine.domain.valueobject.ChunkReferenceDescriptor;
+import com.example.magrathea.storageengine.domain.valueobject.StorageArtifactKind;
+import com.example.magrathea.storageengine.domain.valueobject.StorageArtifactReferenceDescriptor;
 import com.example.magrathea.storageengine.domain.valueobject.ContentHash;
 import com.example.magrathea.storageengine.domain.valueobject.DeclaredChecksum;
 import com.example.magrathea.storageengine.domain.valueobject.DeviceConfigurationHash;
@@ -68,7 +69,9 @@ import java.util.UUID;
 public class FileSystemManifestRepository implements ObjectManifestRepository {
 
     /** Current storage-engine manifest properties schema version. */
-    static final int CURRENT_SCHEMA_VERSION = 1;
+    static final int CURRENT_SCHEMA_VERSION = 2;
+    /** Chunk-only schema written before typed storage artifacts. */
+    static final int CHUNK_SCHEMA_VERSION = 1;
     /** Legacy compatibility version assigned to manifests written before schemaVersion existed. */
     static final int LEGACY_SCHEMA_VERSION = 0;
     /** Property key used for the manifest format schema version. */
@@ -222,7 +225,7 @@ public class FileSystemManifestRepository implements ObjectManifestRepository {
         properties.setProperty("versionId", manifest.versionId().value());
         properties.setProperty("storageClassId", manifest.storageClassId().value());
         properties.setProperty("deviceHash", manifest.deviceHash().value());
-        properties.setProperty("chunkCount", Integer.toString(manifest.chunkCount()));
+        properties.setProperty("artifactCount", Integer.toString(manifest.artifactCount()));
         properties.setProperty("totalOriginalSize", Long.toString(manifest.totalOriginalSize()));
         properties.setProperty("totalStoredSize", Long.toString(manifest.totalStoredSize()));
 
@@ -267,20 +270,21 @@ public class FileSystemManifestRepository implements ObjectManifestRepository {
             properties.setProperty(prefix + "reason.description", decision.reason().description());
         }
 
-        for (int i = 0; i < manifest.chunks().size(); i++) {
-            ChunkReferenceDescriptor chunk = manifest.chunks().get(i);
-            String prefix = "chunk." + i + ".";
-            properties.setProperty(prefix + "chunkId", chunk.chunkId().value().toString());
-            properties.setProperty(prefix + "fingerprint.algorithm", chunk.fingerprint().algorithm().name());
-            properties.setProperty(prefix + "fingerprint.value", chunk.fingerprint().value());
-            properties.setProperty(prefix + "originalSize", Long.toString(chunk.originalSize()));
-            properties.setProperty(prefix + "storedSize", Long.toString(chunk.storedSize()));
-            properties.setProperty(prefix + "finalChecksum.algorithm", chunk.finalChecksum().algorithm().name());
-            properties.setProperty(prefix + "finalChecksum.value", chunk.finalChecksum().value());
-            properties.setProperty(prefix + "locations", joinLocations(chunk.locations()));
-            properties.setProperty(prefix + "stepChecksumCount", Integer.toString(chunk.stepChecksums().size()));
-            for (int j = 0; j < chunk.stepChecksums().size(); j++) {
-                StepChecksumDescriptor checksum = chunk.stepChecksums().get(j);
+        for (int i = 0; i < manifest.artifacts().size(); i++) {
+            StorageArtifactReferenceDescriptor artifact = manifest.artifacts().get(i);
+            String prefix = "artifact." + i + ".";
+            properties.setProperty(prefix + "kind", artifact.artifactKind().name());
+            properties.setProperty(prefix + "artifactId", artifact.chunkId().value().toString());
+            properties.setProperty(prefix + "fingerprint.algorithm", artifact.fingerprint().algorithm().name());
+            properties.setProperty(prefix + "fingerprint.value", artifact.fingerprint().value());
+            properties.setProperty(prefix + "originalSize", Long.toString(artifact.originalSize()));
+            properties.setProperty(prefix + "storedSize", Long.toString(artifact.storedSize()));
+            properties.setProperty(prefix + "finalChecksum.algorithm", artifact.finalChecksum().algorithm().name());
+            properties.setProperty(prefix + "finalChecksum.value", artifact.finalChecksum().value());
+            properties.setProperty(prefix + "locations", joinLocations(artifact.locations()));
+            properties.setProperty(prefix + "stepChecksumCount", Integer.toString(artifact.stepChecksums().size()));
+            for (int j = 0; j < artifact.stepChecksums().size(); j++) {
+                StepChecksumDescriptor checksum = artifact.stepChecksums().get(j);
                 String stepPrefix = prefix + "stepChecksum." + j + ".";
                 properties.setProperty(stepPrefix + "stepId", checksum.stepId().name());
                 properties.setProperty(stepPrefix + "input.algorithm", checksum.inputChecksum().algorithm().name());
@@ -307,12 +311,13 @@ public class FileSystemManifestRepository implements ObjectManifestRepository {
         }
 
         ManifestId manifestId = ManifestId.of(UUID.fromString(required(properties, "manifestId")));
-        validateSchemaVersion(properties, manifestId);
+        int schemaVersion = readSchemaVersion(properties, manifestId);
         ObjectId objectId = ObjectId.of(required(properties, "objectId"));
         VersionId versionId = VersionId.of(required(properties, "versionId"));
         StorageClassId storageClassId = StorageClassId.of(required(properties, "storageClassId"));
         DeviceConfigurationHash deviceHash = DeviceConfigurationHash.of(required(properties, "deviceHash"));
-        int chunkCount = Integer.parseInt(required(properties, "chunkCount"));
+        int artifactCount = Integer.parseInt(required(properties,
+                schemaVersion >= CURRENT_SCHEMA_VERSION ? "artifactCount" : "chunkCount"));
         long totalOriginalSize = Long.parseLong(required(properties, "totalOriginalSize"));
         long totalStoredSize = Long.parseLong(required(properties, "totalStoredSize"));
 
@@ -339,12 +344,15 @@ public class FileSystemManifestRepository implements ObjectManifestRepository {
                             required(properties, prefix + "reason.description"))));
         }
 
-        List<ChunkReferenceDescriptor> chunks = new ArrayList<>();
-        for (int i = 0; i < chunkCount; i++) {
-            String prefix = "chunk." + i + ".";
+        List<StorageArtifactReferenceDescriptor> artifacts = new ArrayList<>();
+        for (int i = 0; i < artifactCount; i++) {
+            boolean typed = schemaVersion >= CURRENT_SCHEMA_VERSION;
+            String prefix = (typed ? "artifact." : "chunk.") + i + ".";
             List<StepChecksumDescriptor> stepChecksums = readStepChecksums(properties, prefix);
-            chunks.add(new ChunkReferenceDescriptor(
-                    ChunkId.of(UUID.fromString(required(properties, prefix + "chunkId"))),
+            artifacts.add(new StorageArtifactReferenceDescriptor(
+                    typed ? StorageArtifactKind.valueOf(required(properties, prefix + "kind"))
+                            : StorageArtifactKind.LEGACY_CHUNK,
+                    ChunkId.of(UUID.fromString(required(properties, prefix + (typed ? "artifactId" : "chunkId")))),
                     Fingerprint.of(
                             FingerprintAlgorithm.valueOf(required(properties, prefix + "fingerprint.algorithm")),
                             required(properties, prefix + "fingerprint.value")),
@@ -366,10 +374,10 @@ public class FileSystemManifestRepository implements ObjectManifestRepository {
                 deviceHash,
                 uploadTrace,
                 policyDecisions,
-                chunkCount,
+                artifactCount,
                 totalOriginalSize,
                 totalStoredSize,
-                chunks);
+                artifacts);
     }
 
     private Optional<DeclaredChecksum> readOptionalDeclaredChecksum(Properties properties, String prefix) {
@@ -433,11 +441,11 @@ public class FileSystemManifestRepository implements ObjectManifestRepository {
         return new VirtualDevice.BucketDevice(bucketRef, policy);
     }
 
-    private void validateSchemaVersion(Properties properties, ManifestId manifestId) {
+    private int readSchemaVersion(Properties properties, ManifestId manifestId) {
         String rawVersion = properties.getProperty(SCHEMA_VERSION_KEY);
         if (rawVersion == null || rawVersion.isBlank()) {
             // Compatibility mode for manifests written before EP-5 schema versioning.
-            return;
+            return LEGACY_SCHEMA_VERSION;
         }
         int version;
         try {
@@ -446,15 +454,16 @@ public class FileSystemManifestRepository implements ObjectManifestRepository {
             throw new IllegalArgumentException(
                     "Invalid manifest schema version '" + rawVersion + "' for manifest: " + manifestId.value(), e);
         }
-        if (version == LEGACY_SCHEMA_VERSION) {
-            return;
-        }
-        if (version != CURRENT_SCHEMA_VERSION) {
+        if (version != LEGACY_SCHEMA_VERSION
+                && version != CHUNK_SCHEMA_VERSION
+                && version != CURRENT_SCHEMA_VERSION) {
             throw new IllegalArgumentException(
                     "Unsupported manifest schema version " + version
                             + " for manifest: " + manifestId.value()
-                            + "; supported versions are " + LEGACY_SCHEMA_VERSION + " and " + CURRENT_SCHEMA_VERSION);
+                            + "; supported versions are " + LEGACY_SCHEMA_VERSION + ", "
+                            + CHUNK_SCHEMA_VERSION + " and " + CURRENT_SCHEMA_VERSION);
         }
+        return version;
     }
 
     private String required(Properties properties, String key) {

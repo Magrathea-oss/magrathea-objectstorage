@@ -3,7 +3,7 @@ package com.example.magrathea.storageengine.application.pipeline;
 import com.example.magrathea.storageengine.domain.aggregate.StoredObject;
 import com.example.magrathea.storageengine.domain.valueobject.BucketRef;
 import com.example.magrathea.storageengine.domain.valueobject.ChunkPersistenceTrace;
-import com.example.magrathea.storageengine.domain.valueobject.ChunkReferenceDescriptor;
+import com.example.magrathea.storageengine.domain.valueobject.StorageArtifactReferenceDescriptor;
 import com.example.magrathea.storageengine.domain.valueobject.CompleteUploadCommand;
 import com.example.magrathea.storageengine.domain.valueobject.EffectiveStoragePolicy;
 import com.example.magrathea.storageengine.domain.valueobject.ManifestId;
@@ -35,7 +35,7 @@ public record StorageContext(
         Optional<PersistencePlan> plan,
         Optional<Integer> chunkSizeBytes,
         List<ChunkPersistenceTrace> chunkTraces,
-        List<ChunkReferenceDescriptor> chunkDescriptors,
+        List<StorageArtifactReferenceDescriptor> chunkDescriptors,
         Optional<ManifestId> manifestId,
         Optional<ObjectId> objectId,
         Optional<VersionId> versionId,
@@ -163,7 +163,7 @@ public record StorageContext(
                 manifest, storedObject, responseContent, stageDecisions, cleanupHandles);
     }
 
-    public StorageContext withChunkDescriptors(List<ChunkReferenceDescriptor> descriptors) {
+    public StorageContext withChunkDescriptors(List<StorageArtifactReferenceDescriptor> descriptors) {
         return copy(command, uploadData, requestedManifestId, uploadTrace, effectivePolicy, device, plan,
                 chunkSizeBytes, chunkTraces, descriptors, manifestId, objectId, versionId,
                 manifest, storedObject, responseContent, stageDecisions, cleanupHandles);
@@ -221,7 +221,7 @@ public record StorageContext(
             Optional<PersistencePlan> newPlan,
             Optional<Integer> newChunkSizeBytes,
             List<ChunkPersistenceTrace> newChunkTraces,
-            List<ChunkReferenceDescriptor> newChunkDescriptors,
+            List<StorageArtifactReferenceDescriptor> newChunkDescriptors,
             Optional<ManifestId> newManifestId,
             Optional<ObjectId> newObjectId,
             Optional<VersionId> newVersionId,

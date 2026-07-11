@@ -11,10 +11,10 @@ public record ObjectManifest(
         DeviceConfigurationHash deviceHash,
         UploadCompletionTrace uploadTrace,
         List<PolicyDecision> policyDecisions,
-        int chunkCount,
+        int artifactCount,
         long totalOriginalSize,
         long totalStoredSize,
-        List<ChunkReferenceDescriptor> chunks) {
+        List<StorageArtifactReferenceDescriptor> artifacts) {
 
     public ObjectManifest {
         java.util.Objects.requireNonNull(manifestId, "manifestId must not be null");
@@ -25,8 +25,8 @@ public record ObjectManifest(
         java.util.Objects.requireNonNull(deviceHash, "deviceHash must not be null");
         java.util.Objects.requireNonNull(uploadTrace, "uploadTrace must not be null");
         java.util.Objects.requireNonNull(policyDecisions, "policyDecisions must not be null");
-        if (chunkCount < 0) {
-            throw new IllegalArgumentException("chunkCount must be >= 0: " + chunkCount);
+        if (artifactCount < 0) {
+            throw new IllegalArgumentException("artifactCount must be >= 0: " + artifactCount);
         }
         if (totalOriginalSize < 0) {
             throw new IllegalArgumentException("totalOriginalSize must be >= 0: " + totalOriginalSize);
@@ -34,12 +34,22 @@ public record ObjectManifest(
         if (totalStoredSize < 0) {
             throw new IllegalArgumentException("totalStoredSize must be >= 0: " + totalStoredSize);
         }
-        java.util.Objects.requireNonNull(chunks, "chunks must not be null");
-        if (chunkCount != chunks.size()) {
+        java.util.Objects.requireNonNull(artifacts, "artifacts must not be null");
+        if (artifactCount != artifacts.size()) {
             throw new IllegalArgumentException(
-                    "chunkCount (" + chunkCount + ") must equal chunks.size() (" + chunks.size() + ")");
+                    "artifactCount (" + artifactCount + ") must equal artifacts.size() (" + artifacts.size() + ")");
         }
         policyDecisions = List.copyOf(policyDecisions);
-        chunks = List.copyOf(chunks);
+        artifacts = List.copyOf(artifacts);
+    }
+
+    /** Compatibility alias for schema 0/1 callers. */
+    public int chunkCount() {
+        return artifactCount;
+    }
+
+    /** Compatibility alias for code migrating from the schema 0/1 chunk-only model. */
+    public List<StorageArtifactReferenceDescriptor> chunks() {
+        return artifacts;
     }
 }

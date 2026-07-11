@@ -276,7 +276,7 @@ public class Phase1UploadStorageEngineAwsCliSteps {
         Properties ref = loadProperties(a.referenceFile());
         assertEquals(String.valueOf(ctx.fixtureBytes.length), mf.getProperty("totalOriginalSize"));
         assertEquals(String.valueOf(ctx.fixtureBytes.length), mf.getProperty("upload.totalObjectSize"));
-        assertTrue(Integer.parseInt(mf.getProperty("chunkCount", "0")) > 0,
+        assertTrue(manifestArtifactCount(mf) > 0,
             "manifest should contain at least one chunk reference");
         assertNotNull(mf.getProperty("upload.consolidatedChecksum.algorithm"));
         assertNotNull(mf.getProperty("upload.consolidatedChecksum.value"));
@@ -422,10 +422,10 @@ public class Phase1UploadStorageEngineAwsCliSteps {
     @Then("the committed manifest contains the ordered chunk references needed to reconstruct the object")
     public void committedManifestContainsOrderedChunkReferences() {
         Properties mf = loadProperties(artifactsFor(ctx.bucket, ctx.objectKey).manifestFile());
-        int chunkCount = Integer.parseInt(mf.getProperty("chunkCount", "0"));
+        int chunkCount = manifestArtifactCount(mf);
         assertTrue(chunkCount > 0, "manifest should contain chunk references");
         for (int i = 0; i < chunkCount; i++) {
-            assertNotNull(mf.getProperty("chunk." + i + ".chunkId"),
+            assertNotNull(manifestArtifactId(mf, i),
                 "manifest should contain ordered chunk reference " + i);
         }
     }
@@ -548,12 +548,12 @@ public class Phase1UploadStorageEngineAwsCliSteps {
             "manifest must have object-level checksum algorithm");
         assertNotNull(mf.getProperty("upload.consolidatedChecksum.value"),
             "manifest must have object-level checksum value");
-        int chunkCount = Integer.parseInt(mf.getProperty("chunkCount", "0"));
+        int chunkCount = manifestArtifactCount(mf);
         assertTrue(chunkCount > 0, "manifest must reference at least one chunk");
         for (int i = 0; i < chunkCount; i++) {
-            assertNotNull(mf.getProperty("chunk." + i + ".finalChecksum.algorithm"),
+            assertNotNull(mf.getProperty(manifestArtifactPrefix(mf, i) + "finalChecksum.algorithm"),
                 "chunk " + i + " must have checksum algorithm in manifest");
-            assertNotNull(mf.getProperty("chunk." + i + ".finalChecksum.value"),
+            assertNotNull(mf.getProperty(manifestArtifactPrefix(mf, i) + "finalChecksum.value"),
                 "chunk " + i + " must have checksum value in manifest");
         }
     }
@@ -730,9 +730,9 @@ public class Phase1UploadStorageEngineAwsCliSteps {
                     .filter(path -> path.getFileName().toString().endsWith(".properties"))
                     .toList()) {
                 Properties manifest = loadProperties(manifestPath);
-                int chunkCount = Integer.parseInt(manifest.getProperty("chunkCount", "0"));
+                int chunkCount = manifestArtifactCount(manifest);
                 for (int i = 0; i < chunkCount; i++) {
-                    String chunkId = manifest.getProperty("chunk." + i + ".chunkId");
+                    String chunkId = manifestArtifactId(manifest, i);
                     if (chunkId != null) {
                         assertFalse(chunkFilesById(chunkId).isEmpty(),
                             "committed manifest must not reference a missing chunk: " + manifestPath);
@@ -766,10 +766,10 @@ public class Phase1UploadStorageEngineAwsCliSteps {
         Path manifestFile = ctx.storageRoot.resolve("metadata/manifests/" + manifestId + ".properties");
         assertTrue(Files.exists(manifestFile), "manifest must exist: " + manifestFile);
         Properties mf = loadProperties(manifestFile);
-        int cc = Integer.parseInt(mf.getProperty("chunkCount", "0"));
+        int cc = manifestArtifactCount(mf);
         List<Path> chunks = new ArrayList<>();
         for (int i = 0; i < cc; i++) {
-            String chunkId = mf.getProperty("chunk." + i + ".chunkId");
+            String chunkId = manifestArtifactId(mf, i);
             if (chunkId != null) {
                 try (var ds = Files.walk(ctx.storageRoot.resolve("nodes"))) {
                     ds.filter(Files::isRegularFile)
@@ -816,6 +816,22 @@ public class Phase1UploadStorageEngineAwsCliSteps {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    private static int manifestArtifactCount(Properties manifest) {
+        return Integer.parseInt(manifest.getProperty(
+            "artifactCount", manifest.getProperty("chunkCount", "0")));
+    }
+
+    private static String manifestArtifactPrefix(Properties manifest, int ordinal) {
+        return manifest.containsKey("artifactCount")
+            ? "artifact." + ordinal + "."
+            : "chunk." + ordinal + ".";
+    }
+
+    private static String manifestArtifactId(Properties manifest, int ordinal) {
+        String prefix = manifestArtifactPrefix(manifest, ordinal);
+        return manifest.getProperty(prefix + (manifest.containsKey("artifactCount") ? "artifactId" : "chunkId"));
     }
 
     private static Properties loadProperties(Path path) {

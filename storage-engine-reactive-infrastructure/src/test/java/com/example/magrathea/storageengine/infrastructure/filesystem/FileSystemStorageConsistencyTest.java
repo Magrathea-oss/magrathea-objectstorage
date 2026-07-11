@@ -54,7 +54,7 @@ class FileSystemStorageConsistencyTest {
                     assertThat(restored.totalStoredSize()).isEqualTo(6L);
                     assertThat(restored.policyDecisions()).hasSize(6);
                     assertThat(restored.chunks()).hasSize(2);
-                    assertThat(restored.chunks()).extracting(ChunkReferenceDescriptor::chunkId)
+                    assertThat(restored.chunks()).extracting(StorageArtifactReferenceDescriptor::chunkId)
                             .containsExactly(manifest.chunks().get(0).chunkId(), manifest.chunks().get(1).chunkId());
                     assertThat(restored.chunks().get(0).locations()).extracting(NodeId::value).containsExactly("node-001");
                     assertThat(restored.chunks().get(1).locations()).extracting(NodeId::value).containsExactly("node-002");
@@ -159,7 +159,7 @@ class FileSystemStorageConsistencyTest {
         return PersistencePlan.create(policy, new VirtualDevice.BucketDevice(bucket, policy));
     }
 
-    private ObjectManifest manifest(List<ChunkReferenceDescriptor> chunks) {
+    private ObjectManifest manifest(List<StorageArtifactReferenceDescriptor> chunks) {
         PersistencePlan plan = plan();
         UploadCompletionTrace uploadTrace = new UploadCompletionTrace(
                 UploadMode.SINGLE_OBJECT,
@@ -172,7 +172,7 @@ class FileSystemStorageConsistencyTest {
         return manifest(chunks, uploadTrace);
     }
 
-    private ObjectManifest manifest(List<ChunkReferenceDescriptor> chunks, UploadCompletionTrace uploadTrace) {
+    private ObjectManifest manifest(List<StorageArtifactReferenceDescriptor> chunks, UploadCompletionTrace uploadTrace) {
         PersistencePlan plan = plan();
         return new ObjectManifest(
                 ManifestId.generate(),
@@ -184,14 +184,14 @@ class FileSystemStorageConsistencyTest {
                 uploadTrace,
                 policyDecisions(),
                 chunks.size(),
-                chunks.stream().mapToLong(ChunkReferenceDescriptor::originalSize).sum(),
-                chunks.stream().mapToLong(ChunkReferenceDescriptor::storedSize).sum(),
+                chunks.stream().mapToLong(StorageArtifactReferenceDescriptor::originalSize).sum(),
+                chunks.stream().mapToLong(StorageArtifactReferenceDescriptor::storedSize).sum(),
                 chunks);
     }
 
-    private ChunkReferenceDescriptor chunk(String uuid, long size, String nodeId) {
+    private StorageArtifactReferenceDescriptor chunk(String uuid, long size, String nodeId) {
         ContentHash hash = ContentHash.of(ChecksumAlgorithm.SHA256, "hash-" + uuid.substring(0, 8));
-        return new ChunkReferenceDescriptor(
+        return new StorageArtifactReferenceDescriptor(
                 ChunkId.of(java.util.UUID.fromString(uuid)),
                 Fingerprint.of(FingerprintAlgorithm.SHA256, "fp-" + uuid.substring(0, 8)),
                 size,

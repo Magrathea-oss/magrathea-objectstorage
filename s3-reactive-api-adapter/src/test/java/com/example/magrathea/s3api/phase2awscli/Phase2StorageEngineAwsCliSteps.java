@@ -486,10 +486,10 @@ public class Phase2StorageEngineAwsCliSteps {
         Path manifestPath = state.storageRoot.resolve("metadata/manifests/" + manifestId + ".properties");
         assertTrue(Files.exists(manifestPath), "manifest should exist: " + manifestPath);
         Properties manifest = loadProperties(manifestPath);
-        int chunkCount = Integer.parseInt(manifest.getProperty("chunkCount", "0"));
+        int chunkCount = manifestArtifactCount(manifest);
         List<Path> chunks = new ArrayList<>();
         for (int i = 0; i < chunkCount; i++) {
-            String chunkId = manifest.getProperty("chunk." + i + ".chunkId");
+            String chunkId = manifestArtifactId(manifest, i);
             if (chunkId != null) {
                 chunks.addAll(chunkFilesById(chunkId));
             }
@@ -632,6 +632,22 @@ public class Phase2StorageEngineAwsCliSteps {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    private static int manifestArtifactCount(Properties manifest) {
+        return Integer.parseInt(manifest.getProperty(
+            "artifactCount", manifest.getProperty("chunkCount", "0")));
+    }
+
+    private static String manifestArtifactPrefix(Properties manifest, int ordinal) {
+        return manifest.containsKey("artifactCount")
+            ? "artifact." + ordinal + "."
+            : "chunk." + ordinal + ".";
+    }
+
+    private static String manifestArtifactId(Properties manifest, int ordinal) {
+        String prefix = manifestArtifactPrefix(manifest, ordinal);
+        return manifest.getProperty(prefix + (manifest.containsKey("artifactCount") ? "artifactId" : "chunkId"));
     }
 
     private static Properties loadProperties(Path path) {

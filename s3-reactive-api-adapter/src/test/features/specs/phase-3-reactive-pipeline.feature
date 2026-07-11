@@ -98,8 +98,20 @@ Ability: Phase 3 staged reactive read and write pipeline
       And no dedup content-address entry, EC shard, or multipart part is created
       And exact streamed readback matches the 8 MiB fixture
 
+    @REQ-PIPELINE-014 @functional-requirement @non-functional-requirement @storage-layout @schema-migration @pipeline-unit-required @pipeline-unit @implemented-and-validated
+    Scenario: Plain manifest uses a versioned typed whole-object artifact reference
+      Given validation mode "pipeline-unit" is selected for requirement "REQ-PIPELINE-014"
+      And the storage engine operator uses filesystem root "target/storage-engine-it/REQ-PIPELINE-014-typed-manifest"
+      And bucket "plain-storage-unit-bucket" exists
+      And storage class "PLAIN" disables multipart, deduplication, and erasure coding
+      And fixture file "target/test-fixtures/pipeline/plain-object-8m.bin" is a deterministic 8 MiB object
+      When the pipeline unit runner uploads the plain fixture to key "pipeline/2026/plain/typed-manifest.bin"
+      Then the committed manifest uses schema version 2 and typed artifact properties
+      And the manifest references one artifact of kind "WHOLE_OBJECT" and zero chunk properties
+      And the typed manifest remains readable through the production read path
+
     @REQ-PIPELINE-014 @functional-requirement @non-functional-requirement @storage-layout @pipeline-unit-required @webclient-required @not-implemented
-    Scenario Outline: Plain manifest and filesystem layout use explicit whole-object artifact terminology
+    Scenario Outline: Plain filesystem layout uses an explicit whole-object namespace
       Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
       And the storage engine operator uses filesystem root "<storage_root>"
       And bucket "plain-storage-unit-bucket" exists

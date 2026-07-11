@@ -86,9 +86,9 @@ class ReactiveStorageOrchestratorTest {
         StoredObject stored = fixture.orchestrator.store(command("bucket", "multi", data.length), body(data)).block();
 
         ObjectManifest manifest = fixture.manifestRepository.savedById.get(stored.manifestId());
-        assertThat(manifest.chunks()).extracting(ChunkReferenceDescriptor::originalSize)
+        assertThat(manifest.chunks()).extracting(StorageArtifactReferenceDescriptor::originalSize)
                 .containsExactly(4096L, 4096L, 808L);
-        assertThat(manifest.chunks()).extracting(ChunkReferenceDescriptor::chunkId).doesNotHaveDuplicates();
+        assertThat(manifest.chunks()).extracting(StorageArtifactReferenceDescriptor::chunkId).doesNotHaveDuplicates();
 
         StepVerifier.create(fixture.orchestrator.read(stored.manifestId()).reduce(this::concat))
                 .assertNext(actual -> assertThat(actual).isEqualTo(data))
@@ -198,7 +198,7 @@ class ReactiveStorageOrchestratorTest {
                     ObjectManifest manifest = fixture.manifestRepository.savedById.get(stored.manifestId());
                     assertThat(manifest.chunkCount()).isEqualTo(sourceBuffers.size());
                     assertThat(manifest.totalOriginalSize()).isEqualTo(data.length);
-                    assertThat(manifest.chunks()).extracting(ChunkReferenceDescriptor::originalSize)
+                    assertThat(manifest.chunks()).extracting(StorageArtifactReferenceDescriptor::originalSize)
                             .containsExactly(sourceBuffers.stream().map(chunk -> (long) chunk.length).toArray(Long[]::new));
                     assertThat(gatedChunkStore.storedData.values())
                             .allSatisfy(storedChunk -> assertThat(storedChunk).hasSizeLessThanOrEqualTo(chunkSize));
@@ -229,7 +229,7 @@ class ReactiveStorageOrchestratorTest {
         assertThat(successfulStageNames(fixture.events.events(), "READ"))
                 .containsExactly("validation", "policy-resolution", "read-planning", "chunk-reading", "response-streaming");
         assertThat(fixture.chunkStore.readOrder)
-                .containsExactlyElementsOf(manifest.chunks().stream().map(ChunkReferenceDescriptor::chunkId).toList());
+                .containsExactlyElementsOf(manifest.chunks().stream().map(StorageArtifactReferenceDescriptor::chunkId).toList());
     }
 
     @Test
@@ -506,17 +506,17 @@ class ReactiveStorageOrchestratorTest {
 
 
     private static final class InMemoryContentAddressIndex implements ContentAddressIndex {
-        private final Map<String, ChunkReferenceDescriptor> index = new ConcurrentHashMap<>();
+        private final Map<String, StorageArtifactReferenceDescriptor> index = new ConcurrentHashMap<>();
 
         @Override
-        public Mono<Optional<ChunkReferenceDescriptor>> find(DeviceConfigurationHash deviceHash, Fingerprint fingerprint) {
+        public Mono<Optional<StorageArtifactReferenceDescriptor>> find(DeviceConfigurationHash deviceHash, Fingerprint fingerprint) {
             return Mono.just(Optional.ofNullable(index.get(key(deviceHash, fingerprint))));
         }
 
         @Override
         public Mono<Void> record(DeviceConfigurationHash deviceHash, Fingerprint fingerprint, ChunkId chunkId) {
             ContentHash hash = ContentHash.of(ChecksumAlgorithm.SHA256, fingerprint.value());
-            index.putIfAbsent(key(deviceHash, fingerprint), new ChunkReferenceDescriptor(
+            index.putIfAbsent(key(deviceHash, fingerprint), new StorageArtifactReferenceDescriptor(
                     chunkId, fingerprint, 0, 0, List.of(), hash, List.of(NodeId.of("node-1"))));
             return Mono.empty();
         }

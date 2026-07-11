@@ -14,7 +14,7 @@ import com.example.magrathea.storageengine.domain.valueobject.BucketId;
 import com.example.magrathea.storageengine.domain.valueobject.BucketRef;
 import com.example.magrathea.storageengine.domain.valueobject.ChecksumAlgorithm;
 import com.example.magrathea.storageengine.domain.valueobject.ChunkId;
-import com.example.magrathea.storageengine.domain.valueobject.ChunkReferenceDescriptor;
+import com.example.magrathea.storageengine.domain.valueobject.StorageArtifactReferenceDescriptor;
 import com.example.magrathea.storageengine.domain.valueobject.ContentHash;
 import com.example.magrathea.storageengine.domain.valueobject.DeviceConfigurationHash;
 import com.example.magrathea.storageengine.domain.valueobject.EffectiveStoragePolicy;
@@ -108,10 +108,24 @@ public class PhaseEp5StorageMigrationSteps {
         assertThat(restored.manifestId()).isEqualTo(manifest.manifestId());
     }
 
+    @Then("the repository can read the previous chunk-only manifest schema version {string}")
+    public void repositoryCanReadPreviousChunkSchema(String version) throws IOException {
+        assertThat(version).isEqualTo("1");
+        String schemaOneContent = withRecomputedChecksum(toChunkSchemaOne(committedContent));
+        Files.writeString(manifestFile, schemaOneContent);
+
+        ObjectManifest restored = repository.findBy(manifest.manifestId()).block();
+
+        assertThat(restored).isNotNull();
+        assertThat(restored.artifacts()).singleElement()
+            .satisfies(artifact -> assertThat(artifact.artifactKind().name()).isEqualTo("LEGACY_CHUNK"));
+    }
+
     @Then("the repository can read a legacy manifest that omits the schema version as compatibility version {string}")
     public void repositoryCanReadLegacyManifestThatOmitsSchemaVersion(String compatibilityVersion) throws IOException {
         assertThat(compatibilityVersion).isEqualTo("0");
-        String legacyContent = withRecomputedChecksum(removeSchemaVersion(committedContent));
+        String schemaOneContent = withRecomputedChecksum(toChunkSchemaOne(committedContent));
+        String legacyContent = withRecomputedChecksum(removeSchemaVersion(schemaOneContent));
         Files.writeString(manifestFile, legacyContent);
 
         ObjectManifest restored = repository.findBy(manifest.manifestId()).block();
@@ -400,6 +414,23 @@ public class PhaseEp5StorageMigrationSteps {
             .encodeToString(value.getBytes(StandardCharsets.UTF_8));
     }
 
+    private static String toChunkSchemaOne(String content) {
+        String data = contentWithoutChecksum(content);
+        StringBuilder builder = new StringBuilder();
+        for (String line : data.split("\\n", -1)) {
+            if (line.matches("artifact\\.\\d+\\.kind=.*")) {
+                continue;
+            }
+            String migrated = line
+                .replace("manifest.schemaVersion=2", "manifest.schemaVersion=1")
+                .replace("artifactCount=", "chunkCount=")
+                .replaceFirst("^artifact\\.(\\d+)\\.artifactId=", "chunk.$1.chunkId=")
+                .replaceFirst("^artifact\\.(\\d+)\\.", "chunk.$1.");
+            builder.append(migrated).append('\n');
+        }
+        return normalizeSingleTrailingNewline(builder.toString());
+    }
+
     private static String removeSchemaVersion(String content) {
         String data = contentWithoutChecksum(content);
         StringBuilder builder = new StringBuilder();
@@ -454,7 +485,7 @@ public class PhaseEp5StorageMigrationSteps {
         DeviceConfigurationHash deviceHash = DeviceConfigurationHash.of("ep5-schema-device-hash");
 
         ContentHash contentHash = ContentHash.of(ChecksumAlgorithm.SHA256, "ep5-schema-content-hash");
-        ChunkReferenceDescriptor chunk = new ChunkReferenceDescriptor(
+        StorageArtifactReferenceDescriptor chunk = new StorageArtifactReferenceDescriptor(
             ChunkId.generate(),
             Fingerprint.of(FingerprintAlgorithm.SHA256, "ep5-schema-fingerprint"),
             64L,

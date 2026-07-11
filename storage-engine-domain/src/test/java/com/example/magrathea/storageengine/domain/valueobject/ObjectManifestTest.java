@@ -10,7 +10,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Unit tests for {@link ObjectManifest} and {@link ChunkReferenceDescriptor}.
+ * Unit tests for {@link ObjectManifest} and {@link StorageArtifactReferenceDescriptor}.
  * Covers chunk reference correctness, collection immutability, and
  * construction invariants.
  * Pure JUnit 5 — no Spring, no Mockito, no reactive imports.
@@ -66,7 +66,7 @@ class ObjectManifestTest {
 
     @Test
     void manifest_withOneChunk_storesAndReturnsIt() {
-        ChunkReferenceDescriptor chunk = aChunk();
+        StorageArtifactReferenceDescriptor chunk = aChunk();
         ObjectManifest manifest = buildManifest(1, List.of(chunk));
 
         assertEquals(1, manifest.chunkCount());
@@ -76,9 +76,9 @@ class ObjectManifestTest {
 
     @Test
     void manifest_withThreeChunks_storesAllInOrder() {
-        ChunkReferenceDescriptor c1 = aChunk();
-        ChunkReferenceDescriptor c2 = aChunk();
-        ChunkReferenceDescriptor c3 = aChunk();
+        StorageArtifactReferenceDescriptor c1 = aChunk();
+        StorageArtifactReferenceDescriptor c2 = aChunk();
+        StorageArtifactReferenceDescriptor c3 = aChunk();
         ObjectManifest manifest = buildManifest(3, List.of(c1, c2, c3));
 
         assertEquals(3, manifest.chunkCount());
@@ -93,7 +93,7 @@ class ObjectManifestTest {
 
     @Test
     void manifest_chunks_returnedListIsImmutable() {
-        ChunkReferenceDescriptor chunk = aChunk();
+        StorageArtifactReferenceDescriptor chunk = aChunk();
         ObjectManifest manifest = buildManifest(1, List.of(chunk));
 
         // Mutations to the returned list must not affect the manifest's internal state.
@@ -104,7 +104,7 @@ class ObjectManifestTest {
 
     @Test
     void manifest_passedMutableList_changesDoNotAffectManifest() {
-        List<ChunkReferenceDescriptor> mutable = new ArrayList<>();
+        List<StorageArtifactReferenceDescriptor> mutable = new ArrayList<>();
         mutable.add(aChunk());
         ObjectManifest manifest = buildManifest(1, mutable);
 
@@ -118,14 +118,14 @@ class ObjectManifestTest {
     }
 
     // -------------------------------------------------------------------------
-    // Collection immutability — ChunkReferenceDescriptor
+    // Collection immutability — StorageArtifactReferenceDescriptor
     // -------------------------------------------------------------------------
 
     @Test
     void chunkDescriptor_stepChecksums_isImmutable() {
         List<StepChecksumDescriptor> mutableChecksums = new ArrayList<>();
         mutableChecksums.add(aStepChecksum());
-        ChunkReferenceDescriptor descriptor = ChunkReferenceDescriptor(mutableChecksums, List.of());
+        StorageArtifactReferenceDescriptor descriptor = StorageArtifactReferenceDescriptor(mutableChecksums, List.of());
 
         assertThrows(UnsupportedOperationException.class, () ->
                 descriptor.stepChecksums().add(aStepChecksum()),
@@ -136,7 +136,7 @@ class ObjectManifestTest {
     void chunkDescriptor_locations_isImmutable() {
         List<NodeId> mutableLocations = new ArrayList<>();
         mutableLocations.add(NodeId.of("node-1"));
-        ChunkReferenceDescriptor descriptor = ChunkReferenceDescriptor(List.of(), mutableLocations);
+        StorageArtifactReferenceDescriptor descriptor = StorageArtifactReferenceDescriptor(List.of(), mutableLocations);
 
         assertThrows(UnsupportedOperationException.class, () ->
                 descriptor.locations().add(NodeId.of("node-extra")),
@@ -150,7 +150,7 @@ class ObjectManifestTest {
         List<NodeId> mutableLocations = new ArrayList<>();
         mutableLocations.add(NodeId.of("node-1"));
 
-        ChunkReferenceDescriptor descriptor = ChunkReferenceDescriptor(mutableChecksums, mutableLocations);
+        StorageArtifactReferenceDescriptor descriptor = StorageArtifactReferenceDescriptor(mutableChecksums, mutableLocations);
 
         // Mutate original lists after construction
         mutableChecksums.add(aStepChecksum());
@@ -165,7 +165,7 @@ class ObjectManifestTest {
     @Test
     void chunkDescriptor_nullStepChecksums_throwsNullPointerException() {
         assertThrows(NullPointerException.class, () ->
-                new com.example.magrathea.storageengine.domain.valueobject.ChunkReferenceDescriptor(
+                new com.example.magrathea.storageengine.domain.valueobject.StorageArtifactReferenceDescriptor(
                         ChunkId.generate(),
                         Fingerprint.of(FingerprintAlgorithm.SHA256, "abc123"),
                         1024L, 800L,
@@ -178,7 +178,7 @@ class ObjectManifestTest {
     // Helpers
     // -------------------------------------------------------------------------
 
-    private static ObjectManifest buildManifest(int chunkCount, List<ChunkReferenceDescriptor> chunks) {
+    private static ObjectManifest buildManifest(int chunkCount, List<StorageArtifactReferenceDescriptor> chunks) {
         return new ObjectManifest(
                 ManifestId.generate(),
                 ObjectId.of("obj-manifest-test"),
@@ -196,8 +196,8 @@ class ObjectManifestTest {
                 chunks);
     }
 
-    private static ChunkReferenceDescriptor aChunk() {
-        return new ChunkReferenceDescriptor(
+    private static StorageArtifactReferenceDescriptor aChunk() {
+        return new StorageArtifactReferenceDescriptor(
                 ChunkId.generate(),
                 Fingerprint.of(FingerprintAlgorithm.SHA256, "fp-" + System.nanoTime()),
                 4096L, 3000L,
@@ -206,11 +206,11 @@ class ObjectManifestTest {
                 List.of(NodeId.of("node-1")));
     }
 
-    /** Helper using positional factory to build ChunkReferenceDescriptor with custom lists. */
-    private static ChunkReferenceDescriptor ChunkReferenceDescriptor(
+    /** Helper using positional factory to build StorageArtifactReferenceDescriptor with custom lists. */
+    private static StorageArtifactReferenceDescriptor StorageArtifactReferenceDescriptor(
             List<StepChecksumDescriptor> stepChecksums,
             List<NodeId> locations) {
-        return new com.example.magrathea.storageengine.domain.valueobject.ChunkReferenceDescriptor(
+        return new com.example.magrathea.storageengine.domain.valueobject.StorageArtifactReferenceDescriptor(
                 ChunkId.generate(),
                 Fingerprint.of(FingerprintAlgorithm.SHA256, "fp-abc"),
                 4096L, 3000L,

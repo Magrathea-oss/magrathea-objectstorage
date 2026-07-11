@@ -230,12 +230,12 @@ public class Phase3ReactivePipelineSteps {
     @Then("every committed manifest chunk reference uses a canonical UUID filename with a matching SHA-256 sidecar readable by the canonical filesystem node")
     public void committedChunksUseCanonicalFilesystemLayout() {
         Properties manifest = loadProperties(onlyFile(state.storageRoot.resolve("metadata/manifests"), ".properties"));
-        int chunkCount = Integer.parseInt(manifest.getProperty("chunkCount"));
+        int chunkCount = manifestArtifactCount(manifest);
         assertTrue(chunkCount > 0, "committed manifest must reference at least one chunk");
         FileSystemStorageNode node = new FileSystemStorageNode(
                 state.storageRoot.resolve("nodes/node-001"), NodeId.of("node-001"));
         for (int ordinal = 0; ordinal < chunkCount; ordinal++) {
-            UUID reference = UUID.fromString(manifest.getProperty("chunk." + ordinal + ".chunkId"));
+            UUID reference = UUID.fromString(manifestArtifactId(manifest, ordinal));
             Path data = state.storageRoot.resolve("nodes/node-001/chunks").resolve(reference.toString());
             Path sidecar = data.resolveSibling(data.getFileName() + ".sha256");
             assertTrue(Files.isRegularFile(data), "missing canonical chunk " + data);
@@ -329,12 +329,12 @@ public class Phase3ReactivePipelineSteps {
     @Then("chunking emits ordered chunks no larger than the configured chunk size")
     public void chunkingEmitsOrderedChunksNoLargerThanConfiguredChunkSize() {
         Properties manifest = largeObjectManifest();
-        int chunkCount = Integer.parseInt(manifest.getProperty("chunkCount"));
+        int chunkCount = manifestArtifactCount(manifest);
         assertEquals(LARGE_OBJECT_SIZE / configuredChunkSizeBytes, chunkCount);
         for (int ordinal = 0; ordinal < chunkCount; ordinal++) {
-            assertTrue(Long.parseLong(manifest.getProperty("chunk." + ordinal + ".originalSize"))
+            assertTrue(Long.parseLong(manifest.getProperty(manifestArtifactPrefix(manifest, ordinal) + "originalSize"))
                     <= configuredChunkSizeBytes);
-            UUID.fromString(manifest.getProperty("chunk." + ordinal + ".chunkId"));
+            UUID.fromString(manifestArtifactId(manifest, ordinal));
         }
     }
 
@@ -365,12 +365,12 @@ public class Phase3ReactivePipelineSteps {
     @Then("the committed manifest references all chunks in write order with the correct total object length")
     public void committedManifestReferencesAllChunksInWriteOrder() {
         Properties manifest = largeObjectManifest();
-        int chunkCount = Integer.parseInt(manifest.getProperty("chunkCount"));
+        int chunkCount = manifestArtifactCount(manifest);
         long totalLength = 0;
         List<String> orderedChunkIds = new ArrayList<>();
         for (int ordinal = 0; ordinal < chunkCount; ordinal++) {
-            totalLength += Long.parseLong(manifest.getProperty("chunk." + ordinal + ".originalSize"));
-            orderedChunkIds.add(manifest.getProperty("chunk." + ordinal + ".chunkId"));
+            totalLength += Long.parseLong(manifest.getProperty(manifestArtifactPrefix(manifest, ordinal) + "originalSize"));
+            orderedChunkIds.add(manifestArtifactId(manifest, ordinal));
         }
         assertEquals(LARGE_OBJECT_SIZE, totalLength);
         assertEquals(chunkCount, orderedChunkIds.stream().distinct().count());
@@ -446,12 +446,12 @@ public class Phase3ReactivePipelineSteps {
         } catch (IOException error) {
             throw new UncheckedIOException(error);
         }
-        int count = Integer.parseInt(properties.getProperty("chunkCount"));
+        int count = manifestArtifactCount(properties);
         assertTrue(count > 1, "committed manifest must contain multiple ordered chunks");
         List<String> ids = new ArrayList<>();
         for (int ordinal = 0; ordinal < count; ordinal++) {
-            String prefix = "chunk." + ordinal + ".";
-            ids.add(properties.getProperty(prefix + "chunkId"));
+            String prefix = manifestArtifactPrefix(properties, ordinal);
+            ids.add(manifestArtifactId(properties, ordinal));
             assertNotNull(properties.getProperty(prefix + "finalChecksum.algorithm"));
             assertFalse(properties.getProperty(prefix + "finalChecksum.value").isBlank());
         }
@@ -832,6 +832,22 @@ public class Phase3ReactivePipelineSteps {
     private static List<String> requiredWriteOrder() {
         return List.of("validation", "policy-resolution", "chunking", "dedup-lookup", "chunk-persistence",
             "manifest-persistence", "object-index-persistence");
+    }
+
+    private static int manifestArtifactCount(Properties manifest) {
+        return Integer.parseInt(manifest.getProperty(
+            "artifactCount", manifest.getProperty("chunkCount", "0")));
+    }
+
+    private static String manifestArtifactPrefix(Properties manifest, int ordinal) {
+        return manifest.containsKey("artifactCount")
+            ? "artifact." + ordinal + "."
+            : "chunk." + ordinal + ".";
+    }
+
+    private static String manifestArtifactId(Properties manifest, int ordinal) {
+        String prefix = manifestArtifactPrefix(manifest, ordinal);
+        return manifest.getProperty(prefix + (manifest.containsKey("artifactCount") ? "artifactId" : "chunkId"));
     }
 
     private static Properties loadProperties(Path path) {
