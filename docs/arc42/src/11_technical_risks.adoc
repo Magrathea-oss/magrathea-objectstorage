@@ -22,10 +22,10 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |Ongoing (S3 API Semantic Completion Plan, `PLAN.md`)
 
 |3
-|**Streaming completeness gap** — known full-body/full-part aggregation defects have been removed from PutObject, GetObject, UploadPart, UploadPartCopy, and multipart part-store paths, but runtime/backpressure evidence for large staged-pipeline workloads is still incomplete.
-|`OutOfMemoryError` risk remains for unvalidated large staged-pipeline workloads even after removing known full-body/full-part joins
-|Keep Cucumber static architecture coverage for PutObject, GetObject, UploadPart/UploadPartCopy, part-store streaming, final assembly, copied bytes, and XML error semantics; add runtime/backpressure validation for large staged pipeline workloads
-|EP-3 (`@partial` — PutObject/GetObject streaming and multipart semantic assembly/copy/error plus no-join part persistence are validated; broader staged pipeline/runtime backpressure evidence remains open)
+|**Streaming completeness gap** — known full-body/full-part aggregation defects have been removed from PutObject, GetObject, UploadPart, UploadPartCopy, and multipart part-store paths. Pipeline-unit/WebTestClient Cucumber now covers selected stage order, canonical UUID/checksum publication, filesystem cleanup, cancellation, and instrumentation; REQ-PIPELINE-013 separately observes upstream request signals capped by a shared four-DataBuffer demand window at existing adapter boundaries. Neither slice proves the unimplemented REQ-PIPELINE-002 large end-to-end memory contract.
+|`OutOfMemoryError` risk is reduced at the validated adapter boundaries but remains for unvalidated large staged-pipeline workloads; client-driven HTTP cancellation remains unvalidated, and deterministic pre-response integrity checking currently adds a second filesystem read with unvalidated first-byte latency impact
+|Keep Cucumber static architecture, staged pipeline-unit/WebTestClient, and finite-demand runtime coverage; implement REQ-PIPELINE-002, add large end-to-end staged-pipeline memory plus client-driven cancellation validation, and benchmark or redesign the integrity-preflight latency trade-off
+|EP-3 (`@partial` — selected staged lifecycle/publication/cleanup behavior and finite adapter demand are validated; REQ-PIPELINE-002 and complete large runtime/e2e evidence remain open)
 
 |4
 |**Security must be explicitly enabled** — EP-1 secured mode now proves SigV4, exact payload hashes, deny-by-default, explicit deny, PublicAccessBlock/public ACL denial, expected-owner mismatch, durable redacted tamper-evident audit, durable credentials/policies, and SSE-S3 encrypted-at-rest inspection through Spring Security Reactive plus WebTestClient/AWS CLI/component specs. The remaining risk is operational: the default profile is still anonymous/permit-all for trusted environments.

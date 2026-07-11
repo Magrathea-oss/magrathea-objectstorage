@@ -19,7 +19,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 === Summary
 
 * Feature files scanned: 23
-* Scenarios discovered: 405
+* Scenarios discovered: 409
 * Protocol-smoke scenarios: 122
 
 ==== Status tag counts
@@ -29,9 +29,10 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |Tag |Scenario count
 |`@absent` |3
 |`@config-only` |69
-|`@implemented-and-validated` |117
+|`@implemented-and-validated` |121
 |`@implemented-not-e2e-validated` |22
-|`@not-implemented` |12
+|`@not-implemented` |7
+|`@partial` |5
 |`@placeholder` |9
 |`unknown/not-tagged` |178
 |===
@@ -42,17 +43,18 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |===
 |Tag |Scenario count
 |`@awscli-required` |58
-|`@bootstrap-integration-required` |3
+|`@bootstrap-integration-required` |4
 |`@component-spec-required` |9
 |`@filesystem-inspection-required` |1
 |`@full-process-restart-required` |1
 |`@live-monitoring-required` |1
 |`@log-inspection-required` |3
 |`@metrics-inspection-required` |3
-|`@pipeline-unit-required` |9
+|`@pipeline-unit-required` |10
+|`@runtime-backpressure-required` |1
 |`@static-architecture-required` |6
 |`@tracing-inspection-required` |2
-|`@webclient-required` |294
+|`@webclient-required` |295
 |`unknown/not-tagged` |63
 |===
 
@@ -61,8 +63,8 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 [cols="1,1",options="header"]
 |===
 |Tag |Scenario count
-|`@functional-requirement` |184
-|`@non-functional-requirement` |101
+|`@functional-requirement` |187
+|`@non-functional-requirement` |105
 |`unknown/not-tagged` |202
 |===
 
@@ -10727,12 +10729,14 @@ and all quarantined or removed artifacts are no longer accessible through the S3
   And a valid committed object exists in bucket "<bucket>" at key "<object_key>" uploaded from fixture file "<fixture_file>"
   And the committed object is readable through the S3 HTTP GetObject API and returns the exact bytes from fixture file "<fixture_file>" before the scanner runs
   And orphaned chunk files from a failed upload exist in the chunk directory of filesystem root "<storage_root>" with no committed manifest referencing them
+  And a final checksum sidecar without its corresponding committed chunk exists in filesystem root "<storage_root>"
   And an incomplete manifest with at least one missing required field exists in the manifest directory of filesystem root "<storage_root>"
   And a broken object reference pointing to an absent manifest exists in the object reference directory of filesystem root "<storage_root>"
   And a committed chunk file with a corrupted checksum mismatch exists in filesystem root "<storage_root>"
   When the recovery scanner is triggered for filesystem root "<storage_root>"
   Then the scanner report lists at least "<minimum_finding_count>" findings
   And the scanner report includes the orphaned chunk artifact paths with artifact type "orphaned-chunk" and a descriptive failure reason
+  And the scanner report includes the checksum sidecar without committed chunk with artifact type "orphaned-chunk" and a descriptive failure reason
   And the scanner report includes the incomplete manifest artifact path with artifact type "incomplete-manifest" and a descriptive failure reason
   And the scanner report includes the broken object reference artifact path with artifact type "broken-reference" and a descriptive failure reason
   And the scanner report includes the corrupted chunk artifact path with artifact type "checksum-mismatch" and a descriptive failure reason
@@ -10748,7 +10752,7 @@ and all quarantined or removed artifacts are no longer accessible through the S3
 [cols="1,1,1,1,1,1,1",options="header"]
 |===
 | requirement_id | validation_mode | bucket | object_key | fixture_file | storage_root | minimum_finding_count
-| REQ-FS-005 | webclient | fs-recovery-bucket | recovery/2026/scan/orphaned-object.bin | fixtures/upload/small-object.txt | target/storage-engine-it/REQ-FS-005-webclient | 4
+| REQ-FS-005 | webclient | fs-recovery-bucket | recovery/2026/scan/orphaned-object.bin | fixtures/upload/small-object.txt | target/storage-engine-it/REQ-FS-005-webclient | 5
 |===
 
 ===== REQ-FS-006
@@ -10758,7 +10762,7 @@ and all quarantined or removed artifacts are no longer accessible through the S3
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-2-filesystem-reliability.feature:248`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-2-filesystem-reliability.feature:250`
 |Rule |Concurrent PUT requests for different keys are fully isolated; concurrent PUT requests for the same key produce exactly one clean committed winner
 |Requirement ID(s) |`REQ-FS-006`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -10817,7 +10821,7 @@ without mixing bytes from multiple concurrent uploads.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-2-filesystem-reliability.feature:274`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-2-filesystem-reliability.feature:276`
 |Rule |Concurrent PUT requests for different keys are fully isolated; concurrent PUT requests for the same key produce exactly one clean committed winner
 |Requirement ID(s) |`REQ-FS-006`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -10891,11 +10895,11 @@ StorageContext, and StorageEvent. StorageContext carries request identity, objec
 metadata, policy decisions, chunking decisions, resource handles, and cleanup state
 between stages. StorageEvent records stage start, success, failure, retry, cleanup,
 cancellation, and timing without carrying object payload bytes.
-Until the Stage 3 abstractions, staged pipelines, and runner glue are implemented,
-scenarios that require runtime StorageStage/StorageContext/StorageEvent evidence remain
-marked not-implemented. Static architecture scenarios may be promoted independently when they
-validate code-level streaming constraints without a full pipeline-unit runner. Keep every
-requirement ID with the REQ-PIPELINE-* prefix unchanged when scenarios become executable.
+Pipeline-unit scenarios may be promoted independently when production
+StorageStage/StorageContext/StorageEvent behavior is executable through a focused runner.
+End-to-end promotion additionally requires WebTestClient evidence that the storage-engine
+S3 adapter delegates through the same staged pipeline and publishes committed artifacts.
+Keep every requirement ID with the REQ-PIPELINE-* prefix unchanged when scenarios become executable.
 Validation roles:
 - Pipeline unit runner validates StorageStage ordering, StorageContext evolution,
 backpressure, cancellation, failure propagation, and StorageEvent sequences using
@@ -10957,10 +10961,10 @@ And reactive pipeline event capture is enabled for the selected validation mode
 |Requirement ID(s) |`REQ-PIPELINE-001`
 |Classification |`@functional-requirement`
 |Capability area tags |`@spec`, `@reactive-pipeline`, `@storage-engine`, `@integrity`, `@stage-ordering`
-|Validation mode tags |`@pipeline-unit-required`
-|Declared/validated status |`@not-implemented`
+|Validation mode tags |`@pipeline-unit-required`, `@webclient-required`
+|Declared/validated status |`@implemented-and-validated`
 |Protocol smoke |`no`
-|All tags |`@spec`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@REQ-PIPELINE-001`, `@functional-requirement`, `@integrity`, `@stage-ordering`, `@pipeline-unit-required`, `@not-implemented`
+|All tags |`@spec`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@implemented-and-validated`, `@REQ-PIPELINE-001`, `@functional-requirement`, `@integrity`, `@stage-ordering`, `@pipeline-unit-required`, `@webclient-required`
 |===
 
 .Rule description
@@ -10978,13 +10982,16 @@ have succeeded.
   And the storage engine operator uses filesystem root "<storage_root>"
   And bucket "<bucket>" exists
   And an S3 client has object content from fixture file "<fixture_file>" for bucket "<bucket>" and key "<object_key>"
-  When the pipeline unit runner submits the fixture stream to the staged PutObject pipeline
+  When the selected validation runner submits the fixture stream to the staged PutObject pipeline
   Then the write pipeline is assembled from StorageStage instances named in the required write pipeline stage order
   And a single StorageContext carries bucket "<bucket>", key "<object_key>", request metadata, chunk decisions, manifest identifier, and cleanup handles across those stages
   And StorageEvent records show start and success for the write stages in this exact order:
   And no manifest is committed before chunk-persistence succeeds for every referenced chunk
   And no object reference is committed before manifest-persistence succeeds
-  And after object-index-persistence succeeds, the S3 client can read bucket "<bucket>" and key "<object_key>" and receive the exact bytes from fixture file "<fixture_file>"
+  And content-address entries for new chunks are published only after object-index-persistence commits the owning object
+  And every committed manifest chunk reference uses a canonical UUID filename with a matching SHA-256 sidecar readable by the canonical filesystem node
+  And a recovery scan of filesystem root "<storage_root>" reports no incomplete chunk artifacts after publication
+  And after object-index-persistence succeeds, the selected validation runner reads the committed object through its declared production read entry point and receives the exact bytes from fixture file "<fixture_file>"
 ----
 
 .Examples: Pipeline unit validation `@pipeline-unit`
@@ -10994,6 +11001,13 @@ have succeeded.
 | REQ-PIPELINE-001 | pipeline-unit | pipeline-stage-order-bucket | pipeline/2026/write/stage-order-object.txt | fixtures/upload/small-object.txt | target/storage-engine-it/REQ-PIPELINE-001-unit
 |===
 
+.Examples: WebTestClient end-to-end validation `@webclient`
+[cols="1,1,1,1,1,1",options="header"]
+|===
+| requirement_id | validation_mode | bucket | object_key | fixture_file | storage_root
+| REQ-PIPELINE-001 | webclient | pipeline-stage-order-bucket | pipeline/2026/write/stage-order-object.txt | fixtures/upload/small-object.txt | target/storage-engine-it/REQ-PIPELINE-001-webclient
+|===
+
 ===== REQ-PIPELINE-002
 
 ====== Scenario Outline: Large PutObject persists chunks with bounded demand and without whole-object aggregation
@@ -11001,7 +11015,7 @@ have succeeded.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:120`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:128`
 |Rule |Write chunk persistence preserves backpressure and bounded memory
 |Requirement ID(s) |`REQ-PIPELINE-002`
 |Classification |`@non-functional-requirement`
@@ -11059,7 +11073,7 @@ array assembly over the complete object body in production object-content paths.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:155`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:163`
 |Rule |Upload ETag computation and dedup windowing preserve streaming request-body paths
 |Requirement ID(s) |`REQ-PIPELINE-007`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -11101,7 +11115,7 @@ materializing the complete FileUnit.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:167`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:175`
 |Rule |Upload ETag computation and dedup windowing preserve streaming request-body paths
 |Requirement ID(s) |`REQ-PIPELINE-008`
 |Classification |`@non-functional-requirement`
@@ -11142,7 +11156,7 @@ materializing the complete FileUnit.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:184`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:192`
 |Rule |Read objects stream chunks in manifest order without aggregating the object
 |Requirement ID(s) |`REQ-PIPELINE-009`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -11168,7 +11182,7 @@ before response streaming begins.
   And production source path "s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/adapter/web/S3ObjectOperationsHandler.java" implements the S3 GetObject route
   When the static architecture runner inspects method "getObject" in the production source path
   Then method "getObject" does not collect object content before a non-range response
-  And method "getObject" passes "oc.content()" directly to "S3ResponseBuilder.okWithBody"
+  And method "getObject" passes "oc.content()" through the shared finite-demand boundary to "S3ResponseBuilder.okWithBody"
   And range handling streams through the explicit Range header branch
 ----
 
@@ -11179,7 +11193,7 @@ before response streaming begins.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:193`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:201`
 |Rule |Read objects stream chunks in manifest order without aggregating the object
 |Requirement ID(s) |`REQ-PIPELINE-010`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -11208,9 +11222,107 @@ before response streaming begins.
   And method "getObject" passes "oc.content()" directly to range helper "serveRange"
   When the static architecture runner inspects the production source path
   Then helper "serveRange" accepts streaming content as "Flux<DataBuffer> content" instead of a collected buffer list
-  And helper "serveRange" attaches "sliceRange(content, start, effectiveEnd)" to "BodyInserters.fromDataBuffers"
-  And helper "sliceRange" emits per-buffer range slices without building a full-object array
+  And helper "serveRange" attaches "S3StreamingBody.sliceRange(content, start, effectiveEnd)" to "BodyInserters.fromDataBuffers"
+  And shared helper "S3StreamingBody.sliceRange" emits finite-demand per-buffer range slices without building a full-object array
 ----
+
+===== REQ-PIPELINE-003
+
+====== Scenario Outline: Pipeline-unit GetObject streams manifest-ordered chunks under controlled demand
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:213`
+|Rule |Read objects stream chunks in manifest order without aggregating the object
+|Requirement ID(s) |`REQ-PIPELINE-003`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@spec`, `@reactive-pipeline`, `@storage-engine`, `@streaming`, `@backpressure`, `@integrity`
+|Validation mode tags |`@pipeline-unit-required`
+|Declared/validated status |`@partial`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@partial`, `@REQ-PIPELINE-003`, `@functional-requirement`, `@non-functional-requirement`, `@streaming`, `@backpressure`, `@integrity`, `@pipeline-unit-required`
+|===
+
+.Rule description
+----
+GetObject MUST use a staged read pipeline that loads the object reference and manifest,
+verifies read preconditions, reads chunks in manifest order, and streams them to the
+S3 response according to subscriber demand. The read path MUST NOT collect all chunks
+before response streaming begins.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
+  And the storage engine operator uses filesystem root "<storage_root>"
+  And bucket "<bucket>" exists
+  And a committed object exists in bucket "<bucket>" at key "<object_key>" uploaded from fixture file "<fixture_file>"
+  And the committed manifest lists multiple chunks with stable ordinal positions and checksums
+  When the selected validation runner reads bucket "<bucket>" and key "<object_key>" through the staged GetObject pipeline
+  Then StorageEvent records show start and success for the read stages in this exact order:
+  And chunk-reading emits chunks in the same ordinal order recorded in the committed manifest
+  And response-streaming begins after the first verified chunk is available, without waiting for every chunk to be read
+  And downstream response demand controls how many chunks are read ahead
+  And production read stages do not perform a global reduce, collectList, or whole-object byte-array assembly over the object content
+  And the streamed S3 response bytes exactly match fixture file "<fixture_file>"
+----
+
+.Examples: Pipeline unit validation `@pipeline-unit`
+[cols="1,1,1,1,1,1",options="header"]
+|===
+| requirement_id | validation_mode | bucket | object_key | fixture_file | storage_root
+| REQ-PIPELINE-003 | pipeline-unit | pipeline-read-order-bucket | pipeline/2026/read/manifest-ordered-object.bin | target/test-fixtures/pipeline/large-object-256m.bin | target/storage-engine-it/REQ-PIPELINE-003-unit
+|===
+
+====== Scenario Outline: WebTestClient GetObject preserves exact bytes and deterministic integrity preflight
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:246`
+|Rule |HTTP read integrity preflight preserves deterministic S3 errors
+|Requirement ID(s) |`REQ-PIPELINE-003`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@spec`, `@reactive-pipeline`, `@storage-engine`, `@streaming`, `@integrity`
+|Validation mode tags |`@webclient-required`
+|Declared/validated status |`@partial`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@partial`, `@REQ-PIPELINE-003`, `@functional-requirement`, `@non-functional-requirement`, `@streaming`, `@integrity`, `@webclient-required`
+|===
+
+.Rule description
+----
+The HTTP adapter additionally preserves REQ-FS-003/004 deterministic S3 XML errors by
+completing a bounded integrity preflight before committing response headers. This preflight
+does not retain object bytes, but it reads persisted chunks before opening the separately
+backpressured response stream; therefore WebTestClient evidence does not claim first-byte
+latency or single-pass filesystem I/O.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
+  And the storage engine operator uses filesystem root "<storage_root>"
+  And bucket "<bucket>" exists
+  And a committed object exists in bucket "<bucket>" at key "<object_key>" uploaded from fixture file "<fixture_file>"
+  And the committed manifest lists multiple chunks with stable ordinal positions and checksums
+  When the selected validation runner reads bucket "<bucket>" and key "<object_key>" through the staged GetObject pipeline
+  Then StorageEvent records show start and success for the read stages in this exact order:
+  And chunk-reading emits chunks in the same ordinal order recorded in the committed manifest
+  And the HTTP adapter performs a bounded integrity preflight before response commitment without retaining object bytes
+  And production read stages do not perform a global reduce, collectList, or whole-object byte-array assembly over the object content
+  And the streamed S3 response bytes exactly match fixture file "<fixture_file>"
+----
+
+.Examples: WebTestClient validation `@webclient`
+[cols="1,1,1,1,1,1",options="header"]
+|===
+| requirement_id | validation_mode | bucket | object_key | fixture_file | storage_root
+| REQ-PIPELINE-003 | webclient | pipeline-read-order-bucket | pipeline/2026/read/manifest-ordered-object.bin | target/test-fixtures/pipeline/large-object-256m.bin | target/storage-engine-it/REQ-PIPELINE-003-webclient
+|===
 
 ===== REQ-PIPELINE-011
 
@@ -11219,7 +11331,7 @@ before response streaming begins.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:211`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:277`
 |Rule |Multipart part persistence streams upload and copy inputs without complete-part aggregation
 |Requirement ID(s) |`REQ-PIPELINE-011`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -11259,7 +11371,7 @@ without loading each part file as one byte array.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:223`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:289`
 |Rule |Multipart part persistence streams upload and copy inputs without complete-part aggregation
 |Requirement ID(s) |`REQ-PIPELINE-012`
 |Classification |`@non-functional-requirement`
@@ -11293,62 +11405,45 @@ without loading each part file as one byte array.
   And method "readPart" does not invoke "Files.readAllBytes"
 ----
 
-===== REQ-PIPELINE-003
+===== REQ-PIPELINE-013
 
-====== Scenario Outline: GetObject streams manifest-ordered chunks without collecting the whole object
+====== Scenario: S3 object and multipart streaming boundaries cap upstream DataBuffer demand at runtime
 
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:236`
-|Rule |Multipart part persistence streams upload and copy inputs without complete-part aggregation
-|Requirement ID(s) |`REQ-PIPELINE-003`
-|Classification |`@functional-requirement`, `@non-functional-requirement`
-|Capability area tags |`@spec`, `@reactive-pipeline`, `@storage-engine`, `@streaming`, `@backpressure`, `@integrity`
-|Validation mode tags |`@pipeline-unit-required`, `@webclient-required`
-|Declared/validated status |`@not-implemented`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:308`
+|Rule |Existing S3 streaming boundaries apply a finite runtime demand window
+|Requirement ID(s) |`REQ-PIPELINE-013`
+|Classification |`@non-functional-requirement`
+|Capability area tags |`@spec`, `@reactive-pipeline`, `@storage-engine`, `@streaming`, `@backpressure`, `@bounded-memory`, `@s3-api`, `@multipart`
+|Validation mode tags |`@runtime-backpressure-required`
+|Declared/validated status |`@implemented-and-validated`
 |Protocol smoke |`no`
-|All tags |`@spec`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@REQ-PIPELINE-003`, `@functional-requirement`, `@non-functional-requirement`, `@streaming`, `@backpressure`, `@integrity`, `@pipeline-unit-required`, `@webclient-required`, `@not-implemented`
+|All tags |`@spec`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@implemented-and-validated`, `@REQ-PIPELINE-013`, `@non-functional-requirement`, `@streaming`, `@backpressure`, `@bounded-memory`, `@runtime-backpressure-required`, `@s3-api`, `@multipart`
 |===
 
 .Rule description
 ----
-UploadPart and UploadPartCopy MUST persist part bytes as a stream while computing the
-part ETag and size incrementally. The multipart part store MUST write and read part
-files as DataBuffer streams so CompleteMultipartUpload can concatenate part streams
-without loading each part file as one byte array.
+Before the complete staged StorageStage pipeline is claimed end to end, the existing
+PutObject, GetObject, Range, UploadPart, UploadPartCopy, and multipart part-file
+boundaries MUST apply a shared finite Reactor demand window. Runtime evidence for this
+boundary does not validate stage ordering, manifest publication, or StorageEvent behavior.
 ----
 
 .Gherkin steps
 [source,gherkin]
 ----
-  Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
-  And the storage engine operator uses filesystem root "<storage_root>"
-  And bucket "<bucket>" exists
-  And a committed object exists in bucket "<bucket>" at key "<object_key>" uploaded from fixture file "<fixture_file>"
-  And the committed manifest lists multiple chunks with stable ordinal positions and checksums
-  When the selected validation runner reads bucket "<bucket>" and key "<object_key>" through the staged GetObject pipeline
-  Then StorageEvent records show start and success for the read stages in this exact order:
-  And chunk-reading emits chunks in the same ordinal order recorded in the committed manifest
-  And response-streaming begins after the first verified chunk is available, without waiting for every chunk to be read
-  And downstream response demand controls how many chunks are read ahead
-  And production read stages do not perform a global reduce, collectList, or whole-object byte-array assembly over the object content
-  And the streamed S3 response bytes exactly match fixture file "<fixture_file>"
+  Given validation mode "runtime-backpressure" is selected for requirement "REQ-PIPELINE-013"
+  And a demand-controlled source contains 12 ordered DataBuffers of 65536 bytes
+  When the runtime runner streams the source through each production S3 object body boundary
+  Then PutObject, GetObject, and ranged GetObject retain at most the shared demand-window number of source DataBuffers
+  And each object path emits the expected ordered bytes without whole-body aggregation
+  When the runtime runner saves the source through multipart part storage
+  Then UploadPart and UploadPartCopy retain at most the shared demand-window number of source DataBuffers
+  And multipart part-file reads emit buffers no larger than 65536 bytes and reproduce the expected ordered bytes
+  And this evidence does not claim the complete staged StorageStage pipeline
 ----
-
-.Examples: Pipeline unit validation `@pipeline-unit`
-[cols="1,1,1,1,1,1",options="header"]
-|===
-| requirement_id | validation_mode | bucket | object_key | fixture_file | storage_root
-| REQ-PIPELINE-003 | pipeline-unit | pipeline-read-order-bucket | pipeline/2026/read/manifest-ordered-object.bin | target/test-fixtures/pipeline/large-object-256m.bin | target/storage-engine-it/REQ-PIPELINE-003-unit
-|===
-
-.Examples: WebTestClient validation `@webclient`
-[cols="1,1,1,1,1,1",options="header"]
-|===
-| requirement_id | validation_mode | bucket | object_key | fixture_file | storage_root
-| REQ-PIPELINE-003 | webclient | pipeline-read-order-bucket | pipeline/2026/read/manifest-ordered-object.bin | target/test-fixtures/pipeline/large-object-256m.bin | target/storage-engine-it/REQ-PIPELINE-003-webclient
-|===
 
 ===== REQ-PIPELINE-004
 
@@ -11357,15 +11452,15 @@ without loading each part file as one byte array.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:272`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:325`
 |Rule |Stage failures propagate deterministically and clean up completed resources
 |Requirement ID(s) |`REQ-PIPELINE-004`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
 |Capability area tags |`@spec`, `@reactive-pipeline`, `@storage-engine`, `@integrity`, `@failure-propagation`, `@cleanup`
 |Validation mode tags |`@pipeline-unit-required`, `@webclient-required`
-|Declared/validated status |`@not-implemented`
+|Declared/validated status |`@partial`
 |Protocol smoke |`no`
-|All tags |`@spec`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@REQ-PIPELINE-004`, `@functional-requirement`, `@non-functional-requirement`, `@integrity`, `@failure-propagation`, `@cleanup`, `@pipeline-unit-required`, `@webclient-required`, `@not-implemented`
+|All tags |`@spec`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@REQ-PIPELINE-004`, `@functional-requirement`, `@non-functional-requirement`, `@integrity`, `@failure-propagation`, `@cleanup`, `@pipeline-unit-required`, `@webclient-required`, `@partial`
 |===
 
 .Rule description
@@ -11409,6 +11504,45 @@ a deterministic S3 error without publishing a readable object.
 | REQ-PIPELINE-004 | webclient | chunk-persistence | simulated chunk write fault | pipeline-failure-bucket | pipeline/2026/failure/stage-failure-object.bin | fixtures/upload/corruptible-object.bin | target/storage-engine-it/REQ-PIPELINE-004-webclient
 |===
 
+====== Scenario: Upstream upload failure removes in-progress atomic chunk artifacts
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:353`
+|Rule |Stage failures propagate deterministically and clean up completed resources
+|Requirement ID(s) |`REQ-PIPELINE-004`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@spec`, `@reactive-pipeline`, `@storage-engine`, `@integrity`, `@failure-propagation`, `@cleanup`, `@pipeline-unit`
+|Validation mode tags |`@pipeline-unit-required`
+|Declared/validated status |`@partial`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@REQ-PIPELINE-004`, `@functional-requirement`, `@non-functional-requirement`, `@integrity`, `@failure-propagation`, `@cleanup`, `@pipeline-unit-required`, `@partial`, `@pipeline-unit`
+|===
+
+.Rule description
+----
+When any required write stage fails, the pipeline MUST emit a typed failure event,
+stop later stages, execute cleanup for resources owned by completed stages, and return
+a deterministic S3 error without publishing a readable object.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given validation mode "pipeline-unit" is selected for requirement "REQ-PIPELINE-004"
+  And the storage engine operator uses filesystem root "target/storage-engine-it/REQ-PIPELINE-004-upstream-unit"
+  And bucket "pipeline-upstream-failure-bucket" exists
+  And no object exists in bucket "pipeline-upstream-failure-bucket" for key "pipeline/2026/failure/upstream-body-object.bin"
+  And an upload body emits one DataBuffer and then fails with reason "simulated upstream body failure"
+  When the pipeline unit runner submits the failing upload body to the staged PutObject pipeline
+  Then the pipeline emits exactly one StorageEvent failure for stage "chunk-persistence" with reason "simulated upstream body failure"
+  And no stage after "chunk-persistence" emits a success event for this StorageContext
+  And all temporary files created for the failed write are removed or quarantined in filesystem root "target/storage-engine-it/REQ-PIPELINE-004-upstream-unit"
+  And no committed manifest or object reference is published for bucket "pipeline-upstream-failure-bucket" and key "pipeline/2026/failure/upstream-body-object.bin"
+  And a later S3 GetObject for bucket "pipeline-upstream-failure-bucket" and key "pipeline/2026/failure/upstream-body-object.bin" reports that the object is absent
+----
+
 ===== REQ-PIPELINE-005
 
 ====== Scenario Outline: Cancelled upload releases resources before manifest or object reference publication
@@ -11416,15 +11550,15 @@ a deterministic S3 error without publishing a readable object.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:305`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:372`
 |Rule |Cancellation before publication cleans up pipeline-owned resources
 |Requirement ID(s) |`REQ-PIPELINE-005`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
 |Capability area tags |`@spec`, `@reactive-pipeline`, `@storage-engine`, `@streaming`, `@cancellation`, `@cleanup`
 |Validation mode tags |`@pipeline-unit-required`, `@webclient-required`
-|Declared/validated status |`@not-implemented`
+|Declared/validated status |`@partial`
 |Protocol smoke |`no`
-|All tags |`@spec`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@REQ-PIPELINE-005`, `@functional-requirement`, `@non-functional-requirement`, `@streaming`, `@cancellation`, `@cleanup`, `@pipeline-unit-required`, `@webclient-required`, `@not-implemented`
+|All tags |`@spec`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@REQ-PIPELINE-005`, `@functional-requirement`, `@non-functional-requirement`, `@streaming`, `@cancellation`, `@cleanup`, `@pipeline-unit-required`, `@webclient-required`, `@partial`
 |===
 
 .Rule description
@@ -11445,6 +11579,7 @@ unpublished chunks or temporary files, and leave no readable object behind.
   And the staged PutObject pipeline has persisted at least "<persisted_chunk_count>" unpublished chunks for bucket "<bucket>" and key "<object_key>"
   When the selected validation runner cancels the upload subscription before manifest-persistence starts
   Then the pipeline emits a cancellation StorageEvent for the active StorageContext
+  And cancellation cleanup is owned by the reactive pipeline lifecycle rather than a detached subscription
   And active upstream publishers stop receiving additional demand after cancellation
   And all retained DataBuffer instances and open file handles owned by the cancelled pipeline are released
   And cleanup events remove or quarantine unpublished chunks and temporary files in filesystem root "<storage_root>"
@@ -11460,7 +11595,7 @@ unpublished chunks or temporary files, and leave no readable object behind.
 | REQ-PIPELINE-005 | pipeline-unit | 2 | pipeline-cancellation-bucket | pipeline/2026/cancel/cancelled-object.bin | target/test-fixtures/pipeline/large-object-256m.bin | target/storage-engine-it/REQ-PIPELINE-005-unit
 |===
 
-.Examples: WebTestClient validation `@webclient`
+.Examples: WebTestClient validation `@webclient`, `@not-implemented`
 [cols="1,1,1,1,1,1,1",options="header"]
 |===
 | requirement_id | validation_mode | persisted_chunk_count | bucket | object_key | fixture_file | storage_root
@@ -11474,15 +11609,15 @@ unpublished chunks or temporary files, and leave no readable object behind.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:337`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:405`
 |Rule |Each pipeline stage emits independent typed instrumentation events
 |Requirement ID(s) |`REQ-PIPELINE-006`
 |Classification |`@non-functional-requirement`
 |Capability area tags |`@spec`, `@reactive-pipeline`, `@storage-engine`, `@observability`, `@instrumentation`
 |Validation mode tags |`@pipeline-unit-required`
-|Declared/validated status |`@not-implemented`
+|Declared/validated status |`@implemented-and-validated`
 |Protocol smoke |`no`
-|All tags |`@spec`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@REQ-PIPELINE-006`, `@non-functional-requirement`, `@observability`, `@instrumentation`, `@pipeline-unit-required`, `@not-implemented`
+|All tags |`@spec`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@REQ-PIPELINE-006`, `@non-functional-requirement`, `@observability`, `@instrumentation`, `@pipeline-unit-required`, `@implemented-and-validated`
 |===
 
 .Rule description
@@ -11709,6 +11844,43 @@ and recovery-related failures from the event stream and operational logs.
 | REQ-OBS-002 | webclient | chunk-persistence | storage-io-failure | obs-pipeline-failure-bucket | observability/2026/events/failed-object.bin | fixtures/upload/corruptible-object.bin | target/storage-engine-it/REQ-OBS-002-webclient
 |===
 
+====== Scenario: Corrupted chunk read preflight emits an integrity-classified chunk-reading failure
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-4-observability.feature:144`
+|Rule |Failed pipelines publish classified failures and cleanup observations
+|Requirement ID(s) |`REQ-OBS-002`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@spec`, `@observability`, `@storage-engine`, `@events`, `@failure-classification`, `@integrity`, `@redaction`
+|Validation mode tags |`@bootstrap-integration-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-4`, `@observability`, `@storage-engine`, `@implemented-not-e2e-validated`, `@REQ-OBS-002`, `@functional-requirement`, `@non-functional-requirement`, `@events`, `@failure-classification`, `@integrity`, `@redaction`, `@bootstrap-integration-required`, `@implemented-and-validated`
+|===
+
+.Rule description
+----
+A failed pipeline MUST publish exactly one classified failure for the failed stage,
+publish cleanup events for resources it owns, and suppress sensitive request details.
+Operators must be able to distinguish validation, integrity, storage I/O, cancellation,
+and recovery-related failures from the event stream and operational logs.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given validation mode "bootstrap-integration" is selected for requirement "REQ-OBS-002"
+  And bucket "obs-pipeline-failure-bucket" contains object "observability/2026/events/failed-object.bin" with user metadata "top-secret"
+  And the committed chunk bytes are corrupted outside the running application
+  When an S3 client reads the object with an Authorization header that must be redacted
+  Then the S3 response signals an integrity failure before returning a successful object body
+  And the listener receives a StageFailed event for stage "chunk-reading" with classification "integrity-failure"
+  And metrics, traces, and operational logs record classification "integrity-failure"
+  And events, metrics, traces, and logs contain neither object payload bytes, user metadata values, nor Authorization credentials
+----
+
 ===== REQ-OBS-003
 
 ====== Scenario Outline: Micrometer metrics report storage bytes, chunks, manifests, failures, recovery, deduplication, and latency
@@ -11716,7 +11888,7 @@ and recovery-related failures from the event stream and operational logs.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-4-observability.feature:150`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-4-observability.feature:161`
 |Rule |Metrics expose storage activity, reliability signals, deduplication outcomes, and latency
 |Requirement ID(s) |`REQ-OBS-003`
 |Classification |`@non-functional-requirement`
@@ -11771,7 +11943,7 @@ external monitoring system.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-4-observability.feature:181`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-4-observability.feature:192`
 |Rule |OpenTelemetry spans identify requests and stages using safe attributes
 |Requirement ID(s) |`REQ-OBS-004`
 |Classification |`@non-functional-requirement`
@@ -11823,7 +11995,7 @@ policy and avoiding payload or sensitive metadata leakage.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-4-observability.feature:209`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-4-observability.feature:220`
 |Rule |Recovery and corruption handling produce operational observability signals
 |Requirement ID(s) |`REQ-OBS-005`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -11874,7 +12046,7 @@ or orphaned artifacts were quarantined, left untouched, or require operator acti
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-4-observability.feature:236`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-4-observability.feature:247`
 |Rule |Redaction policy is enforced consistently across all observability channels
 |Requirement ID(s) |`REQ-OBS-006`
 |Classification |`@non-functional-requirement`
