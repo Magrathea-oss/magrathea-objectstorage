@@ -19,7 +19,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 === Summary
 
 * Feature files scanned: 22
-* Scenarios discovered: 403
+* Scenarios discovered: 404
 * Protocol-smoke scenarios: 122
 
 ==== Status tag counts
@@ -29,7 +29,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |Tag |Scenario count
 |`@absent` |3
 |`@config-only` |69
-|`@implemented-and-validated` |115
+|`@implemented-and-validated` |116
 |`@implemented-not-e2e-validated` |22
 |`@not-implemented` |12
 |`@placeholder` |9
@@ -46,6 +46,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |`@component-spec-required` |9
 |`@filesystem-inspection-required` |1
 |`@full-process-restart-required` |1
+|`@live-monitoring-required` |1
 |`@log-inspection-required` |3
 |`@metrics-inspection-required` |3
 |`@pipeline-unit-required` |9
@@ -60,8 +61,8 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 [cols="1,1",options="header"]
 |===
 |Tag |Scenario count
-|`@functional-requirement` |183
-|`@non-functional-requirement` |99
+|`@functional-requirement` |184
+|`@non-functional-requirement` |100
 |`unknown/not-tagged` |202
 |===
 
@@ -3004,6 +3005,34 @@ so container platforms and CI smoke gates can distinguish a running process from
   And the Loki rule pack declares log alerts:
   And every shipped alert includes a runbook link
   And the generated-password log alert searches for the Spring Boot generated-password banner
+----
+
+===== REQ-OPS-021
+
+====== Scenario: Prometheus delivers a firing Magrathea alert through Alertmanager to an operator receiver
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep5-operability.feature:226`
+|Rule |Shipped SLO and alert rules give operators actionable first-response guidance
+|Requirement ID(s) |`REQ-OPS-021`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep5`, `@operability`, `@admin-api`, `@business-need`, `@slo`, `@alerting`, `@prometheus`, `@alertmanager`
+|Validation mode tags |`@live-monitoring-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep5`, `@operability`, `@admin-api`, `@business-need`, `@implemented-and-validated`, `@REQ-OPS-021`, `@functional-requirement`, `@non-functional-requirement`, `@slo`, `@alerting`, `@prometheus`, `@alertmanager`, `@live-monitoring-required`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given Docker is available for the opt-in live monitoring validation
+  When operators run the live Prometheus and Alertmanager delivery validation
+  Then the shipped Prometheus rule pack passes Prometheus rule validation
+  And Prometheus evaluates the Admin liveness alert against a failing probe signal
+  And Alertmanager delivers alert "MagratheaAdminLivenessProbeDown" to the operator webhook receiver
 ----
 
 ==== s3-reactive-api-adapter/src/test/features/requirements/single-node-backend-bucket-configuration.feature

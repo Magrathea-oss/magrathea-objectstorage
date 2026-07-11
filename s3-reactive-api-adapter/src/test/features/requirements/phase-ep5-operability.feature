@@ -221,3 +221,11 @@ Business Need: EP-5 operational health probes
         | MagratheaUnsupportedManifestSchemaDetected        | ticket   | Unsupported manifest schema version    |
       And every shipped alert includes a runbook link
       And the generated-password log alert searches for the Spring Boot generated-password banner
+
+    @implemented-and-validated @REQ-OPS-021 @functional-requirement @non-functional-requirement @slo @alerting @prometheus @alertmanager @live-monitoring-required
+    Scenario: Prometheus delivers a firing Magrathea alert through Alertmanager to an operator receiver
+      Given Docker is available for the opt-in live monitoring validation
+      When operators run the live Prometheus and Alertmanager delivery validation
+      Then the shipped Prometheus rule pack passes Prometheus rule validation
+      And Prometheus evaluates the Admin liveness alert against a failing probe signal
+      And Alertmanager delivers alert "MagratheaAdminLivenessProbeDown" to the operator webhook receiver

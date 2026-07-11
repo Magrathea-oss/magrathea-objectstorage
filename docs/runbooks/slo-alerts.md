@@ -9,9 +9,9 @@ The shipped rule files are:
 - Prometheus rules: `ops/prometheus/magrathea-objectstorage-alerts.yml`
 - Loki log-safety rules: `ops/loki/magrathea-objectstorage-log-alerts.yml`
 
-These rules are intended as a portable starter pack. The Cucumber validation proves that the rule bundle is present,
+These rules are intended as a portable starter pack. The baseline Cucumber validation proves that the rule bundle is present,
 contains the expected objectives, has actionable runbook links, and keeps the generated-password regression visible.
-It does not yet prove alert delivery through a live Prometheus, Alertmanager, Loki, or paging integration.
+The opt-in `REQ-OPS-021` validation additionally proves live Prometheus evaluation and Alertmanager delivery to an operator webhook. Live Loki ruler delivery and external paging integrations are not yet validated.
 
 ## Service-level objectives
 
@@ -71,8 +71,20 @@ It does not yet prove alert delivery through a live Prometheus, Alertmanager, Lo
 2. Follow `docs/runbooks/schema-migration.md` and identify the manifest path and schema version.
 3. Restore from the last compatible backup if the files were produced by an unsupported future version.
 
+## Live delivery validation
+
+Run the Docker-dependent validation separately from the default focused gate:
+
+```bash
+mvn -pl s3-reactive-api-adapter -am \
+  -Dtest=PhaseEp5LiveAlertDeliveryRequirementsCucumberTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
+The runner uses `scripts/validate-live-alert-delivery.sh`, Quay-hosted Prometheus `v3.5.0` and Alertmanager `v0.28.1`, and host networking. It validates the exact shipped Prometheus rule file with `promtool`, exposes a deterministic failing Admin liveness probe, evaluates the liveness alert with an immediate test threshold, and verifies Alertmanager posts `MagratheaAdminLivenessProbeDown` to a temporary operator webhook receiver. Containers and temporary files are removed on exit.
+
 ## Open gaps
 
-- Alert delivery through Prometheus, Alertmanager, Loki, and notification receivers is not yet end-to-end validated.
+- Live Loki ruler delivery and external notification/paging receivers are not yet end-to-end validated.
 - Capacity and backup timestamp metrics require environment-specific exporters or future native Magrathea metrics.
 - Online/incremental DR and multi-node alerting remain future EP-5 work.

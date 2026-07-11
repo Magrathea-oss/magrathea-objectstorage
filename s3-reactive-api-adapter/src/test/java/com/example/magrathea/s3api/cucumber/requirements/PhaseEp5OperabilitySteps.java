@@ -86,6 +86,7 @@ public class PhaseEp5OperabilitySteps {
     private long disasterRecoveryStartedNanos;
     private long disasterRecoveryCompletedNanos;
     private String lastRecoveredBody;
+    private String liveAlertValidationOutput;
 
     public PhaseEp5OperabilitySteps(@Qualifier("adminWebTestClient") WebTestClient adminClient) {
         this.adminClient = adminClient;
@@ -706,6 +707,56 @@ public class PhaseEp5OperabilitySteps {
     @Then("the generated-password log alert searches for the Spring Boot generated-password banner")
     public void generatedPasswordLogAlertSearchesForSpringBootGeneratedPasswordBanner() {
         assertThat(lokiRulePackText).contains("Using generated security password");
+    }
+
+    @Given("Docker is available for the opt-in live monitoring validation")
+    public void dockerIsAvailableForOptInLiveMonitoringValidation() throws IOException, InterruptedException {
+        Process process = new ProcessBuilder("docker", "info")
+            .redirectErrorStream(true)
+            .start();
+        boolean exited = process.waitFor(15, TimeUnit.SECONDS);
+        assertThat(exited).as("docker info completes").isTrue();
+        assertThat(process.exitValue()).as("docker daemon is available").isZero();
+    }
+
+    @When("operators run the live Prometheus and Alertmanager delivery validation")
+    public void operatorsRunLivePrometheusAndAlertmanagerDeliveryValidation()
+            throws IOException, InterruptedException {
+        Path script = Path.of("scripts/validate-live-alert-delivery.sh").toAbsolutePath();
+        if (!Files.isRegularFile(script)) {
+            script = Path.of("../scripts/validate-live-alert-delivery.sh").toAbsolutePath().normalize();
+        }
+        assertThat(script).as("live alert validation script").isRegularFile();
+        Process process = new ProcessBuilder("bash", script.toString())
+            .directory(script.getParent().getParent().toFile())
+            .redirectErrorStream(true)
+            .start();
+        boolean exited = process.waitFor(180, TimeUnit.SECONDS);
+        if (!exited) {
+            process.destroyForcibly();
+            throw new AssertionError("live alert validation exceeded 180 seconds");
+        }
+        liveAlertValidationOutput = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertThat(process.exitValue())
+            .as("live alert validation output:%n%s", liveAlertValidationOutput)
+            .isZero();
+    }
+
+    @Then("the shipped Prometheus rule pack passes Prometheus rule validation")
+    public void shippedPrometheusRulePackPassesPrometheusRuleValidation() {
+        assertThat(liveAlertValidationOutput).contains("SUCCESS: 5 rules found");
+    }
+
+    @Then("Prometheus evaluates the Admin liveness alert against a failing probe signal")
+    public void prometheusEvaluatesAdminLivenessAlertAgainstFailingProbeSignal() {
+        assertThat(liveAlertValidationOutput).contains("Live alert delivery validated");
+    }
+
+    @Then("Alertmanager delivers alert {string} to the operator webhook receiver")
+    public void alertmanagerDeliversAlertToOperatorWebhookReceiver(String alertName) {
+        assertThat(alertName).isEqualTo("MagratheaAdminLivenessProbeDown");
+        assertThat(liveAlertValidationOutput)
+            .contains("Prometheus -> Alertmanager -> operator webhook");
     }
 
     @Then("disaster recovery completes within the declared RTO")

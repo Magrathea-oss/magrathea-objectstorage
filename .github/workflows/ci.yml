@@ -16,6 +16,14 @@ on:
         options:
           - "false"
           - "true"
+      run-live-alert-delivery:
+        description: "Validate live Prometheus and Alertmanager webhook delivery"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 jobs:
   source-and-cucumber-gates:
@@ -96,6 +104,29 @@ jobs:
           curl -fsS http://127.0.0.1:8080/ci-jvm-smoke-bucket/object.txt | grep -qx 'ci-jvm-smoke-body'
           docker logs magrathea-jvm-smoke > docker-smoke-jvm.log 2>&1
           ! grep -q 'Using generated security password' docker-smoke-jvm.log
+
+  live-alert-delivery-manual:
+    name: Live Prometheus and Alertmanager delivery (manual)
+    runs-on: ubuntu-latest
+    needs: source-and-cucumber-gates
+    if: github.event_name == 'workflow_dispatch' && inputs.run-live-alert-delivery == 'true'
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      - name: Run opt-in live alert delivery requirement
+        run: |
+          set -o pipefail
+          mvn -B --no-transfer-progress -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false -Dtest=PhaseEp5LiveAlertDeliveryRequirementsCucumberTest test | tee live-alert-delivery.log
+          ! grep -q 'Using generated security password' live-alert-delivery.log
+          ! grep -q 'LEAK: ByteBuf.release' live-alert-delivery.log
 
   native-docker-manual:
     name: Native Docker image (manual)
