@@ -42,6 +42,9 @@ import java.util.function.UnaryOperator;
  */
 final class S3ObjectManifestReferenceStore {
 
+    private static final String SCHEMA_VERSION_PROPERTY = "reference.schemaVersion";
+    private static final int CURRENT_SCHEMA_VERSION = 1;
+    private static final int LEGACY_SCHEMA_VERSION = 0;
     private static final String LATEST_MARKER = "true";
     private static final int LOCK_STRIPES = 64;
 
@@ -193,6 +196,7 @@ final class S3ObjectManifestReferenceStore {
 
     private String serialize(Reference reference) {
         Properties properties = new Properties();
+        properties.setProperty(SCHEMA_VERSION_PROPERTY, Integer.toString(CURRENT_SCHEMA_VERSION));
         properties.setProperty("bucket", reference.bucket());
         properties.setProperty("key", reference.key());
         if (reference.storageClass() != null) {
@@ -237,6 +241,13 @@ final class S3ObjectManifestReferenceStore {
             properties.load(new StringReader(data));
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to parse S3 object reference", e);
+        }
+
+        int schemaVersion = Integer.parseInt(
+            properties.getProperty(SCHEMA_VERSION_PROPERTY, Integer.toString(LEGACY_SCHEMA_VERSION)));
+        if (schemaVersion != LEGACY_SCHEMA_VERSION && schemaVersion != CURRENT_SCHEMA_VERSION) {
+            throw new IllegalArgumentException(
+                "Unsupported object manifest reference schema version: " + schemaVersion);
         }
 
         int metadataCount = Integer.parseInt(properties.getProperty("userMetadata.count", "0"));

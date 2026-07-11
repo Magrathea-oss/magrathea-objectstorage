@@ -38,6 +38,9 @@ import com.example.magrathea.storageengine.domain.valueobject.VirtualDevice;
 import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemManifestRepository;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.reactive.server.WebTestClient;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -46,6 +49,7 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
@@ -54,6 +58,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class PhaseEp5StorageMigrationSteps {
+
+    @Autowired
+    private WebTestClient webTestClient;
 
     private Path manifestFile;
     private FileSystemManifestRepository repository;
@@ -72,6 +79,10 @@ public class PhaseEp5StorageMigrationSteps {
     private ObjectKey objectConfigKey;
     private LegalHold objectLegalHold;
     private String committedObjectConfigContent;
+    private Path objectReferenceRoot;
+    private Path objectReferenceStateFile;
+    private ObjectKey objectReferenceKey;
+    private String committedObjectReferenceContent;
 
     @Given("a sample storage-engine object manifest is saved through the filesystem manifest repository")
     public void sampleStorageEngineObjectManifestIsSaved() throws IOException {
@@ -271,6 +282,69 @@ public class PhaseEp5StorageMigrationSteps {
                 objectConfigKey.bucket(), objectConfigKey).block())
             .hasMessageContaining("Unsupported object configuration schema version")
             .hasMessageContaining(unsupportedVersion);
+    }
+
+    @Given("a sample object manifest reference is saved through the storage-engine S3 path")
+    public void sampleObjectManifestReferenceIsSavedThroughStorageEngineS3Path() throws IOException {
+        objectReferenceRoot = Path.of("target/storage-engine-it/current");
+        String bucket = "ep5-reference-schema-" + java.util.UUID.randomUUID().toString().substring(0, 8);
+        objectReferenceKey = ObjectKey.of(bucket, "records/versioned-reference.bin");
+
+        webTestClient.put().uri("/" + bucket)
+            .exchange()
+            .expectStatus().is2xxSuccessful();
+        webTestClient.put().uri("/" + bucket + "/records/versioned-reference.bin")
+            .contentType(MediaType.APPLICATION_OCTET_STREAM)
+            .bodyValue("versioned object reference")
+            .exchange()
+            .expectStatus().is2xxSuccessful();
+
+        objectReferenceStateFile = objectReferenceRoot
+            .resolve("metadata/s3-object-references")
+            .resolve(base64Url(bucket))
+            .resolve(base64Url(objectReferenceKey.key()) + ".properties");
+        assertThat(objectReferenceStateFile).exists();
+        committedObjectReferenceContent = Files.readString(objectReferenceStateFile);
+    }
+
+    @Then("the committed object manifest reference declares schema version {string}")
+    public void committedObjectManifestReferenceDeclaresSchemaVersion(String version) {
+        assertThat(committedObjectReferenceContent).contains("reference.schemaVersion=" + version);
+    }
+
+    @Then("the repository can read a legacy object reference that omits the schema version as compatibility version {string}")
+    public void repositoryCanReadLegacyObjectReferenceThatOmitsSchemaVersion(String compatibilityVersion)
+            throws IOException {
+        assertThat(compatibilityVersion).isEqualTo("0");
+        String legacy = committedObjectReferenceContent.replaceFirst(
+            "(?m)^reference\\.schemaVersion=1\\R", "");
+        assertThat(legacy).doesNotContain("reference.schemaVersion");
+        Files.writeString(objectReferenceStateFile, legacy);
+
+        StorageEngineReactiveS3ObjectRepository legacyRepository =
+            new StorageEngineReactiveS3ObjectRepository(null, null, objectReferenceRoot.toString());
+        var restored = legacyRepository.findByBucketAndKey(objectReferenceKey).block();
+        assertThat(restored).isNotNull();
+        assertThat(restored.key()).isEqualTo(objectReferenceKey);
+    }
+
+    @Then("the repository rejects an object reference that declares unsupported schema version {string}")
+    public void repositoryRejectsObjectReferenceThatDeclaresUnsupportedSchemaVersion(String unsupportedVersion)
+            throws IOException {
+        String unsupported = committedObjectReferenceContent.replaceFirst(
+            "reference\\.schemaVersion=1", "reference.schemaVersion=" + unsupportedVersion);
+        Files.writeString(objectReferenceStateFile, unsupported);
+
+        StorageEngineReactiveS3ObjectRepository unsupportedRepository =
+            new StorageEngineReactiveS3ObjectRepository(null, null, objectReferenceRoot.toString());
+        assertThatThrownBy(() -> unsupportedRepository.findByBucketAndKey(objectReferenceKey).block())
+            .hasMessageContaining("Unsupported object manifest reference schema version")
+            .hasMessageContaining(unsupportedVersion);
+    }
+
+    private static String base64Url(String value) {
+        return Base64.getUrlEncoder().withoutPadding()
+            .encodeToString(value.getBytes(StandardCharsets.UTF_8));
     }
 
     private static String removeSchemaVersion(String content) {
