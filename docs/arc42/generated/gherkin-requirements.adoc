@@ -18,8 +18,8 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 
 === Summary
 
-* Feature files scanned: 22
-* Scenarios discovered: 404
+* Feature files scanned: 23
+* Scenarios discovered: 405
 * Protocol-smoke scenarios: 122
 
 ==== Status tag counts
@@ -29,7 +29,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |Tag |Scenario count
 |`@absent` |3
 |`@config-only` |69
-|`@implemented-and-validated` |116
+|`@implemented-and-validated` |117
 |`@implemented-not-e2e-validated` |22
 |`@not-implemented` |12
 |`@placeholder` |9
@@ -53,7 +53,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |`@static-architecture-required` |6
 |`@tracing-inspection-required` |2
 |`@webclient-required` |294
-|`unknown/not-tagged` |62
+|`unknown/not-tagged` |63
 |===
 
 ==== Classification tag counts
@@ -62,7 +62,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |===
 |Tag |Scenario count
 |`@functional-requirement` |184
-|`@non-functional-requirement` |100
+|`@non-functional-requirement` |101
 |`unknown/not-tagged` |202
 |===
 
@@ -12862,6 +12862,46 @@ so Magrathea Object Storage can run without requiring a Java runtime in the fina
   And the CI workflow builds and smokes the root JVM Docker image
   And the CI workflow requires Docker readiness to be ready in storage-engine mode
   And the CI workflow keeps native Docker packaging available as an explicit manual validation job
+----
+
+==== s3-reactive-api-adapter/src/test/features/specs/s3-api-semantic-coverage-report.feature
+
+* Feature title: Ability: Evidence-based semantic coverage reporting for the official S3 API surface
+* Feature tags: `@spec`, `@non-functional-requirement`, `@documentation`, `@s3-api`, `@coverage-reporting`
+* Feature description:
++
+----
+Maintainers need a deterministic operation-level matrix
+so the 111 mapped-route claim cannot be confused with complete S3 compatibility.
+----
+
+===== REQ-DOC-001
+
+====== Scenario: The generated S3 API matrix classifies all 111 official operations without inventing completion
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/s3-api-semantic-coverage-report.feature:9`
+|Rule |Generated coverage separates route presence from semantic completion evidence
+|Requirement ID(s) |`REQ-DOC-001`
+|Classification |`@non-functional-requirement`
+|Capability area tags |`@spec`, `@documentation`, `@s3-api`, `@coverage-reporting`, `@architecture`, `@source-hygiene`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@non-functional-requirement`, `@documentation`, `@s3-api`, `@coverage-reporting`, `@implemented-and-validated`, `@REQ-DOC-001`, `@architecture`, `@source-hygiene`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the canonical S3 API inventory contains 111 distinct operations
+  When the semantic coverage report is generated from router mappings and executable requirement tags
+  Then every official operation has one matrix row
+  And the report distinguishes mapped routes from implemented-and-validated semantic evidence
+  And operations without explicit implemented-and-validated evidence remain pending
+  And the committed S3 API coverage report is fresh
 ----
 
 ==== s3-reactive-api-adapter/src/test/features/specs/sigv4-verifier.feature

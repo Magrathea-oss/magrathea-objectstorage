@@ -243,7 +243,7 @@ This section implements [ADR 0018](docs/adr/0018-course-correction-classify-s3-a
 
 | Priority | Correction focus | Status / gate |
 |---|---|---|
-| S3-P0 | Replace `111/111` claims with a semantic matrix; inventory all operations. | ⚠️ Documentation truth reset done 2026-06-12; **`docs/api-coverage.md` is missing (verified 2026-07-02)** and the semantic inventory remains open — closed by the generated `docs/api-coverage.md` matrix task in the Ancillary S3 API Requirements Backlog. |
+| S3-P0 | Replace `111/111` claims with a semantic matrix; inventory all operations. | ✅ Closed 2026-07-11 by generated `docs/api-coverage.md` and `REQ-DOC-001`: 111 canonical official operations, 108 with mapped router handlers, 20 with explicit operation-linked `@implemented-and-validated` evidence, and 91 still ineligible for a 100% completion claim. |
 | S3-P1 | Object CRUD + bucket baseline against both backends. | ⚠️ First AWS CLI CRUD/bucket increments complete (CC-9); metadata/checksum/copy semantics, fuller list semantics, and storage-engine scenarios remain. |
 | S3-P2 | Multipart + object metadata/tagging/ACL persistence. | Open; multipart part persistence/assembly is EP-3. |
 | S3-P3 | Bucket configuration statefulness; versioning/delete markers. | Open. |
@@ -266,7 +266,7 @@ Task list:
 - [ ] Write `phase-7-s3-ancillary-config.feature` per the structure above (`java-tester`).
 - [ ] Tag the 148 legacy `bucket-config.feature` status-code scenarios `@protocol-smoke` (`java-tester`).
 - [x] Move the 6 handler-local config families behind repository ports (`java-infra-coder`; feeds EP-2).
-- [ ] Generate `docs/api-coverage.md` as a machine-generated semantic matrix using the Required S3 Semantic Reporting Table Template (pattern: the Gherkin appendix generator), wired into the same freshness-check discipline. Closes the open S3-P0 semantic inventory.
+- [x] Generate `docs/api-coverage.md` as a machine-generated semantic matrix using the Required S3 Semantic Reporting Table Template, wired into CI freshness checks and `REQ-DOC-001`. The conservative baseline closes S3-P0 inventory without claiming that `pending-evidence` operations are absent or complete.
 
 ### S3 Semantic Acceptance Criteria (summary)
 

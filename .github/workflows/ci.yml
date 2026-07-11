@@ -52,6 +52,9 @@ jobs:
       - name: Check generated Gherkin appendix
         run: python3 scripts/generate-gherkin-requirements-appendix.py --check
 
+      - name: Check generated S3 API semantic coverage
+        run: python3 scripts/generate-s3-api-coverage.py --check
+
       - name: Check source hygiene
         run: bash scripts/check-source-hygiene.sh
 
@@ -59,7 +62,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p target
-          mvn -B --no-transfer-progress -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false -Dtest=PhaseEp1SecurityIdentityRequirementsCucumberTest,PhaseEp1SecurityIdentityAwsCliCucumberTest,Ep1SecurityServicesSpecsCucumberTest,PhaseEp2MetadataDurabilityCucumberTest,PhaseEp2MetadataDurabilityFullRestartCucumberTest,Phase3ReactivePipelineStaticArchitectureSpecsCucumberTest,PhaseEp5OperabilityRequirementsCucumberTest,PhaseEp5StorageMigrationSpecsCucumberTest,Phase5S3SemanticCompatibilityRequirementsCucumberTest,Phase5S3SemanticCompatibilityAwsCliCucumberTest,Phase5MultipartFullRestartCucumberTest test | tee target/focused-cucumber.log
+          mvn -B --no-transfer-progress -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false -Dtest=PhaseEp1SecurityIdentityRequirementsCucumberTest,PhaseEp1SecurityIdentityAwsCliCucumberTest,Ep1SecurityServicesSpecsCucumberTest,PhaseEp2MetadataDurabilityCucumberTest,PhaseEp2MetadataDurabilityFullRestartCucumberTest,Phase3ReactivePipelineStaticArchitectureSpecsCucumberTest,PhaseEp5OperabilityRequirementsCucumberTest,PhaseEp5StorageMigrationSpecsCucumberTest,S3ApiSemanticCoverageReportSpecsCucumberTest,Phase5S3SemanticCompatibilityRequirementsCucumberTest,Phase5S3SemanticCompatibilityAwsCliCucumberTest,Phase5MultipartFullRestartCucumberTest test | tee target/focused-cucumber.log
           ! grep -q 'Using generated security password' target/focused-cucumber.log
 
       - name: Check Git diff whitespace

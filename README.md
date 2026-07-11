@@ -21,7 +21,7 @@
 ## Features
 
 - **S3 object API + admin API** — the S3 REST API is the public object interface; `admin-api-adapter` provides `/admin/**` configuration-as-code catalog APIs separate from the S3 surface
-- **Route inventory** — 111 Amazon S3 API action routes are mapped; ⚠️ **this is a route/surface inventory, not a semantic implementation metric** — many operations are stubbed or return nominal/placeholder responses; see [`docs/test-report.md`](docs/test-report.md) and [`PLAN.md`](PLAN.md) for the semantic coverage classification
+- **S3 semantic coverage** — the generated [`docs/api-coverage.md`](docs/api-coverage.md) matrix currently finds 108/111 official operations with router-handler mappings, but only **20/111** with explicit operation-linked `@implemented-and-validated` evidence; **91/111 remain ineligible for a 100% completion claim** pending implementation or stronger classification/evidence. Route presence is not completion evidence.
 - **Pluggable S3 API** — auto-configured when `s3-reactive-api-adapter` is on the classpath; disabled with `s3.api.enabled=false`
 - **Spring Boot 4 WebFlux** — functional RouterFunction endpoints
 - **Jackson 3 XML** — `tools.jackson.dataformat:jackson-dataformat-xml` with custom WebFlux encoder
@@ -260,7 +260,7 @@ The implementation plan tracks all Amazon S3 actions from:
 
 > ⚠️ **Coverage reporting has been reclassified.** The `111/111` figure reflects a route/surface inventory only — it means 111 S3 API action routes are mapped. It does **not** mean 111 operations are semantically implemented, stateful, or AWS CLI compatible.
 >
-> API coverage must now be reported by semantic status: **Mapped / Stubbed / Stateful / AWS CLI compatible / Storage-engine compatible / Semantically S3-compatible**.
+> API coverage is generated in [`docs/api-coverage.md`](docs/api-coverage.md) from the canonical 111-operation inventory, router mappings, and executable requirement tags. The current conservative baseline is **108 mapped**, **20 implemented-and-validated with explicit operation-linked evidence**, and **91 not yet eligible for a 100% completion claim**.
 > AWS CLI parity has improved for the canonical object CRUD subset (put default headers, get content, head, list v1/v2, delete/idempotent delete, `STANDARD` storage class via object attributes, and slash-containing object keys through catch-all routes/key normalization), but it is **not complete** for all S3 scenarios.
 > See [`docs/test-report.md`](docs/test-report.md) for the classification matrix and [`PLAN.md`](PLAN.md) → *S3 API Semantic Completion Plan* for the phased roadmap.
 
@@ -273,6 +273,7 @@ Phases A–F route mapping is recorded in [ADR 0012](docs/adr/0012-phase-f-advan
 | Artifact | Location |
 |---|---|
 | Implementation plan | [`PLAN.md`](PLAN.md) |
+| Generated S3 API semantic coverage | [`docs/api-coverage.md`](docs/api-coverage.md) |
 | Positioning & competitive analysis | [`docs/positioning.md`](docs/positioning.md) |
 | Public roadmap | [`docs/roadmap.md`](docs/roadmap.md) |
 | ARC42 architecture docs | [`docs/arc42/`](docs/arc42/) |
