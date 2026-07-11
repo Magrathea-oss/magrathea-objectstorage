@@ -151,7 +151,7 @@ public class Phase3PipelineUnitSteps {
         assertThat(validationMode).isEqualTo("pipeline-unit");
         assertThat(requirementId).isIn(
                 "REQ-PIPELINE-001", "REQ-PIPELINE-002", "REQ-PIPELINE-003", "REQ-PIPELINE-004", "REQ-PIPELINE-005",
-                "REQ-PIPELINE-006", "REQ-PIPELINE-014");
+                "REQ-PIPELINE-006", "REQ-PIPELINE-014", "REQ-PIPELINE-015");
     }
 
     @Given("the storage engine operator uses filesystem root {string}")
@@ -273,7 +273,8 @@ public class Phase3PipelineUnitSteps {
         var artifacts = completedContext.manifest().orElseThrow().chunks();
         assertThat(artifacts).singleElement()
                 .satisfies(artifact -> assertThat(artifact.originalSize()).isEqualTo(PLAIN_OBJECT_SIZE));
-        assertThat(committedChunkDataFiles()).isEqualTo(1);
+        assertThat(committedWholeObjectDataFiles()).isEqualTo(1);
+        assertThat(committedChunkDataFiles()).isZero();
         String orchestratorSource = Files.readString(repositoryRoot().resolve(
                 "storage-engine-reactive-application/src/main/java/com/example/magrathea/storageengine/application/service/ReactiveStorageOrchestrator.java"));
         assertThat(orchestratorSource).contains("new StorageUnit.FileUnit(");
@@ -284,6 +285,93 @@ public class Phase3PipelineUnitSteps {
         assertThat(countFiles(storageRoot.resolve("metadata/content-address-index"), Files::isRegularFile)).isZero();
         assertThat(countFiles(storageRoot, path -> Files.isRegularFile(path)
                 && (path.toString().contains("ec-shard") || path.toString().contains("multipart")))).isZero();
+    }
+
+    @When("the selected validation runner uploads the plain fixture to key {string}")
+    public void selectedRunnerUploadsPlainFixture(String key) {
+        uploadPlainFixture(key);
+    }
+
+    @Then("the manifest references one whole-object storage unit and zero chunk artifacts")
+    public void manifestReferencesOneWholeObjectStorageUnit() {
+        var artifacts = completedContext.manifest().orElseThrow().artifacts();
+        assertThat(artifacts).singleElement()
+                .satisfies(artifact -> assertThat(artifact.artifactKind())
+                        .isEqualTo(com.example.magrathea.storageengine.domain.valueobject.StorageArtifactKind.WHOLE_OBJECT));
+    }
+
+    @Then("the whole-object namespace contains one data file with its SHA-256 sidecar while the chunk namespace is empty")
+    public void wholeObjectNamespaceContainsDataAndSidecar() {
+        assertThat(committedWholeObjectDataFiles()).isOne();
+        assertThat(countFiles(storageRoot.resolve("nodes/node-001/whole-objects"),
+                path -> Files.isRegularFile(path) && path.getFileName().toString().endsWith(".sha256"))).isOne();
+        assertThat(countFiles(storageRoot.resolve("nodes/node-001/chunks"), Files::isRegularFile)).isZero();
+    }
+
+    @Then("the S3 client reads the exact 8 MiB fixture bytes through the production read path")
+    public void s3ClientReadsExactPlainFixture() throws NoSuchAlgorithmException, IOException {
+        exactPlainStreamedReadback();
+    }
+
+    @Given("storage class {string} selects four data shards and two parity shards")
+    public void storageClassSelectsFourDataAndTwoParityShards(String storageClass) {
+        assertThat(storageClass).isEqualTo("EC_4_2");
+    }
+
+    @When("the selected validation runner uploads the EC fixture to key {string}")
+    public void selectedRunnerUploadsEcFixture(String key) {
+        objectKey = key;
+        StorageClassId ecClass = StorageClassId.of("EC_4_2");
+        configureOrchestrator(StoragePolicy.of(
+                ecClass,
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(com.example.magrathea.storageengine.domain.valueobject.ErasureCodingConfig.of(4, 2)),
+                com.example.magrathea.storageengine.domain.valueobject.ReplicationConfig.of(1)));
+        int bufferCount = Math.toIntExact(PLAIN_OBJECT_SIZE / CANCELLATION_BUFFER_SIZE);
+        Flux<DataBuffer> body = Flux.range(0, bufferCount)
+                .map(ignored -> BUFFER_FACTORY.wrap(new byte[CANCELLATION_BUFFER_SIZE]));
+        completedContext = new StoragePipelineExecutor(eventPublisher)
+                .execute(StorageContext.write(command(bucket, objectKey, PLAIN_OBJECT_SIZE, ecClass), body),
+                        orchestrator.writePipelineStages())
+                .block();
+        assertThat(completedContext).isNotNull();
+    }
+
+    @Then("two bounded 4 MiB stripes persist eight ordered 1 MiB data shards and four parity shards")
+    public void boundedEcStripesPersistExpectedShards() {
+        var artifacts = completedContext.manifest().orElseThrow().artifacts();
+        assertThat(artifacts).hasSize(12);
+        assertThat(artifacts.stream().filter(artifact -> artifact.artifactKind()
+                == com.example.magrathea.storageengine.domain.valueobject.StorageArtifactKind.EC_DATA_SHARD)).hasSize(8);
+        assertThat(artifacts.stream().filter(artifact -> artifact.artifactKind()
+                == com.example.magrathea.storageengine.domain.valueobject.StorageArtifactKind.EC_PARITY_SHARD)).hasSize(4);
+        assertThat(countFiles(storageRoot.resolve("nodes/node-001/chunks"),
+                path -> Files.isRegularFile(path) && !path.getFileName().toString().endsWith(".sha256"))).isEqualTo(12);
+        assertThat(committedWholeObjectDataFiles()).isZero();
+    }
+
+    @Then("the manifest distinguishes EC data and parity shards from dedup chunks and whole-object units")
+    public void manifestDistinguishesEcShardKinds() {
+        var artifacts = completedContext.manifest().orElseThrow().artifacts();
+        assertThat(artifacts).allMatch(artifact -> artifact.artifactKind()
+                == com.example.magrathea.storageengine.domain.valueobject.StorageArtifactKind.EC_DATA_SHARD
+                || artifact.artifactKind()
+                == com.example.magrathea.storageengine.domain.valueobject.StorageArtifactKind.EC_PARITY_SHARD);
+        assertThat(artifacts).noneMatch(artifact -> artifact.artifactKind()
+                == com.example.magrathea.storageengine.domain.valueobject.StorageArtifactKind.DEDUP_CHUNK
+                || artifact.artifactKind()
+                == com.example.magrathea.storageengine.domain.valueobject.StorageArtifactKind.WHOLE_OBJECT);
+    }
+
+    @Then("every shard checksum is validated before exact S3 readback")
+    public void everyShardChecksumValidatedBeforeReadback() throws NoSuchAlgorithmException, IOException {
+        FileSystemStorageNode node = new FileSystemStorageNode(
+                storageRoot.resolve("nodes/node-001"), NodeId.of("node-001"));
+        completedContext.manifest().orElseThrow().artifacts()
+                .forEach(artifact -> assertThat(node.read(artifact.chunkId()).block()).isNotNull());
+        exactPlainStreamedReadback();
     }
 
     @Then("the committed manifest uses schema version 2 and typed artifact properties")
@@ -780,13 +868,16 @@ public class Phase3PipelineUnitSteps {
                 .contentAddressFiles()).isZero();
     }
 
-    @Then("every committed manifest chunk reference uses a canonical UUID filename with a matching SHA-256 sidecar readable by the canonical filesystem node")
-    public void committedChunksUseCanonicalFilesystemLayout() throws IOException {
+    @Then("every committed manifest artifact reference uses a canonical UUID filename with a matching SHA-256 sidecar in its type-specific filesystem namespace")
+    public void committedArtifactsUseCanonicalFilesystemLayout() throws IOException {
         FileSystemStorageNode node = new FileSystemStorageNode(
                 storageRoot.resolve("nodes/node-001"), NodeId.of("node-001"));
-        assertThat(completedContext.chunkDescriptors()).isNotEmpty().allSatisfy(chunk -> {
-            Path data = storageRoot.resolve("nodes/node-001/chunks")
-                    .resolve(chunk.chunkId().value().toString());
+        assertThat(completedContext.chunkDescriptors()).isNotEmpty().allSatisfy(artifact -> {
+            boolean wholeObject = artifact.artifactKind()
+                    == com.example.magrathea.storageengine.domain.valueobject.StorageArtifactKind.WHOLE_OBJECT;
+            Path data = storageRoot.resolve("nodes/node-001")
+                    .resolve(wholeObject ? "whole-objects" : "chunks")
+                    .resolve(artifact.chunkId().value().toString());
             Path sidecar = data.resolveSibling(data.getFileName() + ".sha256");
             assertThat(data).isRegularFile();
             assertThat(sidecar).isRegularFile();
@@ -795,7 +886,10 @@ public class Phase3PipelineUnitSteps {
             } catch (IOException error) {
                 throw new UncheckedIOException(error);
             }
-            assertThat(node.read(chunk.chunkId()).block()).isEqualTo(readBytes(data));
+            byte[] read = wholeObject
+                    ? node.readWholeObject(artifact.chunkId()).block()
+                    : node.read(artifact.chunkId()).block();
+            assertThat(read).isEqualTo(readBytes(data));
         });
     }
 
@@ -905,9 +999,16 @@ public class Phase3PipelineUnitSteps {
         assertThat(read).isEqualTo(fixtureBytes);
     }
 
+    private long committedWholeObjectDataFiles() {
+        return countFiles(storageRoot.resolve("nodes/node-001/whole-objects"),
+                path -> Files.isRegularFile(path)
+                        && !path.getFileName().toString().endsWith(".sha256")
+                        && !path.getFileName().toString().contains(".tmp."));
+    }
+
     private long committedChunkDataFiles() {
         try {
-            return countFiles(storageRoot.resolve("nodes"), path -> Files.isRegularFile(path)
+            return countFiles(storageRoot.resolve("nodes/node-001/chunks"), path -> Files.isRegularFile(path)
                     && !path.getFileName().toString().endsWith(".sha256")
                     && !path.getFileName().toString().contains(".tmp."));
         } catch (UncheckedIOException transientRenameRace) {
@@ -958,8 +1059,10 @@ public class Phase3PipelineUnitSteps {
             listeners.add(independentObserver);
         }
         eventPublisher = new CompositeStorageEventPublisher(listeners);
-        Path chunks = storageRoot.resolve("nodes/node-001/chunks");
-        FileSystemStorePort storePort = new FileSystemStorePort(chunks, chunks, cluster.faultInjector());
+        Path nodeRoot = storageRoot.resolve("nodes/node-001");
+        Path wholeObjects = nodeRoot.resolve("whole-objects");
+        Path chunks = nodeRoot.resolve("chunks");
+        FileSystemStorePort storePort = new FileSystemStorePort(wholeObjects, chunks, cluster.faultInjector());
         DataProcessingPipelinePort pipelineFactory = new DataProcessingPipelineFactory(
                 policy.dedup().isPresent() ? new FixedWindowDedupStep(cluster.addressIndex(), 65536)
                         : new NoOpDeduplicationStep(),

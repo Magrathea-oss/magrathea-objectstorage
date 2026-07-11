@@ -4,6 +4,8 @@ import com.example.magrathea.storageengine.application.port.ChunkStorePort;
 import com.example.magrathea.storageengine.domain.valueobject.ChunkId;
 import com.example.magrathea.storageengine.domain.valueobject.NodeId;
 import com.example.magrathea.storageengine.domain.valueobject.PersistencePlan;
+import com.example.magrathea.storageengine.domain.valueobject.StorageArtifactKind;
+import com.example.magrathea.storageengine.domain.valueobject.StorageArtifactReferenceDescriptor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -47,16 +49,46 @@ public class FileSystemChunkStorePort implements ChunkStorePort {
     }
 
     @Override
+    public Mono<byte[]> read(StorageArtifactReferenceDescriptor artifact) {
+        return Flux.fromIterable(cluster.nodes())
+                .concatMap(node -> readFromNode(node, artifact)
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .onErrorResume(NoSuchFileException.class, ignored -> Mono.empty()))
+                .next()
+                .switchIfEmpty(Mono.error(new NoSuchFileException(
+                        "Storage artifact not found: " + artifact.chunkId().value())));
+    }
+
+    private Mono<byte[]> readFromNode(
+            FileSystemStorageNode node, StorageArtifactReferenceDescriptor artifact) {
+        return artifact.artifactKind() == StorageArtifactKind.WHOLE_OBJECT
+                ? node.readWholeObject(artifact.chunkId())
+                : node.read(artifact.chunkId());
+    }
+
+    @Override
+    public Mono<Void> delete(StorageArtifactKind artifactKind, ChunkId artifactId) {
+        String namespace = artifactKind == StorageArtifactKind.WHOLE_OBJECT
+                ? "whole-objects"
+                : "chunks";
+        return deleteFromNamespace(artifactId, namespace);
+    }
+
+    @Override
     public Mono<Void> delete(ChunkId chunkId) {
+        return deleteFromNamespace(chunkId, "chunks");
+    }
+
+    private Mono<Void> deleteFromNamespace(ChunkId artifactId, String namespace) {
         return Flux.fromIterable(cluster.nodes())
                 .concatMap(node -> Mono.fromRunnable(() -> {
                             try {
-                                java.nio.file.Files.deleteIfExists(node.nodePath().resolve("chunks")
-                                        .resolve(chunkId.value().toString()));
-                                java.nio.file.Files.deleteIfExists(node.nodePath().resolve("chunks")
-                                        .resolve(chunkId.value() + ".sha256"));
+                                java.nio.file.Path root = node.nodePath().resolve(namespace);
+                                java.nio.file.Files.deleteIfExists(root.resolve(artifactId.value().toString()));
+                                java.nio.file.Files.deleteIfExists(root.resolve(artifactId.value() + ".sha256"));
                             } catch (java.io.IOException error) {
-                                throw new java.io.UncheckedIOException("Failed to delete unpublished chunk", error);
+                                throw new java.io.UncheckedIOException(
+                                        "Failed to delete unpublished storage artifact", error);
                             }
                         }).subscribeOn(Schedulers.boundedElastic()))
                 .then();

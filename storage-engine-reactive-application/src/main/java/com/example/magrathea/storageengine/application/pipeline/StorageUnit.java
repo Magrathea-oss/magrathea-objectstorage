@@ -78,6 +78,24 @@ public sealed interface StorageUnit {
         }
     }
 
+    /** One physical data or parity shard produced from a bounded EC stripe. */
+    record ECShardUnit(
+        Flux<DataBuffer> data,
+        StorageUnitInfo info,
+        int stripeIndex,
+        int shardIndex,
+        boolean parity,
+        long logicalSize,
+        int dataBlocks,
+        int parityBlocks
+    ) implements StorageUnit {
+        @Override
+        public StorageUnit withData(Flux<DataBuffer> newData) {
+            return new ECShardUnit(newData, info, stripeIndex, shardIndex, parity,
+                    logicalSize, dataBlocks, parityBlocks);
+        }
+    }
+
     /** Reserved for multipart upload — not yet integrated into the pipeline. */
     record PartUnit(
         Flux<DataBuffer> data,

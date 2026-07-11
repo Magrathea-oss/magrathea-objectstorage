@@ -42,18 +42,15 @@ import static java.nio.file.StandardOpenOption.WRITE;
  * After streaming, atomically renames temp → final path named by SHA-256.
  *
  * Unit type dispatch (single instanceof point in the pipeline):
- *   FileUnit     → chunksRoot / &lt;uuid&gt; (with &lt;uuid&gt;.sha256 sidecar; UUID format
- *                  is compatible with FileSystemStorageNode.read(ChunkId) which
- *                  uses chunkId.value().toString() as the filename)
+ *   FileUnit     → directObjectsRoot / &lt;uuid&gt; (with &lt;uuid&gt;.sha256 sidecar)
  *   ChunkUnit    → chunksRoot / &lt;uuid&gt; (with &lt;uuid&gt;.sha256 sidecar)
  *   ECStripeUnit → NOT YET IMPLEMENTED (TODO criticality 3)
  *   PartUnit     → NOT YET IMPLEMENTED (future multipart support)
  *
- * FileUnit naming convention: the file is stored as &lt;uuid&gt; (not sha256) so that the
- * existing read path via FileSystemStorageNode.read(ChunkId) can locate it using
- * chunkId.value().toString(). The SHA-256 is written to the &lt;uuid&gt;.sha256 sidecar for
- * integrity verification by FileSystemStorageNode.read(). The sha256 hex is also returned
- * in StorageTrace.fingerprint so the orchestrator can build ChunkPersistenceTrace checksums.
+ * FileUnit naming convention: the file is stored as &lt;uuid&gt; in the dedicated
+ * whole-object namespace. The schema-2 manifest labels it {@code WHOLE_OBJECT}; typed
+ * reads use that kind to select the namespace. The SHA-256 sidecar preserves the same
+ * atomic publication and integrity protocol used by segmented artifacts.
  *
  * TODO (criticality 3): ECStripeUnit and PartUnit not yet implemented.
  * TODO (criticality 4): Temp-file cleanup on mid-pipeline failure is per-call only
@@ -84,7 +81,7 @@ public class FileSystemStorePort implements StorePort {
     @Override
     public Mono<StorageTrace> write(StorageUnit unit) {
         return switch (unit) {
-            case StorageUnit.FileUnit f          -> streamFileUnitToChunksDir(f);
+            case StorageUnit.FileUnit f          -> streamFileUnitToWholeObjectsDir(f);
             case StorageUnit.ChunkUnit c         -> {
                 // Deduplicated chunks carry the deduplicatedReuse flag set by DeduplicationStep.
                 // When true, no data is written — we emit a reuse trace directly.
@@ -109,20 +106,21 @@ public class FileSystemStorePort implements StorePort {
                             t.deduplicatedReuse(),
                             t.originalSize(), t.storedSize()));
             }
-            case StorageUnit.ECStripeUnit ignored -> Mono.error(
-                new UnsupportedOperationException(
-                    "ECStripeUnit storage not yet implemented — TODO criticality 3"));
+            case StorageUnit.ECStripeUnit stripe -> streamToStore(stripe, chunksRoot, "ec-stripe");
+            case StorageUnit.ECShardUnit shard    -> streamToStore(
+                    shard, chunksRoot, shard.parity() ? "ec-parity-shard" : "ec-data-shard")
+                    .map(trace -> new StorageTrace(
+                            trace.info(), trace.unitKind(), trace.fingerprint(), trace.storageRef(),
+                            false, shard.logicalSize(), trace.storedSize()));
             case StorageUnit.PartUnit ignored     -> Mono.error(
                 new UnsupportedOperationException(
                     "PartUnit storage not yet implemented — future multipart support"));
         };
     }
 
-    /**
-     * Stores a FileUnit under the UUID/checksum layout consumed by FileSystemStorageNode.
-     */
-    private Mono<StorageTrace> streamFileUnitToChunksDir(StorageUnit.FileUnit unit) {
-        return streamToStore(unit, chunksRoot, "file");
+    /** Stores a FileUnit in the dedicated whole-object namespace. */
+    private Mono<StorageTrace> streamFileUnitToWholeObjectsDir(StorageUnit.FileUnit unit) {
+        return streamToStore(unit, directObjectsRoot, "whole-object");
     }
 
     /**

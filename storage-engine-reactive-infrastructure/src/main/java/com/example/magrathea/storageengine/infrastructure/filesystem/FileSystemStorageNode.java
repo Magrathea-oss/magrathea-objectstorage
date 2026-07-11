@@ -42,6 +42,7 @@ public class FileSystemStorageNode {
     private final Path nodePath;
     private final NodeId nodeId;
     private final Path chunksDir;
+    private final Path wholeObjectsDir;
     private final FileSystemWriteFaultInjector faultInjector;
 
     public FileSystemStorageNode(Path nodePath, NodeId nodeId) {
@@ -56,8 +57,10 @@ public class FileSystemStorageNode {
         this.nodeId = java.util.Objects.requireNonNull(nodeId, "nodeId must not be null");
         this.faultInjector = java.util.Objects.requireNonNull(faultInjector, "faultInjector must not be null");
         this.chunksDir = nodePath.resolve("chunks");
+        this.wholeObjectsDir = nodePath.resolve("whole-objects");
         try {
             Files.createDirectories(chunksDir);
+            Files.createDirectories(wholeObjectsDir);
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to create chunks directory: " + chunksDir, e);
         }
@@ -73,6 +76,10 @@ public class FileSystemStorageNode {
 
     public Path chunksDir() {
         return chunksDir;
+    }
+
+    public Path wholeObjectsDir() {
+        return wholeObjectsDir;
     }
 
     /**
@@ -111,28 +118,34 @@ public class FileSystemStorageNode {
      * @throws NoSuchFileException if the chunk file does not exist (propagated from Files.readAllBytes).
      */
     public Mono<byte[]> read(ChunkId chunkId) {
+        return readFrom(chunksDir, chunkId, "chunk");
+    }
+
+    /** Reads a schema-2 whole-object artifact from its dedicated namespace. */
+    public Mono<byte[]> readWholeObject(ChunkId artifactId) {
+        return readFrom(wholeObjectsDir, artifactId, "whole-object artifact");
+    }
+
+    private Mono<byte[]> readFrom(Path root, ChunkId artifactId, String artifactType) {
         return BlockingFileSystemOperation.fromCallable(() -> {
-            String chunkFileName = chunkId.value().toString();
-            Path chunkFile = chunksDir.resolve(chunkFileName);
-            Path checksumFile = chunksDir.resolve(chunkFileName + SHA256_EXTENSION);
-
-            byte[] data = Files.readAllBytes(chunkFile);
-
+            String fileName = artifactId.value().toString();
+            Path dataFile = root.resolve(fileName);
+            Path checksumFile = root.resolve(fileName + SHA256_EXTENSION);
+            byte[] data = Files.readAllBytes(dataFile);
+            String checksumSubject = artifactType.equals("chunk")
+                    ? "Chunk checksum" : "Whole-object artifact checksum";
             if (!Files.exists(checksumFile)) {
                 throw new ChunkIntegrityException(
-                        "Chunk checksum sidecar missing for chunk: " + chunkId.value()
-                        + " — cannot verify integrity");
+                        checksumSubject + " sidecar missing for " + artifactType + ": " + artifactId.value()
+                                + " — cannot verify integrity");
             }
-
             String storedHex = Files.readString(checksumFile).trim();
             String computedHex = sha256Hex(data);
-
             if (!computedHex.equals(storedHex)) {
                 throw new ChunkIntegrityException(
-                        "Chunk checksum mismatch for chunk: " + chunkId.value()
-                        + " — stored=" + storedHex + " computed=" + computedHex);
+                        checksumSubject + " mismatch for " + artifactType + ": " + artifactId.value()
+                                + " — stored=" + storedHex + " computed=" + computedHex);
             }
-
             return data;
         });
     }

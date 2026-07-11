@@ -84,6 +84,7 @@ public class Phase3ReactivePipelineSteps {
     private static final Path PROJECT_ROOT = Path.of("").toAbsolutePath().normalize();
 
     private static final long LARGE_OBJECT_SIZE = 256L * 1024 * 1024;
+    private static final long PLAIN_OBJECT_SIZE = 8L * 1024 * 1024;
     private static final int LARGE_UPLOAD_BUFFER_SIZE = 64 * 1024;
 
     @Autowired
@@ -227,21 +228,28 @@ public class Phase3ReactivePipelineSteps {
                 .contentAddressFiles());
     }
 
-    @Then("every committed manifest chunk reference uses a canonical UUID filename with a matching SHA-256 sidecar readable by the canonical filesystem node")
-    public void committedChunksUseCanonicalFilesystemLayout() {
+    @Then("every committed manifest artifact reference uses a canonical UUID filename with a matching SHA-256 sidecar in its type-specific filesystem namespace")
+    public void committedArtifactsUseCanonicalFilesystemLayout() {
         Properties manifest = loadProperties(onlyFile(state.storageRoot.resolve("metadata/manifests"), ".properties"));
-        int chunkCount = manifestArtifactCount(manifest);
-        assertTrue(chunkCount > 0, "committed manifest must reference at least one chunk");
+        int artifactCount = manifestArtifactCount(manifest);
+        assertTrue(artifactCount > 0, "committed manifest must reference at least one artifact");
         FileSystemStorageNode node = new FileSystemStorageNode(
                 state.storageRoot.resolve("nodes/node-001"), NodeId.of("node-001"));
-        for (int ordinal = 0; ordinal < chunkCount; ordinal++) {
+        for (int ordinal = 0; ordinal < artifactCount; ordinal++) {
+            String prefix = manifestArtifactPrefix(manifest, ordinal);
+            boolean wholeObject = "WHOLE_OBJECT".equals(manifest.getProperty(prefix + "kind"));
             UUID reference = UUID.fromString(manifestArtifactId(manifest, ordinal));
-            Path data = state.storageRoot.resolve("nodes/node-001/chunks").resolve(reference.toString());
+            Path data = state.storageRoot.resolve("nodes/node-001")
+                    .resolve(wholeObject ? "whole-objects" : "chunks")
+                    .resolve(reference.toString());
             Path sidecar = data.resolveSibling(data.getFileName() + ".sha256");
-            assertTrue(Files.isRegularFile(data), "missing canonical chunk " + data);
+            assertTrue(Files.isRegularFile(data), "missing canonical storage artifact " + data);
             assertTrue(Files.isRegularFile(sidecar), "missing checksum sidecar " + sidecar);
             assertEquals(sha256Hex(readBytes(data)), readString(sidecar).trim());
-            assertArrayEquals(readBytes(data), node.read(ChunkId.of(reference)).block());
+            byte[] read = wholeObject
+                    ? node.readWholeObject(ChunkId.of(reference)).block()
+                    : node.read(ChunkId.of(reference)).block();
+            assertArrayEquals(readBytes(data), read);
         }
     }
 
@@ -263,6 +271,162 @@ public class Phase3ReactivePipelineSteps {
             "one committed storage-engine object artifact must exist");
         assertEquals(1, countRegularFiles(state.storageRoot.resolve("metadata/s3-object-references")),
             "one committed S3-to-manifest reference must exist");
+    }
+
+    // ── REQ-PIPELINE-014 ─────────────────────────────────────────────────────────
+
+    @Given("storage class {string} disables multipart, deduplication, and erasure coding")
+    public void plainStorageClassDisablesChunkProducers(String storageClass) {
+        assertEquals("PLAIN", storageClass);
+        largeUploadStorageClass = storageClass;
+    }
+
+    @Given("fixture file {string} is a deterministic 8 MiB object")
+    public void deterministicPlainFixture(String fixturePath) throws IOException {
+        Path file = PROJECT_ROOT.resolve(fixturePath).normalize();
+        Files.createDirectories(file.getParent());
+        try (FileChannel channel = FileChannel.open(file,
+                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING,
+                StandardOpenOption.WRITE)) {
+            channel.position(PLAIN_OBJECT_SIZE - 1);
+            channel.write(ByteBuffer.wrap(new byte[] {0}));
+        }
+        assertEquals(PLAIN_OBJECT_SIZE, Files.size(file));
+        state.fixtureFile = fixturePath;
+    }
+
+    @When("the selected validation runner uploads the plain fixture to key {string}")
+    public void selectedRunnerUploadsPlainFixture(String key) {
+        state.objectKey = key;
+        eventRecorder.observe(state.storageRoot);
+        Flux<DataBuffer> body = Flux.range(0, Math.toIntExact(PLAIN_OBJECT_SIZE / LARGE_UPLOAD_BUFFER_SIZE))
+                .map(ignored -> new NettyDataBufferFactory(PooledByteBufAllocator.DEFAULT)
+                        .wrap(new byte[LARGE_UPLOAD_BUFFER_SIZE]));
+        var result = webTestClient.put()
+                .uri(URI.create("/" + state.bucket + "/" + state.objectKey))
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header("x-amz-storage-class", largeUploadStorageClass)
+                .contentLength(PLAIN_OBJECT_SIZE)
+                .body(body, DataBuffer.class)
+                .exchange()
+                .expectBody(byte[].class)
+                .returnResult();
+        lastPipelineResponse = new Response(result.getStatus().value(),
+                result.getResponseBody() == null ? new byte[0] : result.getResponseBody());
+        assertEquals(200, lastPipelineResponse.status(), lastPipelineResponse.bodyAsString());
+    }
+
+    @Then("the chunking stage records a whole-object pass-through decision")
+    public void chunkingRecordsWholeObjectPassThrough() {
+        Properties manifest = loadProperties(onlyFile(state.storageRoot.resolve("metadata/manifests"), ".properties"));
+        assertEquals(1, manifestArtifactCount(manifest));
+        assertEquals("WHOLE_OBJECT", manifest.getProperty("artifact.0.kind"));
+    }
+
+    @Then("the manifest references one whole-object storage unit and zero chunk artifacts")
+    public void manifestReferencesOneWholeObjectStorageUnit() {
+        Properties manifest = loadProperties(onlyFile(state.storageRoot.resolve("metadata/manifests"), ".properties"));
+        assertEquals(1, manifestArtifactCount(manifest));
+        assertEquals("WHOLE_OBJECT", manifest.getProperty("artifact.0.kind"));
+        assertTrue(manifest.stringPropertyNames().stream().noneMatch(name -> name.startsWith("chunk.")));
+    }
+
+    @Then("the whole-object namespace contains one data file with its SHA-256 sidecar while the chunk namespace is empty")
+    public void wholeObjectNamespaceContainsDataAndSidecar() {
+        Path wholeObjects = state.storageRoot.resolve("nodes/node-001/whole-objects");
+        assertEquals(1, countRegularFiles(wholeObjects));
+        assertEquals(1, countFilesMatching(wholeObjects,
+                path -> path.getFileName().toString().endsWith(".sha256")));
+        assertEquals(0, countRegularFiles(state.storageRoot.resolve("nodes/node-001/chunks")));
+    }
+
+    @Then("no dedup content-address entry, EC shard, or multipart part is created")
+    public void noSegmentedArtifactsAreCreated() {
+        assertEquals(0, countRegularFiles(state.storageRoot.resolve("metadata/content-address-index")));
+        assertEquals(0, countRegularFiles(state.storageRoot.resolve("multipart")));
+    }
+
+    @Then("the S3 client reads the exact 8 MiB fixture bytes through the production read path")
+    public void clientReadsExactPlainFixture() {
+        Response response = getObject(state.bucket, state.objectKey);
+        String readFailures = eventRecorder.events().stream()
+                .filter(StorageEvent.StageFailed.class::isInstance)
+                .map(StorageEvent.StageFailed.class::cast)
+                .map(StorageEvent.StageFailed::reason)
+                .reduce((left, right) -> left + "; " + right)
+                .orElse("");
+        assertEquals(200, response.status(), response.bodyAsString() + " failures=" + readFailures);
+        assertEquals(PLAIN_OBJECT_SIZE, response.body().length);
+        assertArrayEquals(readFixture(state.fixtureFile), response.body());
+    }
+
+    // ── REQ-PIPELINE-015 ─────────────────────────────────────────────────────────
+
+    @Given("storage class {string} selects four data shards and two parity shards")
+    public void storageClassSelectsFourDataAndTwoParityShards(String storageClass) {
+        assertEquals("EC_4_2", storageClass);
+        largeUploadStorageClass = storageClass;
+    }
+
+    @When("the selected validation runner uploads the EC fixture to key {string}")
+    public void selectedRunnerUploadsEcFixture(String key) {
+        state.objectKey = key;
+        eventRecorder.observe(state.storageRoot);
+        Flux<DataBuffer> body = Flux.range(0, Math.toIntExact(PLAIN_OBJECT_SIZE / LARGE_UPLOAD_BUFFER_SIZE))
+                .map(ignored -> new NettyDataBufferFactory(PooledByteBufAllocator.DEFAULT)
+                        .wrap(new byte[LARGE_UPLOAD_BUFFER_SIZE]));
+        var result = webTestClient.put()
+                .uri(URI.create("/" + state.bucket + "/" + state.objectKey))
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header("x-amz-storage-class", largeUploadStorageClass)
+                .contentLength(PLAIN_OBJECT_SIZE)
+                .body(body, DataBuffer.class)
+                .exchange()
+                .expectBody(byte[].class)
+                .returnResult();
+        lastPipelineResponse = new Response(result.getStatus().value(),
+                result.getResponseBody() == null ? new byte[0] : result.getResponseBody());
+        assertEquals(200, lastPipelineResponse.status(), lastPipelineResponse.bodyAsString());
+    }
+
+    @Then("two bounded 4 MiB stripes persist eight ordered 1 MiB data shards and four parity shards")
+    public void boundedEcStripesPersistExpectedShards() {
+        Properties manifest = loadProperties(onlyFile(state.storageRoot.resolve("metadata/manifests"), ".properties"));
+        assertEquals(12, manifestArtifactCount(manifest));
+        long dataShards = java.util.stream.IntStream.range(0, 12)
+                .filter(index -> "EC_DATA_SHARD".equals(manifest.getProperty("artifact." + index + ".kind")))
+                .count();
+        long parityShards = java.util.stream.IntStream.range(0, 12)
+                .filter(index -> "EC_PARITY_SHARD".equals(manifest.getProperty("artifact." + index + ".kind")))
+                .count();
+        assertEquals(8, dataShards);
+        assertEquals(4, parityShards);
+        assertEquals(12, countRegularFiles(state.storageRoot.resolve("nodes/node-001/chunks")));
+        assertEquals(0, countRegularFiles(state.storageRoot.resolve("nodes/node-001/whole-objects")));
+    }
+
+    @Then("the manifest distinguishes EC data and parity shards from dedup chunks and whole-object units")
+    public void manifestDistinguishesEcShardKinds() {
+        Properties manifest = loadProperties(onlyFile(state.storageRoot.resolve("metadata/manifests"), ".properties"));
+        for (int index = 0; index < manifestArtifactCount(manifest); index++) {
+            String kind = manifest.getProperty("artifact." + index + ".kind");
+            assertTrue("EC_DATA_SHARD".equals(kind) || "EC_PARITY_SHARD".equals(kind));
+        }
+    }
+
+    @Then("every shard checksum is validated before exact S3 readback")
+    public void everyShardChecksumValidatedBeforeReadback() {
+        Properties manifest = loadProperties(onlyFile(state.storageRoot.resolve("metadata/manifests"), ".properties"));
+        FileSystemStorageNode node = new FileSystemStorageNode(
+                state.storageRoot.resolve("nodes/node-001"), NodeId.of("node-001"));
+        for (int index = 0; index < manifestArtifactCount(manifest); index++) {
+            UUID id = UUID.fromString(manifestArtifactId(manifest, index));
+            assertNotNull(node.read(ChunkId.of(id)).block());
+        }
+        Response response = getObject(state.bucket, state.objectKey);
+        assertEquals(200, response.status(), response.bodyAsString());
+        assertEquals(PLAIN_OBJECT_SIZE, response.body().length);
+        assertArrayEquals(readFixture(state.fixtureFile), response.body());
     }
 
     // ── REQ-PIPELINE-002 ─────────────────────────────────────────────────────────
@@ -549,7 +713,7 @@ public class Phase3ReactivePipelineSteps {
         String preflight = orchestratorSource.substring(
                 orchestratorSource.indexOf("public Mono<Void> validateReadable"),
                 orchestratorSource.indexOf("List<StorageStage> writePipelineStages"));
-        assertTrue(preflight.contains("concatMap(chunk -> chunkStorePort.read(chunk.chunkId()).then(), 1)"));
+        assertTrue(preflight.contains("concatMap(artifact -> chunkStorePort.read(artifact).then(), 1)"));
         assertTrue(preflight.contains(".then()"));
         assertFalse(preflight.contains("collectList("));
         assertFalse(preflight.contains("byte[]"));

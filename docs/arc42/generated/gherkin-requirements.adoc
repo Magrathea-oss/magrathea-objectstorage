@@ -29,9 +29,9 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |Tag |Scenario count
 |`@absent` |3
 |`@config-only` |69
-|`@implemented-and-validated` |125
+|`@implemented-and-validated` |127
 |`@implemented-not-e2e-validated` |22
-|`@not-implemented` |16
+|`@not-implemented` |14
 |`@partial` |4
 |`@placeholder` |9
 |`unknown/not-tagged` |178
@@ -11172,9 +11172,9 @@ regression contract.
 |Classification |`@functional-requirement`, `@non-functional-requirement`
 |Capability area tags |`@spec`, `@reactive-pipeline`, `@storage-engine`, `@storage-layout`
 |Validation mode tags |`@pipeline-unit-required`, `@webclient-required`
-|Declared/validated status |`@not-implemented`
+|Declared/validated status |`@implemented-and-validated`
 |Protocol smoke |`no`
-|All tags |`@spec`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@REQ-PIPELINE-014`, `@functional-requirement`, `@non-functional-requirement`, `@storage-layout`, `@pipeline-unit-required`, `@webclient-required`, `@not-implemented`
+|All tags |`@spec`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@REQ-PIPELINE-014`, `@functional-requirement`, `@non-functional-requirement`, `@storage-layout`, `@pipeline-unit-required`, `@webclient-required`, `@implemented-and-validated`
 |===
 
 .Rule description
@@ -11197,18 +11197,19 @@ regression contract.
   When the selected validation runner uploads the plain fixture to key "pipeline/2026/plain/whole-object.bin"
   Then the chunking stage records a whole-object pass-through decision
   And the manifest references one whole-object storage unit and zero chunk artifacts
+  And the whole-object namespace contains one data file with its SHA-256 sidecar while the chunk namespace is empty
   And no dedup content-address entry, EC shard, or multipart part is created
   And the S3 client reads the exact 8 MiB fixture bytes through the production read path
 ----
 
-.Examples: Pipeline unit validation `@pipeline-unit`, `@not-implemented`
+.Examples: Pipeline unit validation `@pipeline-unit`
 [cols="1,1,1",options="header"]
 |===
 | requirement_id | validation_mode | storage_root
 | REQ-PIPELINE-014 | pipeline-unit | target/storage-engine-it/REQ-PIPELINE-014-unit
 |===
 
-.Examples: WebTestClient validation `@webclient`, `@not-implemented`
+.Examples: WebTestClient validation `@webclient`
 [cols="1,1,1",options="header"]
 |===
 | requirement_id | validation_mode | storage_root
@@ -11222,15 +11223,15 @@ regression contract.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:142`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:143`
 |Rule |Erasure coding owns stripe and shard chunking
 |Requirement ID(s) |`REQ-PIPELINE-015`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
-|Capability area tags |`@spec`, `@reactive-pipeline`, `@storage-engine`, `@integrity`, `@erasure-coding`, `@storage-layout`
+|Capability area tags |`@spec`, `@reactive-pipeline`, `@storage-engine`, `@integrity`, `@erasure-coding`, `@storage-layout`, `@streaming`
 |Validation mode tags |`@pipeline-unit-required`, `@webclient-required`
-|Declared/validated status |`@not-implemented`
+|Declared/validated status |`@implemented-and-validated`
 |Protocol smoke |`no`
-|All tags |`@spec`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@REQ-PIPELINE-015`, `@functional-requirement`, `@non-functional-requirement`, `@integrity`, `@erasure-coding`, `@storage-layout`, `@pipeline-unit-required`, `@webclient-required`, `@not-implemented`
+|All tags |`@spec`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@REQ-PIPELINE-015`, `@functional-requirement`, `@non-functional-requirement`, `@integrity`, `@erasure-coding`, `@storage-layout`, `@streaming`, `@pipeline-unit-required`, `@webclient-required`, `@implemented-and-validated`
 |===
 
 .Rule description
@@ -11249,19 +11250,19 @@ EC chunks, and modeled plans alone MUST NOT be reported as physical shard persis
   And storage class "EC_4_2" selects four data shards and two parity shards
   And fixture file "target/test-fixtures/pipeline/ec-object-8m.bin" is a deterministic 8 MiB object
   When the selected validation runner uploads the EC fixture to key "pipeline/2026/ec/sharded-object.bin"
-  Then the EC stage persists ordered data and parity shard artifacts derived from the policy
-  And the manifest distinguishes EC shards from dedup chunks and whole-object units
+  Then two bounded 4 MiB stripes persist eight ordered 1 MiB data shards and four parity shards
+  And the manifest distinguishes EC data and parity shards from dedup chunks and whole-object units
   And every shard checksum is validated before exact S3 readback
 ----
 
-.Examples: Pipeline unit validation `@pipeline-unit`, `@not-implemented`
+.Examples: Pipeline unit validation `@pipeline-unit`
 [cols="1,1,1",options="header"]
 |===
 | requirement_id | validation_mode | storage_root
 | REQ-PIPELINE-015 | pipeline-unit | target/storage-engine-it/REQ-PIPELINE-015-unit
 |===
 
-.Examples: WebTestClient validation `@webclient`, `@not-implemented`
+.Examples: WebTestClient validation `@webclient`
 [cols="1,1,1",options="header"]
 |===
 | requirement_id | validation_mode | storage_root
@@ -11275,7 +11276,7 @@ EC chunks, and modeled plans alone MUST NOT be reported as physical shard persis
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:170`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:171`
 |Rule |Write objects pass through explicit stages in a deterministic order
 |Requirement ID(s) |`REQ-PIPELINE-001`
 |Classification |`@functional-requirement`
@@ -11308,7 +11309,7 @@ order. Later stages MUST NOT run before earlier required stages have succeeded.
   And no manifest is committed before chunk-persistence succeeds for every referenced chunk
   And no object reference is committed before manifest-persistence succeeds
   And no content-address entry is published when the selected policy produces no dedup chunks
-  And every committed manifest chunk reference uses a canonical UUID filename with a matching SHA-256 sidecar readable by the canonical filesystem node
+  And every committed manifest artifact reference uses a canonical UUID filename with a matching SHA-256 sidecar in its type-specific filesystem namespace
   And a recovery scan of filesystem root "<storage_root>" reports no incomplete chunk artifacts after publication
   And after object-index-persistence succeeds, the selected validation runner reads the committed object through its declared production read entry point and receives the exact bytes from fixture file "<fixture_file>"
 ----
@@ -11334,7 +11335,7 @@ order. Later stages MUST NOT run before earlier required stages have succeeded.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:211`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:212`
 |Rule |Dedup chunk persistence preserves backpressure and bounded memory
 |Requirement ID(s) |`REQ-PIPELINE-002`
 |Classification |`@non-functional-requirement`
@@ -11394,7 +11395,7 @@ production object-content paths. This rule does not authorize chunking plain upl
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:247`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:248`
 |Rule |Upload ETag computation and dedup windowing preserve streaming request-body paths
 |Requirement ID(s) |`REQ-PIPELINE-007`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -11436,7 +11437,7 @@ materializing the complete FileUnit.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:259`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:260`
 |Rule |Upload ETag computation and dedup windowing preserve streaming request-body paths
 |Requirement ID(s) |`REQ-PIPELINE-008`
 |Classification |`@non-functional-requirement`
@@ -11477,7 +11478,7 @@ materializing the complete FileUnit.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:276`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:277`
 |Rule |Read objects stream chunks in manifest order without aggregating the object
 |Requirement ID(s) |`REQ-PIPELINE-009`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -11514,7 +11515,7 @@ before response streaming begins.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:285`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:286`
 |Rule |Read objects stream chunks in manifest order without aggregating the object
 |Requirement ID(s) |`REQ-PIPELINE-010`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -11554,7 +11555,7 @@ before response streaming begins.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:297`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:298`
 |Rule |Read objects stream chunks in manifest order without aggregating the object
 |Requirement ID(s) |`REQ-PIPELINE-003`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -11604,7 +11605,7 @@ before response streaming begins.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:332`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:333`
 |Rule |HTTP read integrity preflight preserves deterministic S3 errors
 |Requirement ID(s) |`REQ-PIPELINE-003`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -11656,7 +11657,7 @@ latency or single-pass filesystem I/O.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:365`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:366`
 |Rule |Multipart part persistence streams upload and copy inputs without complete-part aggregation
 |Requirement ID(s) |`REQ-PIPELINE-011`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -11696,7 +11697,7 @@ without loading each part file as one byte array.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:377`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:378`
 |Rule |Multipart part persistence streams upload and copy inputs without complete-part aggregation
 |Requirement ID(s) |`REQ-PIPELINE-012`
 |Classification |`@non-functional-requirement`
@@ -11737,7 +11738,7 @@ without loading each part file as one byte array.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:396`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:397`
 |Rule |Existing S3 streaming boundaries apply a finite runtime demand window
 |Requirement ID(s) |`REQ-PIPELINE-013`
 |Classification |`@non-functional-requirement`
@@ -11777,7 +11778,7 @@ boundary does not validate stage ordering, manifest publication, or StorageEvent
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:413`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:414`
 |Rule |Stage failures propagate deterministically and clean up completed resources
 |Requirement ID(s) |`REQ-PIPELINE-004`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -11834,7 +11835,7 @@ a deterministic S3 error without publishing a readable object.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:441`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:442`
 |Rule |Stage failures propagate deterministically and clean up completed resources
 |Requirement ID(s) |`REQ-PIPELINE-004`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -11875,7 +11876,7 @@ a deterministic S3 error without publishing a readable object.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:460`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:461`
 |Rule |Cancellation before publication cleans up pipeline-owned resources
 |Requirement ID(s) |`REQ-PIPELINE-005`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -11936,7 +11937,7 @@ unpublished chunks or temporary files, and leave no readable object behind.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:495`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:496`
 |Rule |Each pipeline stage emits independent typed instrumentation events
 |Requirement ID(s) |`REQ-PIPELINE-006`
 |Classification |`@non-functional-requirement`

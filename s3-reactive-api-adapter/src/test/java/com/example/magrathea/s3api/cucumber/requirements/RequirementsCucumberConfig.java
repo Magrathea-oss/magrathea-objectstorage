@@ -31,7 +31,8 @@ public class RequirementsCucumberConfig {
             Path catalogRoot = Files.createTempDirectory("magrathea-requirements-catalog-");
             registry.add("storage.engine.policies.dir",
                 () -> extractCatalogDir(catalogRoot, "storage-policies",
-                    List.of("minio-standard.yaml", "pipeline-streaming.yaml")).toString());
+                    List.of("minio-standard.yaml", "pipeline-streaming.yaml", "plain-streaming.yaml",
+                        "ec-4-2.yaml")).toString());
             registry.add("storage.engine.devices.dir",
                 () -> extractCatalogDir(catalogRoot, "storage-devices",
                     List.of("local-disk-0.yaml")).toString());

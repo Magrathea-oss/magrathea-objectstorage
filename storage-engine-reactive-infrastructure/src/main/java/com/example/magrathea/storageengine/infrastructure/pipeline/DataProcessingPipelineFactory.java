@@ -105,7 +105,7 @@ public class DataProcessingPipelineFactory implements DataProcessingPipelinePort
                 }
                 case StepSpec.Compress ignored -> compressionStep;
                 case StepSpec.Encrypt ignored  -> encryptionStep;
-                case StepSpec.EC ignored       -> erasureCodingStep;
+                case StepSpec.EC ec            -> new FixedStripeErasureCodingStep(ec.config());
             };
             steps.add(step);
         }

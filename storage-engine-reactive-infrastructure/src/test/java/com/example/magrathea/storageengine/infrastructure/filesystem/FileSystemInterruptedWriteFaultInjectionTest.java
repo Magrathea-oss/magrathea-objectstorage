@@ -58,7 +58,7 @@ class FileSystemInterruptedWriteFaultInjectionTest {
     Path storageRoot;
 
     @Test
-    void interruptedChunkWriteLeavesNoCommittedChunkOrObjectAndRecoveryCanQuarantineTempArtifact()
+    void interruptedWholeObjectWriteLeavesNoCommittedArtifactAndRecoveryCanQuarantineTempArtifact()
             throws IOException {
         byte[] content = "Hello interrupted chunk write".getBytes(StandardCharsets.UTF_8);
         FileSystemStorageCluster cluster = new FileSystemStorageCluster(
@@ -79,7 +79,7 @@ class FileSystemInterruptedWriteFaultInjectionTest {
         assertNoCommittedObjectVisibility();
 
         ChunkId attemptedChunkId = chunkIdFromTempFile(tempChunks.getFirst());
-        StepVerifier.create(cluster.nodes().getFirst().read(attemptedChunkId))
+        StepVerifier.create(cluster.nodes().getFirst().readWholeObject(attemptedChunkId))
                 .expectError(NoSuchFileException.class)
                 .verify();
 
@@ -87,7 +87,7 @@ class FileSystemInterruptedWriteFaultInjectionTest {
         FileSystemRecoveryScanner.ScanReport report = scanner.scan(storageRoot);
         assertThat(report.findings())
                 .anySatisfy(finding -> {
-                    assertThat(finding.artifactType()).isEqualTo("orphaned-chunk");
+                    assertThat(finding.artifactType()).isEqualTo("orphaned-whole-object");
                     assertThat(finding.artifactPath()).isEqualTo(tempChunks.getFirst().toString());
                 });
 
@@ -138,8 +138,9 @@ class FileSystemInterruptedWriteFaultInjectionTest {
     }
 
     private ReactiveStorageOrchestrator orchestrator(FileSystemStorageCluster cluster) {
-        Path chunksDir = storageRoot.resolve("nodes/node-001/chunks");
-        FileSystemStorePort storePort = new FileSystemStorePort(chunksDir, chunksDir, cluster.faultInjector());
+        Path nodeRoot = storageRoot.resolve("nodes/node-001");
+        FileSystemStorePort storePort = new FileSystemStorePort(
+                nodeRoot.resolve("whole-objects"), nodeRoot.resolve("chunks"), cluster.faultInjector());
         DataProcessingPipelineFactory pipelineFactory = new DataProcessingPipelineFactory(
                 new NoOpDeduplicationStep(),
                 new NoOpCompressionStep(),

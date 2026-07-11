@@ -3,12 +3,14 @@ package com.example.magrathea.storageengine.domain.valueobject;
 import java.util.List;
 
 public record ChunkPersistenceTrace(
+        StorageArtifactKind artifactKind,
         ChunkId chunkId,
         Fingerprint fingerprint,
         long originalSize,
         List<StepExecutionRecord> steps) {
 
     public ChunkPersistenceTrace {
+        java.util.Objects.requireNonNull(artifactKind, "artifactKind must not be null");
         java.util.Objects.requireNonNull(chunkId, "chunkId must not be null");
         java.util.Objects.requireNonNull(fingerprint, "fingerprint must not be null");
         if (originalSize < 0) {
@@ -19,6 +21,14 @@ public record ChunkPersistenceTrace(
         if (steps.size() != 6) {
             throw new IllegalArgumentException("steps must have exactly 6 entries: " + steps.size());
         }
+    }
+
+    public ChunkPersistenceTrace(
+            ChunkId chunkId,
+            Fingerprint fingerprint,
+            long originalSize,
+            List<StepExecutionRecord> steps) {
+        this(StorageArtifactKind.LEGACY_CHUNK, chunkId, fingerprint, originalSize, steps);
     }
 
     public ContentHash finalChecksum() {

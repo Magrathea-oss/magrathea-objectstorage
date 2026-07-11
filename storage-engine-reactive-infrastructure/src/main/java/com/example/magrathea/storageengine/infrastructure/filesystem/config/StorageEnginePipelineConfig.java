@@ -63,10 +63,9 @@ public class StorageEnginePipelineConfig {
     public StorePort storePort(
             @Value("${storage.engine.filesystem.root:target/storage-engine}") String root,
             ObjectProvider<FileSystemStorageCluster> clusterProvider) {
-        // Both FileUnit (non-dedup streaming path) and ChunkUnit (dedup path) are stored
-        // in the same chunks directory so that FileSystemStorageNode.read(ChunkId) can
-        // locate them regardless of which write path was used.
-        Path chunksDir = Path.of(root).resolve("nodes/node-001/chunks");
+        Path nodeRoot = Path.of(root).resolve("nodes/node-001");
+        Path wholeObjectsDir = nodeRoot.resolve("whole-objects");
+        Path chunksDir = nodeRoot.resolve("chunks");
         // Reuse the cluster's fault injector (if a cluster bean is available) so that
         // filesystem-reliability tests that enable fault injection see the same behaviour
         // in the new streaming pipeline path as in the old ChunkStorePort path.
@@ -74,7 +73,7 @@ public class StorageEnginePipelineConfig {
         FileSystemWriteFaultInjector injector = cluster != null
                 ? cluster.faultInjector()
                 : FileSystemWriteFaultInjector.disabled();
-        return new FileSystemStorePort(chunksDir, chunksDir, injector);
+        return new FileSystemStorePort(wholeObjectsDir, chunksDir, injector);
     }
 
     @Bean

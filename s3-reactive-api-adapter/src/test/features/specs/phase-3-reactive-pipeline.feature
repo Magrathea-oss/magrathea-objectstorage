@@ -110,7 +110,7 @@ Ability: Phase 3 staged reactive read and write pipeline
       And the manifest references one artifact of kind "WHOLE_OBJECT" and zero chunk properties
       And the typed manifest remains readable through the production read path
 
-    @REQ-PIPELINE-014 @functional-requirement @non-functional-requirement @storage-layout @pipeline-unit-required @webclient-required @not-implemented
+    @REQ-PIPELINE-014 @functional-requirement @non-functional-requirement @storage-layout @pipeline-unit-required @webclient-required @implemented-and-validated
     Scenario Outline: Plain filesystem layout uses an explicit whole-object namespace
       Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
       And the storage engine operator uses filesystem root "<storage_root>"
@@ -120,15 +120,16 @@ Ability: Phase 3 staged reactive read and write pipeline
       When the selected validation runner uploads the plain fixture to key "pipeline/2026/plain/whole-object.bin"
       Then the chunking stage records a whole-object pass-through decision
       And the manifest references one whole-object storage unit and zero chunk artifacts
+      And the whole-object namespace contains one data file with its SHA-256 sidecar while the chunk namespace is empty
       And no dedup content-address entry, EC shard, or multipart part is created
       And the S3 client reads the exact 8 MiB fixture bytes through the production read path
 
-      @pipeline-unit @not-implemented
+      @pipeline-unit
       Examples: Pipeline unit validation
         | requirement_id     | validation_mode | storage_root                                        |
         | REQ-PIPELINE-014   | pipeline-unit   | target/storage-engine-it/REQ-PIPELINE-014-unit     |
 
-      @webclient @not-implemented
+      @webclient
       Examples: WebTestClient validation
         | requirement_id     | validation_mode | storage_root                                        |
         | REQ-PIPELINE-014   | webclient       | target/storage-engine-it/REQ-PIPELINE-014-webclient |
@@ -138,7 +139,7 @@ Ability: Phase 3 staged reactive read and write pipeline
     produce ordered data/parity shard artifacts. EC-disabled plain uploads MUST produce no
     EC chunks, and modeled plans alone MUST NOT be reported as physical shard persistence.
 
-    @REQ-PIPELINE-015 @functional-requirement @non-functional-requirement @integrity @erasure-coding @storage-layout @pipeline-unit-required @webclient-required @not-implemented
+    @REQ-PIPELINE-015 @functional-requirement @non-functional-requirement @integrity @erasure-coding @storage-layout @streaming @pipeline-unit-required @webclient-required @implemented-and-validated
     Scenario Outline: EC-enabled PutObject persists policy-derived data and parity shards
       Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
       And the storage engine operator uses filesystem root "<storage_root>"
@@ -146,16 +147,16 @@ Ability: Phase 3 staged reactive read and write pipeline
       And storage class "EC_4_2" selects four data shards and two parity shards
       And fixture file "target/test-fixtures/pipeline/ec-object-8m.bin" is a deterministic 8 MiB object
       When the selected validation runner uploads the EC fixture to key "pipeline/2026/ec/sharded-object.bin"
-      Then the EC stage persists ordered data and parity shard artifacts derived from the policy
-      And the manifest distinguishes EC shards from dedup chunks and whole-object units
+      Then two bounded 4 MiB stripes persist eight ordered 1 MiB data shards and four parity shards
+      And the manifest distinguishes EC data and parity shards from dedup chunks and whole-object units
       And every shard checksum is validated before exact S3 readback
 
-      @pipeline-unit @not-implemented
+      @pipeline-unit
       Examples: Pipeline unit validation
         | requirement_id     | validation_mode | storage_root                                        |
         | REQ-PIPELINE-015   | pipeline-unit   | target/storage-engine-it/REQ-PIPELINE-015-unit     |
 
-      @webclient @not-implemented
+      @webclient
       Examples: WebTestClient validation
         | requirement_id     | validation_mode | storage_root                                        |
         | REQ-PIPELINE-015   | webclient       | target/storage-engine-it/REQ-PIPELINE-015-webclient |
@@ -187,7 +188,7 @@ Ability: Phase 3 staged reactive read and write pipeline
       And no manifest is committed before chunk-persistence succeeds for every referenced chunk
       And no object reference is committed before manifest-persistence succeeds
       And no content-address entry is published when the selected policy produces no dedup chunks
-      And every committed manifest chunk reference uses a canonical UUID filename with a matching SHA-256 sidecar readable by the canonical filesystem node
+      And every committed manifest artifact reference uses a canonical UUID filename with a matching SHA-256 sidecar in its type-specific filesystem namespace
       And a recovery scan of filesystem root "<storage_root>" reports no incomplete chunk artifacts after publication
       And after object-index-persistence succeeds, the selected validation runner reads the committed object through its declared production read entry point and receives the exact bytes from fixture file "<fixture_file>"
 

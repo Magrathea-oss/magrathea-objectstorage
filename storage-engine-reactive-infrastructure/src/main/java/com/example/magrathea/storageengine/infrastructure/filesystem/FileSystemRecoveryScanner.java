@@ -106,7 +106,7 @@ public class FileSystemRecoveryScanner {
         Instant startedAt = Instant.now();
         List<Finding> findings = new ArrayList<>();
 
-        scanChunks(storageRoot, findings);
+        scanStorageArtifacts(storageRoot, findings);
         scanManifests(storageRoot, findings);
         scanObjectReferences(storageRoot, findings);
 
@@ -157,7 +157,8 @@ public class FileSystemRecoveryScanner {
                         StorageEventMeasurements.recoveryQuarantine(1)));
                 // Also move the .sha256 sidecar if quarantining a chunk
                 if (finding.artifactType().equals("checksum-mismatch")
-                        || finding.artifactType().equals("orphaned-chunk")) {
+                        || finding.artifactType().equals("orphaned-chunk")
+                        || finding.artifactType().equals("orphaned-whole-object")) {
                     Path sidecar = Path.of(finding.artifactPath() + SHA256_EXT);
                     if (Files.exists(sidecar)) {
                         Path sidecarDest = quarantineRoot.resolve(
@@ -177,50 +178,47 @@ public class FileSystemRecoveryScanner {
     //  Chunk scanning
     // ─────────────────────────────────────────────────────
 
-    private void scanChunks(Path storageRoot, List<Finding> findings) {
+    private void scanStorageArtifacts(Path storageRoot, List<Finding> findings) {
         Path nodesDir = storageRoot.resolve("nodes");
         if (!Files.isDirectory(nodesDir)) {
             return;
         }
-        Path quarantineRoot = storageRoot.resolve(QUARANTINE_DIR);
         try (var nodeStream = Files.list(nodesDir)) {
             nodeStream.filter(Files::isDirectory).forEach(nodeDir -> {
-                Path chunksDir = nodeDir.resolve("chunks");
-                if (!Files.isDirectory(chunksDir)) {
-                    return;
-                }
-                try (var chunkStream = Files.list(chunksDir)) {
-                    chunkStream.filter(Files::isRegularFile).forEach(chunkFile -> {
-                        // Skip quarantine directory
-                        if (chunkFile.startsWith(quarantineRoot)) {
-                            return;
-                        }
-                        String name = chunkFile.getFileName().toString();
-                        // A final sidecar without its data file can remain if interruption
-                        // occurs between the protocol's sidecar and data atomic renames.
-                        if (name.endsWith(SHA256_EXT) && !name.contains(TMP_MARKER)) {
-                            String dataName = name.substring(0, name.length() - SHA256_EXT.length());
-                            if (!Files.exists(chunkFile.resolveSibling(dataName))) {
-                                findings.add(Finding.orphanedChunk(chunkFile.toString(),
-                                        "Orphaned checksum sidecar without committed chunk: " + name));
-                            }
-                            return;
-                        }
-                        // Orphaned temp files
-                        if (name.contains(TMP_MARKER)) {
-                            findings.add(Finding.orphanedChunk(chunkFile.toString(),
-                                    "Orphaned chunk temp file from interrupted write: " + name));
-                            return;
-                        }
-                        // Committed chunk — verify checksum
-                        verifyChunkChecksum(chunkFile, findings);
-                    });
-                } catch (IOException e) {
-                    throw new UncheckedIOException("Failed to list chunks directory: " + chunksDir, e);
-                }
+                scanArtifactNamespace(nodeDir.resolve("chunks"), "chunk", "orphaned-chunk", findings);
+                scanArtifactNamespace(nodeDir.resolve("whole-objects"), "whole-object",
+                        "orphaned-whole-object", findings);
             });
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to list nodes directory: " + nodesDir, e);
+        }
+    }
+
+    private void scanArtifactNamespace(
+            Path namespace, String label, String orphanType, List<Finding> findings) {
+        if (!Files.isDirectory(namespace)) {
+            return;
+        }
+        try (var files = Files.list(namespace)) {
+            files.filter(Files::isRegularFile).forEach(artifact -> {
+                String name = artifact.getFileName().toString();
+                if (name.endsWith(SHA256_EXT) && !name.contains(TMP_MARKER)) {
+                    String dataName = name.substring(0, name.length() - SHA256_EXT.length());
+                    if (!Files.exists(artifact.resolveSibling(dataName))) {
+                        findings.add(Finding.orphaned(artifact.toString(), orphanType,
+                                "Orphaned checksum sidecar without committed " + label + ": " + name));
+                    }
+                    return;
+                }
+                if (name.contains(TMP_MARKER)) {
+                    findings.add(Finding.orphaned(artifact.toString(), orphanType,
+                            "Orphaned " + label + " temp file from interrupted write: " + name));
+                    return;
+                }
+                verifyChunkChecksum(artifact, findings);
+            });
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to list storage artifact namespace: " + namespace, e);
         }
     }
 
@@ -228,14 +226,13 @@ public class FileSystemRecoveryScanner {
         Path checksumFile = chunkFile.getParent().resolve(
                 chunkFile.getFileName().toString() + SHA256_EXT);
         try {
-            byte[] data = Files.readAllBytes(chunkFile);
             if (!Files.exists(checksumFile)) {
                 findings.add(Finding.checksumMismatch(chunkFile.toString(),
                         "Chunk checksum sidecar (.sha256) missing — cannot verify integrity"));
                 return;
             }
             String storedHex = Files.readString(checksumFile).trim();
-            String computedHex = sha256Hex(data);
+            String computedHex = sha256Hex(chunkFile);
             if (!computedHex.equals(storedHex)) {
                 findings.add(Finding.checksumMismatch(chunkFile.toString(),
                         "Chunk SHA-256 mismatch: stored=" + storedHex + " computed=" + computedHex));
@@ -400,6 +397,22 @@ public class FileSystemRecoveryScanner {
     //  SHA-256 helper
     // ─────────────────────────────────────────────────────
 
+    private static String sha256Hex(Path path) throws IOException {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            try (var input = Files.newInputStream(path)) {
+                byte[] buffer = new byte[64 * 1024];
+                int read;
+                while ((read = input.read(buffer)) >= 0) {
+                    digest.update(buffer, 0, read);
+                }
+            }
+            return HexFormat.of().formatHex(digest.digest());
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
+    }
+
     private static String sha256Hex(byte[] data) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
@@ -428,7 +441,11 @@ public class FileSystemRecoveryScanner {
     public record Finding(String artifactPath, String artifactType, String reason) {
 
         static Finding orphanedChunk(String path, String reason) {
-            return new Finding(path, "orphaned-chunk", reason);
+            return orphaned(path, "orphaned-chunk", reason);
+        }
+
+        static Finding orphaned(String path, String type, String reason) {
+            return new Finding(path, type, reason);
         }
 
         static Finding checksumMismatch(String path, String reason) {

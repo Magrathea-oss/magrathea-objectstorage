@@ -24,6 +24,8 @@ public record StorageTrace(
             case StorageUnit.FileUnit ignored     -> "file";
             case StorageUnit.ChunkUnit ignored    -> "chunk";
             case StorageUnit.ECStripeUnit ignored -> "ec-stripe";
+            case StorageUnit.ECShardUnit shard    -> shard.parity()
+                    ? "ec-parity-shard" : "ec-data-shard";
             case StorageUnit.PartUnit ignored     -> "part";
         };
     }

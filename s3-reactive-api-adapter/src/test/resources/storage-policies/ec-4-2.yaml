@@ -1,0 +1,20 @@
+policyId: ec-4-2
+version: "1.0"
+storageClassId: EC_4_2
+
+compression:
+  enabled: false
+  algorithm: ZSTD
+  level: 0
+
+encryption:
+  enabled: false
+  mode: NONE
+
+replication:
+  factor: 1
+
+erasureCoding:
+  enabled: true
+  dataBlocks: 4
+  parityBlocks: 2

@@ -167,8 +167,9 @@ class StorageEngineReactiveS3ObjectRepositoryTest {
 
     private StorageEngineReactiveS3ObjectRepository realFilesystemRepository(Path storageRoot) {
         FileSystemStorageCluster cluster = new FileSystemStorageCluster(storageRoot, 1);
-        Path chunksDir = storageRoot.resolve("nodes/node-001/chunks");
-        FileSystemStorePort storePort = new FileSystemStorePort(chunksDir, chunksDir);
+        Path nodeRoot = storageRoot.resolve("nodes/node-001");
+        FileSystemStorePort storePort = new FileSystemStorePort(
+                nodeRoot.resolve("whole-objects"), nodeRoot.resolve("chunks"));
         DataProcessingPipelineFactory pipelineFactory = new DataProcessingPipelineFactory(
                 new NoOpDeduplicationStep(),
                 new NoOpCompressionStep(),

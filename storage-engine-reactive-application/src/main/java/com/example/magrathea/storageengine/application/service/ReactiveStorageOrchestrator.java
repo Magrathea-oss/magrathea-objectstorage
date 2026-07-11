@@ -192,7 +192,7 @@ public class ReactiveStorageOrchestrator {
         Instant startedAt = Instant.now();
         return objectManifestRepository.findBy(manifestId)
                 .flatMapMany(manifest -> Flux.fromIterable(manifest.chunks()))
-                .concatMap(chunk -> chunkStorePort.read(chunk.chunkId()).then(), 1)
+                .concatMap(artifact -> chunkStorePort.read(artifact).then(), 1)
                 .then()
                 .onErrorResume(error -> storageEventPublisher.publish(new StorageEvent.StageFailed(
                                 StorageOperation.READ,
@@ -343,16 +343,18 @@ public class ReactiveStorageOrchestrator {
                                 .withStageDecision("chunk-persistence",
                                         "chunk-trace-count=" + traces.size())
                                 .addCleanupHandle(StorageCleanupHandle.named(
-                                        "chunk-persistence", cleanupPersistedChunks(traces)))),
+                                        "chunk-persistence", cleanupPersistedArtifacts(context, traces)))),
                 ignored -> Mono.empty(),
                 (state, error) -> cleanupPersistedStorageTraces(context, state.traces()),
                 state -> cleanupPersistedStorageTraces(context, state.traces()));
     }
 
-    private Mono<Void> cleanupPersistedChunks(List<ChunkPersistenceTrace> traces) {
+    private Mono<Void> cleanupPersistedArtifacts(
+            StorageContext context, List<ChunkPersistenceTrace> traces) {
+        StorageArtifactKind artifactKind = artifactKindFor(context);
         return Flux.fromIterable(traces)
                 .filter(trace -> !isDeduplicatedReuse(trace))
-                .concatMap(trace -> chunkStorePort.delete(trace.chunkId()))
+                .concatMap(trace -> chunkStorePort.delete(artifactKind, trace.chunkId()))
                 .then();
     }
 
@@ -366,8 +368,9 @@ public class ReactiveStorageOrchestrator {
             return Mono.empty();
         }
         Instant startedAt = Instant.now();
+        StorageArtifactKind artifactKind = artifactKindFor(context);
         return Flux.fromIterable(owned)
-                .concatMap(trace -> chunkStorePort.delete(
+                .concatMap(trace -> chunkStorePort.delete(artifactKind,
                         ChunkId.of(UUID.fromString(trace.storageRef().orElseThrow()))))
                 .then(storageEventPublisher.publish(
                         new com.example.magrathea.storageengine.application.pipeline.StorageEvent.CleanupCompleted(
@@ -487,7 +490,8 @@ public class ReactiveStorageOrchestrator {
             }
         }
 
-        return new ChunkPersistenceTrace(chunkId, fingerprint, storageTrace.originalSize(), steps);
+        return new ChunkPersistenceTrace(
+                artifactKindFor(storageTrace), chunkId, fingerprint, storageTrace.originalSize(), steps);
     }
 
     /**
@@ -662,6 +666,7 @@ public class ReactiveStorageOrchestrator {
 
     private Mono<StorageContext> prepareChunkReading(StorageContext context) {
         Flux<byte[]> readableChunks = Flux.fromIterable(context.chunkDescriptors())
+                .filter(artifact -> artifact.artifactKind() != StorageArtifactKind.EC_PARITY_SHARD)
                 .index()
                 .concatMap(indexed -> {
                     int ordinal = Math.toIntExact(indexed.getT1());
@@ -669,8 +674,8 @@ public class ReactiveStorageOrchestrator {
                     return Mono.defer(() -> {
                         readPipelineObserver.chunkReadRequested(
                                 context.correlationId(), ordinal, chunk.chunkId());
-                        return chunkStorePort.read(chunk.chunkId())
-                                .map(storedData -> restoreReadableChunk(storedData, chunk))
+                        return chunkStorePort.read(chunk)
+                                .map(storedData -> restoreReadableArtifact(storedData, chunk))
                                 .doOnNext(ignored -> readPipelineObserver.chunkVerified(
                                         context.correlationId(), ordinal, chunk.chunkId()))
                                 .doOnNext(ignored -> readPipelineObserver.responseChunkEmitted(
@@ -723,11 +728,15 @@ public class ReactiveStorageOrchestrator {
         }
     }
 
-    private static byte[] restoreReadableChunk(byte[] storedData, StorageArtifactReferenceDescriptor chunk) {
-        if (!hasAppliedErasureCoding(chunk) || storedData.length <= chunk.originalSize()) {
+    private static byte[] restoreReadableArtifact(
+            byte[] storedData, StorageArtifactReferenceDescriptor artifact) {
+        if (artifact.artifactKind() == StorageArtifactKind.EC_DATA_SHARD) {
+            return Arrays.copyOf(storedData, Math.toIntExact(artifact.originalSize()));
+        }
+        if (!hasAppliedErasureCoding(artifact) || storedData.length <= artifact.originalSize()) {
             return storedData;
         }
-        return Arrays.copyOf(storedData, Math.toIntExact(chunk.originalSize()));
+        return Arrays.copyOf(storedData, Math.toIntExact(artifact.originalSize()));
     }
 
     private static boolean hasAppliedErasureCoding(StorageArtifactReferenceDescriptor chunk) {
@@ -763,7 +772,6 @@ public class ReactiveStorageOrchestrator {
     }
 
     private List<StorageArtifactReferenceDescriptor> buildDescriptors(StorageContext context) {
-        StorageArtifactKind artifactKind = artifactKindFor(context);
         List<StorageArtifactReferenceDescriptor> descriptors = new ArrayList<>();
         for (ChunkPersistenceTrace trace : context.chunkTraces()) {
             List<StepChecksumDescriptor> stepChecksums = new ArrayList<>();
@@ -788,7 +796,7 @@ public class ReactiveStorageOrchestrator {
                     .orElse(trace.originalSize());
 
             descriptors.add(new StorageArtifactReferenceDescriptor(
-                    artifactKind,
+                    trace.artifactKind(),
                     trace.chunkId(),
                     trace.fingerprint(),
                     trace.originalSize(),
@@ -798,6 +806,19 @@ public class ReactiveStorageOrchestrator {
                     locations));
         }
         return descriptors;
+    }
+
+    private StorageArtifactKind artifactKindFor(StorageTrace trace) {
+        return switch (trace.unitKind()) {
+            case "file", "whole-object" -> StorageArtifactKind.WHOLE_OBJECT;
+            case "chunk" -> StorageArtifactKind.DEDUP_CHUNK;
+            case "ec-stripe" -> StorageArtifactKind.EC_STRIPE;
+            case "ec-data-shard" -> StorageArtifactKind.EC_DATA_SHARD;
+            case "ec-parity-shard" -> StorageArtifactKind.EC_PARITY_SHARD;
+            case "part" -> StorageArtifactKind.MULTIPART_PART;
+            default -> throw new IllegalArgumentException(
+                    "Unsupported storage trace unit kind: " + trace.unitKind());
+        };
     }
 
     private StorageArtifactKind artifactKindFor(StorageContext context) {
@@ -810,9 +831,7 @@ public class ReactiveStorageOrchestrator {
             return StorageArtifactKind.DEDUP_CHUNK;
         }
         if (stepIsExecuted(plan, StepId.ERASURE_CODING)) {
-            // Physical EC stripe/shard persistence is REQ-PIPELINE-015. Do not mislabel
-            // the current modeled single artifact as physical EC evidence.
-            return StorageArtifactKind.LEGACY_CHUNK;
+            return StorageArtifactKind.EC_STRIPE;
         }
         return StorageArtifactKind.WHOLE_OBJECT;
     }

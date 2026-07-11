@@ -1,0 +1,20 @@
+policyId: plain-streaming
+version: "1.0"
+storageClassId: PLAIN
+
+compression:
+  enabled: false
+  algorithm: ZSTD
+  level: 0
+
+encryption:
+  enabled: false
+  mode: NONE
+
+replication:
+  factor: 1
+
+erasureCoding:
+  enabled: false
+  dataBlocks: 1
+  parityBlocks: 0
