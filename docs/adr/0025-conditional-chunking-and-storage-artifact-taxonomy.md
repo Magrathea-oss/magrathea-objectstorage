@@ -6,9 +6,11 @@
 
 ## Context
 
-The current storage pipeline names every persisted `FileUnit` as a chunk-compatible UUID and represents every object manifest entry with `ChunkReferenceDescriptor`, even when multipart upload, deduplication, and erasure coding are disabled. This makes a plain streamed object look like a one-chunk object and leaks that accidental representation into recovery, integrity reporting, future garbage collection, quotas, and Admin terminology.
+Forced fixed-window multi-chunk persistence for ordinary non-dedup uploads was introduced historically by `REQ-UPLOAD-003` and intentionally removed in commit `696e147` because it was unnecessary. This ADR preserves that removal and must never be used to reintroduce it.
 
-That model is not the intended storage architecture. Chunking has a cost and a semantic purpose; it must not become the universal representation for all objects.
+The current pipeline correctly keeps a non-dedup upload as one streamed `FileUnit`, but persists that single unit with a chunk-compatible UUID and represents its manifest entry with `ChunkReferenceDescriptor`. That is naming/layout compatibility debt, not forced upload splitting. It can make a plain streamed object look like a one-chunk object in recovery, integrity reporting, future garbage collection, quotas, and Admin terminology.
+
+Chunking has a cost and a semantic purpose; it must not become the universal representation for all objects.
 
 ## Decision
 

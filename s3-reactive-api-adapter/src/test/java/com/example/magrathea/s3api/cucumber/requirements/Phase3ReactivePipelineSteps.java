@@ -215,21 +215,16 @@ public class Phase3ReactivePipelineSteps {
             "object-index-persistence").objectFiles());
     }
 
-    @Then("content-address entries for new chunks are published only after object-index-persistence commits the owning object")
-    public void contentAddressEntriesFollowObjectCommit() {
-        var chunksSucceeded = eventRecorder.snapshot(
-                StorageEventType.STAGE_SUCCEEDED, "chunk-persistence");
-        var manifestSucceeded = eventRecorder.snapshot(
-                StorageEventType.STAGE_SUCCEEDED, "manifest-persistence");
-        var objectStarted = eventRecorder.snapshot(
-                StorageEventType.STAGE_STARTED, "object-index-persistence");
-        var objectSucceeded = eventRecorder.snapshot(
-                StorageEventType.STAGE_SUCCEEDED, "object-index-persistence");
-        assertEquals(0, chunksSucceeded.contentAddressFiles());
-        assertEquals(0, manifestSucceeded.contentAddressFiles());
-        assertEquals(0, objectStarted.contentAddressFiles());
-        assertTrue(objectSucceeded.contentAddressFiles() > 0,
-                "committed object must publish at least one content-address entry");
+    @Then("no content-address entry is published when the selected policy produces no dedup chunks")
+    public void noContentAddressEntryForPlainPolicy() {
+        assertEquals(0, eventRecorder.snapshot(StorageEventType.STAGE_SUCCEEDED, "chunk-persistence")
+                .contentAddressFiles());
+        assertEquals(0, eventRecorder.snapshot(StorageEventType.STAGE_SUCCEEDED, "manifest-persistence")
+                .contentAddressFiles());
+        assertEquals(0, eventRecorder.snapshot(StorageEventType.STAGE_STARTED, "object-index-persistence")
+                .contentAddressFiles());
+        assertEquals(0, eventRecorder.snapshot(StorageEventType.STAGE_SUCCEEDED, "object-index-persistence")
+                .contentAddressFiles());
     }
 
     @Then("every committed manifest chunk reference uses a canonical UUID filename with a matching SHA-256 sidecar readable by the canonical filesystem node")

@@ -80,11 +80,26 @@ Ability: Phase 3 staged reactive read and write pipeline
 
   Rule: Plain uploads remain whole-object storage units
     A single-object PutObject with multipart, deduplication, and erasure coding disabled
-    MUST remain one streamed whole-object storage unit. It MUST NOT create generic chunk
-    identifiers, chunk references, dedup-index entries, EC shards, or multipart parts.
+    MUST remain one streamed whole-object storage unit. It MUST NOT be split into fixed
+    windows or create dedup-index entries, EC shards, or multipart parts. The current
+    chunk-compatible manifest naming is tracked separately from this no-forced-splitting
+    regression contract.
 
-    @REQ-PIPELINE-014 @functional-requirement @non-functional-requirement @streaming @storage-layout @pipeline-unit-required @webclient-required @not-implemented
-    Scenario Outline: Plain PutObject bypasses all chunk-producing transformations
+    @REQ-PIPELINE-014 @functional-requirement @non-functional-requirement @streaming @pipeline-unit-required @pipeline-unit @implemented-and-validated
+    Scenario: Plain pipeline processing does not reintroduce forced upload chunking
+      Given validation mode "pipeline-unit" is selected for requirement "REQ-PIPELINE-014"
+      And the storage engine operator uses filesystem root "target/storage-engine-it/REQ-PIPELINE-014-no-split-unit"
+      And bucket "plain-storage-unit-bucket" exists
+      And storage class "PLAIN" disables multipart, deduplication, and erasure coding
+      And fixture file "target/test-fixtures/pipeline/plain-object-8m.bin" is a deterministic 8 MiB object
+      When the pipeline unit runner uploads the plain fixture to key "pipeline/2026/plain/whole-object.bin"
+      Then the chunking stage records a whole-object pass-through decision
+      And persistence receives one FileUnit for the complete 8 MiB stream rather than fixed-size ChunkUnit windows
+      And no dedup content-address entry, EC shard, or multipart part is created
+      And exact streamed readback matches the 8 MiB fixture
+
+    @REQ-PIPELINE-014 @functional-requirement @non-functional-requirement @storage-layout @pipeline-unit-required @webclient-required @not-implemented
+    Scenario Outline: Plain manifest and filesystem layout use explicit whole-object artifact terminology
       Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
       And the storage engine operator uses filesystem root "<storage_root>"
       And bucket "plain-storage-unit-bucket" exists
@@ -159,7 +174,7 @@ Ability: Phase 3 staged reactive read and write pipeline
         | object-index-persistence |
       And no manifest is committed before chunk-persistence succeeds for every referenced chunk
       And no object reference is committed before manifest-persistence succeeds
-      And content-address entries for new chunks are published only after object-index-persistence commits the owning object
+      And no content-address entry is published when the selected policy produces no dedup chunks
       And every committed manifest chunk reference uses a canonical UUID filename with a matching SHA-256 sidecar readable by the canonical filesystem node
       And a recovery scan of filesystem root "<storage_root>" reports no incomplete chunk artifacts after publication
       And after object-index-persistence succeeds, the selected validation runner reads the committed object through its declared production read entry point and receives the exact bytes from fixture file "<fixture_file>"

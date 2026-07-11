@@ -87,6 +87,7 @@ public class Phase3PipelineUnitSteps {
             new org.springframework.core.io.buffer.DefaultDataBufferFactory();
     private static final int CANCELLATION_BUFFER_SIZE = 65_536;
     private static final long LARGE_OBJECT_SIZE = 256L * 1024 * 1024;
+    private static final long PLAIN_OBJECT_SIZE = 8L * 1024 * 1024;
 
     private String validationMode;
     private String requirementId;
@@ -150,7 +151,7 @@ public class Phase3PipelineUnitSteps {
         assertThat(validationMode).isEqualTo("pipeline-unit");
         assertThat(requirementId).isIn(
                 "REQ-PIPELINE-001", "REQ-PIPELINE-002", "REQ-PIPELINE-003", "REQ-PIPELINE-004", "REQ-PIPELINE-005",
-                "REQ-PIPELINE-006");
+                "REQ-PIPELINE-006", "REQ-PIPELINE-014");
     }
 
     @Given("the storage engine operator uses filesystem root {string}")
@@ -206,6 +207,26 @@ public class Phase3PipelineUnitSteps {
         assertThat(Files.size(fixture)).isEqualTo(LARGE_OBJECT_SIZE);
     }
 
+    @Given("storage class {string} disables multipart, deduplication, and erasure coding")
+    public void plainStorageClassDisablesChunkProducers(String storageClass) {
+        assertThat(storageClass).isEqualTo("PLAIN");
+    }
+
+    @Given("fixture file {string} is a deterministic 8 MiB object")
+    public void deterministicPlainFixture(String relativePath) throws IOException {
+        fixtureFile = relativePath;
+        Path fixture = repositoryRoot().resolve(relativePath).normalize();
+        Files.createDirectories(fixture.getParent());
+        try (var channel = java.nio.channels.FileChannel.open(fixture,
+                java.nio.file.StandardOpenOption.CREATE,
+                java.nio.file.StandardOpenOption.WRITE,
+                java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)) {
+            channel.position(PLAIN_OBJECT_SIZE - 1);
+            channel.write(java.nio.ByteBuffer.wrap(new byte[] {0}));
+        }
+        assertThat(Files.size(fixture)).isEqualTo(PLAIN_OBJECT_SIZE);
+    }
+
     @Given("storage class {string} selects the bounded streaming policy for this upload")
     public void boundedStreamingStorageClass(String storageClass) {
         assertThat(storageClass).isEqualTo("PIPELINE");
@@ -224,6 +245,60 @@ public class Phase3PipelineUnitSteps {
         assertThat(expectedBucket).isEqualTo(bucket);
         objectKey = expectedKey;
         largeDemandUpload = new LargeDemandUpload();
+    }
+
+    @When("the pipeline unit runner uploads the plain fixture to key {string}")
+    public void uploadPlainFixture(String key) {
+        objectKey = key;
+        StorageClassId plain = StorageClassId.of("PLAIN");
+        configureOrchestrator(StoragePolicy.minimal(plain));
+        int bufferCount = Math.toIntExact(PLAIN_OBJECT_SIZE / CANCELLATION_BUFFER_SIZE);
+        Flux<DataBuffer> body = Flux.range(0, bufferCount)
+                .map(ignored -> BUFFER_FACTORY.wrap(new byte[CANCELLATION_BUFFER_SIZE]));
+        completedContext = new StoragePipelineExecutor(eventPublisher)
+                .execute(StorageContext.write(command(bucket, objectKey, PLAIN_OBJECT_SIZE, plain), body),
+                        orchestrator.writePipelineStages())
+                .block();
+        assertThat(completedContext).isNotNull();
+    }
+
+    @Then("the chunking stage records a whole-object pass-through decision")
+    public void chunkingRecordsWholeObjectPassThrough() {
+        assertThat(completedContext.stageDecisions())
+                .containsEntry("chunking", "whole-object-pass-through");
+    }
+
+    @Then("persistence receives one FileUnit for the complete 8 MiB stream rather than fixed-size ChunkUnit windows")
+    public void persistenceReceivesOneWholeFileUnit() throws IOException {
+        var artifacts = completedContext.manifest().orElseThrow().chunks();
+        assertThat(artifacts).singleElement()
+                .satisfies(artifact -> assertThat(artifact.originalSize()).isEqualTo(PLAIN_OBJECT_SIZE));
+        assertThat(committedChunkDataFiles()).isEqualTo(1);
+        String orchestratorSource = Files.readString(repositoryRoot().resolve(
+                "storage-engine-reactive-application/src/main/java/com/example/magrathea/storageengine/application/service/ReactiveStorageOrchestrator.java"));
+        assertThat(orchestratorSource).contains("new StorageUnit.FileUnit(");
+    }
+
+    @Then("no dedup content-address entry, EC shard, or multipart part is created")
+    public void noChunkProducingArtifactsAreCreated() {
+        assertThat(countFiles(storageRoot.resolve("metadata/content-address-index"), Files::isRegularFile)).isZero();
+        assertThat(countFiles(storageRoot, path -> Files.isRegularFile(path)
+                && (path.toString().contains("ec-shard") || path.toString().contains("multipart")))).isZero();
+    }
+
+    @Then("exact streamed readback matches the 8 MiB fixture")
+    public void exactPlainStreamedReadback() throws NoSuchAlgorithmException, IOException {
+        MessageDigest actual = MessageDigest.getInstance("SHA-256");
+        AtomicLong length = new AtomicLong();
+        orchestrator.read(completedContext.manifestId().orElseThrow())
+                .doOnNext(bytes -> {
+                    actual.update(bytes);
+                    length.addAndGet(bytes.length);
+                })
+                .then()
+                .block();
+        assertThat(length.get()).isEqualTo(PLAIN_OBJECT_SIZE);
+        assertThat(actual.digest()).isEqualTo(digestFile(repositoryRoot().resolve(fixtureFile)));
     }
 
     @Given("the staged PutObject pipeline has persisted at least {string} unpublished chunks for bucket {string} and key {string}")
@@ -663,21 +738,16 @@ public class Phase3PipelineUnitSteps {
         assertThat(publisher.snapshot(StorageEventType.STAGE_SUCCEEDED, "object-index-persistence").objectFiles()).isOne();
     }
 
-    @Then("content-address entries for new chunks are published only after object-index-persistence commits the owning object")
-    public void contentAddressEntriesFollowObjectCommit() {
-        PublicationSnapshot chunksSucceeded = publisher.snapshot(
-                StorageEventType.STAGE_SUCCEEDED, "chunk-persistence");
-        PublicationSnapshot manifestSucceeded = publisher.snapshot(
-                StorageEventType.STAGE_SUCCEEDED, "manifest-persistence");
-        PublicationSnapshot objectStarted = publisher.snapshot(
-                StorageEventType.STAGE_STARTED, "object-index-persistence");
-        PublicationSnapshot objectSucceeded = publisher.snapshot(
-                StorageEventType.STAGE_SUCCEEDED, "object-index-persistence");
-        assertThat(chunksSucceeded.contentAddressFiles()).isZero();
-        assertThat(manifestSucceeded.contentAddressFiles()).isZero();
-        assertThat(objectStarted.contentAddressFiles()).isZero();
-        assertThat(objectSucceeded.contentAddressFiles())
-                .isEqualTo(completedContext.chunkDescriptors().size());
+    @Then("no content-address entry is published when the selected policy produces no dedup chunks")
+    public void noContentAddressEntryForPlainPolicy() {
+        assertThat(publisher.snapshot(StorageEventType.STAGE_SUCCEEDED, "chunk-persistence")
+                .contentAddressFiles()).isZero();
+        assertThat(publisher.snapshot(StorageEventType.STAGE_SUCCEEDED, "manifest-persistence")
+                .contentAddressFiles()).isZero();
+        assertThat(publisher.snapshot(StorageEventType.STAGE_STARTED, "object-index-persistence")
+                .contentAddressFiles()).isZero();
+        assertThat(publisher.snapshot(StorageEventType.STAGE_SUCCEEDED, "object-index-persistence")
+                .contentAddressFiles()).isZero();
     }
 
     @Then("every committed manifest chunk reference uses a canonical UUID filename with a matching SHA-256 sidecar readable by the canonical filesystem node")

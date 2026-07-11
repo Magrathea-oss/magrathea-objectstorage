@@ -257,12 +257,27 @@ public class ReactiveStorageOrchestrator {
     }
 
     private Mono<StorageContext> prepareWriteChunks(StorageContext context) {
-        // All uploads are routed through DataProcessingPipeline.
-        // The pipeline handles both dedup-enabled and non-dedup policies via
-        // configured DataProcessingStep implementations (DeduplicationStep, etc.).
+        PersistencePlan plan = context.plan().orElseThrow();
+        CompleteUploadCommand command = context.command().orElseThrow();
+        String decision;
+        if (command.uploadMode() == com.example.magrathea.storageengine.domain.valueobject.UploadMode.MULTIPART) {
+            decision = "multipart-part-segmentation";
+        } else if (stepIsExecuted(plan, StepId.DEDUP)) {
+            decision = "dedup-window-segmentation";
+        } else if (stepIsExecuted(plan, StepId.ERASURE_CODING)) {
+            decision = "ec-stripe-segmentation";
+        } else {
+            decision = "whole-object-pass-through";
+        }
         return Mono.just(context
-                .withStageDecision("chunking", "streaming-pipeline")
+                .withStageDecision("chunking", decision)
                 .addCleanupHandle(StorageCleanupHandle.named("chunking", Mono.empty())));
+    }
+
+    private static boolean stepIsExecuted(PersistencePlan plan, StepId stepId) {
+        return plan.steps().stream()
+                .anyMatch(step -> step.stepId() == stepId
+                        && step.expectedStatus() == StepExecutionStatus.EXECUTED);
     }
 
     private Mono<StorageContext> prepareDedupLookup(StorageContext context) {
@@ -601,6 +616,9 @@ public class ReactiveStorageOrchestrator {
 
     private Mono<Void> publishContentAddressEntries(StorageContext context) {
         PersistencePlan plan = context.plan().orElseThrow();
+        if (!stepIsExecuted(plan, StepId.DEDUP)) {
+            return Mono.empty();
+        }
         return Flux.fromIterable(context.chunkTraces())
                 .filter(trace -> !isDeduplicatedReuse(trace))
                 .concatMap(trace -> contentAddressIndex.record(
