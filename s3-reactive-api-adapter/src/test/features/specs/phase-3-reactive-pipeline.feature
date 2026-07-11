@@ -215,6 +215,8 @@ Ability: Phase 3 staged reactive read and write pipeline
       Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
       And the storage engine operator uses filesystem root "<storage_root>"
       And bucket "<bucket>" exists
+      And storage class "PIPELINE" selects the bounded streaming policy for this upload
+      And the write pipeline chunk size is "1 MiB" with at most "4" in-flight chunks
       And a committed object exists in bucket "<bucket>" at key "<object_key>" uploaded from fixture file "<fixture_file>"
       And the committed manifest lists multiple chunks with stable ordinal positions and checksums
       When the selected validation runner reads bucket "<bucket>" and key "<object_key>" through the staged GetObject pipeline
@@ -248,6 +250,8 @@ Ability: Phase 3 staged reactive read and write pipeline
       Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
       And the storage engine operator uses filesystem root "<storage_root>"
       And bucket "<bucket>" exists
+      And storage class "PIPELINE" selects the bounded streaming policy for this upload
+      And the write pipeline chunk size is "1 MiB" with at most "4" in-flight chunks
       And a committed object exists in bucket "<bucket>" at key "<object_key>" uploaded from fixture file "<fixture_file>"
       And the committed manifest lists multiple chunks with stable ordinal positions and checksums
       When the selected validation runner reads bucket "<bucket>" and key "<object_key>" through the staged GetObject pipeline

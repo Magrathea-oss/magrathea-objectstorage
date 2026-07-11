@@ -100,7 +100,8 @@ public class Phase3PipelineUnitSteps {
     private StorageEventPublisher eventPublisher;
     private StorageContext completedContext;
     private List<StorageStage> assembledStages;
-    private final List<byte[]> readChunks = new ArrayList<>();
+    private MessageDigest streamedReadDigest;
+    private long streamedReadLength;
     private boolean firstChunkArrivedBeforeAllReads;
     private String failingStage;
     private String failureReason;
@@ -708,16 +709,12 @@ public class Phase3PipelineUnitSteps {
     public void committedMultiChunkObject(String bucketName, String key, String fixturePath) throws IOException {
         bucket = bucketName;
         objectKey = key;
-        fixtureFile = fixturePath;
-        Path fixture = repositoryRoot().resolve(fixturePath).normalize();
-        Files.createDirectories(fixture.getParent());
-        fixtureBytes = new byte[1024 * 1024];
-        for (int i = 0; i < fixtureBytes.length; i++)
-            fixtureBytes[i] = (byte) ((i * 31) ^ (i / 65536));
-        Files.write(fixture, fixtureBytes);
-        configureOrchestrator(dedupPolicy(65536));
-        StorageContext writeContext = StorageContext.write(command(bucket, objectKey, fixtureBytes.length),
-                Flux.just(BUFFER_FACTORY.wrap(fixtureBytes)));
+        deterministicLargeFixture(fixturePath);
+        largeDemandUpload = new LargeDemandUpload();
+        configureOrchestrator(dedupPolicy(configuredChunkSizeBytes, StorageClassId.of("PIPELINE")));
+        StorageContext writeContext = StorageContext.write(
+                command(bucket, objectKey, LARGE_OBJECT_SIZE, StorageClassId.of("PIPELINE")),
+                largeDemandUpload.flux());
         completedContext = new StoragePipelineExecutor(eventPublisher)
                 .execute(writeContext, orchestrator.writePipelineStages())
                 .block();
@@ -735,21 +732,26 @@ public class Phase3PipelineUnitSteps {
     }
 
     @When("the selected validation runner reads bucket {string} and key {string} through the staged GetObject pipeline")
-    public void readWithControlledDemand(String expectedBucket, String expectedKey) {
+    public void readWithControlledDemand(String expectedBucket, String expectedKey)
+            throws NoSuchAlgorithmException {
         assertThat(expectedBucket).isEqualTo(bucket);
         assertThat(expectedKey).isEqualTo(objectKey);
-        readChunks.clear();
+        streamedReadDigest = MessageDigest.getInstance("SHA-256");
+        streamedReadLength = 0;
         int totalChunks = completedContext.manifest().orElseThrow().chunks().size();
         StepVerifier.create(orchestrator.read(completedContext.manifestId().orElseThrow()), 0)
                 .expectSubscription()
                 .then(() -> assertThat(publisher.readObservations).isEmpty())
                 .thenRequest(1)
                 .assertNext(bytes -> {
-                    readChunks.add(bytes);
+                    recordStreamedRead(bytes);
                     firstChunkArrivedBeforeAllReads = publisher.count("requested") < totalChunks;
                 })
                 .thenRequest(Long.MAX_VALUE)
-                .thenConsumeWhile(bytes -> { readChunks.add(bytes); return true; })
+                .thenConsumeWhile(bytes -> {
+                    recordStreamedRead(bytes);
+                    return true;
+                })
                 .verifyComplete();
     }
 
@@ -788,10 +790,10 @@ public class Phase3PipelineUnitSteps {
     }
 
     @Then("the streamed S3 response bytes exactly match fixture file {string}")
-    public void streamedBytesMatch(String expectedFixture) {
+    public void streamedBytesMatch(String expectedFixture) throws IOException, NoSuchAlgorithmException {
         assertThat(expectedFixture).isEqualTo(fixtureFile);
-        byte[] actual = readChunks.stream().reduce(new byte[0], Phase3PipelineUnitSteps::concat);
-        assertThat(actual).isEqualTo(fixtureBytes);
+        assertThat(streamedReadLength).isEqualTo(LARGE_OBJECT_SIZE);
+        assertThat(streamedReadDigest.digest()).isEqualTo(digestFile(repositoryRoot().resolve(expectedFixture)));
     }
 
     @Then("after object-index-persistence succeeds, the selected validation runner reads the committed object through its declared production read entry point and receives the exact bytes from fixture file {string}")
@@ -919,6 +921,23 @@ public class Phase3PipelineUnitSteps {
         } catch (NoSuchAlgorithmException error) {
             throw new IllegalStateException("SHA-256 unavailable", error);
         }
+    }
+
+    private void recordStreamedRead(byte[] bytes) {
+        streamedReadDigest.update(bytes);
+        streamedReadLength += bytes.length;
+    }
+
+    private static byte[] digestFile(Path path) throws IOException, NoSuchAlgorithmException {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        try (var input = Files.newInputStream(path)) {
+            byte[] block = new byte[64 * 1024];
+            int read;
+            while ((read = input.read(block)) >= 0) {
+                digest.update(block, 0, read);
+            }
+        }
+        return digest.digest();
     }
 
     private static byte[] concat(byte[] left, byte[] right) {

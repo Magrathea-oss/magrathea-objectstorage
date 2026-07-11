@@ -83,7 +83,6 @@ public class Phase3ReactivePipelineSteps {
 
     private static final Path PROJECT_ROOT = Path.of("").toAbsolutePath().normalize();
 
-    private static final int WEBCLIENT_FIXTURE_SIZE_BYTES = 1024 * 1024;
     private static final long LARGE_OBJECT_SIZE = 256L * 1024 * 1024;
     private static final int LARGE_UPLOAD_BUFFER_SIZE = 64 * 1024;
 
@@ -124,6 +123,8 @@ public class Phase3ReactivePipelineSteps {
     private DisposableServer cancellationServer;
     private long demandAtCancellation;
     private int expectedPersistedChunks;
+    private MessageDigest streamedHttpReadDigest;
+    private long streamedHttpReadLength;
     private final AtomicReference<Throwable> cancellationFailure = new AtomicReference<>();
 
     @Before
@@ -138,6 +139,8 @@ public class Phase3ReactivePipelineSteps {
         cancellationServer = null;
         demandAtCancellation = 0;
         expectedPersistedChunks = 0;
+        streamedHttpReadDigest = null;
+        streamedHttpReadLength = 0;
         cancellationFailure.set(null);
         faultInjector.disable();
     }
@@ -418,27 +421,25 @@ public class Phase3ReactivePipelineSteps {
     // ── REQ-PIPELINE-003 ─────────────────────────────────────────────────────────
 
     @Given("a committed object exists in bucket {string} at key {string} uploaded from fixture file {string}")
-    public void aCommittedObjectExistsInBucket(String bucket, String key, String fixturePath) {
-        // Upload through the real S3 route and observe the production storage-engine pipeline.
+    public void aCommittedObjectExistsInBucket(String bucket, String key, String fixturePath)
+            throws IOException {
         eventRecorder.observe(state.storageRoot);
-        Path fixture = PROJECT_ROOT.resolve(fixturePath).normalize();
-        try {
-            Files.createDirectories(fixture.getParent());
-            byte[] generated = new byte[WEBCLIENT_FIXTURE_SIZE_BYTES];
-            for (int index = 0; index < generated.length; index++)
-                generated[index] = (byte) ((index * 31) ^ (index / 65536));
-            Files.write(fixture, generated);
-            state.fixtureBytes.put(fixturePath, generated);
-        } catch (IOException error) {
-            throw new UncheckedIOException(error);
-        }
-        byte[] bytes = state.fixtureBytes.computeIfAbsent(fixturePath, this::readFixture);
+        fixtureFileIsADeterministic256MiBObject(fixturePath);
         state.bucket = bucket;
         state.objectKey = key;
-        state.fixtureFile = fixturePath;
-        Response response = putObject(bucket, key, bytes);
-        assertEquals(200, response.status(),
-                "Expected committed object upload to succeed: " + response.bodyAsString());
+        largeUpload = new LargeWebClientUpload();
+        var result = webTestClient.put()
+                .uri(URI.create("/" + bucket + "/" + key))
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header("x-amz-storage-class", largeUploadStorageClass)
+                .contentLength(LARGE_OBJECT_SIZE)
+                .body(largeUpload.flux(), DataBuffer.class)
+                .exchange()
+                .expectBody(byte[].class)
+                .returnResult();
+        assertEquals(200, result.getStatus().value(),
+                "Expected committed object upload to succeed");
+        assertTrue(largeUpload.allPayloadBuffersReleased());
     }
 
     @Then("the committed manifest lists multiple chunks with stable ordinal positions and checksums")
@@ -463,10 +464,25 @@ public class Phase3ReactivePipelineSteps {
     }
 
     @When("the selected validation runner reads bucket {string} and key {string} through the staged GetObject pipeline")
-    public void selectedValidationRunnerReadsThroughPipeline(String bucket, String key) {
-        // For webclient validation mode: issue an HTTP GET to the S3 RouterFunction.
-        // The pipeline-unit runner validates StorageEvent stage sequencing and chunk ordering.
-        lastPipelineResponse = getObject(bucket, key);
+    public void selectedValidationRunnerReadsThroughPipeline(String bucket, String key)
+            throws NoSuchAlgorithmException {
+        streamedHttpReadDigest = MessageDigest.getInstance("SHA-256");
+        streamedHttpReadLength = 0;
+        var result = webTestClient.get()
+                .uri(URI.create("/" + bucket + "/" + key))
+                .exchange()
+                .returnResult(DataBuffer.class);
+        lastPipelineResponse = new Response(result.getStatus().value(), new byte[0]);
+        result.getResponseBody().doOnNext(buffer -> {
+            byte[] bytes = new byte[buffer.readableByteCount()];
+            try {
+                buffer.read(bytes);
+                streamedHttpReadDigest.update(bytes);
+                streamedHttpReadLength += bytes.length;
+            } finally {
+                DataBufferUtils.release(buffer);
+            }
+        }).then().block();
     }
 
     @Then("StorageEvent records show start and success for the write stages in this exact order:")
@@ -558,13 +574,13 @@ public class Phase3ReactivePipelineSteps {
     }
 
     @Then("the streamed S3 response bytes exactly match fixture file {string}")
-    public void streamedS3ResponseBytesExactlyMatchFixtureFile(String fixturePath) {
-        // HTTP-observable: verify the GET response body matches the uploaded fixture.
+    public void streamedS3ResponseBytesExactlyMatchFixtureFile(String fixturePath)
+            throws IOException, NoSuchAlgorithmException {
         assertNotNull(lastPipelineResponse, "a pipeline GET response should have been captured");
         assertEquals(200, lastPipelineResponse.status(), lastPipelineResponse.bodyAsString());
-        byte[] expected = state.fixtureBytes.computeIfAbsent(fixturePath, this::readFixture);
-        assertArrayEquals(expected, lastPipelineResponse.body(),
-                "GetObject response body must exactly match fixture: " + fixturePath);
+        assertEquals(LARGE_OBJECT_SIZE, streamedHttpReadLength);
+        assertArrayEquals(digestFile(PROJECT_ROOT.resolve(fixturePath)).digest(),
+                streamedHttpReadDigest.digest());
     }
 
     // ── REQ-PIPELINE-004 ─────────────────────────────────────────────────────────

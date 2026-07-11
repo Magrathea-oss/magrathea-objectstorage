@@ -11259,6 +11259,8 @@ before response streaming begins.
   Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
   And the storage engine operator uses filesystem root "<storage_root>"
   And bucket "<bucket>" exists
+  And storage class "PIPELINE" selects the bounded streaming policy for this upload
+  And the write pipeline chunk size is "1 MiB" with at most "4" in-flight chunks
   And a committed object exists in bucket "<bucket>" at key "<object_key>" uploaded from fixture file "<fixture_file>"
   And the committed manifest lists multiple chunks with stable ordinal positions and checksums
   When the selected validation runner reads bucket "<bucket>" and key "<object_key>" through the staged GetObject pipeline
@@ -11282,7 +11284,7 @@ before response streaming begins.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:247`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:249`
 |Rule |HTTP read integrity preflight preserves deterministic S3 errors
 |Requirement ID(s) |`REQ-PIPELINE-003`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -11308,6 +11310,8 @@ latency or single-pass filesystem I/O.
   Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
   And the storage engine operator uses filesystem root "<storage_root>"
   And bucket "<bucket>" exists
+  And storage class "PIPELINE" selects the bounded streaming policy for this upload
+  And the write pipeline chunk size is "1 MiB" with at most "4" in-flight chunks
   And a committed object exists in bucket "<bucket>" at key "<object_key>" uploaded from fixture file "<fixture_file>"
   And the committed manifest lists multiple chunks with stable ordinal positions and checksums
   When the selected validation runner reads bucket "<bucket>" and key "<object_key>" through the staged GetObject pipeline
@@ -11332,7 +11336,7 @@ latency or single-pass filesystem I/O.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:278`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:282`
 |Rule |Multipart part persistence streams upload and copy inputs without complete-part aggregation
 |Requirement ID(s) |`REQ-PIPELINE-011`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -11372,7 +11376,7 @@ without loading each part file as one byte array.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:290`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:294`
 |Rule |Multipart part persistence streams upload and copy inputs without complete-part aggregation
 |Requirement ID(s) |`REQ-PIPELINE-012`
 |Classification |`@non-functional-requirement`
@@ -11413,7 +11417,7 @@ without loading each part file as one byte array.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:309`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:313`
 |Rule |Existing S3 streaming boundaries apply a finite runtime demand window
 |Requirement ID(s) |`REQ-PIPELINE-013`
 |Classification |`@non-functional-requirement`
@@ -11453,7 +11457,7 @@ boundary does not validate stage ordering, manifest publication, or StorageEvent
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:326`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:330`
 |Rule |Stage failures propagate deterministically and clean up completed resources
 |Requirement ID(s) |`REQ-PIPELINE-004`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -11510,7 +11514,7 @@ a deterministic S3 error without publishing a readable object.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:354`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:358`
 |Rule |Stage failures propagate deterministically and clean up completed resources
 |Requirement ID(s) |`REQ-PIPELINE-004`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -11551,7 +11555,7 @@ a deterministic S3 error without publishing a readable object.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:373`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:377`
 |Rule |Cancellation before publication cleans up pipeline-owned resources
 |Requirement ID(s) |`REQ-PIPELINE-005`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -11612,7 +11616,7 @@ unpublished chunks or temporary files, and leave no readable object behind.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:408`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:412`
 |Rule |Each pipeline stage emits independent typed instrumentation events
 |Requirement ID(s) |`REQ-PIPELINE-006`
 |Classification |`@non-functional-requirement`
