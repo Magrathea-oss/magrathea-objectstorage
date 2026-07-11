@@ -230,10 +230,11 @@ public class Phase3PipelineUnitSteps {
         assertThat(expectedBucket).isEqualTo(bucket);
         objectKey = expectedKey;
         expectedPersistedChunks = Integer.parseInt(count);
-        configureOrchestrator(dedupPolicy(CANCELLATION_BUFFER_SIZE));
+        configureOrchestrator(dedupPolicy(configuredChunkSizeBytes, StorageClassId.of("PIPELINE")));
         cancellationUpload = new DemandControlledUpload();
         cancellationSubscription = orchestrator.store(
-                        command(bucket, objectKey, LARGE_OBJECT_SIZE), cancellationUpload.flux())
+                        command(bucket, objectKey, LARGE_OBJECT_SIZE, StorageClassId.of("PIPELINE")),
+                        cancellationUpload.flux())
                 .subscribe(ignored -> { }, error -> pipelineFailure = error);
         await(() -> committedChunkDataFiles() >= expectedPersistedChunks,
                 "persisted unpublished chunks");

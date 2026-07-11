@@ -17,6 +17,7 @@ import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ApplicationContext;
 import io.netty.buffer.PooledByteBufAllocator;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -24,8 +25,17 @@ import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.NettyDataBuffer;
 import org.springframework.core.io.buffer.NettyDataBufferFactory;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import org.springframework.http.server.reactive.ReactorHttpHandlerAdapter;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.server.RouterFunction;
+import org.springframework.web.reactive.function.server.RouterFunctions;
+import org.springframework.web.reactive.function.server.ServerResponse;
+import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
+import reactor.netty.DisposableServer;
+import reactor.netty.http.server.HttpServer;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,6 +49,7 @@ import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
@@ -46,7 +57,10 @@ import java.util.Properties;
 import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BooleanSupplier;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -76,6 +90,10 @@ public class Phase3ReactivePipelineSteps {
     @Autowired
     private WebTestClient webTestClient;
 
+    @Autowired
+    @Qualifier("s3Routes")
+    private RouterFunction<ServerResponse> s3Routes;
+
     /** Shared state managed by Phase2FilesystemReliabilitySteps (same glue package). */
     @Autowired
     private Phase2FilesystemReliabilitySteps.State state;
@@ -102,6 +120,11 @@ public class Phase3ReactivePipelineSteps {
     private int configuredChunkSizeBytes;
     private int configuredInFlightChunks;
     private String largeUploadStorageClass;
+    private Disposable cancellationSubscription;
+    private DisposableServer cancellationServer;
+    private long demandAtCancellation;
+    private int expectedPersistedChunks;
+    private final AtomicReference<Throwable> cancellationFailure = new AtomicReference<>();
 
     @Before
     public void resetPhase3State() {
@@ -111,11 +134,22 @@ public class Phase3ReactivePipelineSteps {
         configuredChunkSizeBytes = 0;
         configuredInFlightChunks = 0;
         largeUploadStorageClass = null;
+        cancellationSubscription = null;
+        cancellationServer = null;
+        demandAtCancellation = 0;
+        expectedPersistedChunks = 0;
+        cancellationFailure.set(null);
         faultInjector.disable();
     }
 
     @After
     public void stopPhase3EventCapture() {
+        if (cancellationSubscription != null && !cancellationSubscription.isDisposed()) {
+            cancellationSubscription.dispose();
+        }
+        if (cancellationServer != null) {
+            cancellationServer.disposeNow();
+        }
         eventRecorder.reset();
     }
 
@@ -633,64 +667,109 @@ public class Phase3ReactivePipelineSteps {
 
     @Given("the staged PutObject pipeline has persisted at least {string} unpublished chunks for bucket {string} and key {string}")
     public void stagedPutObjectPipelineHasPersistedUnpublishedChunks(String chunkCount, String bucket, String key) {
-        throw new PendingException(
-                "REQ-PIPELINE-005: partial unpublished chunk persistence as a precondition requires"
-                + " the staged pipeline to be running in a partially-complete state. This requires"
-                + " pipeline-unit runner with demand-controlled stream and explicit subscription"
-                + " cancellation before manifest-persistence. Not achievable via synchronous HTTP.");
+        assertEquals(state.bucket, bucket);
+        assertEquals("PIPELINE", largeUploadStorageClass);
+        state.objectKey = key;
+        expectedPersistedChunks = Integer.parseInt(chunkCount);
+        largeUpload = new LargeWebClientUpload();
+        eventRecorder.observe(state.storageRoot);
+        cancellationServer = HttpServer.create()
+                .host("127.0.0.1")
+                .port(0)
+                .handle(new ReactorHttpHandlerAdapter(RouterFunctions.toHttpHandler(s3Routes)))
+                .bindNow();
+        WebClient cancellableClient = WebClient.builder()
+                .baseUrl("http://127.0.0.1:" + cancellationServer.port())
+                .clientConnector(new ReactorClientHttpConnector())
+                .build();
+        cancellationSubscription = cancellableClient.put()
+                .uri("/" + bucket + "/" + key)
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header("x-amz-storage-class", largeUploadStorageClass)
+                .contentLength(LARGE_OBJECT_SIZE)
+                .body(largeUpload.flux()
+                        .delayElements(Duration.ofMillis(1))
+                        .doOnDiscard(DataBuffer.class, DataBufferUtils::release), DataBuffer.class)
+                .retrieve()
+                .toBodilessEntity()
+                .subscribe(ignored -> { }, cancellationFailure::set);
+        await(() -> countRegularFiles(state.storageRoot.resolve("nodes")) >= expectedPersistedChunks
+                        || cancellationFailure.get() != null,
+                "persisted unpublished chunks");
+        assertNull(cancellationFailure.get(), () -> "cancellable HTTP request failed: " + cancellationFailure.get());
+        assertEquals(0, countFilesMatching(state.storageRoot.resolve("metadata/manifests"), path -> true));
     }
 
     @When("the selected validation runner cancels the upload subscription before manifest-persistence starts")
     public void selectedValidationRunnerCancelsUploadBeforeManifestPersistence() {
-        throw new PendingException(
-                "REQ-PIPELINE-005: mid-stream upload cancellation before manifest-persistence requires"
-                + " reactive subscription cancellation in the pipeline-unit runner. WebTestClient"
-                + " issues synchronous HTTP requests; mid-stream cancellation is not testable via"
-                + " HTTP without pipeline-unit infrastructure.");
+        assertNotNull(cancellationSubscription);
+        assertFalse(cancellationSubscription.isDisposed(), "upload must still be active before cancellation");
+        cancellationSubscription.dispose();
+        await(largeUpload::cancelled, "upstream request publisher cancellation");
+        demandAtCancellation = largeUpload.totalRequested();
+        await(() -> capturedWriteEvents(state.bucket, state.objectKey).stream()
+                .anyMatch(event -> event.type() == StorageEventType.STAGE_CANCELLED),
+                "pipeline cancellation event");
     }
 
     @Then("the pipeline emits a cancellation StorageEvent for the active StorageContext")
     public void pipelineEmitsCancellationStorageEvent() {
-        throw new PendingException(
-                "REQ-PIPELINE-005: cancellation StorageEvent requires StorageEvent abstraction from"
-                + " Phase 3. Requires pipeline-unit runner.");
+        List<StorageEvent> cancelled = capturedWriteEvents(state.bucket, state.objectKey).stream()
+                .filter(event -> event.type() == StorageEventType.STAGE_CANCELLED)
+                .toList();
+        assertEquals(1, cancelled.size());
+        assertEquals("chunk-persistence", cancelled.getFirst().stageName());
+    }
+
+    @Then("cancellation cleanup is owned by the reactive pipeline lifecycle rather than a detached subscription")
+    public void cancellationCleanupIsOwnedByReactiveLifecycle() throws IOException {
+        String executor = Files.readString(repositoryRoot().resolve(
+                "storage-engine-reactive-application/src/main/java/com/example/magrathea/storageengine/application/pipeline/StoragePipelineExecutor.java"));
+        String orchestratorSource = Files.readString(repositoryRoot().resolve(
+                "storage-engine-reactive-application/src/main/java/com/example/magrathea/storageengine/application/service/ReactiveStorageOrchestrator.java"));
+        assertTrue(executor.contains("Mono.usingWhen"));
+        assertFalse(executor.contains(".subscribe()"));
+        assertFalse(orchestratorSource.contains(".subscribe()"));
     }
 
     @Then("active upstream publishers stop receiving additional demand after cancellation")
     public void activeUpstreamPublishersStopReceivingDemandAfterCancellation() {
-        throw new PendingException(
-                "REQ-PIPELINE-005: upstream publisher demand termination after cancellation is an"
-                + " internal Reactor backpressure assertion. Requires pipeline-unit runner with"
-                + " demand monitoring.");
+        sleep(100);
+        assertTrue(largeUpload.cancelled());
+        assertEquals(demandAtCancellation, largeUpload.totalRequested());
     }
 
     @Then("all retained DataBuffer instances and open file handles owned by the cancelled pipeline are released")
     public void allRetainedDataBufferInstancesAndFileHandlesAreReleased() {
-        throw new PendingException(
-                "REQ-PIPELINE-005: DataBuffer and file handle release after cancellation requires"
-                + " pipeline-unit runner with resource leak detection (e.g., Netty leak detector)."
-                + " Not externally observable via HTTP.");
+        await(largeUpload::allPayloadBuffersReleased, "cancelled request payload release");
+        assertTrue(largeUpload.allPayloadBuffersReleased());
     }
 
     @Then("cleanup events remove or quarantine unpublished chunks and temporary files in filesystem root {string}")
     public void cleanupEventsRemoveOrQuarantineUnpublishedChunks(String storageRoot) {
-        throw new PendingException(
-                "REQ-PIPELINE-005: cleanup events for cancelled pipeline require StorageStage cleanup"
-                + " lifecycle from Phase 3. Requires pipeline-unit runner.");
+        assertEquals(state.storageRoot, PROJECT_ROOT.resolve(storageRoot).normalize());
+        await(() -> countRegularFiles(state.storageRoot.resolve("nodes")) == 0,
+                "cancelled chunk cleanup");
+        assertEquals(0, countFilesMatching(state.storageRoot,
+                path -> path.getFileName().toString().contains(".tmp.")));
+        await(() -> eventRecorder.events().stream()
+                        .anyMatch(event -> event.stageName().equals("cleanup")
+                                && event.type() == StorageEventType.CLEANUP_COMPLETED),
+                "cancellation cleanup event");
     }
 
     @Then("no manifest is committed for the cancelled upload")
     public void noManifestIsCommittedForCancelledUpload() {
-        throw new PendingException(
-                "REQ-PIPELINE-005: no committed manifest after cancelled upload requires StorageStage"
-                + " cancellation propagation from Phase 3. Requires pipeline-unit runner.");
+        assertEquals(0, countFilesMatching(state.storageRoot.resolve("metadata/manifests"), path -> true));
     }
 
     @Then("no object reference is committed for bucket {string} and key {string}")
     public void noObjectReferenceIsCommittedForBucketAndKey(String bucket, String key) {
-        throw new PendingException(
-                "REQ-PIPELINE-005: no committed object reference after cancelled upload requires"
-                + " StorageStage cancellation lifecycle from Phase 3. Requires pipeline-unit runner.");
+        assertEquals(state.bucket, bucket);
+        assertEquals(state.objectKey, key);
+        assertEquals(0, countFilesMatching(state.storageRoot.resolve("metadata/objects"), path -> true));
+        assertEquals(0, countFilesMatching(
+                state.storageRoot.resolve("metadata/s3-object-references"), path -> true));
     }
 
     // ── Private helpers ──────────────────────────────────────────────────────────
@@ -812,6 +891,23 @@ public class Phase3ReactivePipelineSteps {
         }
     }
 
+    private static void await(BooleanSupplier condition, String description) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (!condition.getAsBoolean() && System.nanoTime() < deadline) {
+            sleep(10);
+        }
+        assertTrue(condition.getAsBoolean(), "Timed out waiting for " + description);
+    }
+
+    private static void sleep(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while awaiting reactive state", error);
+        }
+    }
+
     private static long countFilesMatching(Path root, java.util.function.Predicate<Path> predicate) {
         if (!Files.isDirectory(root)) {
             return 0;
@@ -884,9 +980,11 @@ public class Phase3ReactivePipelineSteps {
                 new NettyDataBufferFactory(PooledByteBufAllocator.DEFAULT);
         private final Queue<NettyDataBuffer> liveBuffers = new ConcurrentLinkedQueue<>();
         private final AtomicLong maxSingleRequest = new AtomicLong();
+        private final AtomicLong totalRequested = new AtomicLong();
         private final AtomicLong maxLivePayloadBuffers = new AtomicLong();
         private final AtomicLong emittedBuffers = new AtomicLong();
         private final AtomicLong releasedBuffers = new AtomicLong();
+        private volatile boolean cancelled;
 
         private Flux<DataBuffer> flux() {
             long totalBuffers = LARGE_OBJECT_SIZE / LARGE_UPLOAD_BUFFER_SIZE;
@@ -904,11 +1002,23 @@ public class Phase3ReactivePipelineSteps {
                         sink.next(buffer);
                         return index + 1;
                     })
-                    .doOnRequest(requested -> maxSingleRequest.accumulateAndGet(requested, Math::max));
+                    .doOnRequest(requested -> {
+                        maxSingleRequest.accumulateAndGet(requested, Math::max);
+                        totalRequested.addAndGet(requested);
+                    })
+                    .doOnCancel(() -> cancelled = true);
         }
 
         private long maxSingleRequest() {
             return maxSingleRequest.get();
+        }
+
+        private long totalRequested() {
+            return totalRequested.get();
+        }
+
+        private boolean cancelled() {
+            return cancelled;
         }
 
         private long maxLivePayloadBuffers() {

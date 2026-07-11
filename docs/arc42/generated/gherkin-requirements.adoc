@@ -29,10 +29,10 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |Tag |Scenario count
 |`@absent` |3
 |`@config-only` |69
-|`@implemented-and-validated` |122
+|`@implemented-and-validated` |123
 |`@implemented-not-e2e-validated` |22
 |`@not-implemented` |6
-|`@partial` |5
+|`@partial` |4
 |`@placeholder` |9
 |`unknown/not-tagged` |178
 |===
@@ -11557,9 +11557,9 @@ a deterministic S3 error without publishing a readable object.
 |Classification |`@functional-requirement`, `@non-functional-requirement`
 |Capability area tags |`@spec`, `@reactive-pipeline`, `@storage-engine`, `@streaming`, `@cancellation`, `@cleanup`
 |Validation mode tags |`@pipeline-unit-required`, `@webclient-required`
-|Declared/validated status |`@partial`
+|Declared/validated status |`@implemented-and-validated`
 |Protocol smoke |`no`
-|All tags |`@spec`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@REQ-PIPELINE-005`, `@functional-requirement`, `@non-functional-requirement`, `@streaming`, `@cancellation`, `@cleanup`, `@pipeline-unit-required`, `@webclient-required`, `@partial`
+|All tags |`@spec`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@REQ-PIPELINE-005`, `@functional-requirement`, `@non-functional-requirement`, `@streaming`, `@cancellation`, `@cleanup`, `@pipeline-unit-required`, `@webclient-required`, `@implemented-and-validated`
 |===
 
 .Rule description
@@ -11577,6 +11577,8 @@ unpublished chunks or temporary files, and leave no readable object behind.
   And bucket "<bucket>" exists
   And no object exists in bucket "<bucket>" for key "<object_key>"
   And fixture file "<fixture_file>" is a deterministic 256 MiB object
+  And storage class "PIPELINE" selects the bounded streaming policy for this upload
+  And the write pipeline chunk size is "1 MiB" with at most "4" in-flight chunks
   And the staged PutObject pipeline has persisted at least "<persisted_chunk_count>" unpublished chunks for bucket "<bucket>" and key "<object_key>"
   When the selected validation runner cancels the upload subscription before manifest-persistence starts
   Then the pipeline emits a cancellation StorageEvent for the active StorageContext
@@ -11596,7 +11598,7 @@ unpublished chunks or temporary files, and leave no readable object behind.
 | REQ-PIPELINE-005 | pipeline-unit | 2 | pipeline-cancellation-bucket | pipeline/2026/cancel/cancelled-object.bin | target/test-fixtures/pipeline/large-object-256m.bin | target/storage-engine-it/REQ-PIPELINE-005-unit
 |===
 
-.Examples: WebTestClient validation `@webclient`, `@not-implemented`
+.Examples: WebTestClient validation `@webclient`
 [cols="1,1,1,1,1,1,1",options="header"]
 |===
 | requirement_id | validation_mode | persisted_chunk_count | bucket | object_key | fixture_file | storage_root
@@ -11610,7 +11612,7 @@ unpublished chunks or temporary files, and leave no readable object behind.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:406`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:408`
 |Rule |Each pipeline stage emits independent typed instrumentation events
 |Requirement ID(s) |`REQ-PIPELINE-006`
 |Classification |`@non-functional-requirement`

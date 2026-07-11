@@ -369,13 +369,15 @@ Ability: Phase 3 staged reactive read and write pipeline
     the pipeline MUST propagate cancellation to active stages, release buffers, clean up
     unpublished chunks or temporary files, and leave no readable object behind.
 
-    @REQ-PIPELINE-005 @functional-requirement @non-functional-requirement @streaming @cancellation @cleanup @pipeline-unit-required @webclient-required @partial
+    @REQ-PIPELINE-005 @functional-requirement @non-functional-requirement @streaming @cancellation @cleanup @pipeline-unit-required @webclient-required @implemented-and-validated
     Scenario Outline: Cancelled upload releases resources before manifest or object reference publication
       Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
       And the storage engine operator uses filesystem root "<storage_root>"
       And bucket "<bucket>" exists
       And no object exists in bucket "<bucket>" for key "<object_key>"
       And fixture file "<fixture_file>" is a deterministic 256 MiB object
+      And storage class "PIPELINE" selects the bounded streaming policy for this upload
+      And the write pipeline chunk size is "1 MiB" with at most "4" in-flight chunks
       And the staged PutObject pipeline has persisted at least "<persisted_chunk_count>" unpublished chunks for bucket "<bucket>" and key "<object_key>"
       When the selected validation runner cancels the upload subscription before manifest-persistence starts
       Then the pipeline emits a cancellation StorageEvent for the active StorageContext
@@ -392,7 +394,7 @@ Ability: Phase 3 staged reactive read and write pipeline
         | requirement_id   | validation_mode | persisted_chunk_count | bucket                       | object_key                                | fixture_file                                       | storage_root                                      |
         | REQ-PIPELINE-005 | pipeline-unit   | 2                     | pipeline-cancellation-bucket | pipeline/2026/cancel/cancelled-object.bin | target/test-fixtures/pipeline/large-object-256m.bin | target/storage-engine-it/REQ-PIPELINE-005-unit    |
 
-      @webclient @not-implemented
+      @webclient
       Examples: WebTestClient validation
         | requirement_id   | validation_mode | persisted_chunk_count | bucket                       | object_key                                | fixture_file                                       | storage_root                                         |
         | REQ-PIPELINE-005 | webclient       | 2                     | pipeline-cancellation-bucket | pipeline/2026/cancel/cancelled-object.bin | target/test-fixtures/pipeline/large-object-256m.bin | target/storage-engine-it/REQ-PIPELINE-005-webclient |
