@@ -59,6 +59,45 @@ public class FileSystemChunkStorePort implements ChunkStorePort {
                         "Storage artifact not found: " + artifact.chunkId().value())));
     }
 
+    @Override
+    public Flux<byte[]> readStream(StorageArtifactReferenceDescriptor artifact) {
+        return Flux.fromIterable(cluster.nodes())
+                .concatMap(node -> validateOnNode(node, artifact)
+                        .thenReturn(node)
+                        .onErrorResume(this::isMissing, ignored -> Mono.empty()))
+                .next()
+                .switchIfEmpty(Mono.error(new NoSuchFileException(
+                        "Storage artifact not found: " + artifact.chunkId().value())))
+                .flatMapMany(node -> artifact.artifactKind() == StorageArtifactKind.WHOLE_OBJECT
+                        ? node.streamWholeObject(artifact.chunkId())
+                        : node.streamChunk(artifact.chunkId()));
+    }
+
+    @Override
+    public Mono<Void> validateMetadata(StorageArtifactReferenceDescriptor artifact) {
+        return Flux.fromIterable(cluster.nodes())
+                .concatMap(node -> validateOnNode(node, artifact)
+                        .thenReturn(node)
+                        .onErrorResume(this::isMissing, ignored -> Mono.empty()))
+                .next()
+                .switchIfEmpty(Mono.error(new NoSuchFileException(
+                        "Storage artifact not found: " + artifact.chunkId().value())))
+                .then();
+    }
+
+    private Mono<Void> validateOnNode(
+            FileSystemStorageNode node, StorageArtifactReferenceDescriptor artifact) {
+        return artifact.artifactKind() == StorageArtifactKind.WHOLE_OBJECT
+                ? node.validateWholeObjectMetadata(artifact.chunkId())
+                : node.validateChunkMetadata(artifact.chunkId());
+    }
+
+    private boolean isMissing(Throwable error) {
+        return error instanceof NoSuchFileException
+                || error instanceof java.io.UncheckedIOException unchecked
+                && unchecked.getCause() instanceof NoSuchFileException;
+    }
+
     private Mono<byte[]> readFromNode(
             FileSystemStorageNode node, StorageArtifactReferenceDescriptor artifact) {
         return artifact.artifactKind() == StorageArtifactKind.WHOLE_OBJECT

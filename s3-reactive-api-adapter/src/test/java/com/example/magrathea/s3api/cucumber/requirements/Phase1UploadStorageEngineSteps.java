@@ -264,7 +264,7 @@ public class Phase1UploadStorageEngineSteps {
         committedObjectRecordsDurableHeadersAndMetadata(expectedManifestMetadata);
     }
 
-    @When("one durable chunk for bucket {string} and key {string} is corrupted outside the application")
+    @When("one durable artifact for bucket {string} and key {string} is corrupted outside the application")
     public void oneDurableChunkIsCorruptedOutsideTheApplication(String bucket, String key) {
         ArtifactSet artifacts = artifactsFor(bucket, key);
         assertFalse(artifacts.chunkFiles().isEmpty(), "expected at least one committed chunk file");
@@ -286,14 +286,14 @@ public class Phase1UploadStorageEngineSteps {
         }
     }
 
-    @Then("each stored chunk has verifiable integrity metadata")
-    public void eachStoredChunkHasVerifiableIntegrityMetadata() {
+    @Then("each stored artifact is re-read and checksum-verified before atomic publication")
+    public void eachStoredArtifactIsVerifiedBeforePublication() {
         ArtifactSet artifacts = artifactsFor(state.bucket, state.objectKey);
         assertFalse(artifacts.chunkFiles().isEmpty(), "expected committed chunks");
         artifacts.chunkFiles().forEach(this::assertChunkChecksumValid);
     }
 
-    @Then("the committed manifest records integrity metadata {string} for the complete object and each chunk reference")
+    @Then("the committed manifest records integrity metadata {string} for the complete object and each artifact reference")
     public void committedManifestRecordsIntegrityMetadata(String expectedIntegrityMetadata) {
         ArtifactSet artifacts = artifactsFor(state.bucket, state.objectKey);
         Properties manifest = loadProperties(artifacts.manifestFile());
@@ -467,25 +467,24 @@ public class Phase1UploadStorageEngineSteps {
         assertNoCommittedManifestReferencesMissingChunks();
     }
 
-    @Then("the storage engine detects the integrity mismatch before returning corrupted bytes as a successful object")
-    public void storageEngineDetectsIntegrityMismatch() {
-        lastObservedRead = getObject(state.bucket, state.objectKey);
-        assertFalse(lastObservedRead.status() >= 200 && lastObservedRead.status() < 300,
-            () -> "corrupted object must not be returned successfully; status=" + lastObservedRead.status()
-                + " body=" + lastObservedRead.bodyAsString());
-        assertFalse(java.util.Arrays.equals(state.fixtureBytes.get(state.fixtureFile), lastObservedRead.body()),
-            "corrupted object bytes must not be returned as the successful fixture body");
+    @When("the integrity-checking S3 client reads bucket {string} and key {string} through the single-pass S3 HTTP GetObject API")
+    public void clientReadsThroughSinglePassGetObject(String bucket, String key) {
+        lastObservedRead = getObject(bucket, key);
     }
 
-    @Then("the observable read result reports an object integrity failure")
-    public void observableReadResultReportsObjectIntegrityFailure() {
+    @Then("the read result exposes the committed object checksum or ETag without a server-side payload preflight")
+    public void readExposesCommittedIntegrityMetadataWithoutPreflight() {
         assertNotNull(lastObservedRead, "corruption read response should be captured");
-        assertTrue(lastObservedRead.status() >= 400,
-            () -> "integrity failure should be an error response, got " + lastObservedRead.status());
-        String body = lastObservedRead.bodyAsString();
-        assertTrue(body.contains("XAmzChecksumMismatch") || body.toLowerCase().contains("integrity")
-                || body.toLowerCase().contains("checksum"),
-            () -> "integrity failure body should mention checksum or integrity, got: " + body);
+        assertEquals(200, lastObservedRead.status());
+        assertNotNull(lastObservedRead.headers().getETag(), "GetObject must expose the committed ETag");
+    }
+
+    @Then("the client detects that the received bytes do not match the committed integrity metadata")
+    public void clientDetectsReceivedBytesMismatch() {
+        assertFalse(java.util.Arrays.equals(state.fixtureBytes.get(state.fixtureFile), lastObservedRead.body()),
+                "the client must observe that corrupted bytes differ from the uploaded fixture");
+        assertNotEquals(stripQuotes(lastObservedRead.headers().getETag()), md5Hex(lastObservedRead.body()),
+                "the committed ETag must not match corrupted response bytes");
     }
 
     private Map<String, String> parseHeaders(String headers, String fixtureFile) {
@@ -754,6 +753,18 @@ public class Phase1UploadStorageEngineSteps {
 
     private String computedMd5Base64(String fixtureFile) {
         return digestBase64("MD5", state.fixtureBytes.computeIfAbsent(fixtureFile, this::readFixture));
+    }
+
+    private static String stripQuotes(String value) {
+        return value == null ? null : value.replace("\"", "");
+    }
+
+    private static String md5Hex(byte[] bytes) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("MD5").digest(bytes));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("MD5 unavailable", e);
+        }
     }
 
     private static String digestBase64(String algorithm, byte[] bytes) {

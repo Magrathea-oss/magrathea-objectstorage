@@ -5,6 +5,7 @@ import com.example.magrathea.storageengine.domain.valueobject.NodeId;
 import com.example.magrathea.storageengine.domain.valueobject.PersistencePlan;
 import com.example.magrathea.storageengine.domain.valueobject.StorageArtifactKind;
 import com.example.magrathea.storageengine.domain.valueobject.StorageArtifactReferenceDescriptor;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -30,6 +31,16 @@ public interface ChunkStorePort {
     /** Reads a typed artifact while preserving compatibility with chunk-only adapters. */
     default Mono<byte[]> read(StorageArtifactReferenceDescriptor artifact) {
         return read(artifact.chunkId());
+    }
+
+    /** Streams bounded byte blocks for one artifact. */
+    default Flux<byte[]> readStream(StorageArtifactReferenceDescriptor artifact) {
+        return read(artifact).flux();
+    }
+
+    /** Validates reference metadata without reading payload bytes. */
+    default Mono<Void> validateMetadata(StorageArtifactReferenceDescriptor artifact) {
+        return Mono.empty();
     }
 
     /** Removes a pipeline-owned unpublished artifact after a failed write. */

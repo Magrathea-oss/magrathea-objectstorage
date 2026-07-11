@@ -122,6 +122,7 @@ public class Phase3PipelineUnitSteps {
     private DemandProbe instrumentedDemand;
     private byte[] instrumentedReadBytes;
     private boolean instrumentationObserversEnabled = true;
+    private boolean corruptTemporaryArtifact;
 
     @Given("the S3 API is configured with profile {string} and backend {string}")
     public void configuredProfileAndBackend(String profile, String backend) {
@@ -151,7 +152,7 @@ public class Phase3PipelineUnitSteps {
         assertThat(validationMode).isEqualTo("pipeline-unit");
         assertThat(requirementId).isIn(
                 "REQ-PIPELINE-001", "REQ-PIPELINE-002", "REQ-PIPELINE-003", "REQ-PIPELINE-004", "REQ-PIPELINE-005",
-                "REQ-PIPELINE-006", "REQ-PIPELINE-014", "REQ-PIPELINE-015");
+                "REQ-PIPELINE-006", "REQ-PIPELINE-014", "REQ-PIPELINE-015", "REQ-PIPELINE-016");
     }
 
     @Given("the storage engine operator uses filesystem root {string}")
@@ -205,6 +206,47 @@ public class Phase3PipelineUnitSteps {
             }
         }
         assertThat(Files.size(fixture)).isEqualTo(LARGE_OBJECT_SIZE);
+    }
+
+    @Given("the persistence fault injector corrupts temporary artifact bytes before verification")
+    public void persistenceFaultInjectorCorruptsTemporaryBytes() {
+        corruptTemporaryArtifact = true;
+    }
+
+    @When("the pipeline unit runner submits the upload to verified artifact persistence")
+    public void submitUploadToVerifiedPersistence() {
+        configureOrchestrator(StoragePolicy.minimal(StorageClassId.STANDARD));
+        try {
+            new StoragePipelineExecutor(eventPublisher)
+                    .execute(StorageContext.write(
+                                    command(bucket, objectKey, fixtureBytes.length, StorageClassId.STANDARD),
+                                    Flux.just(BUFFER_FACTORY.wrap(fixtureBytes))),
+                            orchestrator.writePipelineStages())
+                    .block();
+        } catch (RuntimeException error) {
+            pipelineFailure = reactor.core.Exceptions.unwrap(error);
+        }
+        assertThat(pipelineFailure).isNotNull();
+    }
+
+    @Then("chunk-persistence fails because temporary-file bytes do not match the incoming digest")
+    public void chunkPersistenceFailsForTemporaryChecksumMismatch() {
+        assertThat(pipelineFailure.getMessage()).contains("temporary artifact checksum mismatch");
+        assertThat(writeEvents()).filteredOn(event -> event instanceof StorageEvent.StageFailed)
+                .singleElement().satisfies(event -> {
+                    assertThat(event.stageName()).isEqualTo("chunk-persistence");
+                    assertThat(((StorageEvent.StageFailed) event).reason())
+                            .contains("temporary artifact checksum mismatch");
+                });
+    }
+
+    @Then("no committed artifact, manifest, or object reference remains in filesystem root {string}")
+    public void noCommittedArtifactManifestOrObjectReference(String relativeRoot) {
+        assertThat(storageRoot).isEqualTo(repositoryRoot().resolve(relativeRoot).normalize());
+        assertThat(countFiles(storageRoot.resolve("nodes"), path -> Files.isRegularFile(path)
+                && !path.getFileName().toString().contains(".tmp."))).isZero();
+        assertThat(countFiles(storageRoot.resolve("metadata/manifests"), Files::isRegularFile)).isZero();
+        assertThat(countFiles(storageRoot.resolve("metadata/objects"), Files::isRegularFile)).isZero();
     }
 
     @Given("storage class {string} disables multipart, deduplication, and erasure coding")
@@ -962,10 +1004,10 @@ public class Phase3PipelineUnitSteps {
                 java.util.stream.IntStream.range(0, completedContext.chunkDescriptors().size()).boxed().toList());
     }
 
-    @Then("response-streaming begins after the first verified chunk is available, without waiting for every chunk to be read")
-    public void firstChunkStreamsBeforeAllReads() {
+    @Then("response-streaming begins after the first bounded filesystem buffer is available, without waiting for every artifact to be read")
+    public void firstBufferStreamsBeforeAllReads() {
         assertThat(firstChunkArrivedBeforeAllReads).isTrue();
-        assertThat(publisher.firstIndex("verified")).isLessThan(publisher.firstIndex("emitted") + 1);
+        assertThat(publisher.firstIndex("emitted")).isLessThan(publisher.firstIndex("verified"));
     }
 
     @Then("downstream response demand controls how many chunks are read ahead")
@@ -1047,9 +1089,26 @@ public class Phase3PipelineUnitSteps {
     }
 
     private void configureOrchestrator(StoragePolicy policy) {
-        FileSystemWriteFaultInjector injector = failureReason == null
-                ? FileSystemWriteFaultInjector.disabled()
-                : new ScenarioFaultInjector(failingStage, failureReason);
+        FileSystemWriteFaultInjector injector;
+        if (corruptTemporaryArtifact) {
+            injector = new FileSystemWriteFaultInjector() {
+                @Override
+                public void afterChunkTempFileWritten(ChunkWriteContext context) {
+                    try {
+                        byte[] bytes = Files.readAllBytes(context.tempFile());
+                        bytes[0] ^= 0x7f;
+                        Files.write(context.tempFile(), bytes,
+                                java.nio.file.StandardOpenOption.TRUNCATE_EXISTING);
+                    } catch (IOException error) {
+                        throw new UncheckedIOException(error);
+                    }
+                }
+            };
+        } else {
+            injector = failureReason == null
+                    ? FileSystemWriteFaultInjector.disabled()
+                    : new ScenarioFaultInjector(failingStage, failureReason);
+        }
         FileSystemStorageCluster cluster = new FileSystemStorageCluster(storageRoot, 1, injector);
         publisher = new CapturingPublisher(storageRoot);
         List<StorageEventListener> listeners = new ArrayList<>();

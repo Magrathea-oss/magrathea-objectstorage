@@ -16,22 +16,18 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.List;
+import java.util.Properties;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * REQ-UPLOAD-006: Corrupted chunk data must be detected on read and must not be
- * served to the client as if it were valid object content.
+ * REQ-UPLOAD-006: Upload commit verifies durable bytes and GetObject exposes the
+ * committed integrity identity so clients can detect later disk corruption.
  *
- * <p>After a successful PUT, overwrites a committed chunk file with garbage bytes
- * that do not match the stored SHA-256 sidecar checksum. The subsequent GET must
- * return an error response instead of the corrupted bytes.
- *
- * <p>{@code FileSystemStorageNode.read()} recomputes the SHA-256 of every chunk on
- * each read and compares it against the {@code .sha256} sidecar file written during
- * the atomic commit. When the computed hex does not match the stored hex it throws
- * {@code ChunkIntegrityException}, which the reactive ACL adapter propagates as a
- * non-200 error response.
+ * <p>After a successful PUT, this test changes a committed whole-object artifact
+ * without changing its ETag metadata. The single-pass GET returns the stored bytes
+ * and original ETag; a client comparison detects that they no longer match. Periodic
+ * at-rest detection and repair is owned by EP-4 scrubbing.
  */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -72,7 +68,7 @@ class StorageEngineIntegrityDetectionTest {
     private int port;
 
     @Test
-    void REQ_UPLOAD_006_corruptedChunkIsDetectedOnRead() throws IOException {
+    void REQ_UPLOAD_006_clientDetectsCorruptionFromCommittedEtag() throws IOException {
         WebTestClient client = WebTestClient.bindToServer()
             .baseUrl("http://127.0.0.1:" + port)
             .build();
@@ -84,47 +80,47 @@ class StorageEngineIntegrityDetectionTest {
             .expectStatus().isOk();
 
         // 2. Upload the object successfully
-        client.put()
+        var putResult = client.put()
             .uri("/" + BUCKET + "/" + OBJECT_KEY)
             .contentType(MediaType.TEXT_PLAIN)
             .header("x-amz-storage-class", "STANDARD")
             .bodyValue(FIXTURE_CONTENT)
             .exchange()
-            .expectStatus().isOk();
+            .expectStatus().isOk()
+            .expectBody(byte[].class)
+            .returnResult();
+        String committedEtag = putResult.getResponseHeaders().getETag();
+        assertThat(committedEtag).isNotBlank();
 
-        // 3. Find the first committed chunk file on disk.
-        //    Skip .sha256 sidecar files and .tmp. in-progress files.
-        Path chunksDir = STORAGE_ROOT.resolve("nodes").resolve("node-001").resolve("chunks");
-        assertThat(chunksDir)
-            .as("chunks directory must exist under the storage root after a successful PUT")
-            .isDirectory();
-
-        Path chunkToCorrupt;
-        try (var paths = Files.walk(chunksDir)) {
-            chunkToCorrupt = paths
-                .filter(Files::isRegularFile)
-                .filter(p -> !p.getFileName().toString().endsWith(".sha256"))
-                .filter(p -> !p.getFileName().toString().contains(".tmp."))
-                .findFirst()
-                .orElseThrow(() -> new AssertionError(
-                    "No committed chunk file found under " + chunksDir
-                    + " — the successful PUT must have written at least one chunk"));
+        Path manifestFile;
+        try (var paths = Files.list(STORAGE_ROOT.resolve("metadata/manifests"))) {
+            manifestFile = paths.filter(path -> path.getFileName().toString().endsWith(".properties"))
+                    .findFirst().orElseThrow();
         }
+        Properties manifest = new Properties();
+        try (var input = Files.newInputStream(manifestFile)) {
+            manifest.load(input);
+        }
+        String kind = manifest.getProperty("artifact.0.kind");
+        String artifactId = manifest.getProperty("artifact.0.artifactId");
+        Path namespace = STORAGE_ROOT.resolve("nodes/node-001")
+                .resolve("WHOLE_OBJECT".equals(kind) ? "whole-objects" : "chunks");
+        Path artifactToCorrupt = namespace.resolve(artifactId);
+        assertThat(artifactToCorrupt).isRegularFile();
 
-        // 4. Overwrite the chunk data with garbage bytes.
-        //    The .sha256 sidecar still holds the original checksum, so any read will detect
-        //    the mismatch: computed SHA-256 of {0x00, 0x01, 0x02} != stored SHA-256.
-        Files.write(chunkToCorrupt, new byte[]{0x00, 0x01, 0x02}, StandardOpenOption.TRUNCATE_EXISTING);
+        byte[] corrupted = Files.readAllBytes(artifactToCorrupt);
+        corrupted[0] ^= 0x7f;
+        Files.write(artifactToCorrupt, corrupted, StandardOpenOption.TRUNCATE_EXISTING);
 
-        // 5. GET the object — the storage engine must detect the integrity violation and
-        //    return a non-200 error response instead of the corrupted bytes.
-        client.get()
+        var getResult = client.get()
             .uri("/" + BUCKET + "/" + OBJECT_KEY)
             .exchange()
-            .expectStatus().value(status ->
-                assertThat(status)
-                    .as("GET after chunk corruption must not return 200 OK")
-                    .isNotEqualTo(200));
+            .expectStatus().isOk()
+            .expectBody(byte[].class)
+            .returnResult();
+        assertThat(getResult.getResponseHeaders().getETag()).isEqualTo(committedEtag);
+        assertThat(getResult.getResponseBody())
+            .isNotEqualTo(FIXTURE_CONTENT.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────

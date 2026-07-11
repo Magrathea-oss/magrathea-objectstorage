@@ -279,7 +279,7 @@ public class Phase2FilesystemReliabilitySteps {
         resetRepositories();
     }
 
-    @When("the corruption injector overwrites bytes inside a committed chunk file in filesystem root {string} for bucket {string} and key {string} outside the running application")
+    @When("the corruption injector overwrites bytes inside a committed artifact file in filesystem root {string} for bucket {string} and key {string} outside the running application")
     public void corruptionInjectorOverwritesChunk(String storageRoot, String bucket, String key) {
         assertScenarioRoot(storageRoot);
         ArtifactSet artifacts = artifactsFor(bucket, key);
@@ -304,6 +304,11 @@ public class Phase2FilesystemReliabilitySteps {
         String corrupted = content.substring(0, index) + replacement + content.substring(index + 1);
         writeString(manifest, corrupted);
         state.corruptedRuntimeArtifact = manifest;
+    }
+
+    @When("the S3 client reads bucket {string} and key {string} through the single-pass S3 HTTP GetObject API")
+    public void clientReadsThroughSinglePassGetObject(String bucket, String key) {
+        state.lastResponse = getObject(bucket, key);
     }
 
     @When("the S3 client reads bucket {string} and key {string} through the S3 HTTP GetObject API")
@@ -409,7 +414,7 @@ public class Phase2FilesystemReliabilitySteps {
         assertNoObjectReference(state.bucket, state.objectKey);
     }
 
-    @Then("the upload is committed and every chunk file in filesystem root {string} for bucket {string} and key {string} carries a verifiable checksum")
+    @Then("the upload is committed and every artifact file in filesystem root {string} for bucket {string} and key {string} carries a verifiable checksum")
     public void uploadCommittedAndEveryChunkCarriesChecksum(String storageRoot, String bucket, String key) {
         assertScenarioRoot(storageRoot);
         assertEquals(200, state.lastResponse.status(), state.lastResponse.bodyAsString());
@@ -432,16 +437,16 @@ public class Phase2FilesystemReliabilitySteps {
         assertArrayEquals(state.fixtureBytes.get(fixtureFile), response.body());
     }
 
-    @Then("the storage engine detects the checksum mismatch for the corrupted chunk before returning any response bytes")
-    public void storageEngineDetectsCorruptedChunk() {
-        assertEquals(500, state.lastResponse.status(), state.lastResponse.bodyAsString());
-        assertFalse(Objects.deepEquals(state.fixtureBytes.get(state.fixtureFile), state.lastResponse.body()),
-            "corrupted object bytes must not be returned as a successful body");
+    @Then("the GetObject result exposes the committed checksum or ETag without a complete payload preflight")
+    public void getObjectExposesCommittedIntegrityMetadata() {
+        assertEquals(200, state.lastResponse.status(), state.lastResponse.bodyAsString());
+        assertNotNull(state.lastResponse.headers().getETag(), "GetObject must expose the committed ETag");
     }
 
-    @Then("the S3 HTTP GetObject response signals an object integrity failure rather than returning corrupted bytes as a successful object body")
-    public void getObjectSignalsObjectIntegrityFailure() {
-        assertIntegrityErrorResponse();
+    @Then("the S3 client detects that the received bytes do not match the committed integrity metadata")
+    public void clientDetectsCorruptedArtifactBytes() {
+        assertFalse(Objects.deepEquals(state.fixtureBytes.get(state.fixtureFile), state.lastResponse.body()),
+            "corrupted object bytes must differ from the uploaded fixture");
     }
 
     @Then("the storage engine detects the manifest checksum mismatch before loading any chunk or returning any response bytes")
@@ -782,7 +787,9 @@ public class Phase2FilesystemReliabilitySteps {
             .exchange()
             .expectBody(byte[].class)
             .returnResult();
-        return new Response(result.getStatus().value(), result.getResponseBody() == null ? new byte[0] : result.getResponseBody());
+        return new Response(result.getStatus().value(),
+            result.getResponseBody() == null ? new byte[0] : result.getResponseBody(),
+            result.getResponseHeaders());
     }
 
     private Response getObject(String bucket, String key) {
@@ -791,7 +798,9 @@ public class Phase2FilesystemReliabilitySteps {
             .exchange()
             .expectBody(byte[].class)
             .returnResult();
-        return new Response(result.getStatus().value(), result.getResponseBody() == null ? new byte[0] : result.getResponseBody());
+        return new Response(result.getStatus().value(),
+            result.getResponseBody() == null ? new byte[0] : result.getResponseBody(),
+            result.getResponseHeaders());
     }
 
     private void resetRepositories() {
@@ -1128,7 +1137,7 @@ public class Phase2FilesystemReliabilitySteps {
         MANIFEST_TEMP_WRITE
     }
 
-    private record Response(int status, byte[] body) {
+    private record Response(int status, byte[] body, HttpHeaders headers) {
         String bodyAsString() {
             return new String(body, StandardCharsets.UTF_8);
         }

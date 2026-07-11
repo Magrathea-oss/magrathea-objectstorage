@@ -104,14 +104,19 @@ final class Phase4ObservabilityTestSupport {
         return "/" + bucket + "/" + key;
     }
 
-    static Path firstCommittedChunk(Path storageRoot) {
-        Path chunksRoot = storageRoot.resolve("nodes");
-        try (var paths = Files.walk(chunksRoot)) {
-            return paths.filter(Files::isRegularFile)
+    static List<Path> committedStorageArtifacts(Path storageRoot) {
+        Path nodesRoot = storageRoot.resolve("nodes");
+        try (var paths = Files.walk(nodesRoot)) {
+            List<Path> artifacts = paths.filter(Files::isRegularFile)
+                    .filter(path -> path.getParent() != null
+                            && (path.getParent().endsWith("whole-objects") || path.getParent().endsWith("chunks")))
                     .filter(path -> !path.getFileName().toString().endsWith(".sha256"))
                     .filter(path -> !path.getFileName().toString().contains(".tmp."))
-                    .findFirst()
-                    .orElseThrow(() -> new AssertionError("No committed chunk found under " + chunksRoot));
+                    .toList();
+            if (artifacts.isEmpty()) {
+                throw new AssertionError("No committed storage artifact found under " + nodesRoot);
+            }
+            return artifacts;
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

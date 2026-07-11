@@ -244,12 +244,14 @@ Business Need: Phase 1 upload reliability requirements for the storage-engine ba
         | REQ-UPLOAD-005 | awscli          | checksum-sha256        | x-amz-sdk-checksum-algorithm=SHA256; x-amz-checksum-sha256=computed-sha256-base64-for-fixture | x-amz-checksum-sha256=computed-sha256-base64-for-fixture  | req-upload-read-after-write-bucket | documents/2026/read-after-write/object.txt | fixtures/upload/small-object.txt | target/storage-engine-it/REQ-UPLOAD-005-awscli-sha256              | STANDARD               |
         | REQ-UPLOAD-005 | awscli          | sse-s3-metadata        | x-amz-server-side-encryption=AES256                                                           | x-amz-server-side-encryption=AES256                       | req-upload-read-after-write-bucket | documents/2026/read-after-write/object.txt | fixtures/upload/small-object.txt | target/storage-engine-it/REQ-UPLOAD-005-awscli-sse-s3              | STANDARD               |
 
-  Rule: Integrity metadata protects stored chunks
-    The storage engine validates client-supplied integrity data where present and uses
-    object/chunk checksums to reject corrupted bytes on reads.
+  Rule: Upload commit and client-visible checksums protect object integrity
+    The storage engine validates client-supplied integrity data where present, verifies
+    temporary-file bytes before commit, and returns committed object integrity metadata.
+    GetObject remains single-pass; clients compare received bytes with the committed
+    checksum or ETag. Periodic at-rest detection and repair belongs to EP-4 scrubbing.
 
     @REQ-UPLOAD-006 @functional-requirement @non-functional-requirement @checksum @integrity @webclient-required @awscli-required @implemented-and-validated
-    Scenario Outline: Storage engine detects chunk corruption before returning uploaded bytes
+    Scenario Outline: Client detects post-commit disk corruption from committed integrity metadata
       Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
       And the storage engine operator uses filesystem root "<storage_root>"
       And bucket "<bucket>" exists
@@ -257,13 +259,13 @@ Business Need: Phase 1 upload reliability requirements for the storage-engine ba
       And the S3 client applies PutObject header profile "<header_profile>" with headers "<headers>"
       When the S3 client uploads fixture file "<fixture_file>" to bucket "<bucket>" and key "<object_key>" through the S3 HTTP PutObject API
       Then the upload validates client-supplied integrity headers from profile "<header_profile>" when such headers are present
-      And each stored chunk has verifiable integrity metadata
-      And the committed manifest records integrity metadata "<expected_integrity_metadata>" for the complete object and each chunk reference
+      And each stored artifact is re-read and checksum-verified before atomic publication
+      And the committed manifest records integrity metadata "<expected_integrity_metadata>" for the complete object and each artifact reference
       And the committed manifest records storage class "<expected_storage_class>"
-      When one durable chunk for bucket "<bucket>" and key "<object_key>" is corrupted outside the application
-      And the S3 client reads bucket "<bucket>" and key "<object_key>" through the S3 HTTP GetObject API
-      Then the storage engine detects the integrity mismatch before returning corrupted bytes as a successful object
-      And the observable read result reports an object integrity failure
+      When one durable artifact for bucket "<bucket>" and key "<object_key>" is corrupted outside the application
+      And the integrity-checking S3 client reads bucket "<bucket>" and key "<object_key>" through the single-pass S3 HTTP GetObject API
+      Then the read result exposes the committed object checksum or ETag without a server-side payload preflight
+      And the client detects that the received bytes do not match the committed integrity metadata
 
       @webclient
       Examples: WebTestClient validation

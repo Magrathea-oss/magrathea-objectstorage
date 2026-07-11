@@ -191,8 +191,8 @@ public class ReactiveStorageOrchestrator {
         String correlationId = UUID.randomUUID().toString();
         Instant startedAt = Instant.now();
         return objectManifestRepository.findBy(manifestId)
-                .flatMapMany(manifest -> Flux.fromIterable(manifest.chunks()))
-                .concatMap(artifact -> chunkStorePort.read(artifact).then(), 1)
+                .flatMapMany(manifest -> Flux.fromIterable(manifest.artifacts()))
+                .concatMap(chunkStorePort::validateMetadata, 1)
                 .then()
                 .onErrorResume(error -> storageEventPublisher.publish(new StorageEvent.StageFailed(
                                 StorageOperation.READ,
@@ -671,15 +671,22 @@ public class ReactiveStorageOrchestrator {
                 .concatMap(indexed -> {
                     int ordinal = Math.toIntExact(indexed.getT1());
                     StorageArtifactReferenceDescriptor chunk = indexed.getT2();
-                    return Mono.defer(() -> {
+                    return Flux.defer(() -> {
                         readPipelineObserver.chunkReadRequested(
                                 context.correlationId(), ordinal, chunk.chunkId());
-                        return chunkStorePort.read(chunk)
-                                .map(storedData -> restoreReadableArtifact(storedData, chunk))
-                                .doOnNext(ignored -> readPipelineObserver.chunkVerified(
+                        java.util.concurrent.atomic.AtomicBoolean firstBlock =
+                                new java.util.concurrent.atomic.AtomicBoolean();
+                        Flux<byte[]> content = limitArtifactBytes(
+                                chunkStorePort.readStream(chunk), chunk);
+                        return content
+                                .doOnComplete(() -> readPipelineObserver.chunkVerified(
                                         context.correlationId(), ordinal, chunk.chunkId()))
-                                .doOnNext(ignored -> readPipelineObserver.responseChunkEmitted(
-                                        context.correlationId(), ordinal, chunk.chunkId()));
+                                .doOnNext(ignored -> {
+                                    if (firstBlock.compareAndSet(false, true)) {
+                                        readPipelineObserver.responseChunkEmitted(
+                                                context.correlationId(), ordinal, chunk.chunkId());
+                                    }
+                                });
                     });
                 }, 1)
                 .doOnRequest(requested -> readPipelineObserver.downstreamRequested(
@@ -728,21 +735,24 @@ public class ReactiveStorageOrchestrator {
         }
     }
 
-    private static byte[] restoreReadableArtifact(
-            byte[] storedData, StorageArtifactReferenceDescriptor artifact) {
-        if (artifact.artifactKind() == StorageArtifactKind.EC_DATA_SHARD) {
-            return Arrays.copyOf(storedData, Math.toIntExact(artifact.originalSize()));
+    private static Flux<byte[]> limitArtifactBytes(
+            Flux<byte[]> content, StorageArtifactReferenceDescriptor artifact) {
+        if (artifact.artifactKind() != StorageArtifactKind.EC_DATA_SHARD) {
+            return content;
         }
-        if (!hasAppliedErasureCoding(artifact) || storedData.length <= artifact.originalSize()) {
-            return storedData;
-        }
-        return Arrays.copyOf(storedData, Math.toIntExact(artifact.originalSize()));
-    }
-
-    private static boolean hasAppliedErasureCoding(StorageArtifactReferenceDescriptor chunk) {
-        return chunk.stepChecksums().stream()
-                .anyMatch(checksum -> checksum.stepId() == StepId.ERASURE_CODING
-                        && !checksum.inputChecksum().equals(checksum.outputChecksum()));
+        return Flux.defer(() -> {
+            java.util.concurrent.atomic.AtomicLong remaining =
+                    new java.util.concurrent.atomic.AtomicLong(artifact.originalSize());
+            return content.<byte[]>handle((block, sink) -> {
+                long available = remaining.get();
+                if (available <= 0) {
+                    return;
+                }
+                int emitted = Math.toIntExact(Math.min(available, block.length));
+                remaining.addAndGet(-emitted);
+                sink.next(emitted == block.length ? block : Arrays.copyOf(block, emitted));
+            });
+        });
     }
 
     private StepExecutionRecord buildExecutedStep(

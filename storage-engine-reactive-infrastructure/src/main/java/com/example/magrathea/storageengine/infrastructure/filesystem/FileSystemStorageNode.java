@@ -3,7 +3,9 @@ package com.example.magrathea.storageengine.infrastructure.filesystem;
 import com.example.magrathea.storageengine.application.exception.ChunkIntegrityException;
 import com.example.magrathea.storageengine.domain.valueobject.ChunkId;
 import com.example.magrathea.storageengine.domain.valueobject.NodeId;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -98,6 +100,11 @@ public class FileSystemStorageNode {
                 faultInjector.afterChunkTempFileWritten(
                         new FileSystemWriteFaultInjector.ChunkWriteContext(
                                 nodeId, chunkId, pending.tempData(), pending.finalData(), data.length));
+                String persistedChecksum = sha256Hex(pending.tempData());
+                if (!checksumHex.equals(persistedChecksum)) {
+                    throw new ChunkIntegrityException(
+                            "Persisted temporary chunk checksum mismatch before commit: " + chunkId.value());
+                }
                 AtomicChunkWriteProtocol.commit(pending, checksumHex);
             } catch (Exception e) {
                 AtomicChunkWriteProtocol.cleanupUncommitted(pending, preserveTemporaryArtifacts(e));
@@ -124,6 +131,66 @@ public class FileSystemStorageNode {
     /** Reads a schema-2 whole-object artifact from its dedicated namespace. */
     public Mono<byte[]> readWholeObject(ChunkId artifactId) {
         return readFrom(wholeObjectsDir, artifactId, "whole-object artifact");
+    }
+
+    public Flux<byte[]> streamChunk(ChunkId artifactId) {
+        return streamFrom(chunksDir, artifactId);
+    }
+
+    public Flux<byte[]> streamWholeObject(ChunkId artifactId) {
+        return streamFrom(wholeObjectsDir, artifactId);
+    }
+
+    public Mono<Void> validateChunkMetadata(ChunkId artifactId) {
+        return validateMetadata(chunksDir, artifactId);
+    }
+
+    public Mono<Void> validateWholeObjectMetadata(ChunkId artifactId) {
+        return validateMetadata(wholeObjectsDir, artifactId);
+    }
+
+    private Flux<byte[]> streamFrom(Path root, ChunkId artifactId) {
+        Path dataFile = root.resolve(artifactId.value().toString());
+        return Flux.using(
+                () -> Files.newInputStream(dataFile),
+                input -> Flux.generate(sink -> {
+                    try {
+                        byte[] block = new byte[64 * 1024];
+                        int read = input.read(block);
+                        if (read < 0) {
+                            sink.complete();
+                        } else if (read == block.length) {
+                            sink.next(block);
+                        } else {
+                            sink.next(java.util.Arrays.copyOf(block, read));
+                        }
+                    } catch (IOException error) {
+                        sink.error(error);
+                    }
+                }),
+                input -> {
+                    try {
+                        input.close();
+                    } catch (IOException ignored) {
+                        // Closing after cancellation is best effort.
+                    }
+                })
+                .cast(byte[].class)
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    private Mono<Void> validateMetadata(Path root, ChunkId artifactId) {
+        return BlockingFileSystemOperation.fromRunnable(() -> {
+            Path dataFile = root.resolve(artifactId.value().toString());
+            Path checksumFile = root.resolve(artifactId.value() + SHA256_EXTENSION);
+            if (!Files.isRegularFile(dataFile)) {
+                throw new UncheckedIOException(new NoSuchFileException(dataFile.toString()));
+            }
+            if (!Files.isRegularFile(checksumFile)) {
+                throw new ChunkIntegrityException(
+                        "Checksum sidecar missing for storage artifact: " + artifactId.value());
+            }
+        });
     }
 
     private Mono<byte[]> readFrom(Path root, ChunkId artifactId, String artifactType) {
@@ -157,6 +224,22 @@ public class FileSystemStorageNode {
     private static boolean preserveTemporaryArtifacts(Exception e) {
         return e instanceof FileSystemWriteInterruptedException interrupted
                 && interrupted.preserveTemporaryArtifacts();
+    }
+
+    private static String sha256Hex(Path path) throws IOException {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            try (var input = Files.newInputStream(path)) {
+                byte[] block = new byte[64 * 1024];
+                int read;
+                while ((read = input.read(block)) >= 0) {
+                    digest.update(block, 0, read);
+                }
+            }
+            return HexFormat.of().formatHex(digest.digest());
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
     }
 
     static String sha256Hex(byte[] data) {

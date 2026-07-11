@@ -36,7 +36,7 @@ import java.util.stream.Collectors;
 import static com.example.magrathea.bootstrap.Phase4ObservabilityTestSupport.cleanStorageRoot;
 import static com.example.magrathea.bootstrap.Phase4ObservabilityTestSupport.drain;
 import static com.example.magrathea.bootstrap.Phase4ObservabilityTestSupport.finishedSpans;
-import static com.example.magrathea.bootstrap.Phase4ObservabilityTestSupport.firstCommittedChunk;
+import static com.example.magrathea.bootstrap.Phase4ObservabilityTestSupport.committedStorageArtifacts;
 import static com.example.magrathea.bootstrap.Phase4ObservabilityTestSupport.path;
 import static com.example.magrathea.bootstrap.Phase4ObservabilityTestSupport.registerStorageEngineProperties;
 import static com.example.magrathea.bootstrap.Phase4ObservabilityTestSupport.sha256Hex;
@@ -133,36 +133,41 @@ class Phase4ObservabilityIntegrationTest {
     }
 
     @Test
-    void REQ_OBS_002_corruptedChunkGetEmitsClassifiedFailureSignalsWithoutSensitiveLeak(CapturedOutput output) throws Exception {
+    void REQ_OBS_002_singlePassCorruptedArtifactReadEmitsSuccessSignalsWithoutSensitiveLeak(CapturedOutput output) throws Exception {
         String bucket = "obs-pipeline-failure-bucket";
         String key = "observability/2026/events/failed-object.bin";
         String body = "CORRUPTIBLE-CONTENT-WITHOUT-SENSITIVE-PAYLOAD";
 
         createBucket(bucket);
         putObject(bucket, key, body, "x-amz-meta-secret", "top-secret");
-        Path chunk = firstCommittedChunk(STORAGE_ROOT);
-        Files.writeString(chunk, "tampered", StandardCharsets.UTF_8);
+        for (Path artifact : committedStorageArtifacts(STORAGE_ROOT)) {
+            byte[] corrupted = Files.readAllBytes(artifact);
+            corrupted[0] ^= 0x7f;
+            Files.write(artifact, corrupted);
+        }
         events.clear();
         spanExporter.reset();
         meterRegistry.clear();
 
-        client.get()
+        var result = client.get()
                 .uri(path(bucket, key))
                 .header("Authorization", "AWS4-HMAC-SHA256 Credential=AKIA-MUST-NOT-LEAK")
                 .exchange()
-                .expectStatus().is5xxServerError();
+                .expectStatus().isOk()
+                .expectBody(byte[].class)
+                .returnResult();
 
+        assertThat(result.getResponseHeaders().getETag()).isNotBlank();
+        assertThat(new String(result.getResponseBody(), StandardCharsets.UTF_8)).isNotEqualTo(body);
         assertThat(events.events()).anySatisfy(event -> {
-            assertThat(event.type()).isEqualTo(StorageEventType.STAGE_FAILED);
-            assertThat(event.stageName()).isEqualTo("chunk-reading");
-            assertThat(event.outcome()).hasValueSatisfying(outcome -> assertThat(outcome).contains("checksum"));
+            assertThat(event.type()).isEqualTo(StorageEventType.STAGE_SUCCEEDED);
+            assertThat(event.stageName()).isEqualTo("response-streaming");
         });
-        assertCounterAtLeast(MicrometerStorageEventListener.FAILURES, 1,
-                "operation", "get-object", "stage", "chunk-reading",
-                "failure.classification", "integrity-failure");
-        assertThat(finishedSpans(spanExporter)).anySatisfy(span -> assertThat(span.getAttributes().asMap().toString())
-                .contains("failure.classification", "integrity-failure"));
-        assertThat(output).contains("failureClassification=integrity-failure");
+        assertCounterAtLeast(MicrometerStorageEventListener.BYTES, result.getResponseBody().length,
+                "operation", "get-object", "stage", "response-streaming", "direction", "read");
+        assertThat(finishedSpans(spanExporter)).extracting(SpanData::getName)
+                .contains("GetObject", "magrathea.storage.get-object.response-streaming");
+        assertThat(output).doesNotContain("failureClassification=integrity-failure");
         assertNoSensitiveLeak(output, body, "top-secret", "AKIA-MUST-NOT-LEAK");
     }
 

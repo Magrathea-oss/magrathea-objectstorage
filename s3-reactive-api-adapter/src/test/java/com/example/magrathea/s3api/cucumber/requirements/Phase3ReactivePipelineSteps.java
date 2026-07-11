@@ -124,6 +124,7 @@ public class Phase3ReactivePipelineSteps {
     private DisposableServer cancellationServer;
     private long demandAtCancellation;
     private int expectedPersistedChunks;
+    private String configuredFailureReason;
     private MessageDigest streamedHttpReadDigest;
     private long streamedHttpReadLength;
     private final AtomicReference<Throwable> cancellationFailure = new AtomicReference<>();
@@ -140,6 +141,7 @@ public class Phase3ReactivePipelineSteps {
         cancellationServer = null;
         demandAtCancellation = 0;
         expectedPersistedChunks = 0;
+        configuredFailureReason = null;
         streamedHttpReadDigest = null;
         streamedHttpReadLength = 0;
         cancellationFailure.set(null);
@@ -671,17 +673,20 @@ public class Phase3ReactivePipelineSteps {
                 .map(Phase3StorageEventRecorder.ReadObservation::chunkId).toList());
     }
 
-    @Then("response-streaming begins after the first verified chunk is available, without waiting for every chunk to be read")
-    public void responseStreamingBeginsAfterFirstVerifiedChunk() {
+    @Then("response-streaming begins after the first bounded filesystem buffer is available, without waiting for every artifact to be read")
+    public void responseStreamingBeginsAfterFirstFilesystemBuffer() {
         List<Phase3StorageEventRecorder.ReadObservation> observations = eventRecorder.readObservations();
-        int firstVerified = firstObservation(observations, "verified");
+        int firstRequested = firstObservation(observations, "requested");
         int firstEmitted = firstObservation(observations, "emitted");
-        assertTrue(firstVerified >= 0 && firstVerified < firstEmitted,
-                "the first response chunk must follow verification");
+        int firstCompleted = firstObservation(observations, "verified");
+        assertTrue(firstRequested >= 0 && firstRequested < firstEmitted,
+                "artifact open must precede its first response buffer");
+        assertTrue(firstEmitted < firstCompleted,
+                "the first response buffer must not wait for complete artifact consumption");
         long readsBeforeFirstEmission = observations.subList(0, firstEmitted).stream()
                 .filter(value -> value.kind().equals("requested")).count();
         assertTrue(readsBeforeFirstEmission < manifestChunkIds.size(),
-                "response must begin before all manifest chunks are read");
+                "response must begin before all manifest artifacts are opened");
     }
 
     @Then("downstream response demand controls how many chunks are read ahead")
@@ -698,8 +703,8 @@ public class Phase3ReactivePipelineSteps {
         assertTrue(maxAhead <= 1, "production read path must retain at most one verified chunk ahead");
     }
 
-    @Then("the HTTP adapter performs a bounded integrity preflight before response commitment without retaining object bytes")
-    public void httpAdapterPerformsBoundedIntegrityPreflight() throws IOException {
+    @Then("the HTTP adapter validates manifest and artifact metadata without reading complete payload bytes before response commitment")
+    public void httpAdapterValidatesMetadataWithoutPayloadPreflight() throws IOException {
         Path repositoryRoot = Files.exists(PROJECT_ROOT.resolve("s3-reactive-api-adapter/pom.xml"))
                 ? PROJECT_ROOT : PROJECT_ROOT.getParent();
         String handler = Files.readString(repositoryRoot.resolve(
@@ -713,10 +718,21 @@ public class Phase3ReactivePipelineSteps {
         String preflight = orchestratorSource.substring(
                 orchestratorSource.indexOf("public Mono<Void> validateReadable"),
                 orchestratorSource.indexOf("List<StorageStage> writePipelineStages"));
-        assertTrue(preflight.contains("concatMap(artifact -> chunkStorePort.read(artifact).then(), 1)"));
-        assertTrue(preflight.contains(".then()"));
+        assertTrue(preflight.contains("concatMap(chunkStorePort::validateMetadata, 1)"));
+        assertFalse(preflight.contains("readStream("));
+        assertFalse(preflight.contains("chunkStorePort.read("));
         assertFalse(preflight.contains("collectList("));
         assertFalse(preflight.contains("byte[]"));
+    }
+
+    @Then("each persisted payload artifact is opened once for the response stream")
+    public void eachPersistedArtifactIsOpenedOnce() {
+        List<Phase3StorageEventRecorder.ReadObservation> requested = eventRecorder.readObservations().stream()
+                .filter(observation -> observation.kind().equals("requested"))
+                .toList();
+        assertEquals(manifestChunkIds.size(), requested.size());
+        assertEquals(manifestChunkIds, requested.stream()
+                .map(Phase3StorageEventRecorder.ReadObservation::chunkId).toList());
     }
 
     @Then("production read stages do not perform a global reduce, collectList, or whole-object byte-array assembly over the object content")
@@ -751,6 +767,7 @@ public class Phase3ReactivePipelineSteps {
      */
     @Given("the pipeline failure injector causes stage {string} to fail with reason {string}")
     public void pipelineFailureInjectorCausesStageToFail(String failingStage, String failureReason) {
+        configuredFailureReason = failureReason;
         switch (failingStage) {
             case "chunk-persistence" -> faultInjector.interruptAfterChunkTempWrite(false, failureReason);
             case "manifest-persistence" -> faultInjector.interruptAfterManifestTempWrite(false, failureReason);
@@ -825,7 +842,7 @@ public class Phase3ReactivePipelineSteps {
         assertEquals(500, lastPipelineResponse.status(), lastPipelineResponse.bodyAsString());
         assertTrue(lastPipelineResponse.bodyAsString().contains("<Code>InternalError</Code>"),
                 "the S3 error code must be deterministic: " + lastPipelineResponse.bodyAsString());
-        assertTrue(lastPipelineResponse.bodyAsString().contains("simulated chunk write fault"),
+        assertTrue(lastPipelineResponse.bodyAsString().contains(configuredFailureReason),
                 "the declared fault reason must be exposed: " + lastPipelineResponse.bodyAsString());
     }
 

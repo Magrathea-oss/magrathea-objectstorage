@@ -159,6 +159,11 @@ public class FileSystemStorePort implements StorePort {
                                                 NodeId.of("node-001"), pending.chunkId(),
                                                 pending.tempData(), pending.finalData(), stored));
                                 String checksum = HexFormat.of().formatHex(digest.get().digest());
+                                String persistedChecksum = sha256(pending.tempData());
+                                if (!checksum.equals(persistedChecksum)) {
+                                    throw new IllegalStateException(
+                                            "Persisted temporary artifact checksum mismatch before commit");
+                                }
                                 if (cancelled.get()) {
                                     cleanupCancelledWrite(pending);
                                     throw new CancellationException("chunk write cancelled before commit");
@@ -200,6 +205,18 @@ public class FileSystemStorePort implements StorePort {
         } catch (java.io.IOException ignored) {
             // Cancellation cleanup is best-effort here; pipeline cleanup retries by chunk id.
         }
+    }
+
+    private static String sha256(Path path) throws java.io.IOException {
+        MessageDigest digest = sha256();
+        try (var input = Files.newInputStream(path)) {
+            byte[] block = new byte[64 * 1024];
+            int read;
+            while ((read = input.read(block)) >= 0) {
+                digest.update(block, 0, read);
+            }
+        }
+        return HexFormat.of().formatHex(digest.digest());
     }
 
     private static MessageDigest sha256() {

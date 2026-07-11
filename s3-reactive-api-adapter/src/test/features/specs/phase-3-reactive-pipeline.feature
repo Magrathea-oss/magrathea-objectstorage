@@ -78,6 +78,31 @@ Ability: Phase 3 staged reactive read and write pipeline
     And each scenario uses a clean storage-engine filesystem root "target/storage-engine-it/<scenario-id>"
     And reactive pipeline event capture is enabled for the selected validation mode
 
+  Rule: Upload commit verifies the bytes durably written to temporary storage
+    Before any whole-object, dedup, or EC artifact becomes visible, persistence MUST
+    re-read the temporary file incrementally and compare its SHA-256 with the digest
+    calculated from the incoming stream. A mismatch MUST fail before artifact rename,
+    manifest publication, object-reference publication, or the S3 success response.
+
+    @implemented-and-validated @REQ-PIPELINE-016 @functional-requirement @non-functional-requirement @integrity @durability @streaming @static-architecture-required
+    Scenario: Atomic artifact publication verifies temporary-file bytes before commit
+      Given validation mode "static-architecture" is selected for requirement "REQ-PIPELINE-016"
+      And production source path "storage-engine-reactive-infrastructure/src/main/java/com/example/magrathea/storageengine/infrastructure/pipeline/FileSystemStorePort.java" implements atomic streaming artifact persistence
+      When the static architecture runner inspects method "streamToStore" in the production source path
+      Then artifact persistence compares the incoming digest with an incremental temporary-file SHA-256 before atomic commit
+      And temporary-file verification uses a bounded 65536-byte block instead of whole-artifact materialization
+
+    @implemented-and-validated @REQ-PIPELINE-016 @functional-requirement @non-functional-requirement @integrity @durability @pipeline-unit-required @pipeline-unit
+    Scenario: Corrupted temporary artifact never becomes a committed object
+      Given validation mode "pipeline-unit" is selected for requirement "REQ-PIPELINE-016"
+      And the storage engine operator uses filesystem root "target/storage-engine-it/REQ-PIPELINE-016-unit"
+      And bucket "pipeline-verified-write-bucket" exists
+      And an S3 client has object content from fixture file "fixtures/upload/corruptible-object.bin" for bucket "pipeline-verified-write-bucket" and key "pipeline/2026/write/verified-temp.bin"
+      And the persistence fault injector corrupts temporary artifact bytes before verification
+      When the pipeline unit runner submits the upload to verified artifact persistence
+      Then chunk-persistence fails because temporary-file bytes do not match the incoming digest
+      And no committed artifact, manifest, or object reference remains in filesystem root "target/storage-engine-it/REQ-PIPELINE-016-unit"
+
   Rule: Plain uploads remain whole-object storage units
     A single-object PutObject with multipart, deduplication, and erasure coding disabled
     MUST remain one streamed whole-object storage unit. It MUST NOT be split into fixed
@@ -294,7 +319,7 @@ Ability: Phase 3 staged reactive read and write pipeline
       And helper "serveRange" attaches "S3StreamingBody.sliceRange(content, start, effectiveEnd)" to "BodyInserters.fromDataBuffers"
       And shared helper "S3StreamingBody.sliceRange" emits finite-demand per-buffer range slices without building a full-object array
 
-    @partial @REQ-PIPELINE-003 @functional-requirement @non-functional-requirement @streaming @backpressure @integrity @pipeline-unit-required
+    @implemented-and-validated @REQ-PIPELINE-003 @functional-requirement @non-functional-requirement @streaming @backpressure @pipeline-unit-required
     Scenario Outline: Pipeline-unit GetObject streams manifest-ordered chunks under controlled demand
       Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
       And the storage engine operator uses filesystem root "<storage_root>"
@@ -312,7 +337,7 @@ Ability: Phase 3 staged reactive read and write pipeline
         | chunk-reading      |
         | response-streaming |
       And chunk-reading emits chunks in the same ordinal order recorded in the committed manifest
-      And response-streaming begins after the first verified chunk is available, without waiting for every chunk to be read
+      And response-streaming begins after the first bounded filesystem buffer is available, without waiting for every artifact to be read
       And downstream response demand controls how many chunks are read ahead
       And production read stages do not perform a global reduce, collectList, or whole-object byte-array assembly over the object content
       And the streamed S3 response bytes exactly match fixture file "<fixture_file>"
@@ -322,15 +347,15 @@ Ability: Phase 3 staged reactive read and write pipeline
         | requirement_id   | validation_mode | bucket                     | object_key                                      | fixture_file                                       | storage_root                                      |
         | REQ-PIPELINE-003 | pipeline-unit   | pipeline-read-order-bucket | pipeline/2026/read/manifest-ordered-object.bin | target/test-fixtures/pipeline/large-object-256m.bin | target/storage-engine-it/REQ-PIPELINE-003-unit    |
 
-  Rule: HTTP read integrity preflight preserves deterministic S3 errors
-    The HTTP adapter additionally preserves REQ-FS-003/004 deterministic S3 XML errors by
-    completing a bounded integrity preflight before committing response headers. This preflight
-    does not retain object bytes, but it reads persisted chunks before opening the separately
-    backpressured response stream; therefore WebTestClient evidence does not claim first-byte
-    latency or single-pass filesystem I/O.
+  Rule: HTTP reads validate metadata and stream persisted bytes once
+    Upload commit owns durable-byte verification. GetObject MUST validate the manifest and
+    artifact references before response commitment, then stream filesystem bytes exactly once
+    under downstream demand. It MUST NOT perform a complete payload preflight or calculate a
+    second server-side payload checksum; clients validate the returned ETag/checksum contract.
+    Periodic at-rest detection and repair belongs to EP-4 scrubbing.
 
-    @partial @REQ-PIPELINE-003 @functional-requirement @non-functional-requirement @streaming @integrity @webclient-required
-    Scenario Outline: WebTestClient GetObject preserves exact bytes and deterministic integrity preflight
+    @implemented-and-validated @REQ-PIPELINE-003 @functional-requirement @non-functional-requirement @streaming @backpressure @webclient-required
+    Scenario Outline: WebTestClient GetObject starts after metadata validation and reads payload bytes once
       Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
       And the storage engine operator uses filesystem root "<storage_root>"
       And bucket "<bucket>" exists
@@ -347,7 +372,8 @@ Ability: Phase 3 staged reactive read and write pipeline
         | chunk-reading      |
         | response-streaming |
       And chunk-reading emits chunks in the same ordinal order recorded in the committed manifest
-      And the HTTP adapter performs a bounded integrity preflight before response commitment without retaining object bytes
+      And the HTTP adapter validates manifest and artifact metadata without reading complete payload bytes before response commitment
+      And each persisted payload artifact is opened once for the response stream
       And production read stages do not perform a global reduce, collectList, or whole-object byte-array assembly over the object content
       And the streamed S3 response bytes exactly match fixture file "<fixture_file>"
 
@@ -410,7 +436,7 @@ Ability: Phase 3 staged reactive read and write pipeline
     stop later stages, execute cleanup for resources owned by completed stages, and return
     a deterministic S3 error without publishing a readable object.
 
-    @REQ-PIPELINE-004 @functional-requirement @non-functional-requirement @integrity @failure-propagation @cleanup @pipeline-unit-required @webclient-required @partial
+    @REQ-PIPELINE-004 @functional-requirement @non-functional-requirement @integrity @failure-propagation @cleanup @pipeline-unit-required @webclient-required @implemented-and-validated
     Scenario Outline: Failed write stage reports one deterministic failure and leaves no published object
       Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
       And the storage engine operator uses filesystem root "<storage_root>"
@@ -436,9 +462,10 @@ Ability: Phase 3 staged reactive read and write pipeline
       @webclient
       Examples: WebTestClient validation
         | requirement_id   | validation_mode | failing_stage     | failure_reason             | bucket                  | object_key                                      | fixture_file                           | storage_root                                         |
-        | REQ-PIPELINE-004 | webclient       | chunk-persistence | simulated chunk write fault | pipeline-failure-bucket | pipeline/2026/failure/stage-failure-object.bin | fixtures/upload/corruptible-object.bin | target/storage-engine-it/REQ-PIPELINE-004-webclient |
+        | REQ-PIPELINE-004 | webclient       | chunk-persistence    | simulated chunk write fault | pipeline-failure-bucket | pipeline/2026/failure/stage-failure-object.bin  | fixtures/upload/corruptible-object.bin | target/storage-engine-it/REQ-PIPELINE-004-webclient          |
+        | REQ-PIPELINE-004 | webclient       | manifest-persistence | simulated manifest fault    | pipeline-failure-bucket | pipeline/2026/failure/manifest-failure-object.bin | fixtures/upload/corruptible-object.bin | target/storage-engine-it/REQ-PIPELINE-004-webclient-manifest |
 
-    @REQ-PIPELINE-004 @functional-requirement @non-functional-requirement @integrity @failure-propagation @cleanup @pipeline-unit-required @partial @pipeline-unit
+    @REQ-PIPELINE-004 @functional-requirement @non-functional-requirement @integrity @failure-propagation @cleanup @pipeline-unit-required @implemented-and-validated @pipeline-unit
     Scenario: Upstream upload failure removes in-progress atomic chunk artifacts
       Given validation mode "pipeline-unit" is selected for requirement "REQ-PIPELINE-004"
       And the storage engine operator uses filesystem root "target/storage-engine-it/REQ-PIPELINE-004-upstream-unit"

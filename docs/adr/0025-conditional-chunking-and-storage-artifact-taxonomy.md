@@ -61,4 +61,4 @@ The source-of-truth executable requirements are:
 - `REQ-SCRUB-001`: type-aware integrity scrubbing;
 - `REQ-QUOTA-001/002` and `REQ-CAPACITY-001`: atomic capacity protection.
 
-REQ-PIPELINE-014 and REQ-PIPELINE-015 have pipeline-unit and WebTestClient evidence for the whole-object namespace and physical EC shard persistence. EP-3 still requires resolution of the GetObject single-pass/first-byte versus deterministic pre-commit integrity-error trade-off; EP-4 lifecycle requirements remain pending.
+REQ-PIPELINE-014 and REQ-PIPELINE-015 have pipeline-unit and WebTestClient evidence for the whole-object namespace and physical EC shard persistence. The GetObject decision is single-pass payload streaming after metadata-only validation: upload commit verifies temporary-file bytes against the incoming digest before atomic publication, clients validate later reads against committed checksum/ETag metadata, and periodic at-rest detection/repair belongs to EP-4 scrubbing. The EP-4 lifecycle requirements remain pending.

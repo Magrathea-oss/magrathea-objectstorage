@@ -89,6 +89,13 @@ public class Phase3ReactivePipelineStaticArchitectureSteps {
                 "Expected S3MultipartHandler class in " + inspectedPath);
     }
 
+    @Given("production source path {string} implements atomic streaming artifact persistence")
+    public void productionSourcePathImplementsAtomicArtifactPersistence(String relativePath) throws IOException {
+        inspectSourcePath(relativePath);
+        assertTrue(inspectedSource.contains("class FileSystemStorePort"),
+                "Expected FileSystemStorePort class in " + inspectedPath);
+    }
+
     @Given("production source path {string} implements multipart part body storage")
     public void productionSourcePathImplementsMultipartPartBodyStorage(String relativePath) throws IOException {
         inspectSourcePath(relativePath);
@@ -119,6 +126,22 @@ public class Phase3ReactivePipelineStaticArchitectureSteps {
     public void staticArchitectureRunnerInspectsTheProductionSourcePath() {
         assertSourceLoaded();
         inspectedMethodBody = null;
+    }
+
+    @Then("artifact persistence compares the incoming digest with an incremental temporary-file SHA-256 before atomic commit")
+    public void artifactPersistenceVerifiesTemporaryFileBeforeCommit() {
+        assertSourceLoaded();
+        assertTrue(inspectedSource.contains("sha256(pending.tempData())"));
+        assertTrue(inspectedSource.indexOf("sha256(pending.tempData())")
+                < inspectedSource.indexOf("AtomicChunkWriteProtocol.commit(pending, checksum)"));
+        assertTrue(inspectedSource.contains("checksum.equals(persistedChecksum)"));
+    }
+
+    @Then("temporary-file verification uses a bounded 65536-byte block instead of whole-artifact materialization")
+    public void temporaryFileVerificationIsBounded() {
+        assertSourceLoaded();
+        assertTrue(inspectedSource.contains("byte[] block = new byte[64 * 1024]"));
+        assertFalse(inspectedSource.contains("Files.readAllBytes(pending.tempData())"));
     }
 
     @Then("method {string} does not invoke {string}")

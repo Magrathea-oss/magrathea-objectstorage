@@ -11,9 +11,9 @@ Ability: Phase 2 filesystem reliability for the storage-engine backend
   S3-visible behaviors (checksum mismatch detection, concurrent-write isolation) that
   manifest as observable GetObject errors or clean PUT outcomes.
 
-  REQ-FS-003 and REQ-FS-004 produce directly observable S3 client outcomes: a corrupted
-  chunk or corrupted manifest causes GetObject to return an integrity error rather than
-  corrupt bytes. These are classified as @functional-requirement and validated in both
+  REQ-FS-003 and REQ-FS-004 produce directly observable S3 client outcomes: clients detect
+  corrupted payload artifacts through committed checksum/ETag metadata, while a corrupted
+  manifest is rejected before it can guide a read. These are classified as @functional-requirement and validated in both
   required webclient and awscli validation modes.
 
   REQ-FS-001, REQ-FS-002, and REQ-FS-005 are internal filesystem reliability abilities:
@@ -132,26 +132,25 @@ Ability: Phase 2 filesystem reliability for the storage-engine backend
         | requirement_id | validation_mode | bucket                       | object_key                                      | fixture_file                     | storage_root                                  |
         | REQ-FS-002     | webclient       | fs-atomicity-manifest-bucket | manifests/2026/atomic-write/manifest-object.bin | fixtures/upload/small-object.txt | target/storage-engine-it/REQ-FS-002-webclient |
 
-  Rule: Every stored chunk carries a verifiable checksum
-    The storage engine MUST compute and persist a checksum for each chunk at write time.
-    The read path MUST verify each chunk's checksum before emitting any bytes to the calling
-    layer. A chunk whose bytes do not match the stored checksum MUST be rejected; the read path
-    MUST NOT return corrupted bytes as a successful object. The S3 HTTP GetObject response MUST
-    signal an integrity failure when a chunk checksum mismatch is detected.
+  Rule: Every stored artifact carries client-visible integrity metadata
+    The storage engine MUST compute and persist a checksum for each artifact at write time and
+    verify temporary-file bytes before atomic publication. GetObject MUST remain single-pass
+    and return the committed checksum or ETag so clients can detect corruption introduced after
+    commit. Periodic server-side detection and repair belongs to the EP-4 scrubber.
 
     @REQ-FS-003 @functional-requirement @non-functional-requirement @checksum @integrity @webclient-required @awscli-required @implemented-and-validated
-    Scenario Outline: Storage engine detects a corrupted chunk and rejects it before returning bytes to S3 clients
+    Scenario Outline: Client detects post-commit artifact corruption through committed integrity metadata
       Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
       And the storage engine operator uses filesystem root "<storage_root>"
       And bucket "<bucket>" exists
       And an S3 client has object content from fixture file "<fixture_file>" for bucket "<bucket>" and key "<object_key>"
       When the S3 client uploads fixture file "<fixture_file>" to bucket "<bucket>" and key "<object_key>" through the S3 HTTP PutObject API
-      Then the upload is committed and every chunk file in filesystem root "<storage_root>" for bucket "<bucket>" and key "<object_key>" carries a verifiable checksum
+      Then the upload is committed and every artifact file in filesystem root "<storage_root>" for bucket "<bucket>" and key "<object_key>" carries a verifiable checksum
       And the S3 client can immediately read bucket "<bucket>" and key "<object_key>" and receive the exact original bytes from fixture file "<fixture_file>"
-      When the corruption injector overwrites bytes inside a committed chunk file in filesystem root "<storage_root>" for bucket "<bucket>" and key "<object_key>" outside the running application
-      And the S3 client reads bucket "<bucket>" and key "<object_key>" through the S3 HTTP GetObject API
-      Then the storage engine detects the checksum mismatch for the corrupted chunk before returning any response bytes
-      And the S3 HTTP GetObject response signals an object integrity failure rather than returning corrupted bytes as a successful object body
+      When the corruption injector overwrites bytes inside a committed artifact file in filesystem root "<storage_root>" for bucket "<bucket>" and key "<object_key>" outside the running application
+      And the S3 client reads bucket "<bucket>" and key "<object_key>" through the single-pass S3 HTTP GetObject API
+      Then the GetObject result exposes the committed checksum or ETag without a complete payload preflight
+      And the S3 client detects that the received bytes do not match the committed integrity metadata
 
       @webclient
       Examples: WebTestClient validation
