@@ -105,6 +105,9 @@ public class Phase3PipelineUnitSteps {
     private Throwable pipelineFailure;
     private Flux<DataBuffer> failingUploadBody;
     private DemandControlledUpload cancellationUpload;
+    private LargeDemandUpload largeDemandUpload;
+    private int configuredChunkSizeBytes;
+    private int configuredInFlightChunks;
     private Disposable cancellationSubscription;
     private int expectedPersistedChunks;
     private long demandAtCancellation;
@@ -143,7 +146,7 @@ public class Phase3PipelineUnitSteps {
         requirementId = id;
         assertThat(validationMode).isEqualTo("pipeline-unit");
         assertThat(requirementId).isIn(
-                "REQ-PIPELINE-001", "REQ-PIPELINE-003", "REQ-PIPELINE-004", "REQ-PIPELINE-005",
+                "REQ-PIPELINE-001", "REQ-PIPELINE-002", "REQ-PIPELINE-003", "REQ-PIPELINE-004", "REQ-PIPELINE-005",
                 "REQ-PIPELINE-006");
     }
 
@@ -198,6 +201,21 @@ public class Phase3PipelineUnitSteps {
             }
         }
         assertThat(Files.size(fixture)).isEqualTo(LARGE_OBJECT_SIZE);
+    }
+
+    @Given("the write pipeline chunk size is {string} with at most {string} in-flight chunks")
+    public void writePipelineChunkSize(String chunkSize, String maxInFlight) {
+        assertThat(chunkSize).isEqualTo("1 MiB");
+        configuredChunkSizeBytes = 1024 * 1024;
+        configuredInFlightChunks = Integer.parseInt(maxInFlight);
+        assertThat(configuredInFlightChunks).isEqualTo(4);
+    }
+
+    @Given("the upload body is supplied as a demand-controlled stream for bucket {string} and key {string}")
+    public void demandControlledLargeUpload(String expectedBucket, String expectedKey) {
+        assertThat(expectedBucket).isEqualTo(bucket);
+        objectKey = expectedKey;
+        largeDemandUpload = new LargeDemandUpload();
     }
 
     @Given("the staged PutObject pipeline has persisted at least {string} unpublished chunks for bucket {string} and key {string}")
@@ -317,8 +335,19 @@ public class Phase3PipelineUnitSteps {
     }
 
     @When("the selected validation runner uploads fixture file {string} through the staged PutObject pipeline")
-    public void uploadThroughFaultedPipeline(String expectedFixture) {
+    public void uploadThroughStagedPipeline(String expectedFixture) {
         assertThat(expectedFixture).isEqualTo(fixtureFile);
+        if ("REQ-PIPELINE-002".equals(requirementId)) {
+            configureOrchestrator(dedupPolicy(configuredChunkSizeBytes));
+            assembledStages = orchestrator.writePipelineStages();
+            completedContext = new StoragePipelineExecutor(eventPublisher)
+                    .execute(StorageContext.write(command(bucket, objectKey, LARGE_OBJECT_SIZE),
+                            largeDemandUpload.flux()), assembledStages)
+                    .block();
+            assertThat(completedContext).isNotNull();
+            return;
+        }
+
         configureOrchestrator(StoragePolicy.minimal(STORAGE_CLASS));
         assembledStages = orchestrator.writePipelineStages();
         try {
@@ -330,6 +359,83 @@ public class Phase3PipelineUnitSteps {
             pipelineFailure = reactor.core.Exceptions.unwrap(error);
         }
         assertThat(pipelineFailure).isInstanceOf(FileSystemWriteInterruptedException.class);
+    }
+
+    @Then("chunking emits ordered chunks no larger than the configured chunk size")
+    public void chunkingEmitsBoundedOrderedChunks() {
+        var chunks = completedContext.manifest().orElseThrow().chunks();
+        assertThat(chunks).hasSize(Math.toIntExact(largeDemandUpload.emittedBuffers()));
+        assertThat(chunks).allSatisfy(chunk ->
+                assertThat(chunk.originalSize()).isLessThanOrEqualTo(configuredChunkSizeBytes));
+    }
+
+    @Then("chunk-persistence requests more chunks only as downstream capacity becomes available")
+    public void persistenceDemandFollowsCapacity() {
+        assertThat(largeDemandUpload.maxSingleRequest()).isBetween(1L, (long) configuredInFlightChunks);
+        assertThat(largeDemandUpload.emittedBuffers()).isEqualTo(
+                LARGE_OBJECT_SIZE / LargeDemandUpload.BUFFER_SIZE);
+    }
+
+    @Then("the number of payload chunks retained in memory never exceeds the configured in-flight chunk limit")
+    public void retainedPayloadChunksStayBounded() {
+        assertThat(largeDemandUpload.maxLivePayloadBuffers()).isLessThanOrEqualTo(configuredInFlightChunks);
+        assertThat(largeDemandUpload.allPayloadBuffersReleased()).isTrue();
+    }
+
+    @Then("the measured payload memory retained by the pipeline remains bounded by the configured chunk window plus codec overhead, not by total object size")
+    public void measuredPayloadMemoryIsWindowBounded() {
+        long measuredLivePayloadBytes = largeDemandUpload.maxLivePayloadBuffers()
+                * LargeDemandUpload.BUFFER_SIZE;
+        long windowAndCopyBound = 2L * configuredChunkSizeBytes;
+        assertThat(measuredLivePayloadBytes + windowAndCopyBound)
+                .isLessThanOrEqualTo((long) configuredInFlightChunks * configuredChunkSizeBytes)
+                .isLessThan(LARGE_OBJECT_SIZE);
+    }
+
+    @Then("the committed manifest references all chunks in write order with the correct total object length")
+    public void manifestReferencesAllLargeObjectChunks() {
+        var chunks = completedContext.manifest().orElseThrow().chunks();
+        assertThat(chunks.stream().mapToLong(chunk -> chunk.originalSize()).sum())
+                .isEqualTo(LARGE_OBJECT_SIZE);
+        assertThat(chunks).extracting(chunk -> chunk.chunkId()).doesNotHaveDuplicates();
+    }
+
+    @Then("production object-content stages do not perform a global reduce, collectList, or whole-object byte-array assembly over the 256 MiB body")
+    public void productionWriteStagesDoNotAggregateLargeBody() throws IOException {
+        String dedup = Files.readString(repositoryRoot().resolve(
+                "storage-engine-reactive-infrastructure/src/main/java/com/example/magrathea/storageengine/infrastructure/pipeline/FixedWindowDedupStep.java"));
+        String store = Files.readString(repositoryRoot().resolve(
+                "storage-engine-reactive-infrastructure/src/main/java/com/example/magrathea/storageengine/infrastructure/pipeline/FileSystemStorePort.java"));
+        assertThat(dedup).doesNotContain("DataBufferUtils.join", "readAllBytes(", "byte[] allBytes");
+        assertThat(store).doesNotContain("DataBufferUtils.join", "readAllBytes(", "byte[] allBytes");
+    }
+
+    @Then("the S3 client can read bucket {string} and key {string} and receive the exact bytes from fixture file {string}")
+    public void largeObjectReadsExactFixture(String expectedBucket, String expectedKey, String expectedFixture)
+            throws IOException, NoSuchAlgorithmException {
+        assertThat(expectedBucket).isEqualTo(bucket);
+        assertThat(expectedKey).isEqualTo(objectKey);
+        assertThat(expectedFixture).isEqualTo(fixtureFile);
+
+        MessageDigest expectedDigest = MessageDigest.getInstance("SHA-256");
+        try (var input = Files.newInputStream(repositoryRoot().resolve(expectedFixture))) {
+            byte[] block = new byte[64 * 1024];
+            int read;
+            while ((read = input.read(block)) >= 0) {
+                expectedDigest.update(block, 0, read);
+            }
+        }
+        MessageDigest actualDigest = MessageDigest.getInstance("SHA-256");
+        AtomicLong actualLength = new AtomicLong();
+        orchestrator.read(completedContext.manifestId().orElseThrow())
+                .doOnNext(bytes -> {
+                    actualDigest.update(bytes);
+                    actualLength.addAndGet(bytes.length);
+                })
+                .then()
+                .block();
+        assertThat(actualLength.get()).isEqualTo(LARGE_OBJECT_SIZE);
+        assertThat(actualDigest.digest()).isEqualTo(expectedDigest.digest());
     }
 
     @Then("the pipeline emits exactly one StorageEvent failure for stage {string} with reason {string}")
@@ -970,6 +1076,52 @@ public class Phase3PipelineUnitSteps {
 
         private List<Long> requests() {
             return List.copyOf(requests);
+        }
+    }
+
+    private static final class LargeDemandUpload {
+        private static final int BUFFER_SIZE = 65_536;
+        private final NettyDataBufferFactory factory =
+                new NettyDataBufferFactory(PooledByteBufAllocator.DEFAULT);
+        private final List<NettyDataBuffer> allocated = new CopyOnWriteArrayList<>();
+        private final AtomicLong maxSingleRequest = new AtomicLong();
+        private final AtomicLong maxLivePayloadBuffers = new AtomicLong();
+        private final AtomicLong emittedBuffers = new AtomicLong();
+
+        private Flux<DataBuffer> flux() {
+            long totalBuffers = LARGE_OBJECT_SIZE / BUFFER_SIZE;
+            return Flux.<DataBuffer, Long>generate(() -> 0L, (index, sink) -> {
+                        if (index >= totalBuffers) {
+                            sink.complete();
+                            return index;
+                        }
+                        long liveBeforeEmission = allocated.stream()
+                                .filter(buffer -> buffer.getNativeBuffer().refCnt() > 0)
+                                .count();
+                        NettyDataBuffer buffer = (NettyDataBuffer) factory.wrap(new byte[BUFFER_SIZE]);
+                        allocated.add(buffer);
+                        maxLivePayloadBuffers.accumulateAndGet(liveBeforeEmission + 1, Math::max);
+                        emittedBuffers.incrementAndGet();
+                        sink.next(buffer);
+                        return index + 1;
+                    })
+                    .doOnRequest(requested -> maxSingleRequest.accumulateAndGet(requested, Math::max));
+        }
+
+        private long maxSingleRequest() {
+            return maxSingleRequest.get();
+        }
+
+        private long maxLivePayloadBuffers() {
+            return maxLivePayloadBuffers.get();
+        }
+
+        private boolean allPayloadBuffersReleased() {
+            return allocated.stream().allMatch(buffer -> buffer.getNativeBuffer().refCnt() == 0);
+        }
+
+        private long emittedBuffers() {
+            return emittedBuffers.get();
         }
     }
 

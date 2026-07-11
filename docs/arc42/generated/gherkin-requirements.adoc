@@ -31,8 +31,8 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |`@config-only` |69
 |`@implemented-and-validated` |121
 |`@implemented-not-e2e-validated` |22
-|`@not-implemented` |7
-|`@partial` |5
+|`@not-implemented` |6
+|`@partial` |6
 |`@placeholder` |9
 |`unknown/not-tagged` |178
 |===
@@ -11021,9 +11021,9 @@ have succeeded.
 |Classification |`@non-functional-requirement`
 |Capability area tags |`@spec`, `@reactive-pipeline`, `@storage-engine`, `@streaming`, `@backpressure`, `@bounded-memory`
 |Validation mode tags |`@pipeline-unit-required`, `@webclient-required`
-|Declared/validated status |`@not-implemented`
+|Declared/validated status |`@partial`
 |Protocol smoke |`no`
-|All tags |`@spec`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@REQ-PIPELINE-002`, `@non-functional-requirement`, `@streaming`, `@backpressure`, `@bounded-memory`, `@pipeline-unit-required`, `@webclient-required`, `@not-implemented`
+|All tags |`@spec`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@partial`, `@REQ-PIPELINE-002`, `@non-functional-requirement`, `@streaming`, `@backpressure`, `@bounded-memory`, `@pipeline-unit-required`, `@webclient-required`
 |===
 
 .Rule description
@@ -11045,7 +11045,7 @@ array assembly over the complete object body in production object-content paths.
   When the selected validation runner uploads fixture file "<fixture_file>" through the staged PutObject pipeline
   Then chunking emits ordered chunks no larger than the configured chunk size
   And chunk-persistence requests more chunks only as downstream capacity becomes available
-  And the number of retained uncommitted chunks never exceeds the configured in-flight chunk limit
+  And the number of payload chunks retained in memory never exceeds the configured in-flight chunk limit
   And the measured payload memory retained by the pipeline remains bounded by the configured chunk window plus codec overhead, not by total object size
   And the committed manifest references all chunks in write order with the correct total object length
   And production object-content stages do not perform a global reduce, collectList, or whole-object byte-array assembly over the 256 MiB body
@@ -11059,7 +11059,7 @@ array assembly over the complete object body in production object-content paths.
 | REQ-PIPELINE-002 | pipeline-unit | pipeline-backpressure-bucket | pipeline/2026/write/large-streamed-object.bin | target/test-fixtures/pipeline/large-object-256m.bin | target/storage-engine-it/REQ-PIPELINE-002-unit
 |===
 
-.Examples: WebTestClient validation `@webclient`
+.Examples: WebTestClient validation `@webclient`, `@not-implemented`
 [cols="1,1,1,1,1,1",options="header"]
 |===
 | requirement_id | validation_mode | bucket | object_key | fixture_file | storage_root

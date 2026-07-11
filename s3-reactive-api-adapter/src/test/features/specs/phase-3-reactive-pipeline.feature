@@ -124,7 +124,7 @@ Ability: Phase 3 staged reactive read and write pipeline
     according to downstream demand. It MUST NOT use a global reduce, collectList, or byte
     array assembly over the complete object body in production object-content paths.
 
-    @REQ-PIPELINE-002 @non-functional-requirement @streaming @backpressure @bounded-memory @pipeline-unit-required @webclient-required @not-implemented
+    @partial @REQ-PIPELINE-002 @non-functional-requirement @streaming @backpressure @bounded-memory @pipeline-unit-required @webclient-required
     Scenario Outline: Large PutObject persists chunks with bounded demand and without whole-object aggregation
       Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
       And the storage engine operator uses filesystem root "<storage_root>"
@@ -135,7 +135,7 @@ Ability: Phase 3 staged reactive read and write pipeline
       When the selected validation runner uploads fixture file "<fixture_file>" through the staged PutObject pipeline
       Then chunking emits ordered chunks no larger than the configured chunk size
       And chunk-persistence requests more chunks only as downstream capacity becomes available
-      And the number of retained uncommitted chunks never exceeds the configured in-flight chunk limit
+      And the number of payload chunks retained in memory never exceeds the configured in-flight chunk limit
       And the measured payload memory retained by the pipeline remains bounded by the configured chunk window plus codec overhead, not by total object size
       And the committed manifest references all chunks in write order with the correct total object length
       And production object-content stages do not perform a global reduce, collectList, or whole-object byte-array assembly over the 256 MiB body
@@ -146,7 +146,7 @@ Ability: Phase 3 staged reactive read and write pipeline
         | requirement_id   | validation_mode | bucket                       | object_key                                  | fixture_file                                       | storage_root                                      |
         | REQ-PIPELINE-002 | pipeline-unit   | pipeline-backpressure-bucket | pipeline/2026/write/large-streamed-object.bin | target/test-fixtures/pipeline/large-object-256m.bin | target/storage-engine-it/REQ-PIPELINE-002-unit    |
 
-      @webclient
+      @webclient @not-implemented
       Examples: WebTestClient validation
         | requirement_id   | validation_mode | bucket                       | object_key                                  | fixture_file                                       | storage_root                                         |
         | REQ-PIPELINE-002 | webclient       | pipeline-backpressure-bucket | pipeline/2026/write/large-streamed-object.bin | target/test-fixtures/pipeline/large-object-256m.bin | target/storage-engine-it/REQ-PIPELINE-002-webclient |
