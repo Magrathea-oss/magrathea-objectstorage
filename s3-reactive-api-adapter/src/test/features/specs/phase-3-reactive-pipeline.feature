@@ -18,11 +18,11 @@ Ability: Phase 3 staged reactive read and write pipeline
   between stages. StorageEvent records stage start, success, failure, retry, cleanup,
   cancellation, and timing without carrying object payload bytes.
 
-  Until the Stage 3 abstractions, staged pipelines, and runner glue are implemented,
-  scenarios that require runtime StorageStage/StorageContext/StorageEvent evidence remain
-  marked not-implemented. Static architecture scenarios may be promoted independently when they
-  validate code-level streaming constraints without a full pipeline-unit runner. Keep every
-  requirement ID with the REQ-PIPELINE-* prefix unchanged when scenarios become executable.
+  Pipeline-unit scenarios may be promoted independently when production
+  StorageStage/StorageContext/StorageEvent behavior is executable through a focused runner.
+  End-to-end promotion additionally requires WebTestClient evidence that the storage-engine
+  S3 adapter delegates through the same staged pipeline and publishes committed artifacts.
+  Keep every requirement ID with the REQ-PIPELINE-* prefix unchanged when scenarios become executable.
 
   Validation roles:
     - Pipeline unit runner validates StorageStage ordering, StorageContext evolution,
@@ -84,13 +84,13 @@ Ability: Phase 3 staged reactive read and write pipeline
     reference in that order. Later stages MUST NOT run before earlier required stages
     have succeeded.
 
-    @REQ-PIPELINE-001 @functional-requirement @integrity @stage-ordering @pipeline-unit-required @not-implemented
+    @implemented-and-validated @REQ-PIPELINE-001 @functional-requirement @integrity @stage-ordering @pipeline-unit-required @webclient-required
     Scenario Outline: Write pipeline records the required stage order before publishing an object reference
       Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
       And the storage engine operator uses filesystem root "<storage_root>"
       And bucket "<bucket>" exists
       And an S3 client has object content from fixture file "<fixture_file>" for bucket "<bucket>" and key "<object_key>"
-      When the pipeline unit runner submits the fixture stream to the staged PutObject pipeline
+      When the selected validation runner submits the fixture stream to the staged PutObject pipeline
       Then the write pipeline is assembled from StorageStage instances named in the required write pipeline stage order
       And a single StorageContext carries bucket "<bucket>", key "<object_key>", request metadata, chunk decisions, manifest identifier, and cleanup handles across those stages
       And StorageEvent records show start and success for the write stages in this exact order:
@@ -104,12 +104,20 @@ Ability: Phase 3 staged reactive read and write pipeline
         | object-index-persistence |
       And no manifest is committed before chunk-persistence succeeds for every referenced chunk
       And no object reference is committed before manifest-persistence succeeds
-      And after object-index-persistence succeeds, the S3 client can read bucket "<bucket>" and key "<object_key>" and receive the exact bytes from fixture file "<fixture_file>"
+      And content-address entries for new chunks are published only after object-index-persistence commits the owning object
+      And every committed manifest chunk reference uses a canonical UUID filename with a matching SHA-256 sidecar readable by the canonical filesystem node
+      And a recovery scan of filesystem root "<storage_root>" reports no incomplete chunk artifacts after publication
+      And after object-index-persistence succeeds, the selected validation runner reads the committed object through its declared production read entry point and receives the exact bytes from fixture file "<fixture_file>"
 
       @pipeline-unit
       Examples: Pipeline unit validation
-        | requirement_id   | validation_mode | bucket                      | object_key                                | fixture_file                     | storage_root                                      |
-        | REQ-PIPELINE-001 | pipeline-unit   | pipeline-stage-order-bucket | pipeline/2026/write/stage-order-object.txt | fixtures/upload/small-object.txt | target/storage-engine-it/REQ-PIPELINE-001-unit    |
+        | requirement_id   | validation_mode | bucket                      | object_key                                | fixture_file                     | storage_root                                   |
+        | REQ-PIPELINE-001 | pipeline-unit   | pipeline-stage-order-bucket | pipeline/2026/write/stage-order-object.txt | fixtures/upload/small-object.txt | target/storage-engine-it/REQ-PIPELINE-001-unit |
+
+      @webclient
+      Examples: WebTestClient end-to-end validation
+        | requirement_id   | validation_mode | bucket                      | object_key                                | fixture_file                     | storage_root                                        |
+        | REQ-PIPELINE-001 | webclient       | pipeline-stage-order-bucket | pipeline/2026/write/stage-order-object.txt | fixtures/upload/small-object.txt | target/storage-engine-it/REQ-PIPELINE-001-webclient |
 
   Rule: Write chunk persistence preserves backpressure and bounded memory
     The write pipeline MUST convert object content into bounded chunks and persist them
@@ -186,7 +194,7 @@ Ability: Phase 3 staged reactive read and write pipeline
       And production source path "s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/adapter/web/S3ObjectOperationsHandler.java" implements the S3 GetObject route
       When the static architecture runner inspects method "getObject" in the production source path
       Then method "getObject" does not collect object content before a non-range response
-      And method "getObject" passes "oc.content()" directly to "S3ResponseBuilder.okWithBody"
+      And method "getObject" passes "oc.content()" through the shared finite-demand boundary to "S3ResponseBuilder.okWithBody"
       And range handling streams through the explicit Range header branch
 
     @implemented-and-validated @REQ-PIPELINE-010 @functional-requirement @non-functional-requirement @streaming @bounded-memory @range @static-architecture-required @s3-api
@@ -198,8 +206,66 @@ Ability: Phase 3 staged reactive read and write pipeline
       And method "getObject" passes "oc.content()" directly to range helper "serveRange"
       When the static architecture runner inspects the production source path
       Then helper "serveRange" accepts streaming content as "Flux<DataBuffer> content" instead of a collected buffer list
-      And helper "serveRange" attaches "sliceRange(content, start, effectiveEnd)" to "BodyInserters.fromDataBuffers"
-      And helper "sliceRange" emits per-buffer range slices without building a full-object array
+      And helper "serveRange" attaches "S3StreamingBody.sliceRange(content, start, effectiveEnd)" to "BodyInserters.fromDataBuffers"
+      And shared helper "S3StreamingBody.sliceRange" emits finite-demand per-buffer range slices without building a full-object array
+
+    @partial @REQ-PIPELINE-003 @functional-requirement @non-functional-requirement @streaming @backpressure @integrity @pipeline-unit-required
+    Scenario Outline: Pipeline-unit GetObject streams manifest-ordered chunks under controlled demand
+      Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
+      And the storage engine operator uses filesystem root "<storage_root>"
+      And bucket "<bucket>" exists
+      And a committed object exists in bucket "<bucket>" at key "<object_key>" uploaded from fixture file "<fixture_file>"
+      And the committed manifest lists multiple chunks with stable ordinal positions and checksums
+      When the selected validation runner reads bucket "<bucket>" and key "<object_key>" through the staged GetObject pipeline
+      Then StorageEvent records show start and success for the read stages in this exact order:
+        | stage name         |
+        | validation         |
+        | policy-resolution  |
+        | read-planning      |
+        | chunk-reading      |
+        | response-streaming |
+      And chunk-reading emits chunks in the same ordinal order recorded in the committed manifest
+      And response-streaming begins after the first verified chunk is available, without waiting for every chunk to be read
+      And downstream response demand controls how many chunks are read ahead
+      And production read stages do not perform a global reduce, collectList, or whole-object byte-array assembly over the object content
+      And the streamed S3 response bytes exactly match fixture file "<fixture_file>"
+
+      @pipeline-unit
+      Examples: Pipeline unit validation
+        | requirement_id   | validation_mode | bucket                     | object_key                                      | fixture_file                                       | storage_root                                      |
+        | REQ-PIPELINE-003 | pipeline-unit   | pipeline-read-order-bucket | pipeline/2026/read/manifest-ordered-object.bin | target/test-fixtures/pipeline/large-object-256m.bin | target/storage-engine-it/REQ-PIPELINE-003-unit    |
+
+  Rule: HTTP read integrity preflight preserves deterministic S3 errors
+    The HTTP adapter additionally preserves REQ-FS-003/004 deterministic S3 XML errors by
+    completing a bounded integrity preflight before committing response headers. This preflight
+    does not retain object bytes, but it reads persisted chunks before opening the separately
+    backpressured response stream; therefore WebTestClient evidence does not claim first-byte
+    latency or single-pass filesystem I/O.
+
+    @partial @REQ-PIPELINE-003 @functional-requirement @non-functional-requirement @streaming @integrity @webclient-required
+    Scenario Outline: WebTestClient GetObject preserves exact bytes and deterministic integrity preflight
+      Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
+      And the storage engine operator uses filesystem root "<storage_root>"
+      And bucket "<bucket>" exists
+      And a committed object exists in bucket "<bucket>" at key "<object_key>" uploaded from fixture file "<fixture_file>"
+      And the committed manifest lists multiple chunks with stable ordinal positions and checksums
+      When the selected validation runner reads bucket "<bucket>" and key "<object_key>" through the staged GetObject pipeline
+      Then StorageEvent records show start and success for the read stages in this exact order:
+        | stage name         |
+        | validation         |
+        | policy-resolution  |
+        | read-planning      |
+        | chunk-reading      |
+        | response-streaming |
+      And chunk-reading emits chunks in the same ordinal order recorded in the committed manifest
+      And the HTTP adapter performs a bounded integrity preflight before response commitment without retaining object bytes
+      And production read stages do not perform a global reduce, collectList, or whole-object byte-array assembly over the object content
+      And the streamed S3 response bytes exactly match fixture file "<fixture_file>"
+
+      @webclient
+      Examples: WebTestClient validation
+        | requirement_id   | validation_mode | bucket                     | object_key                                      | fixture_file                                       | storage_root                                         |
+        | REQ-PIPELINE-003 | webclient       | pipeline-read-order-bucket | pipeline/2026/read/manifest-ordered-object.bin | target/test-fixtures/pipeline/large-object-256m.bin | target/storage-engine-it/REQ-PIPELINE-003-webclient |
 
   Rule: Multipart part persistence streams upload and copy inputs without complete-part aggregation
     UploadPart and UploadPartCopy MUST persist part bytes as a stream while computing the
@@ -232,43 +298,30 @@ Ability: Phase 3 staged reactive read and write pipeline
       Then method "readPart" reads multipart content with "DataBufferUtils.read"
       And method "readPart" does not invoke "Files.readAllBytes"
 
-    @REQ-PIPELINE-003 @functional-requirement @non-functional-requirement @streaming @backpressure @integrity @pipeline-unit-required @webclient-required @not-implemented
-    Scenario Outline: GetObject streams manifest-ordered chunks without collecting the whole object
-      Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
-      And the storage engine operator uses filesystem root "<storage_root>"
-      And bucket "<bucket>" exists
-      And a committed object exists in bucket "<bucket>" at key "<object_key>" uploaded from fixture file "<fixture_file>"
-      And the committed manifest lists multiple chunks with stable ordinal positions and checksums
-      When the selected validation runner reads bucket "<bucket>" and key "<object_key>" through the staged GetObject pipeline
-      Then StorageEvent records show start and success for the read stages in this exact order:
-        | stage name         |
-        | validation         |
-        | policy-resolution  |
-        | read-planning      |
-        | chunk-reading      |
-        | response-streaming |
-      And chunk-reading emits chunks in the same ordinal order recorded in the committed manifest
-      And response-streaming begins after the first verified chunk is available, without waiting for every chunk to be read
-      And downstream response demand controls how many chunks are read ahead
-      And production read stages do not perform a global reduce, collectList, or whole-object byte-array assembly over the object content
-      And the streamed S3 response bytes exactly match fixture file "<fixture_file>"
+  Rule: Existing S3 streaming boundaries apply a finite runtime demand window
+    Before the complete staged StorageStage pipeline is claimed end to end, the existing
+    PutObject, GetObject, Range, UploadPart, UploadPartCopy, and multipart part-file
+    boundaries MUST apply a shared finite Reactor demand window. Runtime evidence for this
+    boundary does not validate stage ordering, manifest publication, or StorageEvent behavior.
 
-      @pipeline-unit
-      Examples: Pipeline unit validation
-        | requirement_id   | validation_mode | bucket                     | object_key                                      | fixture_file                                       | storage_root                                      |
-        | REQ-PIPELINE-003 | pipeline-unit   | pipeline-read-order-bucket | pipeline/2026/read/manifest-ordered-object.bin | target/test-fixtures/pipeline/large-object-256m.bin | target/storage-engine-it/REQ-PIPELINE-003-unit    |
-
-      @webclient
-      Examples: WebTestClient validation
-        | requirement_id   | validation_mode | bucket                     | object_key                                      | fixture_file                                       | storage_root                                         |
-        | REQ-PIPELINE-003 | webclient       | pipeline-read-order-bucket | pipeline/2026/read/manifest-ordered-object.bin | target/test-fixtures/pipeline/large-object-256m.bin | target/storage-engine-it/REQ-PIPELINE-003-webclient |
+    @implemented-and-validated @REQ-PIPELINE-013 @non-functional-requirement @streaming @backpressure @bounded-memory @runtime-backpressure-required @s3-api @multipart
+    Scenario: S3 object and multipart streaming boundaries cap upstream DataBuffer demand at runtime
+      Given validation mode "runtime-backpressure" is selected for requirement "REQ-PIPELINE-013"
+      And a demand-controlled source contains 12 ordered DataBuffers of 65536 bytes
+      When the runtime runner streams the source through each production S3 object body boundary
+      Then PutObject, GetObject, and ranged GetObject retain at most the shared demand-window number of source DataBuffers
+      And each object path emits the expected ordered bytes without whole-body aggregation
+      When the runtime runner saves the source through multipart part storage
+      Then UploadPart and UploadPartCopy retain at most the shared demand-window number of source DataBuffers
+      And multipart part-file reads emit buffers no larger than 65536 bytes and reproduce the expected ordered bytes
+      And this evidence does not claim the complete staged StorageStage pipeline
 
   Rule: Stage failures propagate deterministically and clean up completed resources
     When any required write stage fails, the pipeline MUST emit a typed failure event,
     stop later stages, execute cleanup for resources owned by completed stages, and return
     a deterministic S3 error without publishing a readable object.
 
-    @REQ-PIPELINE-004 @functional-requirement @non-functional-requirement @integrity @failure-propagation @cleanup @pipeline-unit-required @webclient-required @not-implemented
+    @REQ-PIPELINE-004 @functional-requirement @non-functional-requirement @integrity @failure-propagation @cleanup @pipeline-unit-required @webclient-required @partial
     Scenario Outline: Failed write stage reports one deterministic failure and leaves no published object
       Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
       And the storage engine operator uses filesystem root "<storage_root>"
@@ -296,12 +349,26 @@ Ability: Phase 3 staged reactive read and write pipeline
         | requirement_id   | validation_mode | failing_stage     | failure_reason             | bucket                  | object_key                                      | fixture_file                           | storage_root                                         |
         | REQ-PIPELINE-004 | webclient       | chunk-persistence | simulated chunk write fault | pipeline-failure-bucket | pipeline/2026/failure/stage-failure-object.bin | fixtures/upload/corruptible-object.bin | target/storage-engine-it/REQ-PIPELINE-004-webclient |
 
+    @REQ-PIPELINE-004 @functional-requirement @non-functional-requirement @integrity @failure-propagation @cleanup @pipeline-unit-required @partial @pipeline-unit
+    Scenario: Upstream upload failure removes in-progress atomic chunk artifacts
+      Given validation mode "pipeline-unit" is selected for requirement "REQ-PIPELINE-004"
+      And the storage engine operator uses filesystem root "target/storage-engine-it/REQ-PIPELINE-004-upstream-unit"
+      And bucket "pipeline-upstream-failure-bucket" exists
+      And no object exists in bucket "pipeline-upstream-failure-bucket" for key "pipeline/2026/failure/upstream-body-object.bin"
+      And an upload body emits one DataBuffer and then fails with reason "simulated upstream body failure"
+      When the pipeline unit runner submits the failing upload body to the staged PutObject pipeline
+      Then the pipeline emits exactly one StorageEvent failure for stage "chunk-persistence" with reason "simulated upstream body failure"
+      And no stage after "chunk-persistence" emits a success event for this StorageContext
+      And all temporary files created for the failed write are removed or quarantined in filesystem root "target/storage-engine-it/REQ-PIPELINE-004-upstream-unit"
+      And no committed manifest or object reference is published for bucket "pipeline-upstream-failure-bucket" and key "pipeline/2026/failure/upstream-body-object.bin"
+      And a later S3 GetObject for bucket "pipeline-upstream-failure-bucket" and key "pipeline/2026/failure/upstream-body-object.bin" reports that the object is absent
+
   Rule: Cancellation before publication cleans up pipeline-owned resources
     If a client cancels a PutObject stream before manifest or object-reference publication,
     the pipeline MUST propagate cancellation to active stages, release buffers, clean up
     unpublished chunks or temporary files, and leave no readable object behind.
 
-    @REQ-PIPELINE-005 @functional-requirement @non-functional-requirement @streaming @cancellation @cleanup @pipeline-unit-required @webclient-required @not-implemented
+    @REQ-PIPELINE-005 @functional-requirement @non-functional-requirement @streaming @cancellation @cleanup @pipeline-unit-required @webclient-required @partial
     Scenario Outline: Cancelled upload releases resources before manifest or object reference publication
       Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
       And the storage engine operator uses filesystem root "<storage_root>"
@@ -311,6 +378,7 @@ Ability: Phase 3 staged reactive read and write pipeline
       And the staged PutObject pipeline has persisted at least "<persisted_chunk_count>" unpublished chunks for bucket "<bucket>" and key "<object_key>"
       When the selected validation runner cancels the upload subscription before manifest-persistence starts
       Then the pipeline emits a cancellation StorageEvent for the active StorageContext
+      And cancellation cleanup is owned by the reactive pipeline lifecycle rather than a detached subscription
       And active upstream publishers stop receiving additional demand after cancellation
       And all retained DataBuffer instances and open file handles owned by the cancelled pipeline are released
       And cleanup events remove or quarantine unpublished chunks and temporary files in filesystem root "<storage_root>"
@@ -323,7 +391,7 @@ Ability: Phase 3 staged reactive read and write pipeline
         | requirement_id   | validation_mode | persisted_chunk_count | bucket                       | object_key                                | fixture_file                                       | storage_root                                      |
         | REQ-PIPELINE-005 | pipeline-unit   | 2                     | pipeline-cancellation-bucket | pipeline/2026/cancel/cancelled-object.bin | target/test-fixtures/pipeline/large-object-256m.bin | target/storage-engine-it/REQ-PIPELINE-005-unit    |
 
-      @webclient
+      @webclient @not-implemented
       Examples: WebTestClient validation
         | requirement_id   | validation_mode | persisted_chunk_count | bucket                       | object_key                                | fixture_file                                       | storage_root                                         |
         | REQ-PIPELINE-005 | webclient       | 2                     | pipeline-cancellation-bucket | pipeline/2026/cancel/cancelled-object.bin | target/test-fixtures/pipeline/large-object-256m.bin | target/storage-engine-it/REQ-PIPELINE-005-webclient |
@@ -333,7 +401,7 @@ Ability: Phase 3 staged reactive read and write pipeline
     observations. Event observers MUST be attachable per stage without changing payload
     demand, buffering object bytes, or coupling one stage's instrumentation to another.
 
-    @REQ-PIPELINE-006 @non-functional-requirement @observability @instrumentation @pipeline-unit-required @not-implemented
+    @REQ-PIPELINE-006 @non-functional-requirement @observability @instrumentation @pipeline-unit-required @implemented-and-validated
     Scenario Outline: StorageEvent records allow per-stage instrumentation without observing object payload bytes
       Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
       And the storage engine operator uses filesystem root "<storage_root>"

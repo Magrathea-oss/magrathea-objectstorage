@@ -52,7 +52,7 @@ public sealed interface StorageEvent permits StorageEvent.StageStarted, StorageE
 
         @Override
         public Optional<String> outcome() {
-            return Optional.empty();
+            return Optional.of("started");
         }
     }
 

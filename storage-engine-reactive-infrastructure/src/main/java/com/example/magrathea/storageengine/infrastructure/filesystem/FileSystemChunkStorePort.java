@@ -45,4 +45,20 @@ public class FileSystemChunkStorePort implements ChunkStorePort {
                 .next()
                 .switchIfEmpty(Mono.error(new NoSuchFileException("Chunk not found: " + chunkId.value())));
     }
+
+    @Override
+    public Mono<Void> delete(ChunkId chunkId) {
+        return Flux.fromIterable(cluster.nodes())
+                .concatMap(node -> Mono.fromRunnable(() -> {
+                            try {
+                                java.nio.file.Files.deleteIfExists(node.nodePath().resolve("chunks")
+                                        .resolve(chunkId.value().toString()));
+                                java.nio.file.Files.deleteIfExists(node.nodePath().resolve("chunks")
+                                        .resolve(chunkId.value() + ".sha256"));
+                            } catch (java.io.IOException error) {
+                                throw new java.io.UncheckedIOException("Failed to delete unpublished chunk", error);
+                            }
+                        }).subscribeOn(Schedulers.boundedElastic()))
+                .then();
+    }
 }

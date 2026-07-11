@@ -24,4 +24,9 @@ public interface ChunkStorePort {
     Mono<List<NodeId>> store(ChunkId chunkId, byte[] data, PersistencePlan plan);
 
     Mono<byte[]> read(ChunkId chunkId);
+
+    /** Removes a pipeline-owned unpublished chunk after a failed write. */
+    default Mono<Void> delete(ChunkId chunkId) {
+        return Mono.empty();
+    }
 }

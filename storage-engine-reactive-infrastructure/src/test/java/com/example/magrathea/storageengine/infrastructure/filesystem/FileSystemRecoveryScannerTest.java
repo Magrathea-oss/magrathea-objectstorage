@@ -106,6 +106,21 @@ class FileSystemRecoveryScannerTest {
         assertThat(report.findings().get(0).artifactType()).isEqualTo("orphaned-chunk");
     }
 
+    @Test
+    void committedChecksumSidecarWithoutDataIsAnInterruptedWriteArtifact() throws IOException {
+        String chunkId = UUID.randomUUID().toString();
+        Path orphanedFinalSidecar = chunksDir.resolve(chunkId + ".sha256");
+        Files.writeString(orphanedFinalSidecar, "a".repeat(64));
+
+        FileSystemRecoveryScanner.ScanReport report = scanner.scan(storageRoot);
+
+        assertThat(report.findings()).singleElement().satisfies(finding -> {
+            assertThat(finding.artifactType()).isEqualTo("orphaned-chunk");
+            assertThat(finding.artifactPath()).isEqualTo(orphanedFinalSidecar.toString());
+            assertThat(finding.reason()).contains("without committed chunk");
+        });
+    }
+
     // ─────────────────────────────────────────────────────
     //  Committed chunk with corrupted checksum → checksum-mismatch
     // ─────────────────────────────────────────────────────

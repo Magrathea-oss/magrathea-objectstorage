@@ -17,8 +17,6 @@ import com.example.magrathea.s3api.dto.query.CopyObjectResultQuery;
 import com.example.magrathea.s3api.dto.query.DeleteResultQuery;
 import com.example.magrathea.s3api.dto.query.SelectObjectContentQuery;
 import org.springframework.core.io.buffer.DataBuffer;
-import org.springframework.core.io.buffer.DataBufferUtils;
-import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.BodyInserters;
@@ -32,7 +30,6 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
@@ -67,7 +64,7 @@ public class S3ObjectOperationsHandler {
         var effectiveStorageClass = storageClass == null || storageClass.isBlank() ? "STANDARD" : storageClass;
         var userMetadata = S3RequestExtractor.extractUserMetadata(request);
         var uploadDigest = new UploadDigest();
-        var content = request.bodyToFlux(DataBuffer.class)
+        var content = S3StreamingBody.bounded(request.bodyToFlux(DataBuffer.class))
             .doOnNext(uploadDigest::update);
         var initialLength = request.headers().contentLength().orElse(0L);
         var active = ActiveS3Object.create(
@@ -236,7 +233,7 @@ public class S3ObjectOperationsHandler {
     public Mono<ServerResponse> getObject(ServerRequest request) {
         var objectKey = S3RequestExtractor.extractObjectKey(request);
         var rangeHeader = request.headers().firstHeader("Range");
-        return objectService.getObjectWithContent(objectKey)
+        return objectService.getIntegrityVerifiedObjectWithContent(objectKey)
             .flatMap(oc -> {
                 var obj = oc.object();
                 // Evaluate conditional headers first
@@ -244,7 +241,7 @@ public class S3ObjectOperationsHandler {
                     if (rangeHeader != null && !rangeHeader.isBlank()) {
                         return serveRange(obj, oc.content(), rangeHeader);
                     }
-                    return S3ResponseBuilder.okWithBody(obj, oc.content());
+                    return S3ResponseBuilder.okWithBody(obj, S3StreamingBody.bounded(oc.content()));
                 });
             })
             .switchIfEmpty(S3WebSupport.xmlError(
@@ -278,36 +275,8 @@ public class S3ObjectOperationsHandler {
         return ServerResponse.status(HttpStatus.PARTIAL_CONTENT)
             .header("Content-Range", "bytes " + start + "-" + effectiveEnd + "/" + total)
             .header("Content-Length", String.valueOf(rangeLength))
-            .body(BodyInserters.fromDataBuffers(sliceRange(content, start, effectiveEnd)));
-    }
-
-    private Flux<DataBuffer> sliceRange(Flux<DataBuffer> content, long start, long endInclusive) {
-        var position = new AtomicLong(0);
-        return content.handle((buffer, sink) -> {
-            long bufferStart = position.get();
-            int readable = buffer.readableByteCount();
-            long bufferEndExclusive = bufferStart + readable;
-            try {
-                if (bufferStart > endInclusive) {
-                    sink.complete();
-                    return;
-                }
-                if (bufferEndExclusive > start && bufferStart <= endInclusive) {
-                    byte[] bufferBytes = new byte[readable];
-                    buffer.read(bufferBytes);
-                    int sliceStart = (int) Math.max(0, start - bufferStart);
-                    int sliceEndExclusive = (int) Math.min(readable, endInclusive - bufferStart + 1);
-                    byte[] rangeSlice = Arrays.copyOfRange(bufferBytes, sliceStart, sliceEndExclusive);
-                    sink.next(DefaultDataBufferFactory.sharedInstance.wrap(rangeSlice));
-                }
-                if (bufferEndExclusive > endInclusive) {
-                    sink.complete();
-                }
-            } finally {
-                position.addAndGet(readable);
-                DataBufferUtils.release(buffer);
-            }
-        });
+            .body(BodyInserters.fromDataBuffers(
+                S3StreamingBody.sliceRange(content, start, effectiveEnd)));
     }
 
     // ─────────────────────────────────────────────────────

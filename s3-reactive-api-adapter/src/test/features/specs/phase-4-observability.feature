@@ -140,6 +140,17 @@ Ability: Phase 4 storage observability for reactive pipelines and recovery
         | requirement_id | validation_mode | failing_stage     | failure_classification | bucket                      | object_key                                   | fixture_file                         | storage_root                                   |
         | REQ-OBS-002    | webclient       | chunk-persistence | storage-io-failure     | obs-pipeline-failure-bucket | observability/2026/events/failed-object.bin | fixtures/upload/corruptible-object.bin | target/storage-engine-it/REQ-OBS-002-webclient |
 
+    @REQ-OBS-002 @functional-requirement @non-functional-requirement @observability @events @failure-classification @integrity @redaction @bootstrap-integration-required @implemented-and-validated
+    Scenario: Corrupted chunk read preflight emits an integrity-classified chunk-reading failure
+      Given validation mode "bootstrap-integration" is selected for requirement "REQ-OBS-002"
+      And bucket "obs-pipeline-failure-bucket" contains object "observability/2026/events/failed-object.bin" with user metadata "top-secret"
+      And the committed chunk bytes are corrupted outside the running application
+      When an S3 client reads the object with an Authorization header that must be redacted
+      Then the S3 response signals an integrity failure before returning a successful object body
+      And the listener receives a StageFailed event for stage "chunk-reading" with classification "integrity-failure"
+      And metrics, traces, and operational logs record classification "integrity-failure"
+      And events, metrics, traces, and logs contain neither object payload bytes, user metadata values, nor Authorization credentials
+
   Rule: Metrics expose storage activity, reliability signals, deduplication outcomes, and latency
     Micrometer metrics MUST expose low-cardinality counters, summaries, and timers for
     bytes, chunks, manifests, failures, recovery findings, dedup hits/misses, and stage

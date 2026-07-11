@@ -9,9 +9,11 @@ import com.example.magrathea.storageengine.application.pipeline.DataProcessingPi
 import com.example.magrathea.storageengine.application.pipeline.DataProcessingPipelinePort;
 import com.example.magrathea.storageengine.application.pipeline.StorageCleanupHandle;
 import com.example.magrathea.storageengine.application.pipeline.StorageContext;
+import com.example.magrathea.storageengine.application.pipeline.StorageEvent;
 import com.example.magrathea.storageengine.application.pipeline.StorageEventMeasurements;
 import com.example.magrathea.storageengine.application.pipeline.StorageEventPublisher;
 import com.example.magrathea.storageengine.application.pipeline.StorageOperation;
+import com.example.magrathea.storageengine.application.pipeline.ReadPipelineObserver;
 import com.example.magrathea.storageengine.application.pipeline.StoragePipelineExecutor;
 import com.example.magrathea.storageengine.application.pipeline.StorageStage;
 import com.example.magrathea.storageengine.application.pipeline.StorageTrace;
@@ -59,11 +61,14 @@ import org.springframework.core.io.buffer.DataBuffer;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 
 /**
@@ -82,6 +87,9 @@ import java.util.function.Function;
  */
 public class ReactiveStorageOrchestrator {
 
+    private static final System.Logger LOGGER =
+            System.getLogger(ReactiveStorageOrchestrator.class.getName());
+
     private final CompleteUploadService completeUploadService;
     private final StoragePolicyCatalog storagePolicyCatalog;
     private final EffectivePolicyResolver effectivePolicyResolver;
@@ -93,6 +101,7 @@ public class ReactiveStorageOrchestrator {
     private final ObjectManifestRepository objectManifestRepository;
     private final StorageEventPublisher storageEventPublisher;
     private final StoragePipelineExecutor pipelineExecutor;
+    private final ReadPipelineObserver readPipelineObserver;
     /** Required pipeline port for the DataProcessingPipeline. */
     private final DataProcessingPipelinePort dataPipelinePort;
 
@@ -111,6 +120,26 @@ public class ReactiveStorageOrchestrator {
             int defaultChunkSizeBytes,
             StorageEventPublisher eventPublisher,
             DataProcessingPipelinePort dataPipelinePort) {
+        this(completeUploadService, storagePolicyCatalog, effectivePolicyResolver, virtualDeviceResolver,
+                persistencePlanner, contentAddressIndex, chunkStorePort, storedObjectRepository,
+                objectManifestRepository, defaultChunkSizeBytes, eventPublisher, dataPipelinePort,
+                ReadPipelineObserver.NO_OP);
+    }
+
+    public ReactiveStorageOrchestrator(
+            CompleteUploadService completeUploadService,
+            StoragePolicyCatalog storagePolicyCatalog,
+            EffectivePolicyResolver effectivePolicyResolver,
+            VirtualDeviceResolver virtualDeviceResolver,
+            PersistencePlanner persistencePlanner,
+            ContentAddressIndex contentAddressIndex,
+            ChunkStorePort chunkStorePort,
+            StoredObjectRepository storedObjectRepository,
+            ObjectManifestRepository objectManifestRepository,
+            int defaultChunkSizeBytes,
+            StorageEventPublisher eventPublisher,
+            DataProcessingPipelinePort dataPipelinePort,
+            ReadPipelineObserver readPipelineObserver) {
         this.completeUploadService = completeUploadService;
         this.storagePolicyCatalog = storagePolicyCatalog;
         this.effectivePolicyResolver = effectivePolicyResolver;
@@ -123,6 +152,7 @@ public class ReactiveStorageOrchestrator {
         this.storageEventPublisher = eventPublisher;
         this.defaultChunkSizeBytes = defaultChunkSizeBytes;
         this.dataPipelinePort = dataPipelinePort;
+        this.readPipelineObserver = readPipelineObserver;
         this.pipelineExecutor = new StoragePipelineExecutor(eventPublisher);
     }
 
@@ -149,6 +179,32 @@ public class ReactiveStorageOrchestrator {
         return pipelineExecutor.execute(StorageContext.read(manifestId), readPipelineStages())
                 .flatMapMany(context -> context.responseContent()
                         .orElseThrow(() -> new IllegalStateException("Read pipeline completed without response content")));
+    }
+
+    /**
+     * Verifies a committed manifest and every referenced chunk before an HTTP adapter
+     * commits a response. This bounded preflight supports the REQ-FS-003 and REQ-FS-004
+     * XML error contract without recording a second staged read operation.
+     */
+    public Mono<Void> validateReadable(ManifestId manifestId, String bucket, String objectKey) {
+        String correlationId = UUID.randomUUID().toString();
+        Instant startedAt = Instant.now();
+        return objectManifestRepository.findBy(manifestId)
+                .flatMapMany(manifest -> Flux.fromIterable(manifest.chunks()))
+                .concatMap(chunk -> chunkStorePort.read(chunk.chunkId()).then(), 1)
+                .then()
+                .onErrorResume(error -> storageEventPublisher.publish(new StorageEvent.StageFailed(
+                                StorageOperation.READ,
+                                correlationId,
+                                "chunk-reading",
+                                Optional.of(bucket),
+                                Optional.of(objectKey),
+                                Optional.of(manifestId.value().toString()),
+                                Instant.now(),
+                                Duration.between(startedAt, Instant.now()),
+                                error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage(),
+                                StorageEventMeasurements.failure()))
+                        .then(Mono.error(error)));
     }
 
     List<StorageStage> writePipelineStages() {
@@ -230,7 +286,9 @@ public class ReactiveStorageOrchestrator {
      * one per window — each resulting in a separate StorageTrace. For non-dedup policies,
      * the pipeline produces a single StorageTrace for the whole FileUnit.
      * <p>
-     * New fingerprints are recorded in the content address index after storing.
+     * New fingerprints remain private to the pipeline until the owning object commits.
+     * The content-address index is published by object-index-persistence so another upload
+     * can never reuse a chunk that is still eligible for failure/cancellation cleanup.
      */
     private Mono<StorageContext> persistChunksViaPipeline(
             StorageContext context, PersistencePlan plan) {
@@ -245,39 +303,61 @@ public class ReactiveStorageOrchestrator {
         StorageUnit.FileUnit fileUnit = new StorageUnit.FileUnit(
                 context.uploadData().orElseThrow(), info);
 
-        return pipeline.execute(fileUnit)
-                .concatMap(trace -> {
-                    // For dedup reuse traces, retrieve the existing chunkId from the index
-                    if (trace.deduplicatedReuse() && trace.fingerprint().isPresent()) {
-                        Fingerprint fp = trace.fingerprint().get();
-                        return contentAddressIndex.find(plan.deviceHash(), fp)
-                                .map(optDescriptor -> {
-                                    ChunkReferenceDescriptor existing = optDescriptor
-                                            .orElseThrow(() -> new IllegalStateException(
-                                                    "Dedup reuse but fingerprint not found in index"));
-                                    ChunkPersistenceTrace chunkTrace = toChunkPersistenceTrace(
-                                            trace, plan, existing.chunkId());
-                                    return chunkTrace;
-                                });
-                    }
-                    // For new chunks, convert trace and record in content address index
-                    ChunkPersistenceTrace chunkTrace = toChunkPersistenceTrace(trace, plan);
-                    if (trace.fingerprint().isPresent() && trace.storageRef().isPresent()) {
-                        Fingerprint fp = trace.fingerprint().get();
-                        ChunkId chunkId = ChunkId.of(
-                                UUID.fromString(trace.storageRef().get()));
-                        return contentAddressIndex.record(plan.deviceHash(), fp, chunkId)
-                                .then(Mono.just(chunkTrace));
-                    }
-                    return Mono.just(chunkTrace);
-                })
-                .collectList()
-                .map(traces -> context
-                        .withChunkTraces(traces)
-                        .withStageDecision("chunk-persistence",
-                                "chunk-trace-count=" + traces.size())
-                        .addCleanupHandle(
-                                StorageCleanupHandle.named("chunk-persistence", Mono.empty())));
+        return Mono.usingWhen(
+                Mono.fromSupplier(PersistedTraceState::new),
+                state -> pipeline.execute(fileUnit)
+                        .doOnNext(state.traces()::add)
+                        .concatMap(trace -> {
+                            // Reuse is possible only for entries published by an already committed object.
+                            if (trace.deduplicatedReuse() && trace.fingerprint().isPresent()) {
+                                Fingerprint fingerprint = trace.fingerprint().orElseThrow();
+                                return contentAddressIndex.find(plan.deviceHash(), fingerprint)
+                                        .map(optional -> {
+                                            ChunkReferenceDescriptor existing = optional.orElseThrow(() ->
+                                                    new IllegalStateException(
+                                                            "Dedup reuse but fingerprint not found in index"));
+                                            return toChunkPersistenceTrace(trace, plan, existing.chunkId());
+                                        });
+                            }
+                            return Mono.just(toChunkPersistenceTrace(trace, plan));
+                        })
+                        .collectList()
+                        .map(traces -> context
+                                .withChunkTraces(traces)
+                                .withStageDecision("chunk-persistence",
+                                        "chunk-trace-count=" + traces.size())
+                                .addCleanupHandle(StorageCleanupHandle.named(
+                                        "chunk-persistence", cleanupPersistedChunks(traces)))),
+                ignored -> Mono.empty(),
+                (state, error) -> cleanupPersistedStorageTraces(context, state.traces()),
+                state -> cleanupPersistedStorageTraces(context, state.traces()));
+    }
+
+    private Mono<Void> cleanupPersistedChunks(List<ChunkPersistenceTrace> traces) {
+        return Flux.fromIterable(traces)
+                .filter(trace -> !isDeduplicatedReuse(trace))
+                .concatMap(trace -> chunkStorePort.delete(trace.chunkId()))
+                .then();
+    }
+
+    private Mono<Void> cleanupPersistedStorageTraces(
+            StorageContext context, List<StorageTrace> traces) {
+        List<StorageTrace> owned = traces.stream()
+                .filter(trace -> !trace.deduplicatedReuse())
+                .filter(trace -> trace.storageRef().isPresent())
+                .toList();
+        if (owned.isEmpty()) {
+            return Mono.empty();
+        }
+        Instant startedAt = Instant.now();
+        return Flux.fromIterable(owned)
+                .concatMap(trace -> chunkStorePort.delete(
+                        ChunkId.of(UUID.fromString(trace.storageRef().orElseThrow()))))
+                .then(storageEventPublisher.publish(
+                        new com.example.magrathea.storageengine.application.pipeline.StorageEvent.CleanupCompleted(
+                                context.operation(), context.correlationId(), "cleanup", context.bucketName(),
+                                context.objectKey(), manifestIdValue(context), Instant.now(),
+                                Duration.between(startedAt, Instant.now()), "chunk-persistence")));
     }
 
     /**
@@ -453,6 +533,14 @@ public class ReactiveStorageOrchestrator {
         };
     }
 
+    private static boolean isDeduplicatedReuse(ChunkPersistenceTrace trace) {
+        return trace.steps().stream()
+                .flatMap(step -> step.operationOutcome().stream())
+                .filter(StepOutcome.DedupOutcome.class::isInstance)
+                .map(StepOutcome.DedupOutcome.class::cast)
+                .anyMatch(StepOutcome.DedupOutcome::matched);
+    }
+
     private Mono<StorageContext> persistManifest(StorageContext context) {
         return Mono.fromCallable(() -> {
                     List<ChunkReferenceDescriptor> descriptors = buildDescriptors(context.chunkTraces());
@@ -506,7 +594,33 @@ public class ReactiveStorageOrchestrator {
 
     private Mono<StorageContext> persistObjectIndex(StorageContext context) {
         return storedObjectRepository.save(context.storedObject().orElseThrow())
-                .thenReturn(context.withStageDecision("object-index-persistence", "object-reference-committed"));
+                .then(publishContentAddressEntries(context))
+                .thenReturn(context.withStageDecision(
+                        "object-index-persistence", "object-reference-and-content-address-index-committed"));
+    }
+
+    private Mono<Void> publishContentAddressEntries(StorageContext context) {
+        PersistencePlan plan = context.plan().orElseThrow();
+        return Flux.fromIterable(context.chunkTraces())
+                .filter(trace -> !isDeduplicatedReuse(trace))
+                .concatMap(trace -> contentAddressIndex.record(
+                        plan.deviceHash(), trace.fingerprint(), trace.chunkId()))
+                .then()
+                .onErrorResume(error -> {
+                    // The object and manifest are already committed. A missing dedup entry reduces
+                    // future reuse but must not turn a durable object into a failed PutObject.
+                    LOGGER.log(System.Logger.Level.WARNING,
+                            "Committed object without content-address optimization index manifestId="
+                                    + context.manifestId().map(id -> id.value().toString()).orElse("none")
+                                    + " reason=" + error.getMessage());
+                    return Mono.empty();
+                });
+    }
+
+    private record PersistedTraceState(List<StorageTrace> traces) {
+        private PersistedTraceState() {
+            this(new CopyOnWriteArrayList<>());
+        }
     }
 
     private Mono<StorageContext> validateRead(StorageContext context) {
@@ -529,11 +643,26 @@ public class ReactiveStorageOrchestrator {
 
     private Mono<StorageContext> prepareChunkReading(StorageContext context) {
         Flux<byte[]> readableChunks = Flux.fromIterable(context.chunkDescriptors())
-                .concatMap(chunk -> chunkStorePort.read(chunk.chunkId())
-                        .map(storedData -> restoreReadableChunk(storedData, chunk)), 1);
+                .index()
+                .concatMap(indexed -> {
+                    int ordinal = Math.toIntExact(indexed.getT1());
+                    ChunkReferenceDescriptor chunk = indexed.getT2();
+                    return Mono.defer(() -> {
+                        readPipelineObserver.chunkReadRequested(
+                                context.correlationId(), ordinal, chunk.chunkId());
+                        return chunkStorePort.read(chunk.chunkId())
+                                .map(storedData -> restoreReadableChunk(storedData, chunk))
+                                .doOnNext(ignored -> readPipelineObserver.chunkVerified(
+                                        context.correlationId(), ordinal, chunk.chunkId()))
+                                .doOnNext(ignored -> readPipelineObserver.responseChunkEmitted(
+                                        context.correlationId(), ordinal, chunk.chunkId()));
+                    });
+                }, 1)
+                .doOnRequest(requested -> readPipelineObserver.downstreamRequested(
+                        context.correlationId(), requested));
         return Mono.just(context
                 .withResponseContent(readableChunks)
-                .withStageDecision("chunk-reading", "manifest-order"));
+                .withStageDecision("chunk-reading", "manifest-order-prefetch=1"));
     }
 
     private Mono<StorageContext> prepareResponseStreaming(StorageContext context) {

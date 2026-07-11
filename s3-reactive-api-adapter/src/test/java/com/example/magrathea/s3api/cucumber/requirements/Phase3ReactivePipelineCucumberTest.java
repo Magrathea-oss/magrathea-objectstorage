@@ -11,23 +11,10 @@ import static io.cucumber.junit.platform.engine.Constants.PLUGIN_PROPERTY_NAME;
 /**
  * Phase 3 reactive pipeline WebTestClient Ability spec runner.
  *
- * <p>Selects {@code @webclient} Examples rows from the shared
- * {@code phase-3-reactive-pipeline.feature} file that are NOT tagged
- * {@code @not-implemented}. The pipeline-unit Examples rows (tagged
- * {@code @pipeline-unit}) are excluded here and belong to the pipeline-unit
- * runner once the StorageStage/StorageEvent abstractions are fully wired.
- *
- * <p>All Phase 3 scenarios are currently tagged {@code @not-implemented}
- * because they require StorageStage, StorageContext, and StorageEvent
- * abstractions that have not yet been implemented. Excluding {@code @not-implemented}
- * avoids {@link io.cucumber.java.PendingException} propagating as a test
- * error (a JUnit Platform 6.x / Cucumber 7.18.0 / Surefire 3.5.4 compatibility
- * constraint where pending scenarios report as errors rather than skips).
- *
- * <p>Once a Phase 3 webclient scenario is promoted to
- * {@code @implemented-not-e2e-validated} or {@code @implemented-and-validated},
- * remove the scenario's {@code @not-implemented} tag and it will automatically
- * be picked up by this runner.
+ * <p>Selects implemented {@code @webclient} Examples rows from the shared
+ * {@code phase-3-reactive-pipeline.feature} file. Runner-specific HTTP,
+ * StorageEvent capture, and filesystem inspection remain in WebTestClient glue;
+ * the pipeline-unit runner consumes the same scenario text through its own glue.
  */
 @Suite
 @SelectClasspathResource("specs/phase-3-reactive-pipeline.feature")

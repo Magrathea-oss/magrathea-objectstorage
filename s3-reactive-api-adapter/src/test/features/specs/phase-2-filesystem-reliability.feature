@@ -214,12 +214,14 @@ Ability: Phase 2 filesystem reliability for the storage-engine backend
       And a valid committed object exists in bucket "<bucket>" at key "<object_key>" uploaded from fixture file "<fixture_file>"
       And the committed object is readable through the S3 HTTP GetObject API and returns the exact bytes from fixture file "<fixture_file>" before the scanner runs
       And orphaned chunk files from a failed upload exist in the chunk directory of filesystem root "<storage_root>" with no committed manifest referencing them
+      And a final checksum sidecar without its corresponding committed chunk exists in filesystem root "<storage_root>"
       And an incomplete manifest with at least one missing required field exists in the manifest directory of filesystem root "<storage_root>"
       And a broken object reference pointing to an absent manifest exists in the object reference directory of filesystem root "<storage_root>"
       And a committed chunk file with a corrupted checksum mismatch exists in filesystem root "<storage_root>"
       When the recovery scanner is triggered for filesystem root "<storage_root>"
       Then the scanner report lists at least "<minimum_finding_count>" findings
       And the scanner report includes the orphaned chunk artifact paths with artifact type "orphaned-chunk" and a descriptive failure reason
+      And the scanner report includes the checksum sidecar without committed chunk with artifact type "orphaned-chunk" and a descriptive failure reason
       And the scanner report includes the incomplete manifest artifact path with artifact type "incomplete-manifest" and a descriptive failure reason
       And the scanner report includes the broken object reference artifact path with artifact type "broken-reference" and a descriptive failure reason
       And the scanner report includes the corrupted chunk artifact path with artifact type "checksum-mismatch" and a descriptive failure reason
@@ -233,7 +235,7 @@ Ability: Phase 2 filesystem reliability for the storage-engine backend
       @webclient
       Examples: WebTestClient validation
         | requirement_id | validation_mode | bucket             | object_key                             | fixture_file                     | storage_root                                  | minimum_finding_count |
-        | REQ-FS-005     | webclient       | fs-recovery-bucket | recovery/2026/scan/orphaned-object.bin | fixtures/upload/small-object.txt | target/storage-engine-it/REQ-FS-005-webclient | 4                     |
+        | REQ-FS-005     | webclient       | fs-recovery-bucket | recovery/2026/scan/orphaned-object.bin | fixtures/upload/small-object.txt | target/storage-engine-it/REQ-FS-005-webclient | 5                     |
 
   Rule: Concurrent PUT requests for different keys are fully isolated; concurrent PUT requests for the same key produce exactly one clean committed winner
     The storage engine MUST ensure that chunk files and manifest files written by concurrent

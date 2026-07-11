@@ -296,6 +296,21 @@ public class ReactiveObjectService {
     }
 
     /**
+     * Validates all persisted content before exposing a fresh streaming read.
+     *
+     * <p>This application boundary preserves the deterministic S3 XML integrity-error
+     * contract of REQ-FS-003 and REQ-FS-004: a checksum failure must be discovered before
+     * the HTTP response is committed. Validation retains no object bytes, and the content
+     * stream exposed by the use case remains the repository's bounded response stream.
+     */
+    public Mono<ObjectWithContent> getIntegrityVerifiedObjectWithContent(ObjectKey objectKey) {
+        return getObjectWithContent(objectKey)
+            .flatMap(objectWithContent -> queryRepository
+                .validateContentIntegrity(objectWithContent.object().key())
+                .thenReturn(objectWithContent));
+    }
+
+    /**
      * Get torrent data for an object identified by its natural {@link ObjectKey}.
      * Looks up the bucket internally.
      * <p>If the bucket is not found, returns {@code Mono.error(BucketNotFoundException)}.

@@ -115,7 +115,8 @@ class FileSystemInterruptedWriteFaultInjectionTest {
         List<Path> tempManifests = tempFiles(storageRoot.resolve("metadata").resolve("manifests"));
         assertThat(tempManifests).hasSize(1);
         assertThat(committedManifestFiles()).isEmpty();
-        assertThat(committedChunkFiles()).hasSize(1);
+        assertThat(committedChunkFiles()).isEmpty();
+        assertThat(regularFiles(storageRoot.resolve("metadata/content-address-index"))).isEmpty();
         assertNoCommittedObjectVisibility();
 
         ManifestId attemptedManifestId = manifestIdFromTempFile(tempManifests.getFirst());

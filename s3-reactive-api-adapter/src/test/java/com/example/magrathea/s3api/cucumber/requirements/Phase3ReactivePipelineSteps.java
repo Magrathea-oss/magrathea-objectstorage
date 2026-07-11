@@ -1,12 +1,23 @@
 package com.example.magrathea.s3api.cucumber.requirements;
 
+import com.example.magrathea.objectstorage.repository.storageengine.adapter.StorageEngineReactiveS3ObjectRepository;
+import com.example.magrathea.storageengine.application.pipeline.StorageEvent;
+import com.example.magrathea.storageengine.application.pipeline.StorageEventType;
+import com.example.magrathea.storageengine.application.pipeline.StorageOperation;
+import com.example.magrathea.storageengine.application.service.ReactiveStorageOrchestrator;
+import com.example.magrathea.storageengine.domain.valueobject.ChunkId;
+import com.example.magrathea.storageengine.domain.valueobject.NodeId;
+import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemRecoveryScanner;
+import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemStorageNode;
 import io.cucumber.datatable.DataTable;
+import io.cucumber.java.After;
 import io.cucumber.java.Before;
 import io.cucumber.java.PendingException;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
@@ -19,6 +30,13 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Properties;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -54,23 +72,146 @@ public class Phase3ReactivePipelineSteps {
     @Autowired
     private RequirementsTestApp.MutableFileSystemWriteFaultInjector faultInjector;
 
+    @Autowired
+    private Phase3StorageEventRecorder eventRecorder;
+
+    @Autowired
+    private ReactiveStorageOrchestrator orchestrator;
+
+    @Autowired
+    private FileSystemRecoveryScanner recoveryScanner;
+
+    @Autowired
+    private ApplicationContext applicationContext;
+
     /** Phase 3–specific last HTTP response from the pipeline upload or read step. */
     private Response lastPipelineResponse;
+    private List<String> manifestChunkIds = List.of();
 
     @Before
     public void resetPhase3State() {
         lastPipelineResponse = null;
+        manifestChunkIds = List.of();
+        faultInjector.disable();
+    }
+
+    @After
+    public void stopPhase3EventCapture() {
+        eventRecorder.reset();
     }
 
     // ── Background ────────────────────────────────────────────────────────────────
 
     @Given("reactive pipeline event capture is enabled for the selected validation mode")
     public void reactivePipelineEventCaptureIsEnabled() {
-        // No-op for webclient runner: this runner validates externally observable S3 HTTP
-        // behavior only. Reactive pipeline event capture (typed StorageEvent records per
-        // StorageStage) is an internal observability concern handled by the pipeline-unit
-        // runner once StorageStage, StorageContext, and StorageEvent are fully wired to
-        // external test runners.
+        eventRecorder.reset();
+    }
+
+    // ── REQ-PIPELINE-001 ─────────────────────────────────────────────────────────
+
+    @When("the selected validation runner submits the fixture stream to the staged PutObject pipeline")
+    public void selectedRunnerSubmitsFixtureToStagedPutObject() {
+        assertInstanceOf(StorageEngineReactiveS3ObjectRepository.class,
+            applicationContext.getBean(com.example.magrathea.objectstore.reactive.repository.application.S3ObjectCommandRepository.class));
+        assertSame(orchestrator, applicationContext.getBean(ReactiveStorageOrchestrator.class));
+        eventRecorder.observe(state.storageRoot);
+        byte[] bytes = state.fixtureBytes.computeIfAbsent(state.fixtureFile, this::readFixture);
+        lastPipelineResponse = putObject(state.bucket, state.objectKey, bytes);
+        assertEquals(200, lastPipelineResponse.status(), lastPipelineResponse.bodyAsString());
+    }
+
+    @Then("the write pipeline is assembled from StorageStage instances named in the required write pipeline stage order")
+    public void writePipelineUsesRequiredStorageStages() {
+        assertEquals(requiredWriteOrder(), stageNames(
+            capturedWriteEvents(state.bucket, state.objectKey), StorageEventType.STAGE_STARTED));
+    }
+
+    @Then("a single StorageContext carries bucket {string}, key {string}, request metadata, chunk decisions, manifest identifier, and cleanup handles across those stages")
+    public void capturedWriteUsesSingleStorageContext(String bucket, String key) {
+        List<StorageEvent> events = capturedWriteEvents(bucket, key);
+        assertEquals(1, events.stream().map(StorageEvent::correlationId).distinct().count());
+        assertTrue(events.stream().allMatch(event -> event.bucket().filter(bucket::equals).isPresent()));
+        assertTrue(events.stream().allMatch(event -> event.objectKey().filter(key::equals).isPresent()));
+        assertTrue(events.stream().anyMatch(event -> event.manifestId().isPresent()));
+        StorageEvent.StageSucceeded chunks = succeeded(events, "chunk-persistence");
+        assertTrue(chunks.measurements().chunks() > 0, "chunk decisions must reach persistence");
+        assertEquals(1, succeeded(events, "manifest-persistence").measurements().manifests());
+    }
+
+    @Then("no manifest is committed before chunk-persistence succeeds for every referenced chunk")
+    public void manifestPublicationWaitsForChunks() {
+        var chunksSucceeded = eventRecorder.snapshot(StorageEventType.STAGE_SUCCEEDED, "chunk-persistence");
+        var manifestStarted = eventRecorder.snapshot(StorageEventType.STAGE_STARTED, "manifest-persistence");
+        assertTrue(chunksSucceeded.chunkFiles() > 0);
+        assertEquals(0, chunksSucceeded.manifestFiles());
+        assertEquals(0, manifestStarted.manifestFiles());
+    }
+
+    @Then("no object reference is committed before manifest-persistence succeeds")
+    public void objectPublicationWaitsForManifest() {
+        var manifestSucceeded = eventRecorder.snapshot(StorageEventType.STAGE_SUCCEEDED, "manifest-persistence");
+        var objectStarted = eventRecorder.snapshot(StorageEventType.STAGE_STARTED, "object-index-persistence");
+        assertEquals(1, manifestSucceeded.manifestFiles());
+        assertEquals(0, manifestSucceeded.objectFiles());
+        assertEquals(1, objectStarted.manifestFiles());
+        assertEquals(0, objectStarted.objectFiles());
+        assertEquals(1, eventRecorder.snapshot(StorageEventType.STAGE_SUCCEEDED,
+            "object-index-persistence").objectFiles());
+    }
+
+    @Then("content-address entries for new chunks are published only after object-index-persistence commits the owning object")
+    public void contentAddressEntriesFollowObjectCommit() {
+        var chunksSucceeded = eventRecorder.snapshot(
+                StorageEventType.STAGE_SUCCEEDED, "chunk-persistence");
+        var manifestSucceeded = eventRecorder.snapshot(
+                StorageEventType.STAGE_SUCCEEDED, "manifest-persistence");
+        var objectStarted = eventRecorder.snapshot(
+                StorageEventType.STAGE_STARTED, "object-index-persistence");
+        var objectSucceeded = eventRecorder.snapshot(
+                StorageEventType.STAGE_SUCCEEDED, "object-index-persistence");
+        assertEquals(0, chunksSucceeded.contentAddressFiles());
+        assertEquals(0, manifestSucceeded.contentAddressFiles());
+        assertEquals(0, objectStarted.contentAddressFiles());
+        assertTrue(objectSucceeded.contentAddressFiles() > 0,
+                "committed object must publish at least one content-address entry");
+    }
+
+    @Then("every committed manifest chunk reference uses a canonical UUID filename with a matching SHA-256 sidecar readable by the canonical filesystem node")
+    public void committedChunksUseCanonicalFilesystemLayout() {
+        Properties manifest = loadProperties(onlyFile(state.storageRoot.resolve("metadata/manifests"), ".properties"));
+        int chunkCount = Integer.parseInt(manifest.getProperty("chunkCount"));
+        assertTrue(chunkCount > 0, "committed manifest must reference at least one chunk");
+        FileSystemStorageNode node = new FileSystemStorageNode(
+                state.storageRoot.resolve("nodes/node-001"), NodeId.of("node-001"));
+        for (int ordinal = 0; ordinal < chunkCount; ordinal++) {
+            UUID reference = UUID.fromString(manifest.getProperty("chunk." + ordinal + ".chunkId"));
+            Path data = state.storageRoot.resolve("nodes/node-001/chunks").resolve(reference.toString());
+            Path sidecar = data.resolveSibling(data.getFileName() + ".sha256");
+            assertTrue(Files.isRegularFile(data), "missing canonical chunk " + data);
+            assertTrue(Files.isRegularFile(sidecar), "missing checksum sidecar " + sidecar);
+            assertEquals(sha256Hex(readBytes(data)), readString(sidecar).trim());
+            assertArrayEquals(readBytes(data), node.read(ChunkId.of(reference)).block());
+        }
+    }
+
+    @Then("a recovery scan of filesystem root {string} reports no incomplete chunk artifacts after publication")
+    public void recoveryScanReportsNoIncompleteChunks(String storageRoot) {
+        assertEquals(state.storageRoot, PROJECT_ROOT.resolve(storageRoot).normalize());
+        assertTrue(recoveryScanner.scan(state.storageRoot).findings().isEmpty());
+    }
+
+    @Then("after object-index-persistence succeeds, the selected validation runner reads the committed object through its declared production read entry point and receives the exact bytes from fixture file {string}")
+    public void webTestClientReadsCommittedBytes(String fixturePath) {
+        Response response = getObject(state.bucket, state.objectKey);
+        assertEquals(200, response.status(), response.bodyAsString());
+        assertArrayEquals(state.fixtureBytes.computeIfAbsent(fixturePath, this::readFixture), response.body());
+        assertTrue(countRegularFiles(state.storageRoot.resolve("nodes")) > 0, "committed chunks must exist");
+        assertEquals(1, countRegularFiles(state.storageRoot.resolve("metadata/manifests")),
+            "one committed manifest artifact must exist");
+        assertEquals(1, countRegularFiles(state.storageRoot.resolve("metadata/objects")),
+            "one committed storage-engine object artifact must exist");
+        assertEquals(1, countRegularFiles(state.storageRoot.resolve("metadata/s3-object-references")),
+            "one committed S3-to-manifest reference must exist");
     }
 
     // ── REQ-PIPELINE-002 ─────────────────────────────────────────────────────────
@@ -120,6 +261,7 @@ public class Phase3ReactivePipelineSteps {
     public void selectedValidationRunnerUploadsFixture(String fixturePath) {
         // For webclient validation mode: issue an HTTP PUT to the S3 RouterFunction.
         // The pipeline-unit runner validates stage ordering and StorageEvent sequences.
+        eventRecorder.observe(state.storageRoot);
         byte[] bytes = state.fixtureBytes.computeIfAbsent(fixturePath, this::readFixture);
         state.fixtureFile = fixturePath;
         lastPipelineResponse = putObject(state.bucket, state.objectKey, bytes);
@@ -188,7 +330,19 @@ public class Phase3ReactivePipelineSteps {
 
     @Given("a committed object exists in bucket {string} at key {string} uploaded from fixture file {string}")
     public void aCommittedObjectExistsInBucket(String bucket, String key, String fixturePath) {
-        // Upload the fixture via HTTP PUT to establish a committed object for read validation.
+        // Upload through the real S3 route and observe the production storage-engine pipeline.
+        eventRecorder.observe(state.storageRoot);
+        Path fixture = PROJECT_ROOT.resolve(fixturePath).normalize();
+        try {
+            Files.createDirectories(fixture.getParent());
+            byte[] generated = new byte[WEBCLIENT_FIXTURE_SIZE_BYTES];
+            for (int index = 0; index < generated.length; index++)
+                generated[index] = (byte) ((index * 31) ^ (index / 65536));
+            Files.write(fixture, generated);
+            state.fixtureBytes.put(fixturePath, generated);
+        } catch (IOException error) {
+            throw new UncheckedIOException(error);
+        }
         byte[] bytes = state.fixtureBytes.computeIfAbsent(fixturePath, this::readFixture);
         state.bucket = bucket;
         state.objectKey = key;
@@ -200,12 +354,23 @@ public class Phase3ReactivePipelineSteps {
 
     @Then("the committed manifest lists multiple chunks with stable ordinal positions and checksums")
     public void committedManifestListsMultipleChunks() {
-        throw new PendingException(
-                "REQ-PIPELINE-003: manifest chunk list with stable ordinal positions and checksums is"
-                + " validated by the pipeline-unit runner via StorageEvent records and filesystem"
-                + " inspection of the manifest artifact. The webclient runner can verify the object"
-                + " is readable but cannot inspect the internal manifest structure without"
-                + " pipeline-unit infrastructure.");
+        Path manifest = onlyFile(state.storageRoot.resolve("metadata/manifests"), ".properties");
+        Properties properties = new Properties();
+        try (InputStream input = Files.newInputStream(manifest)) {
+            properties.load(input);
+        } catch (IOException error) {
+            throw new UncheckedIOException(error);
+        }
+        int count = Integer.parseInt(properties.getProperty("chunkCount"));
+        assertTrue(count > 1, "committed manifest must contain multiple ordered chunks");
+        List<String> ids = new ArrayList<>();
+        for (int ordinal = 0; ordinal < count; ordinal++) {
+            String prefix = "chunk." + ordinal + ".";
+            ids.add(properties.getProperty(prefix + "chunkId"));
+            assertNotNull(properties.getProperty(prefix + "finalChecksum.algorithm"));
+            assertFalse(properties.getProperty(prefix + "finalChecksum.value").isBlank());
+        }
+        manifestChunkIds = List.copyOf(ids);
     }
 
     @When("the selected validation runner reads bucket {string} and key {string} through the staged GetObject pipeline")
@@ -215,45 +380,92 @@ public class Phase3ReactivePipelineSteps {
         lastPipelineResponse = getObject(bucket, key);
     }
 
+    @Then("StorageEvent records show start and success for the write stages in this exact order:")
+    public void storageEventRecordsShowWriteStagesInOrder(DataTable stages) {
+        List<String> expected = stages.asLists().stream().skip(1).map(List::getFirst).toList();
+        List<StorageEvent> events = capturedWriteEvents(state.bucket, state.objectKey);
+        assertEquals(expected, stageNames(events, StorageEventType.STAGE_STARTED));
+        assertEquals(expected, stageNames(events, StorageEventType.STAGE_SUCCEEDED));
+    }
+
     @Then("StorageEvent records show start and success for the read stages in this exact order:")
     public void storageEventRecordsShowReadStagesInOrder(DataTable stages) {
-        throw new PendingException(
-                "REQ-PIPELINE-003: StorageEvent records for read pipeline stage ordering require the"
-                + " StorageStage, StorageContext, and StorageEvent abstractions from Phase 3."
-                + " These are internal instrumentation records not observable via external HTTP API."
-                + " Requires pipeline-unit runner.");
+        List<String> expected = stages.asLists().stream().skip(1).map(List::getFirst).toList();
+        List<StorageEvent> reads = eventRecorder.events().stream()
+                .filter(event -> event.operation() == StorageOperation.READ).toList();
+        assertEquals(expected, stageNames(reads, StorageEventType.STAGE_STARTED));
+        assertEquals(expected, stageNames(reads, StorageEventType.STAGE_SUCCEEDED));
     }
 
     @Then("chunk-reading emits chunks in the same ordinal order recorded in the committed manifest")
     public void chunkReadingEmitsChunksInManifestOrdinalOrder() {
-        throw new PendingException(
-                "REQ-PIPELINE-003: chunk-reading ordinal order is an internal pipeline-stage assertion"
-                + " on chunk-reading StorageStage events. Requires pipeline-unit runner with"
-                + " StorageEvent instrumentation.");
+        List<Phase3StorageEventRecorder.ReadObservation> emitted = eventRecorder.readObservations().stream()
+                .filter(observation -> observation.kind().equals("emitted")).toList();
+        assertEquals(java.util.stream.IntStream.range(0, manifestChunkIds.size()).boxed().toList(),
+                emitted.stream().map(Phase3StorageEventRecorder.ReadObservation::ordinal).toList());
+        assertEquals(manifestChunkIds, emitted.stream()
+                .map(Phase3StorageEventRecorder.ReadObservation::chunkId).toList());
     }
 
     @Then("response-streaming begins after the first verified chunk is available, without waiting for every chunk to be read")
     public void responseStreamingBeginsAfterFirstVerifiedChunk() {
-        throw new PendingException(
-                "REQ-PIPELINE-003: response-streaming start timing relative to chunk-reading is an"
-                + " internal Reactor demand and scheduling concern. Not observable via external HTTP"
-                + " response timing. Requires pipeline-unit runner with controlled demand.");
+        List<Phase3StorageEventRecorder.ReadObservation> observations = eventRecorder.readObservations();
+        int firstVerified = firstObservation(observations, "verified");
+        int firstEmitted = firstObservation(observations, "emitted");
+        assertTrue(firstVerified >= 0 && firstVerified < firstEmitted,
+                "the first response chunk must follow verification");
+        long readsBeforeFirstEmission = observations.subList(0, firstEmitted).stream()
+                .filter(value -> value.kind().equals("requested")).count();
+        assertTrue(readsBeforeFirstEmission < manifestChunkIds.size(),
+                "response must begin before all manifest chunks are read");
     }
 
     @Then("downstream response demand controls how many chunks are read ahead")
     public void downstreamResponseDemandControlsChunksReadAhead() {
-        throw new PendingException(
-                "REQ-PIPELINE-003: downstream response demand control is an internal backpressure"
-                + " concern in the read pipeline. Requires pipeline-unit runner with StepVerifier"
-                + " demand control.");
+        int verified = 0;
+        int emitted = 0;
+        int maxAhead = 0;
+        for (var observation : eventRecorder.readObservations()) {
+            if (observation.kind().equals("verified")) verified++;
+            if (observation.kind().equals("emitted")) emitted++;
+            maxAhead = Math.max(maxAhead, verified - emitted);
+        }
+        assertTrue(eventRecorder.readObservations().stream().anyMatch(value -> value.kind().equals("demand")));
+        assertTrue(maxAhead <= 1, "production read path must retain at most one verified chunk ahead");
+    }
+
+    @Then("the HTTP adapter performs a bounded integrity preflight before response commitment without retaining object bytes")
+    public void httpAdapterPerformsBoundedIntegrityPreflight() throws IOException {
+        Path repositoryRoot = Files.exists(PROJECT_ROOT.resolve("s3-reactive-api-adapter/pom.xml"))
+                ? PROJECT_ROOT : PROJECT_ROOT.getParent();
+        String handler = Files.readString(repositoryRoot.resolve(
+                "s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/adapter/web/S3ObjectOperationsHandler.java"));
+        String service = Files.readString(repositoryRoot.resolve(
+                "object-store-reactive-application/src/main/java/com/example/magrathea/reactive/application/service/ReactiveObjectService.java"));
+        String orchestratorSource = Files.readString(repositoryRoot.resolve(
+                "storage-engine-reactive-application/src/main/java/com/example/magrathea/storageengine/application/service/ReactiveStorageOrchestrator.java"));
+        assertTrue(handler.contains("getIntegrityVerifiedObjectWithContent(objectKey)"));
+        assertTrue(service.contains("validateContentIntegrity(objectWithContent.object().key())"));
+        String preflight = orchestratorSource.substring(
+                orchestratorSource.indexOf("public Mono<Void> validateReadable"),
+                orchestratorSource.indexOf("List<StorageStage> writePipelineStages"));
+        assertTrue(preflight.contains("concatMap(chunk -> chunkStorePort.read(chunk.chunkId()).then(), 1)"));
+        assertTrue(preflight.contains(".then()"));
+        assertFalse(preflight.contains("collectList("));
+        assertFalse(preflight.contains("byte[]"));
     }
 
     @Then("production read stages do not perform a global reduce, collectList, or whole-object byte-array assembly over the object content")
     public void productionReadStagesDoNotPerformGlobalReduce() {
-        throw new PendingException(
-                "REQ-PIPELINE-003: absence of global reduce in read path is a code-level contract."
-                + " Verified by pipeline-unit runner through demand monitoring and StorageEvent"
-                + " sequences. Not observable via external HTTP API.");
+        assertReadPathHasNoAggregation(
+                "storage-engine-reactive-application/src/main/java/com/example/magrathea/storageengine/application/service/ReactiveStorageOrchestrator.java",
+                "private Mono<StorageContext> planRead", "private static Optional<String> manifestIdValue");
+        assertReadPathHasNoAggregation(
+                "object-store-reactive-repository-storage-engine-infrastructure/src/main/java/com/example/magrathea/objectstorage/repository/storageengine/adapter/StorageEngineReactiveS3ObjectRepository.java",
+                "public Flux<DataBuffer> getContent", "// ── Phase F object config queries");
+        assertReadPathHasNoAggregation(
+                "s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/adapter/web/S3ObjectOperationsHandler.java",
+                "public Mono<ServerResponse> getObject", "private Mono<ServerResponse> serveRange");
     }
 
     @Then("the streamed S3 response bytes exactly match fixture file {string}")
@@ -276,8 +488,8 @@ public class Phase3ReactivePipelineSteps {
     @Given("the pipeline failure injector causes stage {string} to fail with reason {string}")
     public void pipelineFailureInjectorCausesStageToFail(String failingStage, String failureReason) {
         switch (failingStage) {
-            case "chunk-persistence" -> faultInjector.interruptAfterChunkTempWrite(true);
-            case "manifest-persistence" -> faultInjector.interruptAfterManifestTempWrite(true);
+            case "chunk-persistence" -> faultInjector.interruptAfterChunkTempWrite(false, failureReason);
+            case "manifest-persistence" -> faultInjector.interruptAfterManifestTempWrite(false, failureReason);
             default -> throw new PendingException(
                     "REQ-PIPELINE-004: no fault injector is wired for pipeline stage '" + failingStage
                     + "'. Only chunk-persistence and manifest-persistence faults are available via"
@@ -288,50 +500,69 @@ public class Phase3ReactivePipelineSteps {
 
     @Then("the pipeline emits exactly one StorageEvent failure for stage {string} with reason {string}")
     public void pipelineEmitsExactlyOneStorageEventFailure(String failingStage, String failureReason) {
-        throw new PendingException(
-                "REQ-PIPELINE-004: StorageEvent failure records per stage require the StorageEvent"
-                + " abstraction from Phase 3. Not observable via external HTTP API."
-                + " Requires pipeline-unit runner with StorageEvent instrumentation.");
+        List<StorageEvent.StageFailed> failures = capturedWriteEvents(state.bucket, state.objectKey).stream()
+                .filter(StorageEvent.StageFailed.class::isInstance)
+                .map(StorageEvent.StageFailed.class::cast)
+                .toList();
+        assertEquals(1, failures.size(), "the failed write must publish one typed StageFailed event");
+        assertEquals(failingStage, failures.getFirst().stageName());
+        assertEquals(failureReason, failures.getFirst().reason());
     }
 
     @Then("no stage after {string} emits a success event for this StorageContext")
     public void noStageAfterEmitsSuccessEvent(String failingStage) {
-        throw new PendingException(
-                "REQ-PIPELINE-004: per-stage StorageEvent success records require StorageContext"
-                + " and StorageEvent abstractions from Phase 3. Requires pipeline-unit runner.");
+        int failedIndex = requiredWriteOrder().indexOf(failingStage);
+        assertTrue(failedIndex >= 0);
+        List<String> succeeded = stageNames(capturedWriteEvents(state.bucket, state.objectKey),
+                StorageEventType.STAGE_SUCCEEDED);
+        assertTrue(succeeded.stream().noneMatch(stage -> requiredWriteOrder().indexOf(stage) > failedIndex),
+                "no later stage may succeed after " + failingStage + ": " + succeeded);
     }
 
     @Then("cleanup events run for every completed stage that owns temporary files, open buffers, or object publication handles")
     public void cleanupEventsRunForEveryCompletedStage() {
-        throw new PendingException(
-                "REQ-PIPELINE-004: cleanup StorageEvent records per stage require StorageStage"
-                + " cleanup lifecycle from Phase 3. Requires pipeline-unit runner.");
+        List<String> succeeded = stageNames(capturedWriteEvents(state.bucket, state.objectKey),
+                StorageEventType.STAGE_SUCCEEDED);
+        List<String> expectedCleanup = new ArrayList<>();
+        if (succeeded.contains("chunk-persistence")) expectedCleanup.add("chunk-persistence");
+        if (succeeded.contains("chunking")) expectedCleanup.add("chunking");
+        List<String> actualCleanup = capturedWriteEvents(state.bucket, state.objectKey).stream()
+                .filter(StorageEvent.CleanupCompleted.class::isInstance)
+                .map(event -> event.outcome().orElseThrow()).toList();
+        assertEquals(expectedCleanup, actualCleanup);
     }
 
     @Then("all temporary files created for the failed write are removed or quarantined in filesystem root {string}")
     public void allTemporaryFilesCreatedForFailedWriteAreRemovedOrQuarantined(String storageRoot) {
-        throw new PendingException(
-                "REQ-PIPELINE-004: cleanup of temporary files after staged pipeline failure requires"
-                + " StorageStage cleanup lifecycle (Phase 3). The existing"
-                + " MutableFileSystemWriteFaultInjector does not guarantee cleanup via staged"
-                + " pipeline events. Pending pipeline-unit runner validation.");
+        assertEquals(state.storageRoot, PROJECT_ROOT.resolve(storageRoot).normalize());
+        assertEquals(0, countFilesMatching(state.storageRoot,
+                path -> path.getFileName().toString().contains(".tmp.")),
+                "failed staged writes must leave no temporary artifacts");
+        assertEquals(0, countFilesMatching(state.storageRoot.resolve("nodes"), path -> true),
+                "failed staged writes must remove unpublished chunk data and checksum sidecars");
+        assertEquals(0, countFilesMatching(
+                state.storageRoot.resolve("metadata/content-address-index"), path -> true),
+                "failed staged writes must remove unpublished content-address references");
     }
 
     @Then("no committed manifest or object reference is published for bucket {string} and key {string}")
     public void noCommittedManifestOrObjectReferenceIsPublished(String bucket, String key) {
-        throw new PendingException(
-                "REQ-PIPELINE-004: no manifest/object-reference assertion after staged pipeline"
-                + " failure requires pipeline-unit runner with StorageStage-level failure propagation."
-                + " Use existing Phase 2 fault injection tests for committed state assertions.");
+        assertEquals(state.bucket, bucket);
+        assertEquals(state.objectKey, key);
+        assertEquals(0, countFilesMatching(state.storageRoot.resolve("metadata/manifests"), path -> true));
+        assertEquals(0, countFilesMatching(state.storageRoot.resolve("metadata/objects"), path -> true));
+        assertEquals(0, countFilesMatching(state.storageRoot.resolve("metadata/s3-object-references"), path -> true));
     }
 
     @Then("the S3 PutObject response exposes a deterministic storage failure rather than a partial success")
     public void s3PutObjectResponseExposesDeterministicStorageFailure() {
         // HTTP-observable: the PutObject response must signal an error status.
         assertNotNull(lastPipelineResponse, "a pipeline PUT response should have been captured");
-        assertTrue(lastPipelineResponse.status() >= 400,
-                "PutObject with fault-injected stage failure should return an error status but got: "
-                + lastPipelineResponse.status() + " " + lastPipelineResponse.bodyAsString());
+        assertEquals(500, lastPipelineResponse.status(), lastPipelineResponse.bodyAsString());
+        assertTrue(lastPipelineResponse.bodyAsString().contains("<Code>InternalError</Code>"),
+                "the S3 error code must be deterministic: " + lastPipelineResponse.bodyAsString());
+        assertTrue(lastPipelineResponse.bodyAsString().contains("simulated chunk write fault"),
+                "the declared fault reason must be exposed: " + lastPipelineResponse.bodyAsString());
     }
 
     @Then("a later S3 GetObject for bucket {string} and key {string} reports that the object is absent")
@@ -431,6 +662,124 @@ public class Phase3ReactivePipelineSteps {
         return new Response(
                 result.getStatus().value(),
                 result.getResponseBody() == null ? new byte[0] : result.getResponseBody());
+    }
+
+    private List<StorageEvent> capturedWriteEvents(String bucket, String key) {
+        return eventRecorder.events().stream()
+            .filter(event -> event.operation() == StorageOperation.WRITE)
+            .filter(event -> event.bucket().filter(bucket::equals).isPresent())
+            .filter(event -> event.objectKey().filter(key::equals).isPresent())
+            .toList();
+    }
+
+    private static StorageEvent.StageSucceeded succeeded(List<StorageEvent> events, String stage) {
+        return events.stream()
+            .filter(event -> event.type() == StorageEventType.STAGE_SUCCEEDED && event.stageName().equals(stage))
+            .map(StorageEvent.StageSucceeded.class::cast)
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Missing successful stage event: " + stage));
+    }
+
+    private static List<String> stageNames(List<StorageEvent> events, StorageEventType type) {
+        return events.stream().filter(event -> event.type() == type).map(StorageEvent::stageName).toList();
+    }
+
+    private static List<String> requiredWriteOrder() {
+        return List.of("validation", "policy-resolution", "chunking", "dedup-lookup", "chunk-persistence",
+            "manifest-persistence", "object-index-persistence");
+    }
+
+    private static Properties loadProperties(Path path) {
+        Properties properties = new Properties();
+        try (InputStream input = Files.newInputStream(path)) {
+            properties.load(input);
+            return properties;
+        } catch (IOException error) {
+            throw new UncheckedIOException(error);
+        }
+    }
+
+    private static byte[] readBytes(Path path) {
+        try {
+            return Files.readAllBytes(path);
+        } catch (IOException error) {
+            throw new UncheckedIOException(error);
+        }
+    }
+
+    private static String readString(Path path) {
+        try {
+            return Files.readString(path);
+        } catch (IOException error) {
+            throw new UncheckedIOException(error);
+        }
+    }
+
+    private static String sha256Hex(byte[] bytes) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+        } catch (NoSuchAlgorithmException error) {
+            throw new IllegalStateException("SHA-256 unavailable", error);
+        }
+    }
+
+    private static Path onlyFile(Path root, String suffix) {
+        try (var paths = Files.list(root)) {
+            List<Path> matches = paths.filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().endsWith(suffix)).toList();
+            assertEquals(1, matches.size(), "expected exactly one " + suffix + " file in " + root);
+            return matches.getFirst();
+        } catch (IOException error) {
+            throw new UncheckedIOException(error);
+        }
+    }
+
+    private static int firstObservation(
+            List<Phase3StorageEventRecorder.ReadObservation> observations, String kind) {
+        for (int index = 0; index < observations.size(); index++) {
+            if (observations.get(index).kind().equals(kind)) return index;
+        }
+        return -1;
+    }
+
+    private static void assertReadPathHasNoAggregation(String relativePath, String start, String end) {
+        try {
+            Path repositoryRoot = Files.exists(PROJECT_ROOT.resolve("s3-reactive-api-adapter/pom.xml"))
+                    ? PROJECT_ROOT : PROJECT_ROOT.getParent();
+            String source = Files.readString(repositoryRoot.resolve(relativePath));
+            String readPath = source.substring(source.indexOf(start), source.indexOf(end));
+            assertFalse(readPath.contains("collectList("));
+            assertFalse(readPath.contains(".reduce("));
+            assertFalse(readPath.contains("toByteArray("));
+            assertFalse(readPath.contains("readAllBytes("));
+        } catch (IOException error) {
+            throw new UncheckedIOException(error);
+        }
+    }
+
+    private static long countFilesMatching(Path root, java.util.function.Predicate<Path> predicate) {
+        if (!Files.isDirectory(root)) {
+            return 0;
+        }
+        try (var paths = Files.walk(root)) {
+            return paths.filter(Files::isRegularFile).filter(predicate).count();
+        } catch (IOException error) {
+            throw new UncheckedIOException(error);
+        }
+    }
+
+    private static long countRegularFiles(Path root) {
+        if (!Files.isDirectory(root)) {
+            return 0;
+        }
+        try (var paths = Files.walk(root)) {
+            return paths.filter(Files::isRegularFile)
+                .filter(path -> !path.getFileName().toString().contains(".tmp."))
+                .filter(path -> !path.getFileName().toString().endsWith(".sha256"))
+                .count();
+        } catch (IOException error) {
+            throw new UncheckedIOException(error);
+        }
     }
 
     private byte[] readFixture(String fixturePath) {

@@ -3,7 +3,6 @@ package com.example.magrathea.storageengine.application.pipeline;
 import com.example.magrathea.storageengine.domain.valueobject.StepOutcome;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.SignalType;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -11,7 +10,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 public final class StoragePipelineExecutor {
@@ -23,20 +21,15 @@ public final class StoragePipelineExecutor {
     }
 
     public Mono<StorageContext> execute(StorageContext initialContext, List<StorageStage> stages) {
-        AtomicReference<StorageContext> lastContext = new AtomicReference<>(initialContext);
-        AtomicReference<String> activeStageName = new AtomicReference<>(stages.isEmpty() ? "pipeline" : stages.getFirst().name());
-        AtomicBoolean terminalCleanupStarted = new AtomicBoolean(false);
-
-        return executeNext(initialContext, stages, 0, lastContext, activeStageName)
-                .doFinally(signal -> {
-                    if (signal == SignalType.CANCEL && terminalCleanupStarted.compareAndSet(false, true)) {
-                        StorageContext context = lastContext.get();
-                        String stageName = activeStageName.get();
-                        publish(cancelled(context, stageName))
-                                .then(cleanup(context))
-                                .subscribe();
-                    }
-                });
+        return Mono.usingWhen(
+                Mono.fromSupplier(() -> new ExecutionState(
+                        initialContext, stages.isEmpty() ? "pipeline" : stages.getFirst().name())),
+                state -> executeNext(initialContext, stages, 0,
+                        state.lastContext(), state.activeStageName()),
+                ignored -> Mono.empty(),
+                (ignored, error) -> Mono.empty(),
+                state -> publish(cancelled(state.lastContext().get(), state.activeStageName().get()))
+                        .then(cleanup(state.lastContext().get())));
     }
 
     private Mono<StorageContext> executeNext(
@@ -166,6 +159,15 @@ public final class StoragePipelineExecutor {
             return StorageEventMeasurements.readChunkStage(bytes, context.chunkDescriptors().size());
         }
         return StorageEventMeasurements.empty();
+    }
+
+    private record ExecutionState(
+            AtomicReference<StorageContext> lastContext,
+            AtomicReference<String> activeStageName) {
+
+        private ExecutionState(StorageContext initialContext, String initialStageName) {
+            this(new AtomicReference<>(initialContext), new AtomicReference<>(initialStageName));
+        }
     }
 
     private static boolean hasDedupHit(com.example.magrathea.storageengine.domain.valueobject.ChunkPersistenceTrace trace) {

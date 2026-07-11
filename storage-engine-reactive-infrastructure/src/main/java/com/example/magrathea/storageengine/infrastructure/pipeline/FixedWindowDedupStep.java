@@ -77,7 +77,8 @@ public class FixedWindowDedupStep implements DeduplicationStep {
             return fileUnit.data()
                     .concatMap(buffer -> Flux.fromIterable(accumulator.append(buffer))
                             .concatMap(window -> window, 1), 1)
-                    .concatWith(Mono.defer(accumulator::finish));
+                    .concatWith(Mono.defer(accumulator::finish))
+                    .doOnDiscard(DataBuffer.class, DataBufferUtils::release);
         });
     }
 

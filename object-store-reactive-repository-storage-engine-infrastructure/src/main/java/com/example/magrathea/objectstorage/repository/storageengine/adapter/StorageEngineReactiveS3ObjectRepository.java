@@ -296,24 +296,39 @@ public class StorageEngineReactiveS3ObjectRepository
     @Override
     public Flux<DataBuffer> getContent(
             com.example.magrathea.objectstore.domain.valueobject.ObjectKey key) {
-        return Mono.defer(() -> {
-                ManifestId manifestId = manifestByKey.get(storeKey(key.bucket(), key.key()));
-                if (manifestId != null) {
-                    return Mono.just(manifestId);
-                }
-                return referenceStore.find(key.bucket(), key.key())
-                    .flatMap(optional -> optional
-                        .map(reference -> {
-                            cacheAndRestore(reference);
-                            return Mono.just(reference.manifestId());
-                        })
-                        .orElseGet(Mono::empty));
-            })
+        return resolveManifestId(key)
             .flatMapMany(orchestrator::read)
             .<DataBuffer>map(DATA_BUFFER_FACTORY::wrap)
             .onErrorMap(
                 e -> e instanceof ChunkIntegrityException || e instanceof ManifestIntegrityException,
                 e -> new StorageObjectIntegrityException(e.getMessage(), e));
+    }
+
+    @Override
+    public Mono<Void> validateContentIntegrity(
+            com.example.magrathea.objectstore.domain.valueobject.ObjectKey key) {
+        return resolveManifestId(key)
+            .flatMap(manifestId -> orchestrator.validateReadable(manifestId, key.bucket(), key.key()))
+            .onErrorMap(
+                e -> e instanceof ChunkIntegrityException || e instanceof ManifestIntegrityException,
+                e -> new StorageObjectIntegrityException(e.getMessage(), e));
+    }
+
+    private Mono<ManifestId> resolveManifestId(
+            com.example.magrathea.objectstore.domain.valueobject.ObjectKey key) {
+        return Mono.defer(() -> {
+            ManifestId manifestId = manifestByKey.get(storeKey(key.bucket(), key.key()));
+            if (manifestId != null) {
+                return Mono.just(manifestId);
+            }
+            return referenceStore.find(key.bucket(), key.key())
+                .flatMap(optional -> optional
+                    .map(reference -> {
+                        cacheAndRestore(reference);
+                        return Mono.just(reference.manifestId());
+                    })
+                    .orElseGet(Mono::empty));
+        });
     }
 
     // ── Phase F object config queries ──

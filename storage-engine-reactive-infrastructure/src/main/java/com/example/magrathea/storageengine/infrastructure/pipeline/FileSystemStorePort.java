@@ -7,28 +7,27 @@ import com.example.magrathea.storageengine.domain.valueobject.ChunkId;
 import com.example.magrathea.storageengine.domain.valueobject.Fingerprint;
 import com.example.magrathea.storageengine.domain.valueobject.FingerprintAlgorithm;
 import com.example.magrathea.storageengine.domain.valueobject.NodeId;
+import com.example.magrathea.storageengine.infrastructure.filesystem.AtomicChunkWriteProtocol;
 import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemWriteFaultInjector;
 import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemWriteInterruptedException;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.SignalType;
 import reactor.core.scheduler.Schedulers;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Optional;
-import java.util.UUID;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
-import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 import static java.nio.file.StandardOpenOption.CREATE_NEW;
 import static java.nio.file.StandardOpenOption.WRITE;
 
@@ -46,7 +45,7 @@ import static java.nio.file.StandardOpenOption.WRITE;
  *   FileUnit     → chunksRoot / &lt;uuid&gt; (with &lt;uuid&gt;.sha256 sidecar; UUID format
  *                  is compatible with FileSystemStorageNode.read(ChunkId) which
  *                  uses chunkId.value().toString() as the filename)
- *   ChunkUnit    → chunksRoot / &lt;sha256&gt;
+ *   ChunkUnit    → chunksRoot / &lt;uuid&gt; (with &lt;uuid&gt;.sha256 sidecar)
  *   ECStripeUnit → NOT YET IMPLEMENTED (TODO criticality 3)
  *   PartUnit     → NOT YET IMPLEMENTED (future multipart support)
  *
@@ -120,149 +119,89 @@ public class FileSystemStorePort implements StorePort {
     }
 
     /**
-     * Stores a FileUnit to chunksRoot using a freshly generated UUID as the filename.
-     * Writes an integrity sidecar (&lt;uuid&gt;.sha256) in the same directory so that
-     * FileSystemStorageNode.read(ChunkId) can verify the data on read.
-     *
-     * The protocol mirrors FileSystemStorageNode.write():
-     *   1. Stream data to a temp file, computing SHA-256 incrementally.
-     *   2. Write sha256 hex to a temp sidecar.
-     *   3. Atomically rename sidecar first, then data file.
-     *
-     * Returns StorageTrace with:
-     *   - storageRef = uuid.toString() (matches ChunkId.value().toString() used by read path)
-     *   - fingerprint = Fingerprint(SHA256, sha256hex) so the orchestrator can build trace checksums
-     */
-    /**
-     * Stores a FileUnit to chunksRoot using a freshly generated UUID as the filename.
-     *
-     * Temp-file naming uses the same {@code <uuid>.tmp.<tmpUuid>} pattern as
-     * {@link com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemStorageNode}
-     * so that filesystem-inspection tests can discover partial artifacts via ".tmp." scans.
-     *
-     * Protocol (mirrors FileSystemStorageNode.write):
-     *   1. Stream data to a temp file {@code <uuid>.tmp.<tmpUuid>}, computing SHA-256.
-     *   2. Call the fault injector (throws FileSystemWriteInterruptedException if enabled).
-     *   3. Write sha256 hex to temp sidecar {@code <uuid>.sha256.tmp.<tmpUuid>}.
-     *   4. Atomically rename sidecar first ({@code <uuid>.sha256}), then data ({@code <uuid>}).
-     *
-     * Returns StorageTrace with:
-     *   - storageRef  = uuid (matches ChunkId.value().toString() used by the read path)
-     *   - fingerprint = Fingerprint(SHA256, sha256hex) for orchestrator checksum chain building
+     * Stores a FileUnit under the UUID/checksum layout consumed by FileSystemStorageNode.
      */
     private Mono<StorageTrace> streamFileUnitToChunksDir(StorageUnit.FileUnit unit) {
-        return Mono.fromCallable(() -> {
-                    Files.createDirectories(chunksRoot);
-                    return UUID.randomUUID();
-                })
-                .subscribeOn(Schedulers.boundedElastic())
-                .flatMap(fileId -> {
-                    String idStr = fileId.toString();
-                    // Use the same <id>.tmp.<uuid> naming pattern as FileSystemStorageNode
-                    // so that filesystem-reliability tests can find partial artifacts.
-                    String tmpSuffix = UUID.randomUUID().toString();
-                    Path tmp = chunksRoot.resolve(idStr + ".tmp." + tmpSuffix);
-                    Path tmpSidecar = chunksRoot.resolve(idStr + ".sha256.tmp." + tmpSuffix);
-                    Path finalFile = chunksRoot.resolve(idStr);
-                    Path finalSidecar = chunksRoot.resolve(idStr + ".sha256");
-
-                    AtomicReference<MessageDigest> digest = new AtomicReference<>(sha256());
-                    AtomicLong size = new AtomicLong(0);
-
-                    Flux<DataBuffer> tracked = Flux.from(unit.data())
-                        .doOnNext(buf -> {
-                            size.addAndGet(buf.readableByteCount());
-                            try (DataBuffer.ByteBufferIterator it = buf.readableByteBuffers()) {
-                                while (it.hasNext()) {
-                                    digest.get().update(it.next());
-                                }
-                            }
-                        });
-
-                    return DataBufferUtils.write(tracked, tmp, CREATE_NEW, WRITE)
-                        .then(Mono.fromCallable(() -> {
-                            String sha256Hex = HexFormat.of().formatHex(digest.get().digest());
-                            long stored = Files.size(tmp);
-
-                            // Fault injection hook — matches FileSystemStorageNode.write() timing
-                            // (after temp file is written, before atomic rename).
-                            faultInjector.afterChunkTempFileWritten(
-                                new FileSystemWriteFaultInjector.ChunkWriteContext(
-                                    NodeId.of("node-001"),
-                                    ChunkId.of(fileId),
-                                    tmp, finalFile, stored));
-
-                            // Write sidecar first (same protocol as FileSystemStorageNode.write)
-                            Files.write(tmpSidecar, sha256Hex.getBytes(StandardCharsets.UTF_8), CREATE_NEW);
-                            Files.move(tmpSidecar, finalSidecar, ATOMIC_MOVE, REPLACE_EXISTING);
-                            // Then move data file
-                            Files.move(tmp, finalFile, ATOMIC_MOVE, REPLACE_EXISTING);
-
-                            return new StorageTrace(
-                                unit.info(), "file",
-                                Optional.of(Fingerprint.of(FingerprintAlgorithm.SHA256, sha256Hex)),
-                                Optional.of(idStr),
-                                false,
-                                size.get(), stored);
-                        }).subscribeOn(Schedulers.boundedElastic()))
-                        .onErrorResume(e -> {
-                            // If the fault injector signalled "preserve temporary artifacts",
-                            // leave the partial temp data file on disk (the test verifies it
-                            // remains). Always clean up the sidecar temp (may not exist).
-                            boolean preserve = e instanceof FileSystemWriteInterruptedException fi
-                                    && fi.preserveTemporaryArtifacts();
-                            return Mono.fromRunnable(() -> {
-                                if (!preserve) {
-                                    try { Files.deleteIfExists(tmp); } catch (IOException ignored) {}
-                                }
-                                try { Files.deleteIfExists(tmpSidecar); } catch (IOException ignored) {}
-                            }).then(Mono.error(e));
-                        });
-                });
+        return streamToStore(unit, chunksRoot, "file");
     }
 
+    /**
+     * Streams one unit into the shared atomic chunk protocol. Both FileUnit and ChunkUnit
+     * therefore use UUID references, forced temp data/checksum files, sidecar-first atomic
+     * renames, and the same error/cancellation cleanup behavior as FileSystemStorageNode.
+     */
     private Mono<StorageTrace> streamToStore(StorageUnit unit, Path root, String kind) {
         return Mono.fromCallable(() -> {
                     Files.createDirectories(root);
-                    return root.resolve(".tmp-" + UUID.randomUUID());
+                    return AtomicChunkWriteProtocol.prepare(root, ChunkId.generate());
                 })
                 .subscribeOn(Schedulers.boundedElastic())
-                .flatMap(tmp -> {
+                .flatMap(pending -> {
                     AtomicReference<MessageDigest> digest = new AtomicReference<>(sha256());
                     AtomicLong size = new AtomicLong(0);
+                    AtomicBoolean cancelled = new AtomicBoolean();
 
-                    // doOnNext peeks at each buffer to feed the digest.
-                    // readableByteBuffers() returns a ByteBufferIterator view that does
-                    // not advance the DataBuffer's readPosition, so DataBufferUtils.write()
-                    // still sees the full content. Both asByteBuffer() and toByteBuffer()
-                    // are deprecated since Spring 6.0.5; ByteBufferIterator is the
-                    // recommended non-deprecated replacement.
                     Flux<DataBuffer> tracked = Flux.from(unit.data())
-                        .doOnNext(buf -> {
-                            size.addAndGet(buf.readableByteCount());
-                            try (DataBuffer.ByteBufferIterator it = buf.readableByteBuffers()) {
-                                while (it.hasNext()) {
-                                    digest.get().update(it.next());
+                            .doOnNext(buffer -> {
+                                size.addAndGet(buffer.readableByteCount());
+                                try (DataBuffer.ByteBufferIterator iterator = buffer.readableByteBuffers()) {
+                                    while (iterator.hasNext()) {
+                                        digest.get().update(iterator.next());
+                                    }
                                 }
-                            }
-                        });
+                            });
 
-                    return DataBufferUtils.write(tracked, tmp, CREATE_NEW, WRITE)
-                        .then(Mono.fromCallable(() -> {
-                            String ref = HexFormat.of().formatHex(digest.get().digest());
-                            long stored = Files.size(tmp);
-                            Files.move(tmp, root.resolve(ref), ATOMIC_MOVE, REPLACE_EXISTING);
-                            return new StorageTrace(
-                                unit.info(), kind,
-                                Optional.empty(),   // fingerprint filled by caller for ChunkUnit
-                                Optional.of(ref),
-                                false,
-                                size.get(), stored);
-                        }).subscribeOn(Schedulers.boundedElastic()))
-                        .onErrorResume(e -> Mono.fromRunnable(() -> {
-                            try { Files.deleteIfExists(tmp); } catch (IOException ignored) {}
-                        }).then(Mono.error(e)));
+                    Mono<StorageTrace> write = DataBufferUtils.write(
+                                    tracked, pending.tempData(), CREATE_NEW, WRITE)
+                            .then(Mono.fromCallable(() -> {
+                                AtomicChunkWriteProtocol.force(pending.tempData());
+                                long stored = Files.size(pending.tempData());
+                                faultInjector.afterChunkTempFileWritten(
+                                        new FileSystemWriteFaultInjector.ChunkWriteContext(
+                                                NodeId.of("node-001"), pending.chunkId(),
+                                                pending.tempData(), pending.finalData(), stored));
+                                String checksum = HexFormat.of().formatHex(digest.get().digest());
+                                if (cancelled.get()) {
+                                    cleanupCancelledWrite(pending);
+                                    throw new CancellationException("chunk write cancelled before commit");
+                                }
+                                AtomicChunkWriteProtocol.commit(pending, checksum);
+                                if (cancelled.get()) {
+                                    cleanupCancelledWrite(pending);
+                                    throw new CancellationException("chunk write cancelled during commit");
+                                }
+                                return new StorageTrace(
+                                        unit.info(), kind,
+                                        Optional.of(Fingerprint.of(FingerprintAlgorithm.SHA256, checksum)),
+                                        Optional.of(pending.chunkId().value().toString()),
+                                        false,
+                                        size.get(), stored);
+                            }).subscribeOn(Schedulers.boundedElastic()))
+                            .onErrorResume(error -> {
+                                boolean preserve = error instanceof FileSystemWriteInterruptedException interrupted
+                                        && interrupted.preserveTemporaryArtifacts();
+                                return Mono.fromRunnable(() ->
+                                                AtomicChunkWriteProtocol.cleanupUncommitted(pending, preserve))
+                                        .then(Mono.error(error));
+                            });
+
+                    return write.doFinally(signal -> {
+                        if (signal == SignalType.CANCEL) {
+                            cancelled.set(true);
+                            cleanupCancelledWrite(pending);
+                        }
+                    });
                 });
+    }
+
+    private static void cleanupCancelledWrite(AtomicChunkWriteProtocol.PendingWrite pending) {
+        AtomicChunkWriteProtocol.cleanupUncommitted(pending, false);
+        try {
+            Files.deleteIfExists(pending.finalChecksum());
+            Files.deleteIfExists(pending.finalData());
+        } catch (java.io.IOException ignored) {
+            // Cancellation cleanup is best-effort here; pipeline cleanup retries by chunk id.
+        }
     }
 
     private static MessageDigest sha256() {

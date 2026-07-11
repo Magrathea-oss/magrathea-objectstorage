@@ -7,16 +7,13 @@ import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
-import java.util.UUID;
 
 /**
  * A storage node backed by a single directory on the filesystem.
@@ -41,7 +38,6 @@ import java.util.UUID;
 public class FileSystemStorageNode {
 
     private static final String SHA256_EXTENSION = ".sha256";
-    private static final String TMP_PREFIX = ".tmp.";
 
     private final Path nodePath;
     private final NodeId nodeId;
@@ -85,44 +81,19 @@ public class FileSystemStorageNode {
      */
     public Mono<WriteResult> write(ChunkId chunkId, byte[] data) {
         return BlockingFileSystemOperation.fromCallable(() -> {
-            String chunkFileName = chunkId.value().toString();
-            String uuid = UUID.randomUUID().toString();
-
-            Path finalFile = chunksDir.resolve(chunkFileName);
-            Path finalChecksumFile = chunksDir.resolve(chunkFileName + SHA256_EXTENSION);
-            Path tempFile = chunksDir.resolve(chunkFileName + TMP_PREFIX + uuid);
-            Path tempChecksumFile = chunksDir.resolve(chunkFileName + SHA256_EXTENSION + TMP_PREFIX + uuid);
-
+            AtomicChunkWriteProtocol.PendingWrite pending =
+                    AtomicChunkWriteProtocol.prepare(chunksDir, chunkId);
             String checksumHex = sha256Hex(data);
 
             try {
-                // Step 1: write data to temp file and fsync
-                Files.write(tempFile, data, StandardOpenOption.CREATE_NEW);
-                try (FileChannel channel = FileChannel.open(tempFile, StandardOpenOption.WRITE)) {
-                    channel.force(true);
-                }
+                Files.write(pending.tempData(), data, StandardOpenOption.CREATE_NEW);
+                AtomicChunkWriteProtocol.force(pending.tempData());
                 faultInjector.afterChunkTempFileWritten(
                         new FileSystemWriteFaultInjector.ChunkWriteContext(
-                                nodeId, chunkId, tempFile, finalFile, data.length));
-
-                // Step 2: write checksum to temp checksum file and fsync
-                Files.writeString(tempChecksumFile, checksumHex, StandardOpenOption.CREATE_NEW);
-                try (FileChannel channel = FileChannel.open(tempChecksumFile, StandardOpenOption.WRITE)) {
-                    channel.force(true);
-                }
-
-                // Step 3: atomic rename — checksum sidecar first, then data
-                Files.move(tempChecksumFile, finalChecksumFile,
-                        StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-                Files.move(tempFile, finalFile,
-                        StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-
+                                nodeId, chunkId, pending.tempData(), pending.finalData(), data.length));
+                AtomicChunkWriteProtocol.commit(pending, checksumHex);
             } catch (Exception e) {
-                if (!preserveTemporaryArtifacts(e)) {
-                    // Best-effort cleanup of temp files on failure
-                    try { Files.deleteIfExists(tempFile); } catch (Exception ignored) { /* best effort */ }
-                    try { Files.deleteIfExists(tempChecksumFile); } catch (Exception ignored) { /* best effort */ }
-                }
+                AtomicChunkWriteProtocol.cleanupUncommitted(pending, preserveTemporaryArtifacts(e));
                 if (e instanceof IOException ioe) {
                     throw new UncheckedIOException("Atomic chunk write failed for: " + chunkId.value(), ioe);
                 }

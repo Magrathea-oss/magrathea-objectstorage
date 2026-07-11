@@ -47,7 +47,7 @@ public class S3MultipartPartStore {
             Path uploadDir = uploadDirectory(uploadId);
             Path target = partPath(uploadId, partNumber);
             Path tmp = target.resolveSibling(target.getFileName() + ".tmp");
-            var measuredContent = content.doOnNext(buffer -> {
+            var measuredContent = S3StreamingBody.bounded(content).doOnNext(buffer -> {
                 size.addAndGet(buffer.readableByteCount());
                 digest.update(buffer.toByteBuffer().asReadOnlyBuffer());
             });
@@ -70,7 +70,8 @@ public class S3MultipartPartStore {
     }
 
     public Flux<DataBuffer> readPart(UploadId uploadId, PartNumber partNumber) {
-        return DataBufferUtils.read(partPath(uploadId, partNumber), DATA_BUFFER_FACTORY, READ_BUFFER_SIZE);
+        return S3StreamingBody.bounded(
+            DataBufferUtils.read(partPath(uploadId, partNumber), DATA_BUFFER_FACTORY, READ_BUFFER_SIZE));
     }
 
     public Mono<Void> deleteUpload(UploadId uploadId) {

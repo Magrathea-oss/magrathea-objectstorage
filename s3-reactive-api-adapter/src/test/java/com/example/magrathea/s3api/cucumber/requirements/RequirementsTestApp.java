@@ -3,6 +3,10 @@ package com.example.magrathea.s3api.cucumber.requirements;
 import com.example.magrathea.s3api.config.JacksonXmlCodecConfig;
 import com.example.magrathea.storageengine.domain.service.EffectivePolicyResolver;
 import com.example.magrathea.storageengine.domain.valueobject.EffectiveStoragePolicy;
+import com.example.magrathea.storageengine.domain.valueobject.DedupConfig;
+import com.example.magrathea.storageengine.domain.valueobject.DedupScope;
+import com.example.magrathea.storageengine.domain.valueobject.FingerprintAlgorithm;
+import com.example.magrathea.storageengine.domain.valueobject.ChunkAlignment;
 import com.example.magrathea.storageengine.domain.valueobject.StoragePolicy;
 import com.example.magrathea.storageengine.domain.valueobject.UploadRequestContext;
 import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemStorageCluster;
@@ -24,9 +28,14 @@ import tools.jackson.dataformat.xml.XmlMapper;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.channels.FileChannel;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
+import java.util.HexFormat;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @SpringBootApplication
@@ -58,6 +67,11 @@ public class RequirementsTestApp {
         return new MutableFileSystemWriteFaultInjector();
     }
 
+    @Bean
+    public Phase3StorageEventRecorder phase3StorageEventRecorder() {
+        return new Phase3StorageEventRecorder();
+    }
+
     /**
      * Override the default EffectivePolicyResolver with a test-safe variant that respects
      * the base storage policy's encryption setting. When the base policy has encryption
@@ -72,6 +86,14 @@ public class RequirementsTestApp {
             @Override
             public EffectiveStoragePolicy resolve(StoragePolicy policy, UploadRequestContext context) {
                 EffectiveStoragePolicy effective = super.resolve(policy, context);
+                if (context.objectKey().key().equals("pipeline/2026/read/manifest-ordered-object.bin")) {
+                    effective = EffectiveStoragePolicy.of(
+                            effective.storageClassId(), effective.bucketRef(),
+                            java.util.Optional.of(DedupConfig.of(DedupScope.BUCKET_LEVEL,
+                                    FingerprintAlgorithm.SHA256, 65536, ChunkAlignment.NONE)),
+                            effective.compression(), effective.encryption(), effective.erasureCoding(),
+                            effective.replication());
+                }
                 // Config-only SSE: respect the base policy's encryption setting.
                 // If the base policy has encryption disabled, do not enable chunk-level
                 // encryption even when an SSE header is present in the request.
@@ -151,23 +173,47 @@ public class RequirementsTestApp {
         private final AtomicBoolean interruptAfterChunkTempWrite = new AtomicBoolean(false);
         private final AtomicBoolean interruptAfterManifestTempWrite = new AtomicBoolean(false);
         private final AtomicBoolean leavePartialTemporaryArtifacts = new AtomicBoolean(true);
+        private volatile String failureReason;
+        private volatile List<Path> committedChunksAtManifestInterruption = List.of();
+        private volatile boolean committedChunkChecksumsValidAtManifestInterruption;
 
         public void interruptAfterChunkTempWrite(boolean leavePartialTemporaryArtifacts) {
+            interruptAfterChunkTempWrite(leavePartialTemporaryArtifacts, null);
+        }
+
+        public void interruptAfterChunkTempWrite(boolean leavePartialTemporaryArtifacts, String failureReason) {
             this.interruptAfterChunkTempWrite.set(true);
             this.interruptAfterManifestTempWrite.set(false);
             this.leavePartialTemporaryArtifacts.set(leavePartialTemporaryArtifacts);
+            this.failureReason = failureReason;
         }
 
         public void interruptAfterManifestTempWrite(boolean leavePartialTemporaryArtifacts) {
+            interruptAfterManifestTempWrite(leavePartialTemporaryArtifacts, null);
+        }
+
+        public void interruptAfterManifestTempWrite(boolean leavePartialTemporaryArtifacts, String failureReason) {
             this.interruptAfterChunkTempWrite.set(false);
             this.interruptAfterManifestTempWrite.set(true);
             this.leavePartialTemporaryArtifacts.set(leavePartialTemporaryArtifacts);
+            this.failureReason = failureReason;
         }
 
         public void disable() {
             interruptAfterChunkTempWrite.set(false);
             interruptAfterManifestTempWrite.set(false);
             leavePartialTemporaryArtifacts.set(true);
+            failureReason = null;
+            committedChunksAtManifestInterruption = List.of();
+            committedChunkChecksumsValidAtManifestInterruption = false;
+        }
+
+        public List<Path> committedChunksAtManifestInterruption() {
+            return committedChunksAtManifestInterruption;
+        }
+
+        public boolean committedChunkChecksumsValidAtManifestInterruption() {
+            return committedChunkChecksumsValidAtManifestInterruption;
         }
 
         @Override
@@ -175,8 +221,8 @@ public class RequirementsTestApp {
             if (!interruptAfterChunkTempWrite.get()) {
                 return;
             }
-            interrupt(context.tempFile(), context.expectedBytes(),
-                "Injected interrupted chunk write before atomic rename for chunk: " + context.chunkId().value());
+            interrupt(context.tempFile(), context.expectedBytes(), failureReason != null ? failureReason
+                : "Injected interrupted chunk write before atomic rename for chunk: " + context.chunkId().value());
         }
 
         @Override
@@ -184,8 +230,48 @@ public class RequirementsTestApp {
             if (!interruptAfterManifestTempWrite.get()) {
                 return;
             }
-            interrupt(context.tempFile(), context.expectedBytes(),
-                "Injected interrupted manifest write before atomic rename for manifest: " + context.manifestId().value());
+            captureCommittedChunkSnapshot(context.tempFile());
+            interrupt(context.tempFile(), context.expectedBytes(), failureReason != null ? failureReason
+                : "Injected interrupted manifest write before atomic rename for manifest: " + context.manifestId().value());
+        }
+
+        private void captureCommittedChunkSnapshot(Path manifestTempFile) {
+            Path storageRoot = manifestTempFile.getParent().getParent().getParent();
+            Path nodes = storageRoot.resolve("nodes");
+            if (!Files.isDirectory(nodes)) {
+                committedChunksAtManifestInterruption = List.of();
+                committedChunkChecksumsValidAtManifestInterruption = false;
+                return;
+            }
+            try (var walk = Files.walk(nodes)) {
+                List<Path> chunks = walk
+                    .filter(Files::isRegularFile)
+                    .filter(path -> !path.getFileName().toString().contains(".tmp."))
+                    .filter(path -> !path.getFileName().toString().endsWith(".sha256"))
+                    .sorted()
+                    .toList();
+                committedChunksAtManifestInterruption = chunks;
+                committedChunkChecksumsValidAtManifestInterruption = !chunks.isEmpty()
+                    && chunks.stream().allMatch(MutableFileSystemWriteFaultInjector::hasValidChecksum);
+            } catch (IOException e) {
+                throw new UncheckedIOException("Failed to capture committed chunks before manifest interruption", e);
+            }
+        }
+
+        private static boolean hasValidChecksum(Path chunk) {
+            Path checksum = chunk.resolveSibling(chunk.getFileName() + ".sha256");
+            try {
+                if (!Files.isRegularFile(checksum)) {
+                    return false;
+                }
+                MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                String actual = HexFormat.of().formatHex(digest.digest(Files.readAllBytes(chunk)));
+                return Files.readString(checksum).trim().equals(actual);
+            } catch (IOException e) {
+                throw new UncheckedIOException("Failed to verify committed chunk snapshot " + chunk, e);
+            } catch (NoSuchAlgorithmException e) {
+                throw new IllegalStateException("SHA-256 unavailable", e);
+            }
         }
 
         private void interrupt(Path tempFile, long expectedBytes, String message) {

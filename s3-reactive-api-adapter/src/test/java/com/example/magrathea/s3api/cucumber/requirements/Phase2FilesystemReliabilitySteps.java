@@ -169,6 +169,15 @@ public class Phase2FilesystemReliabilitySteps {
         state.orphanedChunkPath = orphan;
     }
 
+    @Given("a final checksum sidecar without its corresponding committed chunk exists in filesystem root {string}")
+    public void checksumSidecarWithoutCommittedChunkExists(String storageRoot) {
+        assertScenarioRoot(storageRoot);
+        String chunkId = UUID.randomUUID().toString();
+        Path sidecar = state.storageRoot.resolve("nodes/node-001/chunks/" + chunkId + ".sha256");
+        writeString(sidecar, "a".repeat(64));
+        state.orphanedChecksumSidecarPath = sidecar;
+    }
+
     @Given("an incomplete manifest with at least one missing required field exists in the manifest directory of filesystem root {string}")
     public void incompleteManifestExists(String storageRoot) {
         assertScenarioRoot(storageRoot);
@@ -246,10 +255,12 @@ public class Phase2FilesystemReliabilitySteps {
     @When("all chunk files are successfully written and renamed to their committed paths in filesystem root {string}")
     public void allChunkFilesWrittenAndRenamed(String storageRoot) {
         assertScenarioRoot(storageRoot);
-        state.committedChunksAfterManifestInterruption = committedChunkFiles();
+        state.committedChunksAfterManifestInterruption =
+            faultInjector.committedChunksAtManifestInterruption();
         assertFalse(state.committedChunksAfterManifestInterruption.isEmpty(),
             "manifest interruption should occur after at least one committed chunk is published");
-        state.committedChunksAfterManifestInterruption.forEach(this::assertChunkChecksumValid);
+        assertTrue(faultInjector.committedChunkChecksumsValidAtManifestInterruption(),
+            "every chunk committed before manifest interruption should have a valid checksum sidecar");
     }
 
     @When("the manifest write is interrupted after manifest bytes are partially written but before the manifest rename is complete")
@@ -455,6 +466,11 @@ public class Phase2FilesystemReliabilitySteps {
         assertFinding(state.orphanedChunkPath, artifactType);
     }
 
+    @Then("the scanner report includes the checksum sidecar without committed chunk with artifact type {string} and a descriptive failure reason")
+    public void reportIncludesOrphanedChecksumSidecar(String artifactType) {
+        assertFinding(state.orphanedChecksumSidecarPath, artifactType);
+    }
+
     @Then("the scanner report includes the incomplete manifest artifact path with artifact type {string} and a descriptive failure reason")
     public void reportIncludesIncompleteManifest(String artifactType) {
         assertFinding(state.incompleteManifestPath, artifactType);
@@ -498,6 +514,8 @@ public class Phase2FilesystemReliabilitySteps {
     @Then("after the scan, the orphaned, incomplete, and broken artifacts are no longer served through the S3 HTTP GetObject API")
     public void artifactsNoLongerServedThroughS3() {
         assertFalse(Files.exists(state.orphanedChunkPath), "orphaned chunk should no longer remain at original path");
+        assertFalse(Files.exists(state.orphanedChecksumSidecarPath),
+            "orphaned checksum sidecar should no longer remain at original path");
         assertFalse(Files.exists(state.incompleteManifestPath), "incomplete manifest should no longer remain at original path");
         assertFalse(Files.exists(state.brokenReferencePath), "broken reference should no longer remain at original path");
         Response brokenReferenceRead = getObject(state.bucket, state.brokenReferenceKey);
@@ -1053,6 +1071,7 @@ public class Phase2FilesystemReliabilitySteps {
         List<Path> interruptedTemporaryManifests = List.of();
         List<Path> committedChunksAfterManifestInterruption = List.of();
         Path orphanedChunkPath;
+        Path orphanedChecksumSidecarPath;
         Path incompleteManifestPath;
         Path brokenReferencePath;
         String brokenReferenceKey;
@@ -1078,6 +1097,7 @@ public class Phase2FilesystemReliabilitySteps {
             interruptedTemporaryManifests = List.of();
             committedChunksAfterManifestInterruption = List.of();
             orphanedChunkPath = null;
+            orphanedChecksumSidecarPath = null;
             incompleteManifestPath = null;
             brokenReferencePath = null;
             brokenReferenceKey = null;

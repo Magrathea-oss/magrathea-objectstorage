@@ -196,8 +196,14 @@ public class FileSystemRecoveryScanner {
                             return;
                         }
                         String name = chunkFile.getFileName().toString();
-                        // Skip checksum sidecar files themselves
+                        // A final sidecar without its data file can remain if interruption
+                        // occurs between the protocol's sidecar and data atomic renames.
                         if (name.endsWith(SHA256_EXT) && !name.contains(TMP_MARKER)) {
+                            String dataName = name.substring(0, name.length() - SHA256_EXT.length());
+                            if (!Files.exists(chunkFile.resolveSibling(dataName))) {
+                                findings.add(Finding.orphanedChunk(chunkFile.toString(),
+                                        "Orphaned checksum sidecar without committed chunk: " + name));
+                            }
                             return;
                         }
                         // Orphaned temp files

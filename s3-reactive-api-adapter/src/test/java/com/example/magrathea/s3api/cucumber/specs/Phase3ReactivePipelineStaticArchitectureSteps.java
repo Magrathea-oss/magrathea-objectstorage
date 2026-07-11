@@ -178,8 +178,8 @@ public class Phase3ReactivePipelineStaticArchitectureSteps {
     @Then("method {string} computes part measurements incrementally for each DataBuffer")
     public void methodComputesPartMeasurementsIncrementally(String methodName) {
         assertMethodLoaded();
-        assertTrue(inspectedMethodBody.contains("content.doOnNext(buffer ->"),
-                methodName + " must measure each incoming DataBuffer incrementally");
+        assertTrue(inspectedMethodBody.contains("S3StreamingBody.bounded(content).doOnNext(buffer ->"),
+                methodName + " must bound demand and measure each incoming DataBuffer incrementally");
         assertTrue(inspectedMethodBody.contains("size.addAndGet(buffer.readableByteCount())"),
                 methodName + " must compute part size incrementally");
         assertTrue(inspectedMethodBody.contains("digest.update(buffer.toByteBuffer().asReadOnlyBuffer())"),
@@ -224,13 +224,13 @@ public class Phase3ReactivePipelineStaticArchitectureSteps {
                 methodName + " must not collect object content before building the non-range response");
     }
 
-    @Then("method {string} passes {string} directly to {string}")
-    public void methodPassesSourceDirectlyToTarget(String methodName, String sourceExpression, String targetExpression) {
+    @Then("method {string} passes {string} through the shared finite-demand boundary to {string}")
+    public void methodPassesSourceThroughBoundedTarget(String methodName, String sourceExpression, String targetExpression) {
         assertMethodLoaded();
-        var expectedCall = targetExpression + "(obj, " + sourceExpression + ")";
+        var expectedCall = targetExpression + "(obj, S3StreamingBody.bounded(" + sourceExpression + "))";
         assertTrue(inspectedMethodBody.contains(expectedCall),
-                methodName + " must pass " + sourceExpression + " directly to " + targetExpression
-                + " but expected call was not found: " + expectedCall);
+                methodName + " must pass " + sourceExpression + " through S3StreamingBody.bounded to "
+                + targetExpression + " but expected call was not found: " + expectedCall);
     }
 
     @Then("range handling streams through the explicit Range header branch")
@@ -264,21 +264,25 @@ public class Phase3ReactivePipelineStaticArchitectureSteps {
     @Then("helper {string} attaches {string} to {string}")
     public void helperAttachesExpressionToTarget(String helperName, String expression, String target) {
         assertSourceLoaded();
-        assertTrue(inspectedSource.contains(target + "(" + expression + ")"),
+        var compactSource = inspectedSource.replaceAll("\\s+", "");
+        assertTrue(compactSource.contains((target + "(" + expression + ")").replaceAll("\\s+", "")),
                 helperName + " must attach " + expression + " to " + target);
     }
 
-    @Then("helper {string} emits per-buffer range slices without building a full-object array")
-    public void helperEmitsPerBufferRangeSlicesWithoutFullObjectArray(String helperName) {
-        assertSourceLoaded();
-        assertTrue(inspectedSource.contains("private Flux<DataBuffer> " + helperName),
-                "Expected helper method " + helperName);
+    @Then("shared helper {string} emits finite-demand per-buffer range slices without building a full-object array")
+    public void sharedHelperEmitsFiniteDemandRangeSlices(String helperName) throws IOException {
+        assertTrue("S3StreamingBody.sliceRange".equals(helperName), "Unexpected shared range helper: " + helperName);
+        inspectSourcePath("s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/adapter/web/S3StreamingBody.java");
+        assertTrue(inspectedSource.contains("public static Flux<DataBuffer> sliceRange"),
+                "Expected shared sliceRange helper");
+        assertTrue(inspectedSource.contains("return bounded(content).handle"),
+                "sliceRange must apply the finite-demand boundary before slicing");
         assertTrue(inspectedSource.contains("byte[] bufferBytes = new byte[readable]"),
-                helperName + " must bound temporary arrays to the current DataBuffer size");
+                "sliceRange must bound temporary arrays to the current DataBuffer size");
         assertTrue(inspectedSource.contains("Arrays.copyOfRange(bufferBytes, sliceStart, sliceEndExclusive)"),
-                helperName + " must emit only the overlapping range slice from each DataBuffer");
+                "sliceRange must emit only the overlapping slice from each DataBuffer");
         assertFalse(inspectedSource.contains("byte[] fullBody"),
-                helperName + " must not build a full-object byte array");
+                "sliceRange must not build a full-object byte array");
     }
 
     @Then("FixedWindowDedupStep does not invoke {string}")

@@ -8,6 +8,7 @@ import com.example.magrathea.objectstore.domain.valueobject.ObjectKey;
 import com.example.magrathea.objectstore.domain.valueobject.ObjectLockConfiguration;
 import com.example.magrathea.objectstore.domain.valueobject.RestoreConfiguration;
 import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DataBufferUtils;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Flux;
 
@@ -16,6 +17,14 @@ public interface S3ObjectQueryRepository {
     Mono<S3Object> findByBucketAndKey(ObjectKey key);
     Flux<S3Object> findByBucket(String bucketName);
     Flux<DataBuffer> getContent(ObjectKey key);
+
+    /**
+     * Verifies persisted content integrity without retaining object bytes.
+     * Repositories with a native integrity probe should override this default.
+     */
+    default Mono<Void> validateContentIntegrity(ObjectKey key) {
+        return getContent(key).doOnNext(DataBufferUtils::release).then();
+    }
 
     // ── Phase F object config queries ──
 

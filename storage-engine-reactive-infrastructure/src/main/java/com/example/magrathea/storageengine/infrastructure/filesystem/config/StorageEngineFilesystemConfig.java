@@ -5,6 +5,7 @@ import com.example.magrathea.storageengine.application.port.ChunkStorePort;
 import com.example.magrathea.storageengine.application.port.ContentAddressIndex;
 import com.example.magrathea.storageengine.application.port.DataTransformPort;
 import com.example.magrathea.storageengine.application.port.ObjectManifestRepository;
+import com.example.magrathea.storageengine.application.pipeline.ReadPipelineObserver;
 import com.example.magrathea.storageengine.application.port.StoragePolicyCatalog;
 import com.example.magrathea.storageengine.application.port.StoredObjectRepository;
 import com.example.magrathea.storageengine.application.pipeline.DataProcessingPipelinePort;
@@ -24,6 +25,7 @@ import com.example.magrathea.storageengine.infrastructure.filesystem.ReedSolomon
 import com.example.magrathea.storageengine.infrastructure.filesystem.SimpleReplicationAdapter;
 import com.example.magrathea.storageengine.infrastructure.filesystem.ZstdCompressionAdapter;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -149,7 +151,8 @@ public class StorageEngineFilesystemConfig {
             StoredObjectRepository storedObjectRepository,
             ObjectManifestRepository objectManifestRepository,
             StorageEventPublisher storageEventPublisher,
-            DataProcessingPipelinePort dataPipelinePort) {
+            DataProcessingPipelinePort dataPipelinePort,
+            ObjectProvider<ReadPipelineObserver> readPipelineObserver) {
         return new ReactiveStorageOrchestrator(
             completeUploadService,
             storagePolicyCatalog,
@@ -162,6 +165,7 @@ public class StorageEngineFilesystemConfig {
             objectManifestRepository,
             defaultChunkSizeBytes,
             storageEventPublisher,
-            dataPipelinePort);
+            dataPipelinePort,
+            readPipelineObserver.getIfAvailable(() -> ReadPipelineObserver.NO_OP));
     }
 }

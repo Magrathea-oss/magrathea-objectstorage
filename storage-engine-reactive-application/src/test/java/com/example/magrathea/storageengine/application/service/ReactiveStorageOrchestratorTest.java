@@ -253,6 +253,7 @@ class ReactiveStorageOrchestratorTest {
         assertThat(events.stream().map(StorageEvent::type).toList()).contains(StorageEventType.CLEANUP_COMPLETED);
         assertThat(fixture.storedObjectRepository.objects).isEmpty();
         assertThat(fixture.manifestRepository.savedById).isEmpty();
+        assertThat(fixture.chunkStore.storedData).isEmpty();
     }
 
     @Test
@@ -541,6 +542,12 @@ class ReactiveStorageOrchestratorTest {
         public Mono<byte[]> read(ChunkId chunkId) {
             readOrder.add(chunkId);
             return Mono.just(storedData.get(chunkId).clone());
+        }
+
+        @Override
+        public Mono<Void> delete(ChunkId chunkId) {
+            storedData.remove(chunkId);
+            return Mono.empty();
         }
 
         /** StorePort implementation used by the DataProcessingPipeline path. */
