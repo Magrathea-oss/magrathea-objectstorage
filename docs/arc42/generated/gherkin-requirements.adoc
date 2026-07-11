@@ -18,8 +18,8 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 
 === Summary
 
-* Feature files scanned: 23
-* Scenarios discovered: 409
+* Feature files scanned: 25
+* Scenarios discovered: 419
 * Protocol-smoke scenarios: 122
 
 ==== Status tag counts
@@ -31,7 +31,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |`@config-only` |69
 |`@implemented-and-validated` |123
 |`@implemented-not-e2e-validated` |22
-|`@not-implemented` |6
+|`@not-implemented` |16
 |`@partial` |4
 |`@placeholder` |9
 |`unknown/not-tagged` |178
@@ -42,7 +42,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 [cols="1,1",options="header"]
 |===
 |Tag |Scenario count
-|`@awscli-required` |58
+|`@awscli-required` |61
 |`@bootstrap-integration-required` |4
 |`@component-spec-required` |9
 |`@filesystem-inspection-required` |1
@@ -50,12 +50,12 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |`@live-monitoring-required` |1
 |`@log-inspection-required` |3
 |`@metrics-inspection-required` |3
-|`@pipeline-unit-required` |10
+|`@pipeline-unit-required` |12
 |`@runtime-backpressure-required` |1
 |`@static-architecture-required` |6
 |`@tracing-inspection-required` |2
-|`@webclient-required` |295
-|`unknown/not-tagged` |63
+|`@webclient-required` |300
+|`unknown/not-tagged` |68
 |===
 
 ==== Classification tag counts
@@ -63,8 +63,8 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 [cols="1,1",options="header"]
 |===
 |Tag |Scenario count
-|`@functional-requirement` |187
-|`@non-functional-requirement` |105
+|`@functional-requirement` |196
+|`@non-functional-requirement` |110
 |`unknown/not-tagged` |202
 |===
 
@@ -2545,6 +2545,137 @@ state together across a single restart of the same filesystem root.
   And GetObjectAcl for key "combined/object.bin" returns grant "FULL_CONTROL" for user "admin"
   And listing multipart uploads for bucket "ep2-combined-test" includes the recorded upload ID
 ----
+
+==== s3-reactive-api-adapter/src/test/features/requirements/phase-ep4-capacity-protection.feature
+
+* Feature title: Business Need: Capacity failures reject writes without corrupting committed S3 objects
+* Feature tags: `@business-need`, `@ep-4`, `@capacity-protection`, `@storage-engine`
+* Feature description:
++
+----
+As an S3 client and storage administrator,
+I want quotas and exhausted storage to fail predictably,
+So that capacity limits never publish partial objects or damage previously committed data.
+Background:
+Given the S3 API is configured with profile "storage-engine-it" and backend "storage-engine"
+And bucket "capacity-protection-bucket" exists
+And object key "capacity/2026/existing.bin" contains committed fixture "fixtures/upload/small-object.txt"
+----
+
+===== REQ-QUOTA-001
+
+====== Scenario Outline: PutObject exceeding a bucket byte quota is rejected atomically
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep4-capacity-protection.feature:14`
+|Rule |Bucket quotas are enforced before object publication
+|Requirement ID(s) |`REQ-QUOTA-001`
+|Classification |`@functional-requirement`
+|Capability area tags |`@business-need`, `@ep-4`, `@capacity-protection`, `@storage-engine`, `@quota`, `@s3-api`, `@admin-api`
+|Validation mode tags |`@webclient-required`, `@awscli-required`
+|Declared/validated status |`@not-implemented`
+|Protocol smoke |`no`
+|All tags |`@business-need`, `@ep-4`, `@capacity-protection`, `@storage-engine`, `@REQ-QUOTA-001`, `@functional-requirement`, `@quota`, `@s3-api`, `@admin-api`, `@webclient-required`, `@awscli-required`, `@not-implemented`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given validation mode "<validation_mode>" is selected for requirement "REQ-QUOTA-001"
+  And the administrator configures bucket "capacity-protection-bucket" with byte quota 1048576
+  And fixture "target/test-fixtures/capacity/quota-overflow-2m.bin" is exactly 2097152 bytes
+  When the S3 client uploads the fixture to key "capacity/2026/quota-overflow.bin"
+  Then PutObject returns the documented S3 quota-exceeded error
+  And no object reference, manifest, whole-object unit, multipart part, dedup chunk, or EC shard is published for the rejected key
+  And the previously committed object remains readable with its original checksum
+  And the Admin API reports used bytes, reserved bytes, quota bytes, and the rejected reservation
+----
+
+.Examples
+[cols="1",options="header"]
+|===
+| validation_mode
+| webclient
+| awscli
+|===
+
+===== REQ-QUOTA-002
+
+====== Scenario Outline: Concurrent uploads reserve capacity atomically
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep4-capacity-protection.feature:31`
+|Rule |Concurrent reservations cannot oversubscribe a quota
+|Requirement ID(s) |`REQ-QUOTA-002`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@business-need`, `@ep-4`, `@capacity-protection`, `@storage-engine`, `@quota`, `@concurrency`, `@s3-api`
+|Validation mode tags |`@webclient-required`, `@awscli-required`
+|Declared/validated status |`@not-implemented`
+|Protocol smoke |`no`
+|All tags |`@business-need`, `@ep-4`, `@capacity-protection`, `@storage-engine`, `@REQ-QUOTA-002`, `@functional-requirement`, `@non-functional-requirement`, `@quota`, `@concurrency`, `@s3-api`, `@webclient-required`, `@awscli-required`, `@not-implemented`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given validation mode "<validation_mode>" is selected for requirement "REQ-QUOTA-002"
+  And bucket "capacity-protection-bucket" has quota for exactly one 2 MiB object beyond current usage
+  When two clients concurrently upload distinct 2 MiB keys
+  Then exactly one upload commits and exactly one receives the documented quota-exceeded error
+  And reported used plus reserved bytes never exceeds the configured quota
+  And restart preserves the committed usage and releases the failed reservation
+----
+
+.Examples
+[cols="1",options="header"]
+|===
+| validation_mode
+| webclient
+| awscli
+|===
+
+===== REQ-CAPACITY-001
+
+====== Scenario Outline: ENOSPC during artifact persistence returns a deterministic S3 error and cleans partial state
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep4-capacity-protection.feature:46`
+|Rule |Filesystem exhaustion fails closed
+|Requirement ID(s) |`REQ-CAPACITY-001`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@business-need`, `@ep-4`, `@capacity-protection`, `@storage-engine`, `@enospc`, `@integrity`, `@s3-api`
+|Validation mode tags |`@webclient-required`, `@awscli-required`
+|Declared/validated status |`@not-implemented`
+|Protocol smoke |`no`
+|All tags |`@business-need`, `@ep-4`, `@capacity-protection`, `@storage-engine`, `@REQ-CAPACITY-001`, `@functional-requirement`, `@non-functional-requirement`, `@enospc`, `@integrity`, `@s3-api`, `@webclient-required`, `@awscli-required`, `@not-implemented`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given validation mode "<validation_mode>" is selected for requirement "REQ-CAPACITY-001"
+  And deterministic fault injection reports ENOSPC after at least one temporary artifact is written
+  When the S3 client uploads fixture "target/test-fixtures/capacity/enospc-object-8m.bin" to key "capacity/2026/enospc.bin"
+  Then PutObject returns the documented storage-capacity S3 error rather than success
+  And every temporary file and unpublished storage artifact for the failed key is removed or quarantined
+  And no manifest or object reference is committed for the failed key
+  And the previously committed object remains readable with its original checksum
+  And a capacity failure event exposes backend, storage root, requested bytes, and available bytes without payload content
+----
+
+.Examples
+[cols="1",options="header"]
+|===
+| validation_mode
+| webclient
+| awscli
+|===
 
 ==== s3-reactive-api-adapter/src/test/features/requirements/phase-ep5-operability.feature
 
@@ -10892,7 +11023,7 @@ staged pipeline contracts required to satisfy those externally visible S3 behavi
 without a monolithic orchestrator or whole-object aggregation.
 The Phase 3 implementation must introduce the production abstractions StorageStage,
 StorageContext, and StorageEvent. StorageContext carries request identity, object
-metadata, policy decisions, chunking decisions, resource handles, and cleanup state
+metadata, conditional segmentation decisions, resource handles, and cleanup state
 between stages. StorageEvent records stage start, success, failure, retry, cleanup,
 cancellation, and timing without carrying object payload bytes.
 Pipeline-unit scenarios may be promoted independently when production
@@ -10914,10 +11045,10 @@ Required write pipeline stage order:
 | order | stage name               | purpose                                                                    |
 | 1     | validation               | validate bucket, key, headers, metadata, checksum declarations, and length  |
 | 2     | policy-resolution        | resolve storage backend, storage policy, chunk size, and durability options |
-| 3     | chunking                 | convert the request body stream into bounded ordered chunks                 |
-| 4     | dedup-lookup             | identify already stored chunks without consuming the whole object           |
-| 5     | chunk-persistence        | persist new chunks with bounded demand and cleanup handles                  |
-| 6     | manifest-persistence     | publish a manifest only after all referenced chunks are durable             |
+| 3     | chunking                 | pass through a plain object, or segment only for multipart, dedup, or EC     |
+| 4     | dedup-lookup             | identify dedup chunks only when deduplication is enabled                     |
+| 5     | chunk-persistence        | persist whole units or allowed segmented artifacts with bounded demand       |
+| 6     | manifest-persistence     | publish a manifest only after every referenced storage artifact is durable   |
 | 7     | object-index-persistence | publish the object reference only after the manifest is committed           |
 Required read pipeline stage order:
 | order | stage name         | purpose                                                                    |
@@ -10949,6 +11080,113 @@ And each scenario uses a clean storage-engine filesystem root "target/storage-en
 And reactive pipeline event capture is enabled for the selected validation mode
 ----
 
+===== REQ-PIPELINE-014
+
+====== Scenario Outline: Plain PutObject bypasses all chunk-producing transformations
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:87`
+|Rule |Plain uploads remain whole-object storage units
+|Requirement ID(s) |`REQ-PIPELINE-014`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@spec`, `@reactive-pipeline`, `@storage-engine`, `@streaming`, `@storage-layout`
+|Validation mode tags |`@pipeline-unit-required`, `@webclient-required`
+|Declared/validated status |`@not-implemented`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@REQ-PIPELINE-014`, `@functional-requirement`, `@non-functional-requirement`, `@streaming`, `@storage-layout`, `@pipeline-unit-required`, `@webclient-required`, `@not-implemented`
+|===
+
+.Rule description
+----
+A single-object PutObject with multipart, deduplication, and erasure coding disabled
+MUST remain one streamed whole-object storage unit. It MUST NOT create generic chunk
+identifiers, chunk references, dedup-index entries, EC shards, or multipart parts.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
+  And the storage engine operator uses filesystem root "<storage_root>"
+  And bucket "plain-storage-unit-bucket" exists
+  And storage class "PLAIN" disables multipart, deduplication, and erasure coding
+  And fixture file "target/test-fixtures/pipeline/plain-object-8m.bin" is a deterministic 8 MiB object
+  When the selected validation runner uploads the plain fixture to key "pipeline/2026/plain/whole-object.bin"
+  Then the chunking stage records a whole-object pass-through decision
+  And the manifest references one whole-object storage unit and zero chunk artifacts
+  And no dedup content-address entry, EC shard, or multipart part is created
+  And the S3 client reads the exact 8 MiB fixture bytes through the production read path
+----
+
+.Examples: Pipeline unit validation `@pipeline-unit`, `@not-implemented`
+[cols="1,1,1",options="header"]
+|===
+| requirement_id | validation_mode | storage_root
+| REQ-PIPELINE-014 | pipeline-unit | target/storage-engine-it/REQ-PIPELINE-014-unit
+|===
+
+.Examples: WebTestClient validation `@webclient`, `@not-implemented`
+[cols="1,1,1",options="header"]
+|===
+| requirement_id | validation_mode | storage_root
+| REQ-PIPELINE-014 | webclient | target/storage-engine-it/REQ-PIPELINE-014-webclient
+|===
+
+===== REQ-PIPELINE-015
+
+====== Scenario Outline: EC-enabled PutObject persists policy-derived data and parity shards
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:115`
+|Rule |Erasure coding owns stripe and shard chunking
+|Requirement ID(s) |`REQ-PIPELINE-015`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@spec`, `@reactive-pipeline`, `@storage-engine`, `@integrity`, `@erasure-coding`, `@storage-layout`
+|Validation mode tags |`@pipeline-unit-required`, `@webclient-required`
+|Declared/validated status |`@not-implemented`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@REQ-PIPELINE-015`, `@functional-requirement`, `@non-functional-requirement`, `@integrity`, `@erasure-coding`, `@storage-layout`, `@pipeline-unit-required`, `@webclient-required`, `@not-implemented`
+|===
+
+.Rule description
+----
+When erasure coding is enabled, segmentation MUST be derived from the EC policy and
+produce ordered data/parity shard artifacts. EC-disabled plain uploads MUST produce no
+EC chunks, and modeled plans alone MUST NOT be reported as physical shard persistence.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
+  And the storage engine operator uses filesystem root "<storage_root>"
+  And bucket "ec-storage-unit-bucket" exists
+  And storage class "EC_4_2" selects four data shards and two parity shards
+  And fixture file "target/test-fixtures/pipeline/ec-object-8m.bin" is a deterministic 8 MiB object
+  When the selected validation runner uploads the EC fixture to key "pipeline/2026/ec/sharded-object.bin"
+  Then the EC stage persists ordered data and parity shard artifacts derived from the policy
+  And the manifest distinguishes EC shards from dedup chunks and whole-object units
+  And every shard checksum is validated before exact S3 readback
+----
+
+.Examples: Pipeline unit validation `@pipeline-unit`, `@not-implemented`
+[cols="1,1,1",options="header"]
+|===
+| requirement_id | validation_mode | storage_root
+| REQ-PIPELINE-015 | pipeline-unit | target/storage-engine-it/REQ-PIPELINE-015-unit
+|===
+
+.Examples: WebTestClient validation `@webclient`, `@not-implemented`
+[cols="1,1,1",options="header"]
+|===
+| requirement_id | validation_mode | storage_root
+| REQ-PIPELINE-015 | webclient | target/storage-engine-it/REQ-PIPELINE-015-webclient
+|===
+
 ===== REQ-PIPELINE-001
 
 ====== Scenario Outline: Write pipeline records the required stage order before publishing an object reference
@@ -10956,7 +11194,7 @@ And reactive pipeline event capture is enabled for the selected validation mode
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:88`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:143`
 |Rule |Write objects pass through explicit stages in a deterministic order
 |Requirement ID(s) |`REQ-PIPELINE-001`
 |Classification |`@functional-requirement`
@@ -10970,9 +11208,9 @@ And reactive pipeline event capture is enabled for the selected validation mode
 .Rule description
 ----
 A PutObject write MUST be composed from StorageStage instances connected by a
-StorageContext. The write pipeline MUST publish chunks, then manifest, then object
-reference in that order. Later stages MUST NOT run before earlier required stages
-have succeeded.
+StorageContext. The write pipeline MUST publish its whole-object unit or allowed
+multipart/dedup/EC artifacts, then the manifest, then the object reference in that
+order. Later stages MUST NOT run before earlier required stages have succeeded.
 ----
 
 .Gherkin steps
@@ -11015,8 +11253,8 @@ have succeeded.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:128`
-|Rule |Write chunk persistence preserves backpressure and bounded memory
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:184`
+|Rule |Dedup chunk persistence preserves backpressure and bounded memory
 |Requirement ID(s) |`REQ-PIPELINE-002`
 |Classification |`@non-functional-requirement`
 |Capability area tags |`@spec`, `@reactive-pipeline`, `@storage-engine`, `@streaming`, `@backpressure`, `@bounded-memory`
@@ -11028,9 +11266,10 @@ have succeeded.
 
 .Rule description
 ----
-The write pipeline MUST convert object content into bounded chunks and persist them
-according to downstream demand. It MUST NOT use a global reduce, collectList, or byte
-array assembly over the complete object body in production object-content paths.
+When deduplication is enabled, the write pipeline MUST convert object content into
+bounded dedup windows and persist them according to downstream demand. It MUST NOT use
+a global reduce, collectList, or byte array assembly over the complete object body in
+production object-content paths. This rule does not authorize chunking plain uploads.
 ----
 
 .Gherkin steps
@@ -11074,7 +11313,7 @@ array assembly over the complete object body in production object-content paths.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:164`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:220`
 |Rule |Upload ETag computation and dedup windowing preserve streaming request-body paths
 |Requirement ID(s) |`REQ-PIPELINE-007`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -11116,7 +11355,7 @@ materializing the complete FileUnit.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:176`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:232`
 |Rule |Upload ETag computation and dedup windowing preserve streaming request-body paths
 |Requirement ID(s) |`REQ-PIPELINE-008`
 |Classification |`@non-functional-requirement`
@@ -11157,7 +11396,7 @@ materializing the complete FileUnit.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:193`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:249`
 |Rule |Read objects stream chunks in manifest order without aggregating the object
 |Requirement ID(s) |`REQ-PIPELINE-009`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -11194,7 +11433,7 @@ before response streaming begins.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:202`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:258`
 |Rule |Read objects stream chunks in manifest order without aggregating the object
 |Requirement ID(s) |`REQ-PIPELINE-010`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -11234,7 +11473,7 @@ before response streaming begins.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:214`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:270`
 |Rule |Read objects stream chunks in manifest order without aggregating the object
 |Requirement ID(s) |`REQ-PIPELINE-003`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -11284,7 +11523,7 @@ before response streaming begins.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:249`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:305`
 |Rule |HTTP read integrity preflight preserves deterministic S3 errors
 |Requirement ID(s) |`REQ-PIPELINE-003`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -11336,7 +11575,7 @@ latency or single-pass filesystem I/O.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:282`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:338`
 |Rule |Multipart part persistence streams upload and copy inputs without complete-part aggregation
 |Requirement ID(s) |`REQ-PIPELINE-011`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -11376,7 +11615,7 @@ without loading each part file as one byte array.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:294`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:350`
 |Rule |Multipart part persistence streams upload and copy inputs without complete-part aggregation
 |Requirement ID(s) |`REQ-PIPELINE-012`
 |Classification |`@non-functional-requirement`
@@ -11417,7 +11656,7 @@ without loading each part file as one byte array.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:313`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:369`
 |Rule |Existing S3 streaming boundaries apply a finite runtime demand window
 |Requirement ID(s) |`REQ-PIPELINE-013`
 |Classification |`@non-functional-requirement`
@@ -11457,7 +11696,7 @@ boundary does not validate stage ordering, manifest publication, or StorageEvent
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:330`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:386`
 |Rule |Stage failures propagate deterministically and clean up completed resources
 |Requirement ID(s) |`REQ-PIPELINE-004`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -11514,7 +11753,7 @@ a deterministic S3 error without publishing a readable object.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:358`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:414`
 |Rule |Stage failures propagate deterministically and clean up completed resources
 |Requirement ID(s) |`REQ-PIPELINE-004`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -11555,7 +11794,7 @@ a deterministic S3 error without publishing a readable object.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:377`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:433`
 |Rule |Cancellation before publication cleans up pipeline-owned resources
 |Requirement ID(s) |`REQ-PIPELINE-005`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -11616,7 +11855,7 @@ unpublished chunks or temporary files, and leave no readable object behind.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:412`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:468`
 |Rule |Each pipeline stage emits independent typed instrumentation events
 |Requirement ID(s) |`REQ-PIPELINE-006`
 |Classification |`@non-functional-requirement`
@@ -12729,6 +12968,177 @@ production readiness. Completion must not be inferred from route inventories, pl
   And the reports do not mark distributed readiness as complete or "@implemented-and-validated"
   And the reports distinguish modeled planner behavior from distributed-production readiness
 ----
+
+==== s3-reactive-api-adapter/src/test/features/specs/phase-ep4-space-management.feature
+
+* Feature title: Ability: Type-aware storage reclamation and integrity hygiene
+* Feature tags: `@spec`, `@ep-4`, `@space-management`, `@storage-engine`
+* Feature description:
++
+----
+As a storage-engine operator and maintainer,
+I want reclamation and scrubbing to understand each physical storage-artifact type,
+So that deleted data is reclaimed without corrupting shared content or inventing chunks
+for plain objects.
+Chunks are valid only for multipart parts, deduplication windows, and erasure-coding
+stripes or shards. A plain object with all three mechanisms disabled is one streamed
+whole-object storage unit. GC, reference accounting, recovery, metrics, and reports must
+distinguish these artifact types.
+Background:
+Given the storage engine uses filesystem root "target/storage-engine-it/<scenario-id>"
+And the scenario starts with no pending reclamation or scrub findings
+----
+
+===== REQ-GC-001
+
+====== Scenario: Deleting a plain object reclaims its whole-object unit without chunk accounting
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep4-space-management.feature:19`
+|Rule |Plain objects are reclaimed as whole-object units
+|Requirement ID(s) |`REQ-GC-001`
+|Classification |`@functional-requirement`
+|Capability area tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@storage-layout`, `@garbage-collection`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@not-implemented`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@REQ-GC-001`, `@functional-requirement`, `@storage-layout`, `@garbage-collection`, `@not-implemented`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given a committed plain object uses storage class "PLAIN" with multipart, deduplication, and erasure coding disabled
+  And its manifest references one whole-object storage unit and zero chunk artifacts
+  When the owning S3 object reference is deleted and reclamation runs
+  Then the whole-object storage unit and obsolete manifest are removed
+  And no chunk reference count, dedup index entry, multipart part, or EC shard is created or decremented
+  And an idempotent second reclamation run reports no additional deletion
+----
+
+===== REQ-GC-002
+
+====== Scenario: Shared dedup chunks are reclaimed only after the final manifest reference disappears
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep4-space-management.feature:29`
+|Rule |Dedup chunks remain until their final owner is deleted
+|Requirement ID(s) |`REQ-GC-002`
+|Classification |`@functional-requirement`
+|Capability area tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@dedup`, `@reference-counting`, `@garbage-collection`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@not-implemented`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@REQ-GC-002`, `@functional-requirement`, `@dedup`, `@reference-counting`, `@garbage-collection`, `@not-implemented`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given two committed objects reference the same dedup chunk fingerprint in one bucket scope
+  When the first object is deleted and reclamation runs
+  Then the shared dedup chunk, checksum sidecar, and content-address entry remain readable by the second object
+  When the second object is deleted and reclamation runs
+  Then the final reference count reaches zero
+  And the dedup chunk, checksum sidecar, and content-address entry are removed atomically
+----
+
+===== REQ-GC-003
+
+====== Scenario: Aborted or expired multipart uploads reclaim uncommitted parts
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep4-space-management.feature:39`
+|Rule |Multipart and EC artifacts have independent reclamation rules
+|Requirement ID(s) |`REQ-GC-003`
+|Classification |`@functional-requirement`
+|Capability area tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@multipart`, `@garbage-collection`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@not-implemented`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@REQ-GC-003`, `@functional-requirement`, `@multipart`, `@garbage-collection`, `@not-implemented`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given a multipart upload has persisted parts but has no committed object manifest
+  When the upload is aborted or expires and multipart reclamation runs
+  Then every uncommitted part and temporary checksum artifact is removed
+  And chunks belonging to committed dedup or EC objects are unchanged
+----
+
+===== REQ-GC-004
+
+====== Scenario: EC object deletion reclaims all policy-derived shards after the final object reference
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep4-space-management.feature:46`
+|Rule |Multipart and EC artifacts have independent reclamation rules
+|Requirement ID(s) |`REQ-GC-004`
+|Classification |`@functional-requirement`
+|Capability area tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@erasure-coding`, `@garbage-collection`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@not-implemented`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@REQ-GC-004`, `@functional-requirement`, `@erasure-coding`, `@garbage-collection`, `@not-implemented`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given a committed EC object manifest references four data shards and two parity shards
+  When the final owning object is deleted and EC reclamation runs
+  Then all six shard artifacts and checksum metadata are removed
+  And no whole-object unit or unrelated dedup chunk is removed
+----
+
+===== REQ-SCRUB-001
+
+====== Scenario Outline: Scrubbing reports and quarantines corrupt storage artifacts by type
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep4-space-management.feature:54`
+|Rule |Periodic scrubbing verifies typed artifacts without changing valid data
+|Requirement ID(s) |`REQ-SCRUB-001`
+|Classification |`@non-functional-requirement`
+|Capability area tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@integrity`, `@scrubbing`, `@observability`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@not-implemented`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@REQ-SCRUB-001`, `@non-functional-requirement`, `@integrity`, `@scrubbing`, `@observability`, `@not-implemented`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given a committed "<artifact_type>" artifact has a mismatching checksum
+  When the periodic scrub job inspects the configured storage root
+  Then one integrity finding identifies artifact type, identifier, owning manifest when known, and checksum failure
+  And the corrupt artifact is quarantined according to the configured repair policy
+  And healthy artifacts remain byte-for-byte unchanged
+  And a second scrub run is deterministic and does not duplicate the finding
+----
+
+.Examples
+[cols="1",options="header"]
+|===
+| artifact_type
+| whole-object
+| dedup-chunk
+| multipart-part
+| ec-shard
+|===
 
 ==== s3-reactive-api-adapter/src/test/features/specs/phase-ep5-storage-migration.feature
 

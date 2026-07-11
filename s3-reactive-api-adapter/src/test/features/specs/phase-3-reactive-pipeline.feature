@@ -14,7 +14,7 @@ Ability: Phase 3 staged reactive read and write pipeline
 
   The Phase 3 implementation must introduce the production abstractions StorageStage,
   StorageContext, and StorageEvent. StorageContext carries request identity, object
-  metadata, policy decisions, chunking decisions, resource handles, and cleanup state
+  metadata, conditional segmentation decisions, resource handles, and cleanup state
   between stages. StorageEvent records stage start, success, failure, retry, cleanup,
   cancellation, and timing without carrying object payload bytes.
 
@@ -39,10 +39,10 @@ Ability: Phase 3 staged reactive read and write pipeline
     | order | stage name               | purpose                                                                    |
     | 1     | validation               | validate bucket, key, headers, metadata, checksum declarations, and length  |
     | 2     | policy-resolution        | resolve storage backend, storage policy, chunk size, and durability options |
-    | 3     | chunking                 | convert the request body stream into bounded ordered chunks                 |
-    | 4     | dedup-lookup             | identify already stored chunks without consuming the whole object           |
-    | 5     | chunk-persistence        | persist new chunks with bounded demand and cleanup handles                  |
-    | 6     | manifest-persistence     | publish a manifest only after all referenced chunks are durable             |
+    | 3     | chunking                 | pass through a plain object, or segment only for multipart, dedup, or EC     |
+    | 4     | dedup-lookup             | identify dedup chunks only when deduplication is enabled                     |
+    | 5     | chunk-persistence        | persist whole units or allowed segmented artifacts with bounded demand       |
+    | 6     | manifest-persistence     | publish a manifest only after every referenced storage artifact is durable   |
     | 7     | object-index-persistence | publish the object reference only after the manifest is committed           |
 
   Required read pipeline stage order:
@@ -78,11 +78,66 @@ Ability: Phase 3 staged reactive read and write pipeline
     And each scenario uses a clean storage-engine filesystem root "target/storage-engine-it/<scenario-id>"
     And reactive pipeline event capture is enabled for the selected validation mode
 
+  Rule: Plain uploads remain whole-object storage units
+    A single-object PutObject with multipart, deduplication, and erasure coding disabled
+    MUST remain one streamed whole-object storage unit. It MUST NOT create generic chunk
+    identifiers, chunk references, dedup-index entries, EC shards, or multipart parts.
+
+    @REQ-PIPELINE-014 @functional-requirement @non-functional-requirement @streaming @storage-layout @pipeline-unit-required @webclient-required @not-implemented
+    Scenario Outline: Plain PutObject bypasses all chunk-producing transformations
+      Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
+      And the storage engine operator uses filesystem root "<storage_root>"
+      And bucket "plain-storage-unit-bucket" exists
+      And storage class "PLAIN" disables multipart, deduplication, and erasure coding
+      And fixture file "target/test-fixtures/pipeline/plain-object-8m.bin" is a deterministic 8 MiB object
+      When the selected validation runner uploads the plain fixture to key "pipeline/2026/plain/whole-object.bin"
+      Then the chunking stage records a whole-object pass-through decision
+      And the manifest references one whole-object storage unit and zero chunk artifacts
+      And no dedup content-address entry, EC shard, or multipart part is created
+      And the S3 client reads the exact 8 MiB fixture bytes through the production read path
+
+      @pipeline-unit @not-implemented
+      Examples: Pipeline unit validation
+        | requirement_id     | validation_mode | storage_root                                        |
+        | REQ-PIPELINE-014   | pipeline-unit   | target/storage-engine-it/REQ-PIPELINE-014-unit     |
+
+      @webclient @not-implemented
+      Examples: WebTestClient validation
+        | requirement_id     | validation_mode | storage_root                                        |
+        | REQ-PIPELINE-014   | webclient       | target/storage-engine-it/REQ-PIPELINE-014-webclient |
+
+  Rule: Erasure coding owns stripe and shard chunking
+    When erasure coding is enabled, segmentation MUST be derived from the EC policy and
+    produce ordered data/parity shard artifacts. EC-disabled plain uploads MUST produce no
+    EC chunks, and modeled plans alone MUST NOT be reported as physical shard persistence.
+
+    @REQ-PIPELINE-015 @functional-requirement @non-functional-requirement @integrity @erasure-coding @storage-layout @pipeline-unit-required @webclient-required @not-implemented
+    Scenario Outline: EC-enabled PutObject persists policy-derived data and parity shards
+      Given validation mode "<validation_mode>" is selected for requirement "<requirement_id>"
+      And the storage engine operator uses filesystem root "<storage_root>"
+      And bucket "ec-storage-unit-bucket" exists
+      And storage class "EC_4_2" selects four data shards and two parity shards
+      And fixture file "target/test-fixtures/pipeline/ec-object-8m.bin" is a deterministic 8 MiB object
+      When the selected validation runner uploads the EC fixture to key "pipeline/2026/ec/sharded-object.bin"
+      Then the EC stage persists ordered data and parity shard artifacts derived from the policy
+      And the manifest distinguishes EC shards from dedup chunks and whole-object units
+      And every shard checksum is validated before exact S3 readback
+
+      @pipeline-unit @not-implemented
+      Examples: Pipeline unit validation
+        | requirement_id     | validation_mode | storage_root                                        |
+        | REQ-PIPELINE-015   | pipeline-unit   | target/storage-engine-it/REQ-PIPELINE-015-unit     |
+
+      @webclient @not-implemented
+      Examples: WebTestClient validation
+        | requirement_id     | validation_mode | storage_root                                        |
+        | REQ-PIPELINE-015   | webclient       | target/storage-engine-it/REQ-PIPELINE-015-webclient |
+
   Rule: Write objects pass through explicit stages in a deterministic order
     A PutObject write MUST be composed from StorageStage instances connected by a
-    StorageContext. The write pipeline MUST publish chunks, then manifest, then object
-    reference in that order. Later stages MUST NOT run before earlier required stages
-    have succeeded.
+    StorageContext. The write pipeline MUST publish its whole-object unit or allowed
+    multipart/dedup/EC artifacts, then the manifest, then the object reference in that
+    order. Later stages MUST NOT run before earlier required stages have succeeded.
 
     @implemented-and-validated @REQ-PIPELINE-001 @functional-requirement @integrity @stage-ordering @pipeline-unit-required @webclient-required
     Scenario Outline: Write pipeline records the required stage order before publishing an object reference
@@ -119,10 +174,11 @@ Ability: Phase 3 staged reactive read and write pipeline
         | requirement_id   | validation_mode | bucket                      | object_key                                | fixture_file                     | storage_root                                        |
         | REQ-PIPELINE-001 | webclient       | pipeline-stage-order-bucket | pipeline/2026/write/stage-order-object.txt | fixtures/upload/small-object.txt | target/storage-engine-it/REQ-PIPELINE-001-webclient |
 
-  Rule: Write chunk persistence preserves backpressure and bounded memory
-    The write pipeline MUST convert object content into bounded chunks and persist them
-    according to downstream demand. It MUST NOT use a global reduce, collectList, or byte
-    array assembly over the complete object body in production object-content paths.
+  Rule: Dedup chunk persistence preserves backpressure and bounded memory
+    When deduplication is enabled, the write pipeline MUST convert object content into
+    bounded dedup windows and persist them according to downstream demand. It MUST NOT use
+    a global reduce, collectList, or byte array assembly over the complete object body in
+    production object-content paths. This rule does not authorize chunking plain uploads.
 
     @implemented-and-validated @REQ-PIPELINE-002 @non-functional-requirement @streaming @backpressure @bounded-memory @pipeline-unit-required @webclient-required
     Scenario Outline: Large PutObject persists chunks with bounded demand and without whole-object aggregation
