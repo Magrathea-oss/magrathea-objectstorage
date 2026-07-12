@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "paths": {
+      "@magrathea/product-shell": ["packages/product-shell/dist/index.d.ts"]
+    }
+  },
+  "include": ["src/**/*.ts"]
+}

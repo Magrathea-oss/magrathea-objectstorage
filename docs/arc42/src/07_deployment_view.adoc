@@ -14,8 +14,11 @@ ifndef::imagesdir[:imagesdir: ../images]
 |Runtime JAR
 |`bootstrap-application-0.1.0-SNAPSHOT.jar` running on the configured HTTP port
 
+|Object Storage Admin Browser Application
+|Independently built static distribution executed in the operator's browser. It composes the Product Shell, Object Storage Product Extension, application-owned browser adapters, and documentation viewer.
+
 |Static resources
-|Generated Vue/admin documentation assets, ARC42 JSON, ADR JSON, JaCoCo JSON exports, C4 PNGs, and ARC42 images served from classpath `static/**`
+|Generated browser application and documentation assets, ARC42 JSON, ADR JSON, JaCoCo JSON exports, C4 PNGs, and ARC42 images served by `bootstrap-application` from classpath `static/**`
 
 |Bare local default backend (`single-node` profile)
 |In-memory (ConcurrentHashMap), allocated in the same JVM heap as the server; does not persist across restarts. This default is retained for unpackaged development/test compatibility.
@@ -37,7 +40,9 @@ A JVM `Dockerfile`, a native-image `Dockerfile.native`, and `docker-compose.yml`
 **Dockerfile:**
 
 * Builder stage: Maven 3.9 + Eclipse Temurin 21 from public ECR mirrored Docker Hub images, with Node.js installed for documentation/frontend generation
-* Regenerates web documentation and admin UI static assets inside the builder stage from source-controlled docs and `magrathea-ui` sources
+* Regenerates web documentation and frontend static assets inside the builder stage from source-controlled docs and the `magrathea-ui` workspace
+* Builds isolated `object-storage` and `magrathea-example` products from one Product Shell artifact; the `frontend-packaging-validation` target builds both products and documentation twice and compares path-sorted SHA-256 inventories
+* The canonical `docker build --network=host --target frontend-packaging-validation -t magrathea-frontend-packaging-validation:local .` gate passed for EP-7
 * Runs the Gherkin requirements appendix quality gate (`--check` against the committed appendix) before regenerating it deterministically, so the image build fails if the ARC42 appendix is stale relative to the shared requirement feature files
 * Copies the full `scripts/` gate set so root Maven validation can run module-layering checks during packaging
 * Does not copy host-generated `bootstrap-application/src/main/resources/static/**` assets; `.dockerignore` excludes those generated resources from the build context
@@ -104,6 +109,7 @@ The current single-process deployment is intentionally monolithic for single-nod
 * EP-4 (Space Management & Data Hygiene): typed GC, dedup reachability, quotas, ENOSPC behavior, and scrubbing are implemented and validated for single-node operation
 * EP-5 (Operability & Delivery): implemented and validated for the `0.1.0` single-node JVM 21 preview. Mandatory CI runs the full root gate and generated/source checks before image validation. The tag-driven release workflow enforces SemVer/OCI identity, immutable version/minor/SHA tags, digest recording, persistent-volume container replacement, and live Prometheus-to-Alertmanager delivery before publication. SIGTERM validation covers committed, streaming, multipart, concurrent, cancellation, abort-race, and bounded mixed-load paths. Offline backup/restore and same-node DR validate RTO 30 seconds and RPO as the last completed backup. Typed object manifests use schema `2`; multipart sessions, bucket registry, object configuration, object references, ACL sidecars, and capacity ledgers use schema `1`; all accept documented legacy version `0` and reject unsupported future versions. Live Loki/external paging is deployment integration, sustained/production load belongs to EP-6, and online/multi-node DR belongs to EP-10.
 * EP-6 (Performance & Capacity): implemented and validated for the `0.1.x` single-node safety envelope. S3 routes enforce 256 MiB single/assembled object limits, 64 MiB multipart parts, finite timeout, 16 active requests, 64 TCP connections, and a 100 requests/s token bucket with burst 200. Mandatory 45-second CI load and weekly/manual 15-minute soak run eight deterministic workers under `-Xmx256m`, produce machine-readable evidence, and assert bounded heap, checksums, and idle resources. These gates are not production sizing or competitive benchmarks.
+* EP-7 (Complete Admin Panel): `REQ-ADMIN-001..031` UI/contracts and reproducible packaging are implemented and validated. The phase remains partial because credential/tenant administration and real recovery/GC/scrub/audit/metrics/traces providers are absent; provider routes return truthful HTTP 503 not-configured responses.
 * EP-10 (S3 Cluster, multi-node): after an accepted cluster architecture ADR (EP-8) — membership, quorum, failover, healing, rebalance validated by multi-node scenarios
 
 No production distributed-cluster claims are made until EP-10 is validated end to end; see `PLAN.md` for current status per phase.

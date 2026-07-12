@@ -65,6 +65,19 @@ All cross-cutting concerns (validation, bucket existence checks, CORS, website r
 
 The `S3BucketConfigHandler` uses a registry/strategy pattern to dispatch configuration operations without copypasta. Each config type has a `ConfigStrategy` entry in an internal registry map; adding a new config type requires only one strategy registration. As of the EP-2 metadata durability work, **all bucket configuration families (including ABAC, bucket metadata configuration, bucket metadata-table configuration, object-lock, inventory-table, and journal-table) are modeled as value objects on the `Bucket` aggregate** and persisted through `ReactiveBucketService.updateBucket(...)`. The handler holds no configuration state of its own; in storage-engine mode, every family is durable via `BucketStore`.
 
+=== Reusable Admin UI Strategy (ADR 0026)
+
+[NOTE]
+====
+Status: *implementation-informed*. The Product Shell/Product Extension split and the `REQ-ADMIN-001..031` bounded scope are implemented and validated. EP-7 overall remains partial because credential/tenant administration and real operational report providers are absent.
+====
+
+The reusable **Magrathea Product Shell** provides only the product-neutral frame, navigation/layout, **Design Tokens**, **Shell Primitives**, localization infrastructure, route/extension composition, documentation integration, and common UI states. Product behavior is supplied through explicit **Product Extension** contracts; static boundary and deterministic extension-removal tests enforce the separation.
+
+The **Object Storage Admin Application** is the Product Extension owned by this repository. It owns every Object Storage route, screen, model, permission, endpoint path, API client, and response mapping. Its implemented screens use the **Admin Control Plane** for health/readiness, backend and catalog status, read-only configuration, validation, capacity/quota, and report availability. Object and bucket semantics remain on the **S3 Data Plane**; the optional HeadObject diagnostic calls S3 as an ordinary client and has no storage-engine bypass.
+
+Operational report availability is fail-closed: without a configured recovery, garbage-collection, scrub, audit, metrics, or traces provider, the route returns HTTP 503 `report-provider-not-configured` and the UI renders `not-configured`. This is a truthful contract, not provider implementation.
+
 === Quality Strategy
 
 - **Testability**: domain tested with pure JUnit (no Spring), integration tested with Cucumber BDD, targeted S3 compatibility verified with AWS CLI; the first AWS CLI object CRUD increment passes, but full S3 scenario parity remains open

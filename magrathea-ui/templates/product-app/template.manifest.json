@@ -1,0 +1,9 @@
+{
+  "templateVersion": 1,
+  "shellPackage": "@magrathea/product-shell",
+  "shellVersion": "0.1.0",
+  "copyExcludes": [
+    "dist",
+    "test"
+  ]
+}

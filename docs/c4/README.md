@@ -6,6 +6,12 @@ The canonical C4 workspace for this project is:
 docs/c4/workspace.dsl
 ```
 
+## Current frontend modeling boundary
+
+The C2 model includes the independently built **Object Storage Admin Browser Application** as a browser-runtime container. Its C3 view models the deployable product application, product-neutral Product Shell library, Object Storage Product Extension library, application-owned browser adapters, separate typed Admin API and optional S3 HeadObject clients, and application-owned documentation viewer.
+
+The model does not represent Product Shell or a product extension as separately running C4 containers: they are build-time package boundaries that execute as components in the browser application. It also does not invent operational report providers. The current Admin Control Plane returns explicit provider-not-configured responses when no real recovery, garbage-collection, scrub, audit, metrics, or trace provider is present.
+
 This project uses **Structurizr local** through the official `docker.io/structurizr/structurizr` container image, following the current Structurizr local workflow. The helper scripts are compatible with both **Podman** and **Docker**; Podman is preferred when both are available.
 
 <https://docs.structurizr.com/local/quickstart>

@@ -178,15 +178,15 @@ Done: JaCoCo documented as baseline (Clover optional/legacy); evidence-based `do
 
 Done: S3-only/admin contradiction corrected; storage-engine runtime claims downgraded then re-verified; JaCoCo baseline wording. Remaining: C4 diagram refresh for current routers/admin API; ADR freshness sweep; residual stale links; **`LICENSE` resolved (2026-07-03)** — the MIT `LICENSE` now exists at the repository root together with the licensing ADR (`docs/adr/0019-adopt-the-mit-license.md`), delivered by KA-1; **`docs/api-coverage.md` does not exist (verified 2026-07-02)** despite being referenced here and required by the S3 Semantic Reporting Table Template — the S3-P0 semantic inventory was never completed; closed by the generated-matrix task in the Ancillary S3 API Requirements Backlog.
 
-### H. Web/UI planning
+### H. Web/UI implementation and remaining scope
 
 | Field | Plan |
 |---|---|
-| Owner agent(s) | `documenter` for UI/API plan; `java-infra-coder` for backend contracts; frontend implementation requires the frontend workflow agents |
+| Owner agent(s) | `documenter` for status/API documentation; `java-infra-coder` for backend contracts; frontend workflow agents for `magrathea-ui` implementation |
 | Affected modules/files | `magrathea-ui/**` (planned only), `admin-api-adapter`, Docker frontend/docs packaging |
 | Acceptance gates | Backend admin contract tests pass; UI stays planned until frontend ownership assigned; Docker regenerates frontend/docs assets; docs claim no unimplemented screens |
 
-Done: read-only configuration-as-code Admin API catalogs with non-persistent validation; Dockerfile-driven asset regeneration; Admin UI screen plan delivered (`docs/admin-ui-plan.md`). Remaining: `GET /admin/backend-status` implementation; frontend workflow handoff. Superseded/expanded by EP-7.
+Done: superseded and expanded by the implemented EP-7 bounded slice: Product Shell/Product Extension separation, Object Storage Admin Application, backend status and Admin contracts, and deterministic Docker packaging are validated. Remaining under the authoritative EP-7 scope: credential/tenant administration and real operational report providers.
 
 ### Prioritized roadmap (audit corrections)
 
@@ -284,7 +284,7 @@ This section defines the path from "validated prototype with honest gaps" to an 
 
 - **INV-1 — Reactive-first.** Every new production path must remain reactive/non-blocking end to end: Reactor, bounded memory, no `DataBufferUtils.join` or whole-body materialization, blocking I/O only on `boundedElastic`. Static architecture tests (pattern: `ReactiveUploadStreamingArchitectureTest`) must guard each newly fixed path.
 - **INV-2 — Cucumber-first requirements.** Every EP phase MUST begin by writing/refreshing shared Gherkin requirement features (per AGENTS.md): requirement IDs, functional/non-functional tags, honest status tags, and WebTestClient + AWS CLI (or protocol-appropriate CLI) validation modes reusing the same shared feature text.
-- **INV-3 — Admin panel is a first-class product deliverable.** A COMPLETE admin panel (not just read-only catalogs) is in scope — but it must never become an alternate object API (AGENTS.md B.3).
+- **INV-3 — Admin panel is a first-class product deliverable.** A COMPLETE admin panel (not just read-only catalogs) is in scope — but it must never become an alternate object API (AGENTS.md B.3). The planned UI must separate a reusable, product-neutral **Magrathea Product Shell** from the Object Storage **Product Extension**: Object Storage domain/API logic is forbidden in the shell, and object/bucket semantics remain exclusively on the **S3 Data Plane**.
 - **INV-4 — S3 is the internal core.** Any additional protocol facade (WebDAV, SMB, future protocols) is an optional external adapter that MUST delegate to the same reactive object-store application services (`ReactiveObjectService` and friends) — internally everything remains S3. No facade or internal transport (including gRPC) may talk to the storage engine directly, introduce a parallel persistence path, or become an alternate public object API.
 - **INV-5 — Self-contained by default, Maven-executable.** Every capability that can integrate external infrastructure (Kafka/NATS, Prometheus/Grafana, Elasticsearch, external KMS, LDAP/AD/Kerberos KDC, external CA) MUST ship a simplified built-in backend (embedded event-delivery log, built-in metrics view in the admin panel, file-based audit store, local key store, local CA fallback) so the functionality is fully demonstrable without external infrastructure; external adapters are optional plugins. All gates, validations, and benchmarks must be executable via Maven wherever possible (containerized steps invoked from Maven), supporting air-gapped/offline installation — a hard requirement for the government/military target.
 - **INV-6 — Conditional chunking only.** Chunks are storage artifacts only for multipart uploads, deduplication windows, and erasure-coding stripes/shards. A plain single-object write with multipart, deduplication, and erasure coding all disabled remains one streamed whole-object storage unit; it must not be split, named, reported, reference-counted, or garbage-collected as generic chunks. Manifests, recovery, GC, quotas, metrics, and Admin reports must distinguish whole-object units, multipart parts, dedup chunks, and EC artifacts.
@@ -376,15 +376,19 @@ KA dependencies: KA-2 (Ceph s3-tests requires SigV4), KA-3 (presigned URLs), and
 
 ### EP-7 — Complete Admin Panel (HIGH)
 
-| Field | Plan |
+> **Late implementation status (2026-07-12):** the declared `REQ-ADMIN-001..031` slice is implemented and validated. EP-7 overall remains `@partial` because this authoritative plan also requires credential/tenant administration and real operational report providers, which are absent.
+
+| Field | Plan / Result |
 |---|---|
-| Focus | Builds on `docs/admin-ui-plan.md`. Backend read-only catalogs are done; the UI is absent. Admin API completion: `GET /admin/backend-status` per the planned contract; recovery-scanner reports; GC/space reports from EP-4; audit-log access from EP-1; credential/tenant management from EP-1. Full Vue UI in `magrathea-ui`: dashboard (backend status, health, metrics), storage policies (list/detail/validate), devices, disk sets/topology, recovery/GC reports, observability views, and admin-side S3 diagnostics that CALL the S3 API rather than bypass it. |
-| Owner agents | Java workflow plans contracts (`java-infra-coder`, `documenter`); frontend implementation requires the frontend workflow agents (`frontend-scaffolder`/`core`/`ui`/`app-coder` + `frontend-tester` from the multi-agent base skill). |
-| Requirement feature file | `phase-ep7-admin-panel.feature` |
-| Key requirement IDs | REQ-ADMIN-* (`@admin-api` tags; `Business Need` for user-visible admin capabilities) |
-| Expected outputs | Complete Admin API + complete Vue admin panel per INV-3. |
-| Acceptance gates | Admin API contract tests pass; UI validated by frontend-tester; panel remains admin/config/status only — never an alternate object CRUD API (AGENTS.md B.3). |
-| Status | `@partial` (backend read-only catalogs done; UI `@absent`) |
+| Focus | Reusable **Magrathea Product Shell**, Object Storage **Product Extension**, Admin Control Plane contracts, and S3 diagnostics through the **S3 Data Plane**. The broader phase also calls for credential/tenant administration and real recovery/GC/scrub/audit/metrics/traces reporting. |
+| Architectural boundary | Implemented: the Product Shell owns only product-neutral frame/navigation/layout, Design Tokens, Shell Primitives, localization, extension composition, documentation integration, and common states. Product-specific routes, labels, models, permissions, clients, mappings, and screens belong to Product Extensions. |
+| Implemented UI/contracts | Dashboard health/readiness/backend/catalog evidence; read-only policy/device/disk-set views; non-persistent policy validation; capacity/quota presentation; truthful unavailable report states; optional S3 HeadObject diagnostic through a separately configured S3 client; direct navigation, responsive keyboard operation, localization, accessibility, extension isolation/removal, and reusable product composition. |
+| Plane boundary | Validated: Admin route inventory contains no object/bucket data plane. Object and bucket semantics remain on S3 endpoints; the HeadObject diagnostic has no Admin/storage-engine bypass. |
+| Requirement feature files | `requirements/phase-ep7-admin-panel.feature` and `specs/phase-ep7-product-shell.feature`; all `REQ-ADMIN-001..031` are `@implemented-and-validated`. |
+| Validation evidence | 72/72 Vitest tests; 39/39 Playwright/axe tests (13 at each 360/768/1440 viewport); deterministic extension removal; reproducible dual-product packaging; canonical Docker `frontend-packaging-validation` passed; Admin API Cucumber passed 18 executed scenarios/132 steps for REQ-ADMIN-023..031; focused Maven passed. |
+| Honest provider boundary | Recovery, garbage-collection, scrub, audit, metrics, and traces routes intentionally return HTTP 503 `report-provider-not-configured` with `availability: not-configured` when no provider exists. This validates truthful unavailability, not real providers or operational data. |
+| Remaining authoritative scope | Credential administration, tenant administration, and real recovery/GC/scrub/audit/metrics/traces provider integrations remain absent. |
+| Status | `@partial` overall. The `REQ-ADMIN-001..031` bounded implementation/contract scope is complete and validated, but **EP-7 Complete Admin Panel is not complete under this plan** until the remaining scope is delivered or formally descoped. |
 
 ### EP-8 — Cluster Architecture ADR & Supply Chain (MEDIUM)
 
@@ -478,7 +482,7 @@ Owner rule (2026-07-02): any gRPC used by the SMB/VFS gateway follows the same r
 | 4 | EP-4 Space management & data hygiene | High | `@implemented-and-validated` for declared single-node scope |
 | 5 | EP-5 Operability & delivery | High | `@implemented-and-validated` for the `0.1.0` single-node JVM preview |
 | 6 | EP-6 Performance & capacity | High | `@implemented-and-validated` for declared single-node envelope |
-| 7 | EP-7 Complete admin panel (backend contracts may proceed in parallel with EP-1..EP-6) | High | `@partial` |
+| 7 | EP-7 Complete admin panel | High | `@partial` overall; `REQ-ADMIN-001..031` bounded scope implemented and validated, credential/tenant administration and real report providers absent |
 | 8 | EP-8 HA decision & supply chain | Medium | `@absent` |
 | 9 | EP-10 S3 cluster (multi-node; after the EP-8 ADR is accepted) | High | `@absent` |
 | 10 | EP-11 SMB gateway (optional; after EP-1 and EP-3; independent of EP-10) | Future | `@absent` |
@@ -505,7 +509,7 @@ EP-0 governance applies continuously from the start.
 
 The EP track makes Magrathea production-ready; the KA track makes it the killer app among S3-compatible object stores (MinIO, Ceph RGW, Garage, SeaweedFS). KA phases attach to EP prerequisites and never bypass INV-1..INV-5 or the evidence discipline. All KA capabilities start `@absent` — **no completion claims are made here**. Owner-decided target audiences: enterprise, single user, AND government/military — legacy integration paths are first-class. A second Magrathea-suite project will be PKI; its integration point is planned in the Bounded Context Evolution subsection below.
 
-Market-window note (factual): MinIO removed features from its community console, and its AGPL license creates adoption friction for some organizations; Magrathea's MIT license (KA-1) and complete admin panel (EP-7/INV-3) target that window. Embryonic differentiators already present: YAML policy-driven storage classes; the complete admin panel; the unique WebDAV (EP-9) + SMB (EP-11) gateway combination; executable Gherkin requirements as living compliance evidence.
+Market-window note (factual): MinIO removed features from its community console, and its AGPL license creates adoption friction for some organizations; Magrathea's MIT license (KA-1) and planned complete admin panel (EP-7/INV-3) target that window. Existing foundations include YAML policy-driven storage classes and executable Gherkin requirements as living compliance evidence. The complete Admin Panel, WebDAV (EP-9), and SMB (EP-11) gateway combination remain planned and must not be described as delivered.
 
 ### KA-1 — Positioning & Licensing (IMMEDIATE, low cost)
 
@@ -641,7 +645,7 @@ Chunking stays inside `DedupConfig`, configurable via `StoragePolicy`; one YAML 
 | Storage-engine backend ACL | `object-store-reactive-repository-storage-engine-infrastructure` |
 | Storage engine domain / application / infrastructure | `storage-engine-domain`, `storage-engine-reactive-application`, `storage-engine-reactive-infrastructure` |
 | Runtime assembly | `bootstrap-application`, root `pom.xml` |
-| Admin API / Admin UI | `admin-api-adapter` / `magrathea-ui` (frontend workflow required for UI code) |
+| Admin API / Admin UI | `admin-api-adapter` / `magrathea-ui` (implemented Product Shell, Object Storage Product Extension, and deployable product applications) |
 | Documentation/reports | `README.md`, `PLAN.md`, `docs/**` |
 
 ### Completed corrections (CC-0 .. CC-5)
@@ -672,8 +676,8 @@ Backend selection, mutually exclusive beans, fail-fast on missing config, and S3
 | Field | Open items |
 |---|---|
 | Owner agents | `java-infra-coder` (backend), frontend workflow agents (UI) |
-| Delivered | Read-only `/admin/storage-policies`, `/admin/storage-devices`, `/admin/disk-sets`; non-persistent `POST /admin/storage-policies/validate`; 405 on mutation; Admin UI screen plan (`docs/admin-ui-plan.md`). |
-| Remaining | Implement `GET /admin/backend-status` per the planned contract (selected backend, selecting profile/property, catalog summary, storage roots, recovery-scanner summary); frontend workflow handoff before changing `magrathea-ui`. Superseded/expanded by **EP-7**. |
+| Delivered | EP-7 `REQ-ADMIN-001..031`: reusable Product Shell and extension contracts; Object Storage Admin Application; backend status, health/readiness, read-only catalogs, non-persistent validation, capacity/quota and route inventory; truthful unavailable-provider contracts; optional S3 HeadObject diagnostic; deterministic dual-product Docker packaging. |
+| Remaining | Credential/tenant administration and real recovery/GC/scrub/audit/metrics/traces providers. HTTP 503 `report-provider-not-configured` is the implemented fallback contract, not provider completion. |
 
 ### CC-9 — Cucumber Parity — remaining open items
 
@@ -696,7 +700,7 @@ Phase CC-10 quality gates were completed 2026-06-12 (HEAD `351d088`): `mvn valid
 - [x] Storage-engine backend can be selected at runtime without duplicate repositories. **Qualifier:** full-process restart validation now covers bucket registry, multipart state, legal hold, object lock, retention, object encryption, object restore state, object tags, object ACLs, bucket configuration families, and the combined EP-2 bucket/object-tag/object-ACL/multipart scenario.
 - [x] S3 write/read path works end to end with the selected storage-engine backend for object bytes, manifests, object references, bucket registry, multipart upload state, per-object configuration metadata, object tags, and object ACL metadata. EP-2 is closed for the declared storage-engine durability scope; remaining metadata work moves to later roadmap phases rather than EP-2 closure.
 - [x] Backend Admin API exposes read-only policy/device/disk-set catalogs and non-persistent validation as configuration-as-code.
-- [x] Admin UI plan covers policy/device/disk-set/backend-status screens and awaits frontend workflow ownership (`docs/admin-ui-plan.md`, 2026-07-02).
+- [x] EP-7 `REQ-ADMIN-001..031` UI/contracts implemented and validated; `docs/admin-ui-plan.md` records delivered scope and remaining authoritative backlog (2026-07-12).
 - [ ] AWS CLI Cucumber parity for all canonical scenarios (increments delivered; remainder tracked in CC-9).
 - [x] Documentation reports planned vs completed work accurately.
 
@@ -711,7 +715,7 @@ Phase CC-10 quality gates were completed 2026-06-12 (HEAD `351d088`): `mvn valid
 | Real disk placement | Paths, capacity, health, and failure-domain behavior may diverge from simple tests | Minimum topology modeled; temporary-directory integration tests; document real-disk limitations | `java-domain-coder`, `java-infra-coder` |
 | MinIO semantic ambiguity | `MINIO_STANDARD` interpreted inconsistently | CC-5 fixed the documented semantics; no runtime EC shard placement claims until tested | `java-domain-coder`, `documenter` |
 | AWS CLI environment dependency | CLI tests fail due to missing AWS CLI, credentials, endpoint, or port conflicts | Tagged tests, preflight checks, endpoint overrides, clear skip/failure reporting | `java-tester` |
-| Frontend workflow availability | Vue UI work blocked because current workflow is Java-focused | Backend contracts first; frontend workflow handoff before `magrathea-ui` changes | `documenter`, `java-infra-coder` |
+| Missing EP-7 provider integrations | UI/contracts are validated, but credential/tenant administration and real recovery/GC/scrub/audit/metrics/traces providers are absent | Keep EP-7 `@partial`; preserve truthful 503 not-configured behavior until requirement-first provider integrations exist | `documenter`, `java-infra-coder`, frontend owners |
 | WebDAV scope creep / protocol divergence | Second protocol facade drifts from S3 semantics or grows a parallel persistence path | S3-internal-core invariant **INV-4**; ADR-gated protocol subset at EP-9 start; adapter reviews reject direct storage-engine access | `documenter`, `java-infra-coder` |
 | Admin panel drifting into an alternate object API | Admin API/UI grows object CRUD semantics, violating the storage-engine boundary | AGENTS.md B.3 gate enforced in every EP-7 review; admin-side S3 diagnostics must call the S3 API | `documenter`, `java-infra-coder` |
 | Unauthenticated exposure in default mode | The default profile remains explicitly unsecured/permit-all for trusted environments; secured deployments must enable `s3.security.enabled=true` and provide durable credential/policy/audit/key files | Deployment guidance must state that default unsecured mode is not for untrusted networks; CI keeps secured-mode WebTestClient/AWS CLI gates green | `documenter`, `java-infra-coder` |

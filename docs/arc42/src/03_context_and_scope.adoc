@@ -12,7 +12,7 @@ image::../../c4/images/SystemContext.png[System Context, width=600]
 
 The system context shows:
 - **User**: end user interacting via HTTPS — S3-compatible object API
-- **Operator/Admin UI**: internal actor using `/admin/**` JSON endpoints and static documentation/UI assets
+- **Operator**: internal actor using the Object Storage Admin Browser Application, `/admin/**` JSON endpoints, and bundled documentation assets
 - **Magrathea ObjectStore**: Spring Boot 4 reactive object storage runtime with S3 and admin adapters
 
 === Technical Context

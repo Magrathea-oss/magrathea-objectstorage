@@ -71,7 +71,11 @@ Unsecured mode remains the default trusted-environment behavior and is explicitl
 
 The current runtime mutability decision is configuration-as-code: YAML-backed storage policies, devices, and disk sets are managed outside the running process and exposed as read-only catalog data. `POST /admin/storage-policies/validate` validates a submitted payload and returns structured results without persisting it. Policy mutation requests are rejected at runtime with `405 Method Not Allowed`.
 
-Planned Admin UI screens are policy list/detail/validation report, device list/detail, disk-set/topology overview/detail, and backend/status dashboard. Frontend implementation must be handed off to an appropriate frontend workflow/agent before changing `magrathea-ui`.
+Per ADR 0026, the implemented Admin UI is a reusable, product-neutral **Magrathea Product Shell** plus explicit **Product Extensions**. A **Design Token** is a product-neutral named visual value; a **Shell Primitive** is a reusable product-neutral UI building block. The shell owns frame/navigation/layout, tokens, primitives, localization infrastructure, route/extension composition, documentation integration, and common UI states only.
+
+The **Object Storage Admin Application** is this repository's Product Extension and owns all Object Storage routes, labels, permissions, models, screens, API paths, clients, and response mapping. Implemented views cover health/readiness/backend and catalog evidence, policy validation, devices/topology, capacity/quota, truthful operational-report availability, and the permitted S3 HeadObject diagnostic. The **Admin Control Plane** serves non-S3 administration; object/bucket semantics remain exclusively on the **S3 Data Plane**.
+
+Operational-report provider ports are optional and fail closed. With no recovery, garbage-collection, scrub, audit, metrics, or traces provider configured, HTTP 503 `report-provider-not-configured` is rendered as `not-configured`; no records or healthy defaults are fabricated. Credential/tenant administration is absent. Status: *implementation-informed* for `REQ-ADMIN-001..031`; EP-7 overall remains partial.
 
 === Pluggable S3 API Module
 

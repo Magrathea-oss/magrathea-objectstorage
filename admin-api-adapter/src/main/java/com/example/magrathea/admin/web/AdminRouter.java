@@ -1,5 +1,7 @@
 package com.example.magrathea.admin.web;
 
+import com.example.magrathea.admin.application.port.AdminBackendStatusProvider;
+import com.example.magrathea.admin.application.port.AdminOperationalReportProvider;
 import com.example.magrathea.storageengine.application.port.BucketCapacityPort;
 import com.example.magrathea.storageengine.application.port.DiskSetCatalog;
 import com.example.magrathea.storageengine.application.port.StorageDeviceCatalog;
@@ -39,12 +41,22 @@ public class AdminRouter {
     private final ObjectProvider<StorageDeviceCatalog> storageDeviceCatalog;
     private final ObjectProvider<DiskSetCatalog> diskSetCatalog;
     private final ObjectProvider<BucketCapacityPort> bucketCapacity;
+    private final ObjectProvider<AdminBackendStatusProvider> backendStatusProvider;
+    private final ObjectProvider<AdminOperationalReportProvider> reportProviders;
 
     public AdminRouter(
             ObjectProvider<StoragePolicyCatalog> storagePolicyCatalog,
             ObjectProvider<StorageDeviceCatalog> storageDeviceCatalog,
             ObjectProvider<DiskSetCatalog> diskSetCatalog) {
-        this(storagePolicyCatalog, storageDeviceCatalog, diskSetCatalog, null);
+        this(storagePolicyCatalog, storageDeviceCatalog, diskSetCatalog, null, null, null);
+    }
+
+    public AdminRouter(
+            ObjectProvider<StoragePolicyCatalog> storagePolicyCatalog,
+            ObjectProvider<StorageDeviceCatalog> storageDeviceCatalog,
+            ObjectProvider<DiskSetCatalog> diskSetCatalog,
+            ObjectProvider<BucketCapacityPort> bucketCapacity) {
+        this(storagePolicyCatalog, storageDeviceCatalog, diskSetCatalog, bucketCapacity, null, null);
     }
 
     @Autowired
@@ -52,11 +64,15 @@ public class AdminRouter {
             ObjectProvider<StoragePolicyCatalog> storagePolicyCatalog,
             ObjectProvider<StorageDeviceCatalog> storageDeviceCatalog,
             ObjectProvider<DiskSetCatalog> diskSetCatalog,
-            ObjectProvider<BucketCapacityPort> bucketCapacity) {
+            ObjectProvider<BucketCapacityPort> bucketCapacity,
+            ObjectProvider<AdminBackendStatusProvider> backendStatusProvider,
+            ObjectProvider<AdminOperationalReportProvider> reportProviders) {
         this.storagePolicyCatalog = storagePolicyCatalog;
         this.storageDeviceCatalog = storageDeviceCatalog;
         this.diskSetCatalog = diskSetCatalog;
         this.bucketCapacity = bucketCapacity;
+        this.backendStatusProvider = backendStatusProvider;
+        this.reportProviders = reportProviders;
     }
 
     @Bean
@@ -64,6 +80,7 @@ public class AdminRouter {
         return route(GET("/admin/health"), this::health)
             .andRoute(GET("/admin/live"), this::live)
             .andRoute(GET("/admin/ready"), this::ready)
+            .andRoute(GET("/admin/backend-status"), this::backendStatus)
             .andRoute(GET("/admin/storage-policies"), this::listStoragePolicies)
             .andRoute(GET("/admin/storage-policies/{id}"), this::getStoragePolicy)
             .andRoute(POST("/admin/storage-policies/validate"), this::validateStoragePolicy)
@@ -75,7 +92,67 @@ public class AdminRouter {
             .andRoute(GET("/admin/disk-sets"), this::listDiskSets)
             .andRoute(GET("/admin/disk-sets/{id}"), this::getDiskSet)
             .andRoute(PUT("/admin/buckets/{bucket}/quota"), this::configureBucketQuota)
-            .andRoute(GET("/admin/buckets/{bucket}/capacity"), this::getBucketCapacity);
+            .andRoute(GET("/admin/buckets/{bucket}/capacity"), this::getBucketCapacity)
+            .andRoute(GET("/admin/reports/recovery"), request -> operationalReport(request, "recovery"))
+            .andRoute(GET("/admin/reports/garbage-collection"), request -> operationalReport(request, "garbage-collection"))
+            .andRoute(GET("/admin/reports/scrub"), request -> operationalReport(request, "scrub"))
+            .andRoute(GET("/admin/reports/audit"), request -> operationalReport(request, "audit"))
+            .andRoute(GET("/admin/reports/metrics"), request -> operationalReport(request, "metrics"))
+            .andRoute(GET("/admin/reports/traces"), request -> operationalReport(request, "traces"));
+    }
+
+    /** The production Admin Control Plane route boundary, grouped by path family. */
+    public static List<AdminRoute> routeInventory() {
+        return List.of(
+            new AdminRoute("GET", "/admin/health", "API metadata"),
+            new AdminRoute("GET", "/admin/live", "liveness"),
+            new AdminRoute("GET", "/admin/ready", "readiness"),
+            new AdminRoute("GET", "/admin/backend-status", "backend and configuration status"),
+            new AdminRoute("GET, POST", "/admin/storage-policies", "read catalog or reject mutation"),
+            new AdminRoute("GET, PUT, DELETE", "/admin/storage-policies/{id}", "read catalog item or reject mutation"),
+            new AdminRoute("POST", "/admin/storage-policies/validate", "non-persistent validation"),
+            new AdminRoute("GET", "/admin/storage-devices", "read device catalog"),
+            new AdminRoute("GET", "/admin/storage-devices/{id}", "read device catalog item"),
+            new AdminRoute("GET", "/admin/disk-sets", "read disk-set catalog"),
+            new AdminRoute("GET", "/admin/disk-sets/{id}", "read disk-set catalog item"),
+            new AdminRoute("GET", "/admin/buckets/{bucket}/capacity", "capacity accounting"),
+            new AdminRoute("PUT", "/admin/buckets/{bucket}/quota", "quota administration"),
+            new AdminRoute("GET", "/admin/reports/recovery", "recovery report or unavailable"),
+            new AdminRoute("GET", "/admin/reports/garbage-collection", "GC report or unavailable"),
+            new AdminRoute("GET", "/admin/reports/scrub", "scrub report or unavailable"),
+            new AdminRoute("GET", "/admin/reports/audit", "audit report or unavailable"),
+            new AdminRoute("GET", "/admin/reports/metrics", "metrics report or unavailable"),
+            new AdminRoute("GET", "/admin/reports/traces", "trace report or unavailable"));
+    }
+
+    private Mono<ServerResponse> backendStatus(ServerRequest request) {
+        AdminBackendStatusProvider provider = backendStatusProvider == null
+            ? null : backendStatusProvider.getIfAvailable();
+        if (provider == null) {
+            return ServerResponse.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(errorBody("backend-status-provider-not-configured",
+                    "Backend status provider is not configured", request.path(), adminLinks()));
+        }
+        return provider.backendStatus().flatMap(this::ok);
+    }
+
+    private Mono<ServerResponse> operationalReport(ServerRequest request, String reportType) {
+        AdminOperationalReportProvider provider = reportProviders == null ? null
+            : reportProviders.orderedStream()
+                .filter(candidate -> reportType.equals(candidate.reportType()))
+                .findFirst()
+                .orElse(null);
+        if (provider == null) {
+            return ServerResponse.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(errorBody("report-provider-not-configured",
+                    "No real operational report provider is configured for " + reportType,
+                    request.path(),
+                    Map.of("reportType", reportType, "availability", "not-configured"),
+                    adminLinks()));
+        }
+        return provider.report().flatMap(this::ok);
     }
 
     private Mono<ServerResponse> health(ServerRequest request) {
@@ -402,6 +479,7 @@ public class AdminRouter {
             "self", link("/admin/health"),
             "live", link("/admin/live"),
             "ready", link("/admin/ready"),
+            "backendStatus", link("/admin/backend-status"),
             "policies", link("/admin/storage-policies"),
             "devices", link("/admin/storage-devices"),
             "diskSets", link("/admin/disk-sets"),
@@ -477,6 +555,8 @@ public class AdminRouter {
     private static String safeMessage(Throwable error) {
         return error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();
     }
+
+    public record AdminRoute(String methods, String pathPattern, String purpose) { }
 
     record BucketQuotaCommand(long quotaBytes) { }
 

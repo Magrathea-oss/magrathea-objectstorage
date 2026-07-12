@@ -129,7 +129,7 @@ As of the EP-2 metadata durability work, every family below is a value object on
 
 === Scenario 6c — Admin Configuration-as-Code Catalog API
 
-**Description:** Operators and the future Admin UI use `/admin/**` JSON endpoints to inspect YAML-backed storage policies, storage devices, and disk-set/topology catalogs. These endpoints are separate from the public S3 object API and are read-only at runtime.
+**Description:** Operators and the implemented Object Storage Admin Application use `/admin/**` JSON endpoints to inspect health/readiness, backend status, YAML-backed catalogs, capacity/quota, and operational-report availability. These endpoints are separate from the public S3 object API; catalogs remain read-only at runtime.
 
 **Flow:**
 1. Operator/Admin UI → admin-api-adapter: `GET /admin/health` to discover admin links and confirm configuration-as-code mode.
@@ -139,9 +139,11 @@ As of the EP-2 metadata durability work, every family below is a value object on
 5. Optional validation: `POST /admin/storage-policies/validate` parses the submitted policy payload and returns `{valid, errors, policy}` without writing YAML files or changing active runtime state.
 6. Runtime mutation requests such as `POST /admin/storage-policies`, `PUT /admin/storage-policies/{id}`, and `DELETE /admin/storage-policies/{id}` return `405 Method Not Allowed` with an `admin-catalog-read-only` error.
 
-**Verification:** `mvn -B -pl admin-api-adapter -am test` completed with 9 tests, 0 failures, and build success for read-only catalog behavior, validation responses, and error semantics.
+**Verification:** `PhaseEp7AdminApiRequirementsCucumberTest` passed 18 executed scenarios / 132 steps for `REQ-ADMIN-023..031`; 17 other scenarios were excluded by its Admin API tag filter.
 
-**UI planning boundary:** Planned Vue screens are policy list/detail/validation, device list/detail, disk-set/topology, and backend/status. Frontend implementation requires a frontend workflow/agent before changing `magrathea-ui`.
+**Implemented browser boundary (ADR 0026):** The runtime composition is Product Shell → Object Storage Product Extension, with application-owned browser adapters. Product screens call the Admin Control Plane for non-S3 administration. An optional HeadObject diagnostic calls the separately configured S3 Data Plane client and has no Admin/storage-engine bypass. Playwright/axe passed 39/39 tests across 360/768/1440-pixel Chromium viewports.
+
+**Unavailable-provider flow:** UI → typed Admin client → operational report route → optional provider port. If no provider is configured, the route returns HTTP 503 `report-provider-not-configured` with `availability: not-configured`, and the UI renders an unavailable state without fabricated records.
 
 === Scenario 7 — Reactive Chain Pattern
 

@@ -1,22 +1,55 @@
 {
-  "name": "magrathea-ui",
+  "name": "magrathea-ui-workspace",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "templates/*"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
+    "dev": "npm run build --workspace @magrathea/product-shell && npm run build --workspace @magrathea/object-storage-extension && npm run dev --workspace @magrathea/object-storage-admin",
+    "build": "npm run build:products",
+    "build:products": "node scripts/build-products.mjs",
+    "build:example": "npm run build:products",
+    "build:template": "npm run build --workspace @magrathea/product-app-template",
+    "test": "vitest run",
+    "test:component": "vitest run --project component",
+    "test:accessibility": "vitest run --project accessibility",
+    "test:e2e": "npm run build && playwright test",
+    "test:e2e:ci": "npm run build && playwright test",
+    "test:e2e:ui": "npm run build && playwright test --ui",
+    "test:e2e:runner": "playwright test",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint apps packages templates scripts e2e playwright.config.ts --max-warnings=0",
+    "validate:template": "node scripts/validate-template.mjs",
+    "validate:extension-removal": "node scripts/validate-extension-removal.mjs",
+    "validate": "npm run lint && npm run typecheck && npm run test && npm run validate:template && npm run build && npm run validate:extension-removal",
+    "validate:reproducible-packaging": "../scripts/validate-frontend-packaging.sh",
+    "clean": "node scripts/clean.mjs",
+    "preview": "npm run preview --workspace @magrathea/object-storage-admin",
+    "preview:e2e": "vite preview --config apps/object-storage-admin/vite.config.js --host 127.0.0.1 --port 4173 --strictPort",
     "docs": "node scripts/convert-docs.cjs"
   },
-  "dependencies": {
-    "vue": "^3.5.34",
-    "vue-i18n": "^10.0.8",
-    "vue-router": "^4.6.4"
-  },
   "devDependencies": {
-    "@asciidoctor/core": "^3.0.0",
-    "@vitejs/plugin-vue": "^6.0.6",
-    "vite": "^8.0.12"
+    "@asciidoctor/core": "^3.0.4",
+    "@axe-core/playwright": "^4.12.1",
+    "@eslint/js": "^9.31.0",
+    "@playwright/test": "^1.61.1",
+    "@types/node": "^24.1.0",
+    "@vitejs/plugin-vue": "^6.0.1",
+    "@vue/test-utils": "^2.4.6",
+    "axe-core": "^4.10.3",
+    "eslint": "^9.31.0",
+    "eslint-plugin-vue": "^10.3.0",
+    "globals": "^16.3.0",
+    "jsdom": "^26.1.0",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.38.0",
+    "vite": "^7.0.6",
+    "vitest": "^3.2.4",
+    "vue-eslint-parser": "^10.2.0",
+    "vue-tsc": "^3.0.4"
   }
 }

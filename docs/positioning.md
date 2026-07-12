@@ -21,7 +21,7 @@
 | Dimension | MinIO | Magrathea |
 |---|---|---|
 | License | AGPL / proprietary | **MIT** — no adoption friction, no viral copyleft concerns |
-| Admin console | Community console feature-gated / removed; enterprise console requires subscription | **Complete admin panel in scope (EP-7)** — full dashboard, storage policy/device/disk-set management, recovery/GC reports, observability views. Not an alternate object API (INV-3). |
+| Admin console | Community console feature-gated / removed; enterprise console requires subscription | **EP-7 bounded UI/contracts delivered; overall partial** — Product Shell and Object Storage admin views are validated, but credential/tenant administration and real recovery/GC/scrub/audit/metrics/traces providers are absent. Not an alternate object API (INV-3). |
 | Policy model | JSON / bucket-policy based | **YAML policy-driven storage classes** — `StoragePolicy` / `EffectiveStoragePolicy` with deterministic chunk/dedup/EC/compression/encryption plans; configuration-as-code YAML catalogs |
 | Protocol gateways | Gateway mode (S3 → other S3); no WebDAV/SMB | **WebDAV adapter (EP-9) + SMB/VFS gateway (EP-11)** — legacy application compatibility for government/military |
 | Requirements as compliance | — | **Executable Gherkin requirements as living compliance evidence** — each requirement scenario carries status tags, validation modes, and observable outcomes; ARC42 appendix generated from shared features |
@@ -34,7 +34,7 @@
 |---|---|---|
 | Architecture | Multi-service, multi-daemon; requires Ceph cluster (MON/OSD/MGR/RGW) | **Single-process Spring Boot WebFlux application** — two backends (in-memory / storage-engine filesystem), selectable at runtime |
 | Complexity | High — requires Ceph cluster expertise, heavyweight deployment | **Low** — one JAR, one config, no external daemons; YAML-based configuration-as-code |
-| Admin surface | CLI (`radosgw-admin`) + limited dashboard | **Full admin API + planned Vue panel (EP-7)** — REST JSON API for policies/devices/disk-sets/backend-status |
+| Admin surface | CLI (`radosgw-admin`) + limited dashboard | **Validated Vue/admin contract slice (EP-7)** — policies/devices/disk-sets/backend/capacity and truthful provider availability; broader phase remains partial |
 | Protocol gateways | NFS Ganesha (NFS→RGW) | **WebDAV + SMB gateway planned** — broader legacy protocol coverage |
 | License | LGPL / proprietary | MIT |
 | S3 conformance | High | Planned (KA-2) |
@@ -45,7 +45,7 @@
 |---|---|---|
 | Architecture | Rust, single-binary, multi-node cluster by design | **Java/Spring WebFlux** — multi-node planned (EP-10), but cluster is an evolution not the starting assumption |
 | License | AGPL | MIT |
-| Admin UI | Web dashboard included | Planned Vue panel (EP-7) |
+| Admin UI | Web dashboard included | Validated EP-7 bounded UI/contracts; broader provider/admin backlog remains |
 | Protocol support | S3 + WebDAV | S3 + planned WebDAV + planned SMB |
 | Single binary | Yes (Rust) | Planned (KA-5) |
 | S3 conformance | High (tested against s3-tests) | Planned (KA-2) |
@@ -56,7 +56,7 @@
 |---|---|---|
 | License | MIT | MIT |
 | Architecture | Go, multi-volume server; FUSE mount, S3 API via Filer | **Java/Spring WebFlux** — no FUSE; S3-native; planned WebDAV + SMB for legacy access |
-| Admin UI | Web UI via Filer | Planned Vue panel (EP-7) |
+| Admin UI | Web UI via Filer | Validated EP-7 bounded UI/contracts; broader provider/admin backlog remains |
 | S3 conformance | Moderate | Planned (KA-2) |
 | Ecosystem | S3 + FUSE + Cloud Drive (HDFS-style) | S3-native; legacy protocol bridges via WebDAV/SMB |
 
@@ -66,7 +66,7 @@
 
 1. **YAML policy-driven storage classes** — `StoragePolicy` as a first-class domain concept with deterministic `StepPlan` (DEDUP→COMPRESS→CRYPT→ERASURE_CODING→REPLICATION→STORE). Configuration-as-code YAML catalogs for policies, devices, disk sets/topology. No JSON bucket-policy-only lock-in.
 
-2. **Complete admin panel** — Backend read-only catalog APIs delivered; full Vue UI planned (EP-7). Not an alternate object API (AGENTS.md B.3). Contrasts with MinIO's community console feature-gating.
+2. **Admin panel architecture and validated bounded slice** — Product-neutral shell, Object Storage extension, Admin contracts, accessibility, and reproducible packaging are delivered for REQ-ADMIN-001..031. EP-7 remains partial because credential/tenant administration and real operational report providers are absent. Not an alternate object API (AGENTS.md B.3).
 
 3. **WebDAV + SMB gateway combination** — Two optional protocol adapters for legacy application compatibility (government/military target). WebDAV planned as EP-9; SMB/VFS as EP-11. Both delegate to the same reactive S3 services (INV-4).
 

@@ -21,6 +21,8 @@ bootstrap-application/src/main/resources/static/docs/
 bootstrap-application/src/main/resources/static/index.html
 bootstrap-application/src/main/resources/static/favicon.svg
 bootstrap-application/src/main/resources/static/icons.svg
+bootstrap-application/src/main/resources/static/_redirects
+bootstrap-application/src/main/resources/static/product-manifest.json
 
 # Compiled classes and generated JAR metadata accidentally emitted at the repository root.
 # Do not broaden this to source resource META-INF directories.

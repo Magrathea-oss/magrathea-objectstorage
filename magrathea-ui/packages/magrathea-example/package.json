@@ -1,0 +1,30 @@
+{
+  "name": "@magrathea/magrathea-example",
+  "version": "0.1.0",
+  "description": "Minimal product-neutral extension composition fixture",
+  "private": true,
+  "type": "module",
+  "files": ["dist"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "vite build && vue-tsc -p tsconfig.build.json",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "@magrathea/product-shell": "0.1.0"
+  },
+  "peerDependencies": {
+    "vue": "^3.5.0",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "vue": "^3.5.18",
+    "vue-router": "^4.5.1"
+  },
+  "license": "MIT"
+}

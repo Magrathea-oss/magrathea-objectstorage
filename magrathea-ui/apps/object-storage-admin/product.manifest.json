@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "productId": "object-storage",
+  "applicationPackage": "@magrathea/object-storage-admin",
+  "shellPackage": "@magrathea/product-shell",
+  "extensionRegistrations": ["@magrathea/object-storage-extension"],
+  "routes": [
+    "/admin",
+    "/admin/backend-status",
+    "/admin/storage-policies",
+    "/admin/storage-policies/validate",
+    "/admin/storage-policies/:id",
+    "/admin/storage-devices",
+    "/admin/storage-devices/:id",
+    "/admin/disk-sets",
+    "/admin/disk-sets/:id",
+    "/admin/capacity",
+    "/admin/capacity/:bucket",
+    "/admin/data-hygiene",
+    "/admin/observability",
+    "/admin/s3-diagnostics",
+    "/admin/docs",
+    "/admin/docs/arc42",
+    "/admin/docs/test-report",
+    "/admin/docs/adr/:id"
+  ],
+  "localization": [
+    { "locale": "en", "namespace": "objectStorage" },
+    { "locale": "de", "namespace": "objectStorage" },
+    { "locale": "es", "namespace": "objectStorage" },
+    { "locale": "it", "namespace": "objectStorage" },
+    { "locale": "zh-CN", "namespace": "objectStorage" }
+  ]
+}

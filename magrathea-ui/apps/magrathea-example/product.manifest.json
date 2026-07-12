@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "productId": "magrathea-example",
+  "applicationPackage": "@magrathea/magrathea-example-app",
+  "shellPackage": "@magrathea/product-shell",
+  "extensionRegistrations": ["@magrathea/magrathea-example"],
+  "routes": ["/example/status"],
+  "localization": [
+    { "locale": "en", "namespace": "example" }
+  ]
+}

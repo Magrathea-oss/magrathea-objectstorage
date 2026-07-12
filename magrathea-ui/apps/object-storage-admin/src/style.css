@@ -1,0 +1,30 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color-scheme: light;
+  --bg-primary: var(--shell-surface-canvas);
+  --bg-secondary: var(--shell-surface-raised);
+  --bg-card: var(--shell-surface);
+  --bg-card-hover: var(--shell-brand-soft);
+  --border-glass: var(--shell-border);
+  --text-primary: var(--shell-text);
+  --text-secondary: var(--shell-text-muted);
+  --text-muted: var(--shell-text-muted);
+  --accent: var(--shell-brand);
+  --accent-teal: var(--shell-info);
+  --danger: var(--shell-danger);
+}
+
+* { box-sizing: border-box; }
+html { min-width: 20rem; background: var(--shell-surface-canvas); }
+body { min-width: 20rem; min-height: 100vh; margin: 0; color: var(--shell-text); background: var(--shell-surface-canvas); }
+button, input, select, textarea { font: inherit; }
+button, a { touch-action: manipulation; }
+:focus-visible { outline: 3px solid var(--shell-focus); outline-offset: 3px; }
+
+.docs-viewer { min-width: 0; }
+.docs-content, .docs-table-wrapper, .docs-tabs { max-width: 100%; overflow-x: auto; }
+.docs-content a { color: var(--shell-brand); }
+@media (max-width: 30rem) {
+  .docs-viewer { padding: 0 !important; }
+  .docs-tabs { display: grid !important; grid-template-columns: 1fr 1fr; }
+}

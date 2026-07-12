@@ -1,0 +1,2 @@
+# Static hosts that support Netlify-style redirects serve the SPA for direct routes.
+/* /index.html 200

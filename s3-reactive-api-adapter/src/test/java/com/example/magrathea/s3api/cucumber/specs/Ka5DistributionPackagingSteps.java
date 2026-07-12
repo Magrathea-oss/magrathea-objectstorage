@@ -65,8 +65,18 @@ public class Ka5DistributionPackagingSteps {
     @Given("distribution source path {string} defines the root JVM Docker image")
     public void distributionSourcePathDefinesRootJvmDockerImage(String relativePath) throws IOException {
         inspect(relativePath);
-        assertTrue(inspectedSource.contains("FROM public.ecr.aws/docker/library/maven:3.9-eclipse-temurin-21 AS builder"),
-            "Root Dockerfile should have Maven/JDK builder stage from the public ECR Docker Hub mirror");
+        int buildBase = inspectedSource.indexOf(
+            "FROM public.ecr.aws/docker/library/maven:3.9-eclipse-temurin-21 AS build-base");
+        int frontendValidation = inspectedSource.indexOf(
+            "FROM build-base AS frontend-packaging-validation");
+        int builder = inspectedSource.indexOf(
+            "FROM frontend-packaging-validation AS builder");
+        assertTrue(buildBase >= 0,
+            "Root Dockerfile should have a public-ECR Maven/JDK build-base stage");
+        assertTrue(frontendValidation > buildBase,
+            "Root Dockerfile should derive deterministic frontend validation from the Maven/JDK build-base stage");
+        assertTrue(builder > frontendValidation,
+            "Root Dockerfile should derive the final builder from the deterministic frontend validation stage");
         assertTrue(inspectedSource.contains("FROM public.ecr.aws/docker/library/eclipse-temurin:21-jre"),
             "Root Dockerfile should have JRE runtime stage from the public ECR Docker Hub mirror");
     }

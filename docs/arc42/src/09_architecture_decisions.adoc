@@ -84,4 +84,32 @@ All architectural decisions are documented as Architecture Decision Records (ADR
 |link:../../adr/0019-adopt-the-mit-license.md[0019]
 |Adopt the MIT license (Killer-App Track KA-1)
 |✅ Accepted
+
+|link:../../adr/0020-requirements-specs-folder-separation.md[0020]
+|Requirements vs Specs folder separation in Cucumber features
+|✅ Accepted
+
+|link:../../adr/0021-migrate-legacy-feature-folders.md[0021]
+|Migrate legacy feature folders into the requirements/specs structure
+|✅ Accepted
+
+|link:../../adr/0022-complete-s3-solution-roadmap.md[0022]
+|Complete S3 Solution Roadmap
+|Proposed
+
+|link:../../adr/0023-reactive-spring-security-for-s3-security.md[0023]
+|Reactive Spring Security for S3 Security
+|✅ Accepted
+
+|link:../../adr/0024-native-image-and-alpine-runtime-packaging.md[0024]
+|Native image and Alpine runtime packaging
+|✅ Accepted for first slice
+
+|link:../../adr/0025-conditional-chunking-and-storage-artifact-taxonomy.md[0025]
+|Conditional chunking and storage-artifact taxonomy
+|✅ Accepted
+
+|link:../../adr/0026-magrathea-product-shell-and-product-extension-contracts.md[0026]
+|Magrathea Product Shell and Product Extension contracts
+|✅ Accepted — implemented and validated for REQ-ADMIN-001..031
 |===

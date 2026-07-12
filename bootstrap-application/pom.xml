@@ -161,7 +161,7 @@
                             <workingDirectory>${project.basedir}/../magrathea-ui</workingDirectory>
                             <executable>npm</executable>
                             <arguments>
-                                <argument>install</argument>
+                                <argument>ci</argument>
                             </arguments>
                         </configuration>
                     </execution>
@@ -314,7 +314,7 @@
                             <target name="copy frontend dist">
                                 <mkdir dir="${project.basedir}/src/main/resources/static"/>
                                 <copy todir="${project.basedir}/src/main/resources/static" overwrite="true" preservelastmodified="true">
-                                    <fileset dir="${project.basedir}/../magrathea-ui/dist">
+                                    <fileset dir="${project.basedir}/../magrathea-ui/dist/object-storage">
                                         <include name="**/*"/>
                                     </fileset>
                                 </copy>

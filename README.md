@@ -20,7 +20,7 @@
 
 ## Features
 
-- **S3 object API + admin API** — the S3 REST API is the public object interface; `admin-api-adapter` provides `/admin/**` configuration-as-code catalog APIs separate from the S3 surface
+- **S3 data plane + Admin control plane** — the S3 REST API is the exclusive object interface; `admin-api-adapter` provides separate `/admin/**` health, status, configuration-as-code catalog, validation, capacity/quota, route-inventory, and truthful report-availability contracts
 - **S3 semantic coverage** — the generated [`docs/api-coverage.md`](docs/api-coverage.md) matrix currently finds 108/111 official operations with router-handler mappings, but only **20/111** with explicit operation-linked `@implemented-and-validated` evidence; **91/111 remain ineligible for a 100% completion claim** pending implementation or stronger classification/evidence. Route presence is not completion evidence.
 - **Pluggable S3 API** — auto-configured when `s3-reactive-api-adapter` is on the classpath; disabled with `s3.api.enabled=false`
 - **Spring Boot 4 WebFlux** — functional RouterFunction endpoints
@@ -36,7 +36,7 @@
 | Module | Responsibility | Notes |
 |---|---|---|
 | `s3-reactive-api-adapter` | Pluggable AWS S3 HTTP adapter | Auto-configuration, RouterFunction, XML responses, Cucumber tests |
-| `admin-api-adapter` | Internal/admin HTTP adapter | `/admin/**` JSON API for read-only storage policy/device/disk-set catalogs and non-persistent policy validation; separate from S3 object API |
+| `admin-api-adapter` | Internal/admin HTTP adapter | `/admin/**` JSON API for health/readiness, backend/catalog status, read-only catalogs, non-persistent validation, capacity/quota, route inventory, and report-provider availability; separate from S3 object API |
 | `object-store-domain` | S3 domain model | Zero framework dependencies |
 | `object-store-reactive-repository-application` | Reactive CQS repository interfaces | Bucket, object, and multipart command/query ports |
 | `object-store-reactive-application` | Reactive application services and DTOs | Native Mono/Flux service APIs |
@@ -84,15 +84,16 @@ EC differentiates DedupDevice; replication does not.
 
 ### Admin API (configuration-as-code)
 
-The Admin API is an internal/operator JSON API under `/admin/**`. It is **not** part of the AWS S3 object API and must not be counted in S3 semantic coverage.
+The Admin API is an internal/operator JSON API under `/admin/**`. It is **not** part of the AWS S3 object API and must not be counted in S3 semantic coverage. Its validated route inventory contains no object or bucket data-plane operations.
 
-Current runtime mutability decision: storage policies, storage devices, and disk sets/topology are YAML-backed **configuration-as-code**. The runtime exposes read-only catalog views. Policy validation is non-persistent: it validates a submitted JSON policy shape and returns structured results without writing YAML or changing active runtime state.
+Current runtime mutability decision: storage policies, storage devices, and disk sets/topology are YAML-backed **configuration-as-code**. The runtime exposes read-only catalog views. Policy validation is non-persistent: it validates a submitted JSON policy shape and returns structured results without writing YAML or changing active runtime state. Backend/status and capacity/quota contracts are implemented. Operational report endpoints expose availability, but no real recovery, GC, scrub, audit, metrics, or traces provider is configured; they therefore return typed HTTP 503 not-configured responses.
 
 | Endpoint | Purpose | Runtime mutability |
 |---|---|---|
 | `GET /admin/health` | Admin API health and links | Read-only |
 | `GET /admin/live` | Liveness probe for the Admin API process | Read-only |
 | `GET /admin/ready` | Readiness probe for configured storage-policy, storage-device, and disk-set catalogs | Read-only |
+| `GET /admin/backend-status` | Selected backend, profile/property evidence, catalog sources/counts, and storage roots | Read-only |
 | `GET /admin/storage-policies` | List configured storage policies | Read-only YAML catalog |
 | `GET /admin/storage-policies/{id}` | Read one storage policy | Read-only YAML catalog |
 | `POST /admin/storage-policies/validate` | Validate a policy payload | Non-persistent validation only |
@@ -103,10 +104,14 @@ Current runtime mutability decision: storage policies, storage devices, and disk
 | `GET /admin/storage-devices/{id}` | Read one storage device | Read-only YAML catalog |
 | `GET /admin/disk-sets` | List configured disk sets/topology groups | Read-only YAML catalog |
 | `GET /admin/disk-sets/{id}` | Read one disk set/topology group | Read-only YAML catalog |
+| `GET /admin/buckets/{bucket}/capacity` | Read logical capacity/quota accounting | Read-only administrative accounting |
+| `GET /admin/reports/{recovery\|garbage-collection\|scrub\|audit\|metrics\|traces}` | Read an operational report only when a real provider is configured | HTTP 503 `report-provider-not-configured` when absent |
 
-### Admin UI plan
+### Admin UI and Product Shell
 
-Planned Vue screens are policy list/detail/validation report, device list/detail, disk-set/topology overview/detail, and backend/status dashboard. Frontend implementation requires an appropriate frontend workflow/agent before changing `magrathea-ui`; the current Java workflow only documents the plan and backend contracts.
+EP-7 implements a product-neutral `@magrathea/product-shell`, an explicit Product Extension contract, the Object Storage extension/application, an independent example product, and a reusable product template. The validated UI covers health/readiness/backend status, read-only policy/device/disk-set catalogs, non-persistent policy validation, capacity/quota, truthful unavailable operational-report states, and an optional S3 HeadObject diagnostic through the S3 Data Plane.
+
+The bounded `REQ-ADMIN-001..031` scope is implemented and validated: **72/72 Vitest** tests and **39/39 Playwright/axe** tests across Chromium widths **360/768/1440**, plus deterministic extension removal, reproducible dual-product packaging, canonical Docker frontend-packaging validation, and **18 Admin API Cucumber scenarios / 132 steps**. EP-7 overall remains partial under [`PLAN.md`](PLAN.md): credential/tenant administration and real recovery, GC, scrub, audit, metrics, and traces providers are absent. Without providers, those routes intentionally return `503 report-provider-not-configured`; this is not real operational data.
 
 ### Container build, native image and generated static assets
 
@@ -115,6 +120,10 @@ Generated bootstrap static resources are not expected to be committed or copied 
 The canonical JVM container path is:
 
 ```bash
+# deterministic dual-product + documentation packaging gate
+docker build --network=host --target frontend-packaging-validation \
+  -t magrathea-frontend-packaging-validation:local .
+
 docker build --network=host -f Dockerfile -t magrathea-objectstorage:jvm .
 docker run --rm --network=host magrathea-objectstorage:jvm
 
@@ -191,7 +200,9 @@ aws --endpoint-url http://localhost:8080 s3api get-object --bucket test-bucket -
 | 1 | All unit + integration tests | `mvn test` |
 | 2 | Domain JUnit only | `mvn test -pl object-store-domain` |
 | 3 | S3 API Cucumber only | `mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false` (latest evidence: 248 tests, 0 failures/errors/skips) |
-| 3b | Admin API adapter tests | `mvn -B -pl admin-api-adapter -am test` |
+| 3b | EP-7 Admin API Cucumber | `mvn -B -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false -Dtest=PhaseEp7AdminApiRequirementsCucumberTest test` (18 scenarios / 132 steps passed) |
+| 3c | Frontend unit/component/accessibility | `cd magrathea-ui && npm test` (72/72 passed) |
+| 3d | Real-browser Playwright/axe | `cd magrathea-ui && npm run test:e2e:ci` (39/39 at 360/768/1440 passed) |
 | 4 | JaCoCo coverage (current baseline) | `mvn verify` (JaCoCo runs automatically with the default lifecycle) |
 | 4b | Clover coverage (optional/legacy) | `mvn -Pcoverage clover:setup test clover:aggregate clover:clover` |
 | 5 | AWS CLI compatibility | `bash test-aws-cli.sh` |
@@ -284,6 +295,7 @@ Phases A–F route mapping is recorded in [ADR 0012](docs/adr/0012-phase-f-advan
 | Positioning & competitive analysis | [`docs/positioning.md`](docs/positioning.md) |
 | Public roadmap | [`docs/roadmap.md`](docs/roadmap.md) |
 | Release policy | [`docs/release-policy.md`](docs/release-policy.md) |
+| EP-7 Admin UI implemented scope/backlog | [`docs/admin-ui-plan.md`](docs/admin-ui-plan.md) |
 | JVM container replacement runbook | [`docs/runbooks/container-replacement.md`](docs/runbooks/container-replacement.md) |
 | Performance and capacity validation | [`docs/runbooks/performance-capacity.md`](docs/runbooks/performance-capacity.md) |
 | ARC42 architecture docs | [`docs/arc42/`](docs/arc42/) |

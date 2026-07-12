@@ -1,0 +1,92 @@
+@layer magrathea-reset, magrathea-tokens, magrathea-components;
+
+@layer magrathea-tokens {
+  :root {
+    color-scheme: light;
+    --shell-brand-strong: #173b3f;
+    --shell-brand: #0f6564;
+    --shell-brand-accent: #d17a22;
+    --shell-brand-soft: #dcefed;
+    --shell-surface-canvas: #f4f6f3;
+    --shell-surface: #ffffff;
+    --shell-surface-raised: #ffffff;
+    --shell-text: #162525;
+    --shell-text-muted: #536363;
+    --shell-border: #c6d0cd;
+    --shell-focus: #006fc4;
+    --shell-positive: #17663a;
+    --shell-positive-soft: #e1f3e7;
+    --shell-warning: #825000;
+    --shell-warning-soft: #fff0cc;
+    --shell-danger: #9b2834;
+    --shell-danger-soft: #fbe4e7;
+    --shell-info: #205b80;
+    --shell-info-soft: #e1f0fa;
+    --shell-font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --shell-font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    --shell-text-xs: 0.75rem;
+    --shell-text-sm: 0.875rem;
+    --shell-text-md: 1rem;
+    --shell-text-lg: 1.25rem;
+    --shell-text-xl: clamp(1.75rem, 4vw, 2.5rem);
+    --shell-space-1: 0.25rem;
+    --shell-space-2: 0.5rem;
+    --shell-space-3: 0.75rem;
+    --shell-space-4: 1rem;
+    --shell-space-5: 1.5rem;
+    --shell-space-6: 2rem;
+    --shell-space-7: 3rem;
+    --shell-radius-sm: 0.375rem;
+    --shell-radius: 0.75rem;
+    --shell-radius-lg: 1.25rem;
+    --shell-shadow: 0 1px 2px rgb(15 47 47 / 8%), 0 12px 30px rgb(15 47 47 / 8%);
+    --shell-motion-fast: 140ms;
+    --shell-motion-normal: 240ms;
+    --shell-focus-ring: 0 0 0 3px var(--shell-surface), 0 0 0 6px var(--shell-focus);
+    --shell-content-max: 80rem;
+    --shell-breakpoint-compact: 48rem;
+    --shell-breakpoint-wide: 75rem;
+  }
+}
+
+@layer magrathea-reset {
+  *, *::before, *::after { box-sizing: border-box; }
+  html { font-family: var(--shell-font-sans); color: var(--shell-text); background: var(--shell-surface-canvas); }
+  body { margin: 0; }
+  button, input, select, textarea { font: inherit; }
+  button, a { -webkit-tap-highlight-color: transparent; }
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible { outline: none; box-shadow: var(--shell-focus-ring); }
+  :where(button, input, select, textarea):disabled { cursor: not-allowed; opacity: 0.58; }
+  [hidden] { display: none !important; }
+}
+
+@layer magrathea-components {
+  .shell-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  .shell-button { display: inline-flex; min-height: 2.75rem; align-items: center; justify-content: center; gap: var(--shell-space-2); padding: 0.65rem 1rem; border: 1px solid transparent; border-radius: var(--shell-radius-sm); color: white; background: var(--shell-brand); font-weight: 700; line-height: 1.2; cursor: pointer; text-decoration: none; transition: background var(--shell-motion-fast), transform var(--shell-motion-fast); }
+  .shell-button:hover { background: var(--shell-brand-strong); }
+  .shell-button:active { transform: translateY(1px); }
+  .shell-button--secondary { color: var(--shell-text); background: var(--shell-surface); border-color: var(--shell-border); }
+  .shell-button--secondary:hover { background: var(--shell-brand-soft); }
+  .shell-button--danger { background: var(--shell-danger); }
+  .shell-stack { display: grid; gap: var(--shell-space-5); }
+  .shell-cluster { display: flex; flex-wrap: wrap; align-items: center; gap: var(--shell-space-3); }
+  .shell-field { display: grid; gap: var(--shell-space-2); }
+  .shell-field label { font-weight: 700; }
+  .shell-field :where(input, select, textarea) { width: 100%; min-height: 2.75rem; padding: 0.65rem 0.75rem; color: var(--shell-text); background: var(--shell-surface); border: 1px solid var(--shell-border); border-radius: var(--shell-radius-sm); }
+  .shell-field__hint { margin: 0; color: var(--shell-text-muted); font-size: var(--shell-text-sm); }
+  .shell-field__error { margin: 0; color: var(--shell-danger); font-weight: 700; font-size: var(--shell-text-sm); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+
+@media (forced-colors: active) {
+  :root { --shell-focus-ring: none; }
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 3px solid Highlight !important;
+    outline-offset: 3px !important;
+    box-shadow: none !important;
+  }
+  .shell-button { border-color: ButtonText; }
+}

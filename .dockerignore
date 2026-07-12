@@ -4,6 +4,9 @@ node_modules/
 magrathea-ui/node_modules/
 magrathea-ui/node/
 magrathea-ui/dist/
+magrathea-ui/**/dist/
+magrathea-ui/playwright-report/
+magrathea-ui/test-results/
 bootstrap-application/src/main/scripts/node_modules/
 
 # Generated web/static resources; Dockerfile regenerates these from source docs and frontend sources
@@ -12,6 +15,8 @@ bootstrap-application/src/main/resources/static/assets/
 bootstrap-application/src/main/resources/static/index.html
 bootstrap-application/src/main/resources/static/favicon.svg
 bootstrap-application/src/main/resources/static/icons.svg
+bootstrap-application/src/main/resources/static/_redirects
+bootstrap-application/src/main/resources/static/product-manifest.json
 
 # Maven build artifacts
 **/target/

@@ -28,6 +28,30 @@ ifndef::imagesdir[:imagesdir: ../images]
 |Admin API
 |Internal `/admin/**` JSON API for storage policy, device, and configuration management; not part of S3 API coverage
 
+|Magrathea Product Shell
+|Implemented reusable, product-neutral frontend foundation for Magrathea products. It owns frame/navigation/layout, Design Tokens, Shell Primitives, localization infrastructure, extension/route composition, documentation integration, and common UI states, but no product domain/API logic (ADR 0026)
+
+|Design Token
+|Product-neutral named visual value, such as color, typography, spacing, elevation, motion, or breakpoint, consumed by the Magrathea Product Shell and Product Extensions
+
+|Shell Primitive
+|Reusable product-neutral UI building block supplied by the Magrathea Product Shell, such as a page frame, navigation container, status banner, table, form, dialog, or common UI state
+
+|Product Extension
+|Explicit contribution of product-owned navigation, routes, screens, localization, permissions, and API integrations to the Magrathea Product Shell without modifying shell internals
+
+|Object Storage Admin Application
+|The implemented Object Storage Product Extension. It owns all Object Storage screens, models, routes, permissions, API clients, and mapping; it is not the reusable shell
+
+|Admin Control Plane
+|Operator-facing `/admin/**` management, configuration, status, security, capacity, and reporting surface for capabilities without S3 equivalents. It must not implement object/bucket semantics
+
+|S3 Data Plane
+|The exclusive S3-compatible path for object and bucket semantics. Admin-side S3 diagnostics use this plane as an S3 client and receive no storage-engine bypass
+
+|Report provider
+|Optional Admin Control Plane adapter that supplies real operational recovery, garbage-collection, scrub, audit, metrics, or traces records. When absent, the validated contract returns HTTP 503 `report-provider-not-configured`; an unavailable contract is not a provider implementation
+
 |ETag
 |Entity tag for optimistic concurrency and content verification; computed via a single-pass streaming tee (`UploadDigest`) during PutObject, not a separate materialization pass
 

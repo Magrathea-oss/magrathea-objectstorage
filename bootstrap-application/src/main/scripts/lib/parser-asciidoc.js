@@ -113,7 +113,7 @@ function blockToJson(node) {
     }
 
     case 'admonition': {
-      const admonitionType = node.getType() || 'note';
+      const admonitionType = (typeof node.getType === 'function' ? node.getType() : node.getStyle?.()) || 'note';
       const html = node.getContent() || '';
       return {
         type: 'admonition',

@@ -18,8 +18,8 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 
 === Summary
 
-* Feature files scanned: 28
-* Scenarios discovered: 445
+* Feature files scanned: 30
+* Scenarios discovered: 476
 * Protocol-smoke scenarios: 122
 
 ==== Status tag counts
@@ -29,7 +29,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |Tag |Scenario count
 |`@absent` |3
 |`@config-only` |69
-|`@implemented-and-validated` |164
+|`@implemented-and-validated` |195
 |`@implemented-not-e2e-validated` |21
 |`@not-implemented` |6
 |`@placeholder` |9
@@ -41,22 +41,27 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 [cols="1,1",options="header"]
 |===
 |Tag |Scenario count
+|`@admin-api-contract-required` |12
 |`@awscli-required` |61
 |`@bootstrap-integration-required` |4
 |`@ci-load-required` |10
 |`@component-spec-required` |12
 |`@connection-validation-required` |2
+|`@docker-build-required` |1
 |`@docker-release-required` |1
 |`@docker-required` |1
 |`@filesystem-inspection-required` |1
+|`@frontend-contract-required` |5
+|`@frontend-e2e-required` |13
 |`@full-process-restart-required` |1
 |`@live-monitoring-required` |1
 |`@log-inspection-required` |3
 |`@metrics-inspection-required` |3
 |`@pipeline-unit-required` |15
 |`@runtime-backpressure-required` |1
+|`@s3-diagnostic-contract-required` |1
 |`@soak-required` |2
-|`@static-architecture-required` |7
+|`@static-architecture-required` |10
 |`@tracing-inspection-required` |2
 |`@webclient-required` |300
 |`unknown/not-tagged` |73
@@ -67,8 +72,8 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 [cols="1,1",options="header"]
 |===
 |Tag |Scenario count
-|`@functional-requirement` |209
-|`@non-functional-requirement` |133
+|`@functional-requirement` |240
+|`@non-functional-requirement` |142
 |`unknown/not-tagged` |205
 |===
 
@@ -3495,6 +3500,755 @@ The connection validation mode uses real TCP clients against a child process rat
   And the S3 process remains live
   And closing one accepted connection permits a subsequent TCP client connection
 ----
+
+==== s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature
+
+* Feature title: Business Need: EP-7 Object Storage administration through the Magrathea Product Shell
+* Feature tags: `@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`
+* Feature description:
++
+----
+Object Storage administrators need an accessible operational application that presents
+only evidence supplied by the Admin Control Plane and uses the S3 Data Plane for S3
+diagnostics. The application must not turn read-only configuration catalogs into an
+apparent mutation interface or create a privileged alternate object API.
+Validation roles:
+- Frontend end-to-end validation exercises the built application with keyboard, desktop,
+tablet, mobile, offline, and direct-navigation browser modes.
+- Admin API contract validation observes the production AdminRouter HTTP contracts.
+- S3 diagnostic contract validation observes the destination plane, authentication,
+request path, response, and audit evidence for a diagnostic request.
+----
+
+===== REQ-ADMIN-023
+
+====== Scenario: Backend status identifies its configuration sources and runtime availability
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature:18`
+|Rule |Admin API contracts expose truthful control-plane evidence without a frontend
+|Requirement ID(s) |`REQ-ADMIN-023`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-api`, `@backend-status`
+|Validation mode tags |`@admin-api-contract-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-023`, `@functional-requirement`, `@admin-api`, `@backend-status`, `@admin-api-contract-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the Admin API runs with profile "storage-engine"
+  And property "magrathea.object-store.backend" selects backend "storage-engine"
+  And the YAML catalogs and storage root are configured as follows:
+  And filesystem root "target/ep7-admin-api/storage-engine" is available
+  And no latest recovery summary provider is configured
+  When an Admin API client requests GET "/admin/backend-status"
+  Then the Admin API response status is 200 with content type "application/json"
+  And the response contains these backend-status fields:
+  And storage root "target/ep7-admin-api/storage-engine" reports availability "available"
+  And the response invents no recovery scan or finding counts
+----
+
+===== REQ-ADMIN-024
+
+====== Scenario Outline: An operational report without a real provider is honestly unavailable
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature:47`
+|Rule |Admin API contracts expose truthful control-plane evidence without a frontend
+|Requirement ID(s) |`REQ-ADMIN-024`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-api`, `@operational-report`, `@recovery`, `@garbage-collection`, `@scrub`, `@audit`, `@metrics`, `@tracing`
+|Validation mode tags |`@admin-api-contract-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-024`, `@functional-requirement`, `@admin-api`, `@operational-report`, `@recovery`, `@garbage-collection`, `@scrub`, `@audit`, `@metrics`, `@tracing`, `@admin-api-contract-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given no real "<report>" report provider is configured
+  When an Admin API client requests GET "<path>"
+  Then the Admin API response status is 503 with content type "application/json"
+  And the response error code is "report-provider-not-configured"
+  And the response error path is "<path>"
+  And response field "error.details.reportType" is "<report>"
+  And response field "error.details.availability" is "not-configured"
+  And the response contains no sample records, generated values, filesystem inference, or healthy default
+----
+
+.Examples
+[cols="1,1",options="header"]
+|===
+| report | path
+| recovery | /admin/reports/recovery
+| garbage-collection | /admin/reports/garbage-collection
+| scrub | /admin/reports/scrub
+| audit | /admin/reports/audit
+| metrics | /admin/reports/metrics
+| traces | /admin/reports/traces
+|===
+
+===== REQ-ADMIN-025
+
+====== Scenario: Policy catalog responses preserve configured pipeline semantics
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature:67`
+|Rule |Admin API contracts expose truthful control-plane evidence without a frontend
+|Requirement ID(s) |`REQ-ADMIN-025`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-api`, `@storage-policy`, `@storage-policy-catalog`
+|Validation mode tags |`@admin-api-contract-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-025`, `@functional-requirement`, `@admin-api`, `@storage-policy`, `@storage-policy-catalog`, `@admin-api-contract-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the YAML policy catalog contains "MINIO_STANDARD" with erasure coding 4 data blocks and 2 parity blocks and replication factor 1
+  When an Admin API client requests GET "/admin/storage-policies"
+  Then the Admin API response status is 200 with content type "application/json"
+  And the response count matches the number of configured policies
+  And policy "MINIO_STANDARD" reports erasure coding 4 data blocks and 2 parity blocks and replication factor 1
+  And policy "MINIO_STANDARD" omits deduplication, compression, and encryption stages that are not configured
+  When the client requests GET "/admin/storage-policies/minio-standard"
+  Then the response identifies storage class "MINIO_STANDARD", erasure coding 4 data blocks and 2 parity blocks, and replication factor 1
+  And its links identify the read-only collection and non-persistent validation endpoint
+----
+
+===== REQ-ADMIN-026
+
+====== Scenario: Device and disk-set responses preserve capacity, eligibility, and topology
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature:79`
+|Rule |Admin API contracts expose truthful control-plane evidence without a frontend
+|Requirement ID(s) |`REQ-ADMIN-026`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-api`, `@storage-device`, `@disk-set`, `@topology`
+|Validation mode tags |`@admin-api-contract-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-026`, `@functional-requirement`, `@admin-api`, `@storage-device`, `@disk-set`, `@topology`, `@admin-api-contract-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the storage-device catalog contains device "node-1-disk-0" at "/data/node-1/disk-0" with health "DEGRADED"
+  And device "node-1-disk-0" has total capacity 107374182400, available capacity 26843545600, read eligibility true, and write eligibility false
+  And disk-set "rack-a" has failure domain "RACK" and members "node-1-disk-0" and "node-2-disk-0"
+  When an Admin API client requests GET "/admin/storage-devices/node-1-disk-0"
+  Then the response status is 200 and preserves the configured path, capacities, health, and eligibility
+  When the client requests GET "/admin/disk-sets/rack-a"
+  Then the response status is 200 and preserves failure domain "RACK" and both member identifiers
+  And the responses link only to their read-only catalog resources
+----
+
+===== REQ-ADMIN-027
+
+====== Scenario Outline: A catalog without a configured provider fails closed
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature:90`
+|Rule |Admin API contracts expose truthful control-plane evidence without a frontend
+|Requirement ID(s) |`REQ-ADMIN-027`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-api`, `@catalog`, `@fail-closed`
+|Validation mode tags |`@admin-api-contract-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-027`, `@functional-requirement`, `@admin-api`, `@catalog`, `@fail-closed`, `@admin-api-contract-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given no "<catalog>" catalog provider is configured
+  When an Admin API client requests GET "<path>"
+  Then the Admin API response status is 503 with content type "application/json"
+  And the response error code is "catalog-not-configured"
+  And the response error path is "<path>"
+  And no catalog item is returned
+----
+
+.Examples
+[cols="1,1",options="header"]
+|===
+| catalog | path
+| storage-policy-catalog | /admin/storage-policies
+| storage-device-catalog | /admin/storage-devices
+| disk-set-catalog | /admin/disk-sets
+|===
+
+===== REQ-ADMIN-028
+
+====== Scenario: Policy validation returns structured findings without changing the catalog
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature:105`
+|Rule |Admin API contracts expose truthful control-plane evidence without a frontend
+|Requirement ID(s) |`REQ-ADMIN-028`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-api`, `@storage-policy`, `@validation`, `@non-persistent`
+|Validation mode tags |`@admin-api-contract-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-028`, `@functional-requirement`, `@admin-api`, `@storage-policy`, `@validation`, `@non-persistent`, `@admin-api-contract-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the policy catalog contains only storage class "MINIO_STANDARD"
+  When an Admin API client posts this proposal to "/admin/storage-policies/validate":
+  Then the Admin API response status is 200 with content type "application/json"
+  And the response reports validity true with no field errors
+  And the response links to the validation endpoint and the read-only policy collection
+  When the client requests GET "/admin/storage-policies"
+  Then storage class "ARCHIVE_EC" is absent and "MINIO_STANDARD" remains unchanged
+----
+
+===== REQ-ADMIN-029
+
+====== Scenario Outline: Storage policy catalog mutation methods remain unavailable
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature:122`
+|Rule |Admin API contracts expose truthful control-plane evidence without a frontend
+|Requirement ID(s) |`REQ-ADMIN-029`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-api`, `@storage-policy`, `@configuration-as-code`
+|Validation mode tags |`@admin-api-contract-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-029`, `@functional-requirement`, `@admin-api`, `@storage-policy`, `@configuration-as-code`, `@admin-api-contract-required`, `@implemented-and-validated`
+|===
+
+.Rule description
+----
+        {
+          "storageClassId": "ARCHIVE_EC",
+          "erasureCoding": { "dataBlocks": 8, "parityBlocks": 4 },
+          "replication": { "factor": 1 }
+        }
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the Admin API uses a YAML-backed read-only storage-policy catalog
+  When an Admin API client requests <method> "<path>"
+  Then the Admin API response status is 405 with content type "application/json"
+  And the response Allow header is "GET, HEAD"
+  And the response error code is "admin-catalog-read-only"
+  And the response explains that changes require configuration-as-code and catalog reload or redeployment
+----
+
+.Examples
+[cols="1,1",options="header"]
+|===
+| method | path
+| POST | /admin/storage-policies
+| PUT | /admin/storage-policies/minio-standard
+| DELETE | /admin/storage-policies/minio-standard
+|===
+
+===== REQ-ADMIN-030
+
+====== Scenario: Bucket capacity and quota administration expose accounting rather than object access
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature:137`
+|Rule |Admin API contracts expose truthful control-plane evidence without a frontend
+|Requirement ID(s) |`REQ-ADMIN-030`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-api`, `@capacity`, `@quota`
+|Validation mode tags |`@admin-api-contract-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-030`, `@functional-requirement`, `@admin-api`, `@capacity`, `@quota`, `@admin-api-contract-required`, `@implemented-and-validated`
+|===
+
+.Rule description
+----
+        {
+          "storageClassId": "ARCHIVE_EC",
+          "erasureCoding": { "dataBlocks": 8, "parityBlocks": 4 },
+          "replication": { "factor": 1 }
+        }
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given bucket "archive-2026" has used bytes 7340032, reserved bytes 1048576, quota bytes 10737418240, 2 rejected reservations, and last rejected bytes 2097152
+  When an Admin API client requests GET "/admin/buckets/archive-2026/capacity"
+  Then the Admin API response status is 200 with content type "application/json"
+  And the response identifies bucket "archive-2026" and preserves every capacity accounting value
+  When the client requests PUT "/admin/buckets/archive-2026/quota" with quota bytes 21474836480
+  Then the response status is 200 and quota bytes are 21474836480
+  And a subsequent capacity response preserves usage, reservations, and rejection counters
+  And neither response contains bucket contents, object keys, or object-operation links
+----
+
+===== REQ-ADMIN-031
+
+====== Scenario: The Admin route inventory contains no bucket or object data plane
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature:148`
+|Rule |Admin API contracts expose truthful control-plane evidence without a frontend
+|Requirement ID(s) |`REQ-ADMIN-031`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-api`, `@route-inventory`, `@s3-data-plane`, `@security`
+|Validation mode tags |`@admin-api-contract-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-031`, `@functional-requirement`, `@admin-api`, `@route-inventory`, `@s3-data-plane`, `@security`, `@admin-api-contract-required`, `@implemented-and-validated`
+|===
+
+.Rule description
+----
+        {
+          "storageClassId": "ARCHIVE_EC",
+          "erasureCoding": { "dataBlocks": 8, "parityBlocks": 4 },
+          "replication": { "factor": 1 }
+        }
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the production AdminRouter is the Admin Control Plane route source
+  When the Admin API contract runner inventories its HTTP methods and path predicates
+  Then the inventory contains only these route families:
+  And no route creates, lists, reads, writes, or deletes buckets or objects
+  And no route exposes multipart, metadata, tagging, ACL, versioning, or other S3 object semantics
+  And no route exposes a storage-engine object, chunk, manifest, filesystem, or private repository API
+----
+
+===== REQ-ADMIN-001
+
+====== Scenario: Dashboard distinguishes liveness from readiness and identifies unavailable catalogs
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature:179`
+|Rule |The dashboard reports only observable Admin Control Plane state
+|Requirement ID(s) |`REQ-ADMIN-001`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-ui`, `@health`, `@readiness`
+|Validation mode tags |`@frontend-e2e-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-001`, `@functional-requirement`, `@admin-ui`, `@health`, `@readiness`, `@frontend-e2e-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the Object Storage extension is opened at route "/admin"
+  And "GET /admin/health" reports status "ok" and mode "configuration-as-code"
+  And "GET /admin/ready" reports status "not-ready" with component "storage-device-catalog" status "not-configured"
+  When the administrator views the dashboard
+  Then the dashboard shows the Admin API as live but not ready
+  And the unavailable component is named "storage-device-catalog"
+  And the dashboard does not replace the unavailable result with a healthy default
+----
+
+===== REQ-ADMIN-002
+
+====== Scenario: Dashboard explains selected backend and catalog sources when backend status is available
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature:189`
+|Rule |The dashboard reports only observable Admin Control Plane state
+|Requirement ID(s) |`REQ-ADMIN-002`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-ui`, `@backend-status`
+|Validation mode tags |`@frontend-e2e-required`, `@admin-api-contract-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-002`, `@functional-requirement`, `@admin-ui`, `@backend-status`, `@frontend-e2e-required`, `@admin-api-contract-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given profile "storage-engine" selects backend "storage-engine"
+  And "GET /admin/backend-status" reports the selecting property, catalog counts, catalog source locations, storage roots, and their availability
+  When the administrator opens route "/admin/backend-status"
+  Then the selected backend and selecting profile or property are visible
+  And policy, device, and disk-set catalog counts and source locations are visible
+  And every configured storage root is shown with its availability
+  And the page identifies unavailable fields instead of inventing values
+----
+
+===== REQ-ADMIN-003
+
+====== Scenario: Administrator reads the MINIO_STANDARD policy without mutation controls
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature:201`
+|Rule |Storage policy administration preserves configuration-as-code semantics
+|Requirement ID(s) |`REQ-ADMIN-003`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-ui`, `@admin-api`, `@storage-policy`, `@storage-policy-catalog`
+|Validation mode tags |`@frontend-e2e-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-003`, `@functional-requirement`, `@admin-ui`, `@admin-api`, `@storage-policy`, `@storage-policy-catalog`, `@frontend-e2e-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given "GET /admin/storage-policies" includes storage class "MINIO_STANDARD"
+  And "GET /admin/storage-policies/minio-standard" reports its deduplication, compression, encryption, erasure-coding, and replication pipeline
+  When the administrator follows the policy link to route "/admin/storage-policies/minio-standard"
+  Then the policy detail shows every configured pipeline stage returned by the Admin API
+  And the page states "Read-only configuration-as-code"
+  And the page states that changes require YAML configuration followed by catalog reload or redeployment
+  And create, edit, save, and delete policy actions are not offered
+----
+
+===== REQ-ADMIN-004
+
+====== Scenario: Administrator validates a proposed policy without persisting it
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature:211`
+|Rule |Storage policy administration preserves configuration-as-code semantics
+|Requirement ID(s) |`REQ-ADMIN-004`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-ui`, `@admin-api`, `@storage-policy`, `@validation`
+|Validation mode tags |`@frontend-e2e-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-004`, `@functional-requirement`, `@admin-ui`, `@admin-api`, `@storage-policy`, `@validation`, `@frontend-e2e-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the policy catalog contains only storage class "MINIO_STANDARD"
+  And the administrator enters proposed storage class "ARCHIVE_EC" with erasure coding 8 data blocks and 4 parity blocks
+  When the application posts the proposal to "/admin/storage-policies/validate"
+  Then the application labels the result as validation only and non-persistent
+  And the structured validity result and field errors are displayed
+  And a subsequent "GET /admin/storage-policies" does not contain "ARCHIVE_EC"
+  And the application does not send POST, PUT, or DELETE to a storage-policy catalog mutation route
+----
+
+===== REQ-ADMIN-005
+
+====== Scenario: Policy catalog failure uses a truthful recoverable state
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature:221`
+|Rule |Storage policy administration preserves configuration-as-code semantics
+|Requirement ID(s) |`REQ-ADMIN-005`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-ui`, `@admin-api`, `@storage-policy`, `@offline`
+|Validation mode tags |`@frontend-e2e-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-005`, `@functional-requirement`, `@admin-ui`, `@admin-api`, `@storage-policy`, `@offline`, `@frontend-e2e-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the administrator opens route "/admin/storage-policies"
+  And "GET /admin/storage-policies" returns error code "catalog-unavailable"
+  When the policy page finishes loading
+  Then an error state identifies the storage-policy catalog as unavailable
+  And a keyboard-operable retry action is offered
+  And stale policy rows are not presented as current configuration
+----
+
+===== REQ-ADMIN-006
+
+====== Scenario: Administrator inspects device capacity, health, and eligibility
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature:232`
+|Rule |Devices and disk-set topology are read-only operational catalogs
+|Requirement ID(s) |`REQ-ADMIN-006`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-ui`, `@admin-api`, `@storage-device`
+|Validation mode tags |`@frontend-e2e-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-006`, `@functional-requirement`, `@admin-ui`, `@admin-api`, `@storage-device`, `@frontend-e2e-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given "GET /admin/storage-devices" contains device "node-1-disk-0" at path "/data/node-1/disk-0"
+  And the device reports total and available capacity, health "DEGRADED", and read and write eligibility
+  When the administrator opens route "/admin/storage-devices/node-1-disk-0"
+  Then the device path, capacity, health, and eligibility are visible
+  And the page provides no create, edit, retire, or delete device action
+  And the page identifies the catalog as read-only configuration-as-code
+----
+
+===== REQ-ADMIN-007
+
+====== Scenario: Administrator follows disk-set membership into device details
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature:241`
+|Rule |Devices and disk-set topology are read-only operational catalogs
+|Requirement ID(s) |`REQ-ADMIN-007`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-ui`, `@admin-api`, `@disk-set`, `@topology`
+|Validation mode tags |`@frontend-e2e-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-007`, `@functional-requirement`, `@admin-ui`, `@admin-api`, `@disk-set`, `@topology`, `@frontend-e2e-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given "GET /admin/disk-sets/rack-a" reports failure domain "RACK" and devices "node-1-disk-0" and "node-2-disk-0"
+  When the administrator opens route "/admin/disk-sets/rack-a"
+  Then the failure domain and both member identifiers are visible
+  And each member links to its storage-device detail route
+  And the topology page offers no disk-set or membership mutation action
+----
+
+===== REQ-ADMIN-008
+
+====== Scenario: Capacity view reports the bucket capacity contract that exists
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature:251`
+|Rule |Operational views never fabricate unsupported Admin API evidence
+|Requirement ID(s) |`REQ-ADMIN-008`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-ui`, `@capacity`
+|Validation mode tags |`@frontend-e2e-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-008`, `@functional-requirement`, `@admin-ui`, `@capacity`, `@frontend-e2e-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given "GET /admin/buckets/archive-2026/capacity" reports used bytes 7340032, reserved bytes 1048576, quota bytes 10737418240, and 2 rejected reservations
+  When the administrator opens route "/admin/capacity/archive-2026"
+  Then used, reserved, quota, and rejected-reservation values are visibly distinguished
+  And the capacity view identifies "archive-2026" as the selected bucket
+  And the view does not offer object or bucket browsing
+----
+
+===== REQ-ADMIN-009
+
+====== Scenario: Recovery, garbage-collection, and scrub views present unavailable reports honestly
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature:259`
+|Rule |Operational views never fabricate unsupported Admin API evidence
+|Requirement ID(s) |`REQ-ADMIN-009`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-ui`, `@recovery`, `@garbage-collection`, `@scrub`
+|Validation mode tags |`@frontend-e2e-required`, `@admin-api-contract-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-009`, `@functional-requirement`, `@admin-ui`, `@recovery`, `@garbage-collection`, `@scrub`, `@frontend-e2e-required`, `@admin-api-contract-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the Admin API report contracts for recovery, garbage collection, and scrub return error code "report-provider-not-configured" with availability "not-configured" because no providers are configured
+  When the administrator opens route "/admin/data-hygiene"
+  Then the application shows those reports as unavailable
+  And it does not infer findings from health, route inventory, filesystem paths, or static examples
+  And no recovery, garbage-collection, or scrub action is enabled
+----
+
+===== REQ-ADMIN-010
+
+====== Scenario: Audit and observability views expose only authorized Admin API records
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature:267`
+|Rule |Operational views never fabricate unsupported Admin API evidence
+|Requirement ID(s) |`REQ-ADMIN-010`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-ui`, `@audit`, `@metrics`, `@observability`
+|Validation mode tags |`@frontend-e2e-required`, `@admin-api-contract-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-010`, `@functional-requirement`, `@admin-ui`, `@audit`, `@metrics`, `@observability`, `@frontend-e2e-required`, `@admin-api-contract-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the Admin API report contracts for audit, metrics, and traces return error code "report-provider-not-configured" with availability "not-configured" because no providers are configured
+  When the administrator opens route "/admin/observability"
+  Then audit, metric, and trace panels are shown as unavailable
+  And no sample event, generated chart, or hard-coded healthy value is presented as runtime evidence
+  And the application does not read storage-engine files or internal observability ports directly
+----
+
+===== REQ-ADMIN-011
+
+====== Scenario: Diagnostic HeadObject uses S3 authentication and never an Admin object route
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature:277`
+|Rule |S3 diagnostics remain ordinary S3 Data Plane requests
+|Requirement ID(s) |`REQ-ADMIN-011`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@security`, `@admin-ui`, `@s3-diagnostics`, `@s3-data-plane`
+|Validation mode tags |`@frontend-e2e-required`, `@s3-diagnostic-contract-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-011`, `@functional-requirement`, `@security`, `@admin-ui`, `@s3-diagnostics`, `@s3-data-plane`, `@frontend-e2e-required`, `@s3-diagnostic-contract-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the administrator is authorized to run an S3 diagnostic with credential profile "tenant-a-readonly"
+  And bucket "diagnostics-2026" contains object "probes/readiness.txt"
+  When the administrator requests a HeadObject diagnostic for that bucket and key
+  Then the application sends a signed HeadObject request to the configured S3 Data Plane endpoint
+  And the diagnostic displays the S3 request id, status, ETag, content length, and S3 error code when present
+  And no request is sent to an "/admin/objects", "/admin/buckets/diagnostics-2026/objects", storage-engine port, or private storage-engine endpoint
+  And the diagnostic receives no authorization privilege beyond credential profile "tenant-a-readonly"
+----
+
+===== REQ-ADMIN-012
+
+====== Scenario Outline: A copied detail URL restores navigable page context
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature:289`
+|Rule |Navigation remains usable across routes, input methods, and viewports
+|Requirement ID(s) |`REQ-ADMIN-012`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@accessibility`, `@deep-linking`
+|Validation mode tags |`@frontend-e2e-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-012`, `@functional-requirement`, `@non-functional-requirement`, `@accessibility`, `@deep-linking`, `@frontend-e2e-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the administrator starts a new browser session at "<route>"
+  When the requested resource is loaded from its backing Admin API endpoint
+  Then the named detail page is displayed without first visiting the dashboard
+  And the page title and primary heading identify "<resource>"
+  And breadcrumbs provide keyboard-operable navigation to its collection and the dashboard
+  And browser back and forward navigation preserve the selected route
+----
+
+.Examples
+[cols="1,1",options="header"]
+|===
+| route | resource
+| /admin/storage-policies/minio-standard | MINIO_STANDARD
+| /admin/storage-devices/node-1-disk-0 | node-1-disk-0
+| /admin/disk-sets/rack-a | rack-a
+|===
+
+===== REQ-ADMIN-013
+
+====== Scenario Outline: Primary administration remains keyboard accessible at supported widths
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature:304`
+|Rule |Navigation remains usable across routes, input methods, and viewports
+|Requirement ID(s) |`REQ-ADMIN-013`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@accessibility`, `@responsive`
+|Validation mode tags |`@frontend-e2e-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-013`, `@functional-requirement`, `@non-functional-requirement`, `@accessibility`, `@responsive`, `@frontend-e2e-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the Object Storage application viewport is <width> pixels wide
+  And focus starts at the browser content boundary
+  When the administrator uses only Tab, Shift+Tab, Enter, Space, Escape, and arrow keys
+  Then a skip link moves focus to the main content
+  And every visible navigation item and page action has a visible focus indicator
+  And the current route is exposed programmatically
+  And no content or action requires horizontal page scrolling at <width> pixels
+  And status is conveyed by text or programmatic name rather than color alone
+----
+
+.Examples
+[cols="1",options="header"]
+|===
+| width
+| 360
+| 768
+| 1440
+|===
 
 ==== s3-reactive-api-adapter/src/test/features/requirements/single-node-backend-bucket-configuration.feature
 
@@ -14235,6 +14989,304 @@ Connection-limit behavior is owned by the separate real-socket connection valida
   And it identifies the tested 0.1.x single-node hardware and software envelope
   And it separates observed values from configured limits and pass criteria
   And it states that the result is not production sizing guidance and not a comparison with another object store
+----
+
+==== s3-reactive-api-adapter/src/test/features/specs/phase-ep7-product-shell.feature
+
+* Feature title: Ability: Reuse the product-neutral Magrathea Product Shell
+* Feature tags: `@spec`, `@phase-ep7`, `@product-shell`, `@product-extension`
+* Feature description:
++
+----
+Maintainers need a stable shell that composes independently owned Magrathea products
+without importing their domains. Product extensions own their routes, navigation,
+localization, permissions, API integrations, and screens while the shell supplies
+accessible presentation and lifecycle contracts.
+----
+
+===== REQ-ADMIN-014
+
+====== Scenario: A minimal non-Object-Storage extension composes without shell edits
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep7-product-shell.feature:11`
+|Rule |Product behavior enters only through an explicit extension contract
+|Requirement ID(s) |`REQ-ADMIN-014`
+|Classification |`@functional-requirement`
+|Capability area tags |`@spec`, `@phase-ep7`, `@product-shell`, `@product-extension`, `@architecture`
+|Validation mode tags |`@static-architecture-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-ep7`, `@product-shell`, `@product-extension`, `@REQ-ADMIN-014`, `@functional-requirement`, `@architecture`, `@static-architecture-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given a fixture extension with id "magrathea-example" contributes navigation label "Example", route "/example/status", permission "example:status:read", localization namespace "example", and a status screen
+  When the frontend contract runner builds the shell with only extension "magrathea-example"
+  Then the Example navigation entry and route are available
+  And removing the extension removes its navigation, route, permission declaration, localization resources, and screen
+  And no product-neutral shell source file changes between the two compositions
+----
+
+===== REQ-ADMIN-015
+
+====== Scenario: Product Shell source contains no Object Storage domain or endpoint knowledge
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep7-product-shell.feature:19`
+|Rule |Product behavior enters only through an explicit extension contract
+|Requirement ID(s) |`REQ-ADMIN-015`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@spec`, `@phase-ep7`, `@product-shell`, `@product-extension`, `@architecture`, `@product-neutral`
+|Validation mode tags |`@static-architecture-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-ep7`, `@product-shell`, `@product-extension`, `@REQ-ADMIN-015`, `@functional-requirement`, `@non-functional-requirement`, `@architecture`, `@product-neutral`, `@static-architecture-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the Product Shell and Object Storage Product Extension have separate source boundaries
+  When the static architecture runner inspects Product Shell imports, routes, defaults, labels, models, clients, permissions, and endpoint constants
+  Then the shell contains no bucket, object, multipart, storage policy, storage device, disk-set, S3, or storage-engine domain dependency
+  And the shell contains no "/admin/storage-policies", "/admin/storage-devices", "/admin/disk-sets", "/admin/buckets", or S3 endpoint path
+  And Object Storage navigation and documentation routes enter only through the registered Object Storage Product Extension
+----
+
+===== REQ-ADMIN-016
+
+====== Scenario: A failed extension is isolated from the shell and other extensions
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep7-product-shell.feature:27`
+|Rule |Product behavior enters only through an explicit extension contract
+|Requirement ID(s) |`REQ-ADMIN-016`
+|Classification |`@functional-requirement`
+|Capability area tags |`@spec`, `@phase-ep7`, `@product-shell`, `@product-extension`, `@resilience`
+|Validation mode tags |`@frontend-contract-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-ep7`, `@product-shell`, `@product-extension`, `@REQ-ADMIN-016`, `@functional-requirement`, `@resilience`, `@frontend-contract-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given extensions "object-storage" and "magrathea-example" are registered
+  And extension "object-storage" fails during route composition
+  When the shell starts
+  Then the shell frame and extension "magrathea-example" remain usable
+  And the shell shows a localized extension-load error naming "object-storage"
+  And retrying the failed extension does not reload or duplicate healthy extension routes
+----
+
+===== REQ-ADMIN-017
+
+====== Scenario: Shell presentation is defined by reusable semantic Design Tokens
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep7-product-shell.feature:38`
+|Rule |Design Tokens and Shell Primitives are product-neutral defaults
+|Requirement ID(s) |`REQ-ADMIN-017`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@spec`, `@phase-ep7`, `@product-shell`, `@product-extension`, `@design-tokens`, `@theming`
+|Validation mode tags |`@static-architecture-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-ep7`, `@product-shell`, `@product-extension`, `@REQ-ADMIN-017`, `@functional-requirement`, `@non-functional-requirement`, `@design-tokens`, `@theming`, `@static-architecture-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the shell token contract defines color, typography, spacing, elevation, motion, focus, and responsive breakpoint tokens
+  When the static architecture runner inspects shell primitives and the Object Storage extension
+  Then shell primitives consume semantic tokens instead of Object Storage-specific visual constants
+  And extension branding overrides only documented brand token slots
+  And forced-colors and reduced-motion preferences retain readable content, visible focus, and operable navigation
+  And missing brand overrides use the product-neutral Magrathea name, mark, and accessible text defaults
+----
+
+===== REQ-ADMIN-018
+
+====== Scenario Outline: Every asynchronous shell page uses the standard state contract
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep7-product-shell.feature:47`
+|Rule |Design Tokens and Shell Primitives are product-neutral defaults
+|Requirement ID(s) |`REQ-ADMIN-018`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@spec`, `@phase-ep7`, `@product-shell`, `@product-extension`, `@shell-primitives`, `@ui-states`, `@accessibility`
+|Validation mode tags |`@frontend-contract-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-ep7`, `@product-shell`, `@product-extension`, `@REQ-ADMIN-018`, `@functional-requirement`, `@non-functional-requirement`, `@shell-primitives`, `@ui-states`, `@accessibility`, `@frontend-contract-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given fixture page "/example/resources" is rendered through the standard page and collection primitives
+  When its resource provider enters state "<state>"
+  Then the standard "<state>" presentation has a programmatic heading and status announcement
+  And focus is not moved unexpectedly
+  And the available recovery action is keyboard operable
+  And no product-specific example value is presented as live data
+----
+
+.Examples
+[cols="1",options="header"]
+|===
+| state
+| loading
+| empty
+| error
+| offline
+| unauthorized
+| not-found
+|===
+
+===== REQ-ADMIN-019
+
+====== Scenario: Shell starts with product-neutral English defaults and supports extension messages
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep7-product-shell.feature:67`
+|Rule |Localization and branding have safe defaults
+|Requirement ID(s) |`REQ-ADMIN-019`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@spec`, `@phase-ep7`, `@product-shell`, `@product-extension`, `@localization`, `@branding`
+|Validation mode tags |`@frontend-contract-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-ep7`, `@product-shell`, `@product-extension`, `@REQ-ADMIN-019`, `@functional-requirement`, `@non-functional-requirement`, `@localization`, `@branding`, `@frontend-contract-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given no saved locale, product name override, logo override, or Object Storage extension is configured
+  When the Product Shell starts
+  Then locale "en" is selected
+  And the accessible product name is "Magrathea"
+  And shell navigation, loading, empty, error, offline, unauthorized, and not-found messages are available in English
+  And no Object Storage label appears
+  When extension "object-storage" contributes its own English localization namespace
+  Then its labels are resolved without modifying or shadowing product-neutral shell messages
+----
+
+===== REQ-ADMIN-020
+
+====== Scenario: Locale selection persists without breaking navigation semantics
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep7-product-shell.feature:78`
+|Rule |Localization and branding have safe defaults
+|Requirement ID(s) |`REQ-ADMIN-020`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@spec`, `@phase-ep7`, `@product-shell`, `@product-extension`, `@localization`, `@accessibility`
+|Validation mode tags |`@frontend-contract-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-ep7`, `@product-shell`, `@product-extension`, `@REQ-ADMIN-020`, `@functional-requirement`, `@non-functional-requirement`, `@localization`, `@accessibility`, `@frontend-contract-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given locales "en", "de", "es", "it", and "zh-CN" are registered with localized names
+  When a keyboard user selects locale "de" and reloads route "/admin/storage-policies/minio-standard"
+  Then locale "de" remains selected
+  And the document language is "de"
+  And the current route, landmarks, accessible names, and focus order remain unchanged
+  And any missing extension message falls back to English and is reported without exposing a raw translation key
+----
+
+===== REQ-ADMIN-021
+
+====== Scenario Outline: Extension navigation adapts without losing keyboard operation
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep7-product-shell.feature:89`
+|Rule |Shell navigation is accessible and responsive by contract
+|Requirement ID(s) |`REQ-ADMIN-021`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@spec`, `@phase-ep7`, `@product-shell`, `@product-extension`, `@accessibility`, `@responsive`, `@navigation`
+|Validation mode tags |`@frontend-contract-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-ep7`, `@product-shell`, `@product-extension`, `@REQ-ADMIN-021`, `@functional-requirement`, `@non-functional-requirement`, `@accessibility`, `@responsive`, `@navigation`, `@frontend-contract-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given extensions contribute 12 primary navigation entries
+  And the shell viewport is <width> pixels wide
+  When the user opens and traverses primary navigation using only the keyboard
+  Then every entry is reachable in a logical order
+  And the current entry is programmatically identified
+  And collapsed navigation exposes its accessible name, expanded state, and Escape behavior
+  And no navigation entry is clipped or requires horizontal page scrolling
+  And focus returns to the navigation trigger when collapsed navigation closes
+----
+
+.Examples
+[cols="1",options="header"]
+|===
+| width
+| 360
+| 768
+| 1440
+|===
+
+===== REQ-ADMIN-022
+
+====== Scenario: Canonical Docker build composes two products from one shell source
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep7-product-shell.feature:108`
+|Rule |Frontend packaging proves shell reuse rather than copying templates
+|Requirement ID(s) |`REQ-ADMIN-022`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@spec`, `@phase-ep7`, `@product-shell`, `@product-extension`, `@build`, `@packaging`, `@template-reuse`
+|Validation mode tags |`@docker-build-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-ep7`, `@product-shell`, `@product-extension`, `@REQ-ADMIN-022`, `@functional-requirement`, `@non-functional-requirement`, `@build`, `@packaging`, `@template-reuse`, `@docker-build-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the canonical Docker frontend build starts from a clean checkout
+  And product manifests "object-storage" and "magrathea-example" reference the same Product Shell package and different extension registrations
+  When the Docker build produces both frontend distributions twice
+  Then each distribution contains only its registered product routes and localization resources
+  And both distributions identify the same Product Shell artifact version and content digest
+  And no copied shell template or host-generated static asset is used as a source input
+  And the second clean build produces byte-for-byte equivalent generated frontend and documentation assets
 ----
 
 ==== s3-reactive-api-adapter/src/test/features/specs/phase-ka5-distribution.feature

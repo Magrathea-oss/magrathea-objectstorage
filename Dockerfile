@@ -1,5 +1,5 @@
 # Stage 1: Build with Maven + Node.js
-FROM public.ecr.aws/docker/library/maven:3.9-eclipse-temurin-21 AS builder
+FROM public.ecr.aws/docker/library/maven:3.9-eclipse-temurin-21 AS build-base
 
 ARG NODE_VERSION=26.1.0
 ARG NODE_DIST=node-v${NODE_VERSION}-linux-x64
@@ -39,11 +39,14 @@ COPY s3-reactive-api-adapter/pom.xml ./s3-reactive-api-adapter/
 COPY admin-api-adapter/pom.xml ./admin-api-adapter/
 COPY bootstrap-application/pom.xml ./bootstrap-application/
 
-# Frontend and documentation script manifests for dependency caching
-COPY magrathea-ui/package.json magrathea-ui/package-lock.json magrathea-ui/vite.config.js ./magrathea-ui/
-COPY magrathea-ui/index.html ./magrathea-ui/
-COPY magrathea-ui/public ./magrathea-ui/public/
-COPY magrathea-ui/src ./magrathea-ui/src/
+# Frontend workspace and documentation script manifests for dependency caching
+COPY magrathea-ui/package.json magrathea-ui/package-lock.json ./magrathea-ui/
+COPY magrathea-ui/apps/object-storage-admin/package.json ./magrathea-ui/apps/object-storage-admin/
+COPY magrathea-ui/apps/magrathea-example/package.json ./magrathea-ui/apps/magrathea-example/
+COPY magrathea-ui/packages/product-shell/package.json ./magrathea-ui/packages/product-shell/
+COPY magrathea-ui/packages/magrathea-example/package.json ./magrathea-ui/packages/magrathea-example/
+COPY magrathea-ui/packages/object-storage-extension/package.json ./magrathea-ui/packages/object-storage-extension/
+COPY magrathea-ui/templates/product-app/package.json ./magrathea-ui/templates/product-app/
 COPY bootstrap-application/src/main/scripts/package.json bootstrap-application/src/main/scripts/package-lock.json ./bootstrap-application/src/main/scripts/
 
 # Install npm dependencies for the frontend and bootstrap documentation scripts
@@ -55,6 +58,7 @@ RUN mvn -B --no-transfer-progress dependency:go-offline -DskipTests -Dmaven.plug
 
 # Copy all source code
 COPY docs ./docs/
+COPY magrathea-ui ./magrathea-ui/
 COPY admin-api-adapter/src ./admin-api-adapter/src/
 COPY object-store-domain/src ./object-store-domain/src/
 COPY storage-engine-domain/src ./storage-engine-domain/src/
@@ -77,6 +81,12 @@ COPY scripts ./scripts/
 RUN python3 scripts/generate-gherkin-requirements-appendix.py --check && \
     python3 scripts/generate-gherkin-requirements-appendix.py
 
+# REQ-ADMIN-022: the named target is the canonical deterministic packaging gate.
+FROM build-base AS frontend-packaging-validation
+RUN scripts/validate-frontend-packaging.sh
+
+FROM frontend-packaging-validation AS builder
+
 # Regenerate web documentation assets from source docs inside the builder.
 # This intentionally does not copy generated bootstrap static resources from the host context.
 RUN set -eux; \
@@ -91,8 +101,8 @@ RUN set -eux; \
       docs/c4/images \
       docs/test-report.md \
       docs/adr \
-      magrathea-ui/public/favicon.svg \
-      magrathea-ui/public/icons.svg; \
+      magrathea-ui/apps/object-storage-admin/public/favicon.svg \
+      magrathea-ui/apps/object-storage-admin/public/icons.svg; \
     do \
       test -e "$required"; \
     done; \
@@ -114,8 +124,9 @@ RUN set -eux; \
     node bootstrap-application/src/main/scripts/asciidoc-to-arc42-json.mjs; \
     node bootstrap-application/src/main/scripts/markdown-to-json.mjs; \
     node bootstrap-application/src/main/scripts/adr-to-json.mjs; \
+    npm run validate:template --prefix magrathea-ui; \
     npm run build --prefix magrathea-ui; \
-    cp -R magrathea-ui/dist/. bootstrap-application/src/main/resources/static/; \
+    cp -R magrathea-ui/dist/object-storage/. bootstrap-application/src/main/resources/static/; \
     test -f bootstrap-application/src/main/resources/static/index.html; \
     test -f bootstrap-application/src/main/resources/static/favicon.svg; \
     test -f bootstrap-application/src/main/resources/static/icons.svg; \

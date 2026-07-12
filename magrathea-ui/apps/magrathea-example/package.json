@@ -1,0 +1,16 @@
+{
+  "name": "@magrathea/magrathea-example-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "@magrathea/magrathea-example": "0.1.0",
+    "@magrathea/product-shell": "0.1.0",
+    "vue": "^3.5.18",
+    "vue-router": "^4.5.1"
+  }
+}

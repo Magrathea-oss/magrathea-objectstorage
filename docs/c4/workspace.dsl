@@ -14,8 +14,18 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
         backendSelection = component "ObjectStoreBackendStatusConfig" "Validates and logs the selected object-store backend. The single-node profile uses in-memory repositories; the storage-engine profile/property selects the Storage Engine-backed repositories." "Spring @Configuration"
       }
 
-      adminApiAdapter = container "admin-api-adapter" "Management HTTP adapter that exposes JSON admin endpoints such as health and storage policy operations. Frontend/static documentation assets are handed off to bootstrap-application and served from its classpath static resources." "Spring Boot 4 WebFlux, RouterFunction" {
-        adminRouter = component "AdminRouter" "Defines /admin/health and /admin/storage-policies routes, maps storage policy requests to storage-engine domain value objects, and returns JSON/HATEOAS-style responses." "Spring @Configuration, RouterFunction"
+      browserFrontend = container "Object Storage Admin Browser Application" "Browser runtime for the independently built Object Storage product composition. The deployed static distribution composes the product-neutral Product Shell with the Object Storage Product Extension and application-owned browser adapters. It calls the Admin Control Plane and, only when a separate endpoint and in-memory signer are configured, the S3 Data Plane for HeadObject diagnostics." "Vue 3, TypeScript, JavaScript, Vue Router, Vite" {
+        productApplication = component "Object Storage Admin Application" "Deployable product composition in apps/object-storage-admin. Registers the Object Storage Product Extension, composes its navigation and routes into Product Shell, owns documentation routes, and wires browser/platform adapters through dependency injection." "Vue 3 application"
+        productShell = component "Product Shell" "Product-neutral @magrathea/product-shell package. Provides extension contracts and deterministic composition, application/resource-state contracts, localization boundaries, accessible shell components, and semantic theme tokens. It contains no product routes, product data, network access, browser storage, or document mutation." "Vue 3, TypeScript library"
+        objectStorageExtension = component "Object Storage Product Extension" "Product-owned @magrathea/object-storage-extension package. Contributes admin screens, routes, navigation, localization, catalog and capacity presentation, unavailable-provider states, and the optional S3 HeadObject diagnostic. It consumes typed clients rather than accessing private storage-engine routes." "Vue 3, TypeScript library"
+        browserPlatformAdapters = component "Browser Platform Adapters" "Application-owned adapters for public endpoint metadata, connectivity, locale preference in localStorage, document language/title, navigation focus, and the optional in-memory S3 request signer. Credentials are not read from runtime metadata or browser storage." "Browser APIs, Vue Router"
+        adminApiClient = component "Admin API Client" "Typed Object Storage extension adapter for health/readiness, backend status, read-only catalogs, non-persistent policy validation, bucket capacity/quota, and operational report routes. Preserves explicit unavailable and error responses from the Admin Control Plane." "TypeScript Fetch API adapter"
+        s3HeadObjectClient = component "S3 HeadObject Client" "Typed, separately configured S3 Data Plane adapter limited to signed HeadObject diagnostics. Rejects Admin and private storage-engine target paths and is absent unless both an endpoint and signer are configured." "TypeScript Fetch API adapter"
+        documentationUi = component "Documentation Viewer" "Application-owned routes and components for bundled generated product, architecture, test, API, and ADR documentation." "Vue 3 components"
+      }
+
+      adminApiAdapter = container "admin-api-adapter" "Management HTTP adapter that exposes the implemented JSON Admin Control Plane for health/readiness, backend status, read-only catalogs, non-persistent policy validation, capacity/quota, and operational-report availability. Frontend/static documentation assets are handed off to bootstrap-application and served from its classpath static resources." "Spring Boot 4 WebFlux, RouterFunction" {
+        adminRouter = component "AdminRouter" "Defines the /admin JSON route families. Catalog and capacity routes use configured storage-engine ports; backend status uses its configured provider; operational report routes return explicit provider-not-configured responses when no matching real provider exists." "Spring @Configuration, RouterFunction"
       }
 
       s3ReactiveApiAdapter = container "s3-reactive-api-adapter" "HTTP adapter that exposes the S3-compatible REST API and translates HTTP/XML/binary requests into reactive application use cases." "Spring Boot 4 WebFlux, RouterFunction, Java 21, Jackson XML" {
@@ -71,7 +81,8 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
     }
 
     administrator -> magrathea "Uses admin UI, generated documentation, and management API" "HTTP/JSON"
-    administrator -> magrathea.bootstrapApplication.adminServerConfig "Uses bundled admin UI and generated documentation on the admin port" "HTTP"
+    administrator -> magrathea.bootstrapApplication.adminServerConfig "Loads bundled admin UI and generated documentation on the admin port" "HTTP"
+    administrator -> magrathea.browserFrontend.productApplication "Uses the Object Storage administration experience" "Browser interaction"
     administrator -> magrathea.adminApiAdapter.adminRouter "Calls admin management endpoints" "HTTP/JSON"
 
     magrathea.bootstrapApplication.magratheaApplication -> magrathea.s3ReactiveApiAdapter.s3ProxyRouter "Bootstraps S3 API routes on the main WebFlux server" "Spring Boot auto-configuration"
@@ -79,9 +90,23 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
     magrathea.bootstrapApplication.magratheaApplication -> magrathea.reactiveBucketManagement.reactiveBucketService "Component-scans bucket-management services" "Spring component scan"
     magrathea.bootstrapApplication.adminServerConfig -> magrathea.adminApiAdapter.adminRouter "Mounts admin API routes on the admin server" "RouterFunction"
     magrathea.bootstrapApplication.adminServerConfig -> magrathea.bootstrapApplication.staticResources "Serves copied UI, documentation, and report assets from the bootstrap classpath" "ClassPathResource"
+    magrathea.bootstrapApplication.staticResources -> magrathea.browserFrontend.productApplication "Delivers the built Object Storage Admin distribution and bundled documentation" "HTTP static assets"
     magrathea.bootstrapApplication.backendSelection -> magrathea.reactiveInfrastructure "Selects in-memory repositories for the single-node profile" "Spring profiles/properties"
     magrathea.bootstrapApplication.backendSelection -> magrathea.storageEngine.storageEngineRepositoryAdapter "Selects Storage Engine-backed repositories for the storage-engine profile" "Spring profiles/properties"
     magrathea.adminApiAdapter.adminRouter -> magrathea.storageEngine.storageEngineDomain "Uses storage policy value objects for admin request mapping" "Java calls"
+    magrathea.adminApiAdapter.adminRouter -> magrathea.storageEngine.storageEngineReactiveRepositoryApplication "Reads configured policy, device, disk-set, and bucket-capacity ports; reports unavailable when required ports are absent" "Reactive port interfaces"
+
+    magrathea.browserFrontend.productApplication -> magrathea.browserFrontend.productShell "Composes the accessible product frame and extension contracts" "TypeScript/Vue imports"
+    magrathea.browserFrontend.productApplication -> magrathea.browserFrontend.objectStorageExtension "Registers Object Storage routes, navigation, localization, and screens" "ProductExtension contract"
+    magrathea.browserFrontend.productApplication -> magrathea.browserFrontend.browserPlatformAdapters "Uses application-owned browser effects and runtime configuration" "TypeScript calls"
+    magrathea.browserFrontend.productApplication -> magrathea.browserFrontend.documentationUi "Registers bundled documentation routes" "Vue Router"
+    magrathea.browserFrontend.objectStorageExtension -> magrathea.browserFrontend.productShell "Uses ProductExtension contracts and shell presentation primitives" "TypeScript/Vue imports"
+    magrathea.browserFrontend.objectStorageExtension -> magrathea.browserFrontend.adminApiClient "Uses the injected Admin Control Plane port" "Typed client interface"
+    magrathea.browserFrontend.objectStorageExtension -> magrathea.browserFrontend.s3HeadObjectClient "Uses the optional injected S3 diagnostic port" "Typed client interface"
+    magrathea.browserFrontend.browserPlatformAdapters -> magrathea.browserFrontend.adminApiClient "Configures endpoint, connectivity, and timeout behavior" "Dependency injection"
+    magrathea.browserFrontend.browserPlatformAdapters -> magrathea.browserFrontend.s3HeadObjectClient "Configures the separate endpoint and in-memory signer only when supplied" "Dependency injection"
+    magrathea.browserFrontend.adminApiClient -> magrathea.adminApiAdapter.adminRouter "Calls implemented Admin Control Plane routes" "HTTP/JSON"
+    magrathea.browserFrontend.s3HeadObjectClient -> magrathea.s3ReactiveApiAdapter.objectOperationsHandler "Optionally sends a signed HeadObject diagnostic to the separately configured S3 Data Plane" "HTTP HEAD"
 
     user -> magrathea.s3ReactiveApiAdapter.bucketOperationsHandler "Sends S3 bucket operations requests" "HTTP"
     user -> magrathea.s3ReactiveApiAdapter.bucketMetadataHandler "Sends S3 bucket metadata requests" "HTTP"
@@ -158,10 +183,11 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
 
     container magrathea "Container" {
       title "C2 Container: Magrathea ObjectStore"
-      description "bootstrap-application is the executable Spring Boot assembly and owns the static asset handoff for magrathea-ui dist assets, generated docs/reports, C4 images, and arc42 images; admin-api-adapter contributes only JSON admin routes. s3-reactive-api-adapter exposes the S3 API with RouterFunction dispatch; reactive-object-store and reactive-bucket-management implement core reactive capabilities with Phase F advanced operations; reactive-repository-application provides CQS interfaces; reactive-infrastructure persists state reactively in-process; and storage-engine provides the Storage Engine bounded context for persistence pipeline, virtual devices, storage policies, optional deduplication, erasure coding, content-addressed storage, and manifest management. MINIO_STANDARD is STANDARD with dedup disabled, EC enabled (4 data / 2 parity), replication factor 1, compression disabled, and encryption disabled by default."
+      description "bootstrap-application is the executable Spring Boot assembly and owns the static asset handoff. Object Storage Admin Browser Application is the independently built browser runtime that composes Product Shell, the Object Storage Product Extension, and application-owned adapters; it does not imply that operational report providers exist. admin-api-adapter contributes the JSON Admin Control Plane. s3-reactive-api-adapter exposes the S3 API; reactive application containers implement object and bucket capabilities; reactive-repository-application supplies CQS interfaces; reactive-infrastructure supplies in-memory persistence; and storage-engine supplies the Storage Engine bounded context."
       include user
       include administrator
       include magrathea.bootstrapApplication
+      include magrathea.browserFrontend
       include magrathea.adminApiAdapter
       include magrathea.s3ReactiveApiAdapter
       include magrathea.reactiveObjectStore
@@ -187,9 +213,20 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
       autolayout lr
     }
 
+    component magrathea.browserFrontend "ObjectStorageAdminBrowserComponents" {
+      title "C3 Component: Object Storage Admin Browser Application"
+      description "Implemented EP-7 frontend boundaries. The deployable application composes the product-neutral Product Shell and independently maintained Object Storage Product Extension, owns browser/platform and documentation integration, and injects separate typed Admin API and optional S3 HeadObject clients. Operational report screens preserve provider-not-configured responses; no absent report, audit, metrics, trace, recovery, garbage-collection, or scrub provider is modeled."
+      include administrator
+      include magrathea.bootstrapApplication
+      include *
+      include magrathea.adminApiAdapter
+      include magrathea.s3ReactiveApiAdapter
+      autolayout lr
+    }
+
     component magrathea.adminApiAdapter "AdminApiAdapterComponents" {
       title "C3 Component: admin-api-adapter"
-      description "JSON management API routes consumed by the bootstrap admin server and the bundled UI. Frontend and generated documentation assets are handed off to bootstrap-application static resources."
+      description "Implemented JSON Admin Control Plane routes consumed by the browser application and mounted by the bootstrap admin server. Catalog and capacity behavior is backed by configured ports; operational reports explicitly remain unavailable when no matching real provider is configured. Frontend and generated documentation assets are handed off to bootstrap-application static resources."
       include administrator
       include magrathea.bootstrapApplication
       include *
@@ -257,13 +294,16 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
       autolayout lr
     }
 
-    dynamic magrathea.bootstrapApplication "AdminStaticAssetRuntime" {
-      title "Runtime: Admin UI and Documentation Static Assets"
-      description "The admin server in bootstrap-application serves the bundled UI and generated docs from classpath static resources; admin-api-adapter supplies only /admin JSON API routes."
+    dynamic magrathea.browserFrontend "AdminStaticAssetRuntime" {
+      title "Runtime: Object Storage Administration"
+      description "The admin server delivers the independently built browser distribution and bundled documentation. The running browser application composes Product Shell with the Object Storage Product Extension and calls implemented Admin Control Plane routes. Operational report routes return provider-not-configured when no real provider exists; S3 HeadObject is attempted only when its separate endpoint and signer are configured."
       administrator -> magrathea.bootstrapApplication.adminServerConfig "1. GET /, /assets/**, or /docs/**" "HTTP"
-      magrathea.bootstrapApplication.adminServerConfig -> magrathea.bootstrapApplication.staticResources "2. Serve index.html, assets, docs, C4 images, and reports" "ClassPathResource"
-      administrator -> magrathea.bootstrapApplication.adminServerConfig "3. GET/POST/PUT/DELETE /admin/**" "HTTP"
-      magrathea.bootstrapApplication.adminServerConfig -> magrathea.adminApiAdapter.adminRouter "4. Dispatch admin API route" "RouterFunction"
+      magrathea.bootstrapApplication.adminServerConfig -> magrathea.bootstrapApplication.staticResources "2. Resolve classpath static resource" "ClassPathResource"
+      magrathea.bootstrapApplication.staticResources -> magrathea.browserFrontend.productApplication "3. Deliver application and documentation assets" "HTTP static assets"
+      administrator -> magrathea.browserFrontend.productApplication "4. Navigate an administration screen" "Browser interaction"
+      magrathea.browserFrontend.productApplication -> magrathea.browserFrontend.objectStorageExtension "5. Render the registered product route" "ProductExtension contract"
+      magrathea.browserFrontend.objectStorageExtension -> magrathea.browserFrontend.adminApiClient "6. Request Admin Control Plane data" "Typed client interface"
+      magrathea.browserFrontend.adminApiClient -> magrathea.adminApiAdapter.adminRouter "7. GET/POST/PUT /admin/**" "HTTP/JSON"
       autolayout lr
     }
 

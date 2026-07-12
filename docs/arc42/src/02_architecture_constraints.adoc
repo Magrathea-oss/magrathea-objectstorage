@@ -9,6 +9,8 @@ ifndef::imagesdir[:imagesdir: ../images]
 - **Spring Boot 4 WebFlux**: reactive non-blocking stack
 - **Maven multi-module**: flat sibling modules per bounded context
 - **S3 object API boundary**: public object-storage endpoints MUST be AWS S3-compatible. Internal/admin endpoints are allowed only under the separate `admin-api-adapter` `/admin/**` surface and must not be counted as S3 API coverage.
+- **Control-plane boundary**: the Admin Control Plane MUST NOT expose object/bucket CRUD, listing, multipart, metadata, tagging, ACL, versioning, or other S3 semantics. Those remain exclusively on the S3 Data Plane. Admin-side S3 diagnostics MUST call S3 as a client and MUST NOT bypass through storage-engine ports or private routes.
+- **Product-shell neutrality (ADR 0026, implementation-informed)**: the reusable Magrathea Product Shell MUST contain no Object Storage domain or API logic. Product-specific routes, labels, permissions, endpoint paths, clients, models, and screens belong to a Product Extension; this repository's extension is the Object Storage Admin Application.
 - **Pluggable S3 adapter**: S3 API lives in `s3-reactive-api-adapter` and is loaded via Spring Boot auto-configuration, not component scanning
 - **S3 API toggle**: `s3.api.enabled=false` disables S3 routes even when the module is present
 - **RouterFunction**: NO `@Controller`, NO `@RequestMapping` — functional WebFlux style only
