@@ -19,6 +19,10 @@ import java.util.UUID;
 
 /** Filesystem-backed, process-atomic bucket quota ledger. */
 public final class FileSystemBucketCapacityStore implements BucketCapacityPort {
+    static final int LEGACY_SCHEMA_VERSION = 0;
+    static final int CURRENT_SCHEMA_VERSION = 1;
+    static final String SCHEMA_VERSION_PROPERTY = "capacity.schemaVersion";
+
     private final Path ledger;
     private final Object monitor = new Object();
     private final Map<String, MutableCapacity> capacities = new HashMap<>();
@@ -184,7 +188,10 @@ public final class FileSystemBucketCapacityStore implements BucketCapacityPort {
             } catch (IOException e) {
                 throw new UncheckedIOException("Failed to load bucket capacity ledger: " + ledger, e);
             }
+            readSchemaVersion(properties);
             properties.stringPropertyNames().stream()
+                    .filter(name -> !SCHEMA_VERSION_PROPERTY.equals(name))
+                    .filter(name -> name.lastIndexOf('.') > 0)
                     .map(name -> name.substring(0, name.lastIndexOf('.')))
                     .distinct()
                     .forEach(bucket -> capacities.put(bucket, new MutableCapacity(
@@ -193,6 +200,12 @@ public final class FileSystemBucketCapacityStore implements BucketCapacityPort {
                             number(properties, bucket + ".quotaBytes", -1),
                             number(properties, bucket + ".rejectedReservations", 0),
                             number(properties, bucket + ".lastRejectedBytes", 0))));
+            boolean staleReservations = properties.stringPropertyNames().stream()
+                    .filter(name -> name.endsWith(".reservedBytes"))
+                    .anyMatch(name -> number(properties, name, 0) != 0);
+            if (staleReservations) {
+                persist();
+            }
             return true;
         }
     }
@@ -229,6 +242,7 @@ public final class FileSystemBucketCapacityStore implements BucketCapacityPort {
         try {
             Files.createDirectories(ledger.getParent());
             Properties properties = new Properties();
+            properties.setProperty(SCHEMA_VERSION_PROPERTY, Integer.toString(CURRENT_SCHEMA_VERSION));
             capacities.forEach((bucket, state) -> {
                 properties.setProperty(bucket + ".usedBytes", Long.toString(state.usedBytes));
                 properties.setProperty(bucket + ".reservedBytes", Long.toString(state.reservedBytes));
@@ -251,6 +265,27 @@ public final class FileSystemBucketCapacityStore implements BucketCapacityPort {
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to persist bucket capacity ledger: " + ledger, e);
         }
+    }
+
+    private int readSchemaVersion(Properties properties) {
+        String rawVersion = properties.getProperty(SCHEMA_VERSION_PROPERTY);
+        if (rawVersion == null) {
+            return LEGACY_SCHEMA_VERSION;
+        }
+        int version;
+        try {
+            version = Integer.parseInt(rawVersion.trim());
+        } catch (NumberFormatException error) {
+            throw new IllegalArgumentException(
+                    "Invalid bucket capacity ledger schema version '" + rawVersion + "': " + ledger, error);
+        }
+        if (version != LEGACY_SCHEMA_VERSION && version != CURRENT_SCHEMA_VERSION) {
+            throw new IllegalArgumentException(
+                    "Unsupported bucket capacity ledger schema version " + version + ": " + ledger
+                            + "; supported versions are " + LEGACY_SCHEMA_VERSION
+                            + " and " + CURRENT_SCHEMA_VERSION);
+        }
+        return version;
     }
 
     private static long number(Properties properties, String name, long fallback) {

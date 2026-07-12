@@ -135,6 +135,13 @@ RUN mvn -B --no-transfer-progress clean package -DskipTests && \
 # Stage 2: Runtime
 FROM public.ecr.aws/docker/library/eclipse-temurin:21-jre
 
+ARG OCI_VERSION=unknown
+ARG OCI_REVISION=unknown
+ARG OCI_SOURCE=unknown
+LABEL org.opencontainers.image.version="${OCI_VERSION}" \
+      org.opencontainers.image.revision="${OCI_REVISION}" \
+      org.opencontainers.image.source="${OCI_SOURCE}"
+
 RUN apt-get update \
     && apt-get install -y --no-install-recommends wget \
     && rm -rf /var/lib/apt/lists/* \

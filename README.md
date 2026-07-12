@@ -117,7 +117,14 @@ The canonical JVM container path is:
 ```bash
 docker build --network=host -f Dockerfile -t magrathea-objectstorage:jvm .
 docker run --rm --network=host magrathea-objectstorage:jvm
+
+# Docker-required non-root, persistent-volume, SIGTERM/replacement requirement
+mvn -Pdocker-cucumber-tests -pl s3-reactive-api-adapter -am \
+  -Dsurefire.failIfNoSpecifiedTests=false \
+  -Dtest=PhaseEp5JvmContainerReplacementRequirementsCucumberIT test
 ```
+
+The replacement gate is intentionally opt-in for ordinary Maven runs and mandatory before release publication. Its validated procedure is documented in [`docs/runbooks/container-replacement.md`](docs/runbooks/container-replacement.md).
 
 The JVM runtime image uses public ECR mirrored Maven/Temurin bases, runs as the non-root `magrathea` user with writable `/app/data`, activates the `storage-engine` profile with packaged YAML catalogs, exposes ports 8080/8081, and has an Admin API healthcheck. Graceful shutdown is enabled for the bootstrap application. The 2026-07-10 validation used `--network=host` because the local Docker sandbox cannot create bridge networking; it passed Admin health, `/admin/live`, `/admin/ready` with ready catalog status, S3 ListBuckets XML, bucket/object PUT/GET, selected-backend log verification, SIGTERM committed-object recovery, SIGTERM draining of active streaming PutObject, multipart UploadPart, and CompleteMultipartUpload requests, including concurrent PutObjects, a bounded mixed read/write load, cancelled-and-aborted part cleanup, abort-wins multipart completion overlap, and restart durability checks, offline storage-root backup/restore, declared single-node DR RTO/RPO rehearsal, object-manifest, multipart-session, bucket-registry, object-configuration, object-reference, and object-ACL schema-version compatibility checks, shipped SLO/alerting rule coverage, opt-in live Prometheus-to-Alertmanager webhook delivery, and generated-password log checks. The validated graceful shutdown, offline backup, disaster recovery, schema migration, and alert response procedures are documented in `docs/runbooks/graceful-shutdown.md`, `docs/runbooks/backup-restore.md`, `docs/runbooks/disaster-recovery.md`, `docs/runbooks/schema-migration.md`, and `docs/runbooks/slo-alerts.md`.
 
@@ -158,7 +165,7 @@ s3-reactive-api-adapter/src/main/resources/META-INF/spring/org.springframework.b
 ```bash
 mvn clean test
 mvn -pl bootstrap-application -am package -DskipTests
-java -jar bootstrap-application/target/bootstrap-application-1.0.0-SNAPSHOT.jar
+java -jar bootstrap-application/target/bootstrap-application-0.1.0-SNAPSHOT.jar
 
 # optional JVM-free native executable
 mvn -Pnative -pl bootstrap-application -am -DskipTests native:compile
@@ -236,7 +243,7 @@ AWS CLI tests require:
 
 ```bash
 # Manual: start server in one shell, run tests in another
-java -jar bootstrap-application/target/bootstrap-application-1.0.0-SNAPSHOT.jar
+java -jar bootstrap-application/target/bootstrap-application-0.1.0-SNAPSHOT.jar
 bash test-aws-cli.sh
 
 # Automatic via Maven (starts server, runs tests, stops server):
@@ -276,6 +283,8 @@ Phases A–F route mapping is recorded in [ADR 0012](docs/adr/0012-phase-f-advan
 | Generated S3 API semantic coverage | [`docs/api-coverage.md`](docs/api-coverage.md) |
 | Positioning & competitive analysis | [`docs/positioning.md`](docs/positioning.md) |
 | Public roadmap | [`docs/roadmap.md`](docs/roadmap.md) |
+| Release policy | [`docs/release-policy.md`](docs/release-policy.md) |
+| JVM container replacement runbook | [`docs/runbooks/container-replacement.md`](docs/runbooks/container-replacement.md) |
 | ARC42 architecture docs | [`docs/arc42/`](docs/arc42/) |
 | ADRs | [`docs/adr/`](docs/adr/) |
 | C4 diagrams | [`docs/c4/`](docs/c4/) |

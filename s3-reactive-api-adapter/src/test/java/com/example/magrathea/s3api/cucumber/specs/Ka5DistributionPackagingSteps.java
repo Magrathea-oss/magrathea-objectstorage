@@ -290,31 +290,35 @@ public class Ka5DistributionPackagingSteps {
     }
 
     @Then("the CI workflow builds and smokes the root JVM Docker image")
-    public void ciWorkflowBuildsAndSmokesRootJvmDockerImage() {
+    public void ciWorkflowBuildsAndSmokesRootJvmDockerImage() throws IOException {
         assertInspected();
-        assertTrue(inspectedSource.contains("docker build --network=host -f Dockerfile -t magrathea-objectstorage:jvm ."),
-            "CI workflow should build the root JVM Docker image");
-        assertTrue(inspectedSource.contains("docker run -d --name magrathea-jvm-smoke --network=host"),
-            "CI workflow should start the root JVM Docker image for smoke validation");
-        assertTrue(inspectedSource.contains("http://127.0.0.1:8081/admin/health"),
-            "CI workflow should smoke the Admin API health endpoint");
-        assertTrue(inspectedSource.contains("http://127.0.0.1:8081/admin/live"),
-            "CI workflow should smoke the Admin API liveness endpoint");
-        assertTrue(inspectedSource.contains("http://127.0.0.1:8081/admin/ready"),
-            "CI workflow should smoke the Admin API readiness endpoint");
-        assertTrue(inspectedSource.contains("ci-jvm-smoke-bucket/object.txt"),
-            "CI workflow should smoke S3 bucket/object PUT/GET behavior");
+        assertTrue(inspectedSource.contains("PhaseEp5JvmContainerReplacementRequirementsCucumberIT"),
+            "CI workflow should select the executable JVM container replacement requirement");
+        assertTrue(inspectedSource.contains("-Pdocker-cucumber-tests"),
+            "CI workflow should opt in to Docker-required Cucumber validation");
+        String validationScript = readRelative("scripts/validate-jvm-container-replacement.sh");
+        assertTrue(validationScript.contains("docker build --network=\"$NETWORK_MODE\" -f Dockerfile"),
+            "Docker requirement validation should build the root JVM image");
+        assertTrue(validationScript.contains("docker run -d --name \"$FIRST_CONTAINER\""),
+            "Docker requirement validation should start the root JVM image");
+        assertTrue(validationScript.contains("/admin/live"),
+            "Docker requirement validation should probe Admin liveness");
+        assertTrue(validationScript.contains("/admin/ready"),
+            "Docker requirement validation should probe Admin readiness");
+        assertTrue(validationScript.contains("curl -fsS -X PUT"),
+            "Docker requirement validation should exercise S3 bucket and object writes");
     }
 
     @Then("the CI workflow requires Docker readiness to be ready in storage-engine mode")
-    public void ciWorkflowRequiresDockerReadinessReady() {
+    public void ciWorkflowRequiresDockerReadinessReady() throws IOException {
         assertInspected();
-        assertTrue(inspectedSource.contains("curl -fsS http://127.0.0.1:8081/admin/ready"),
-            "CI Docker smoke should require /admin/ready to return a successful ready response");
-        assertFalse(inspectedSource.contains("ready_status=$(curl -sS -o"),
-            "CI Docker smoke must not tolerate not-ready responses for packaged single-node containers");
-        assertFalse(inspectedSource.contains("\"503\""),
-            "CI Docker smoke must not accept HTTP 503 readiness for packaged single-node containers");
+        String validationScript = readRelative("scripts/validate-jvm-container-replacement.sh");
+        assertTrue(validationScript.contains("grep -q '\"status\":\"ready\"'"),
+            "CI Docker requirement should require /admin/ready to report ready");
+        assertFalse(validationScript.contains("ready_status=$(curl -sS -o"),
+            "CI Docker validation must not tolerate not-ready responses");
+        assertFalse(validationScript.contains("\"503\""),
+            "CI Docker validation must not accept HTTP 503 readiness");
     }
 
     @Then("the CI workflow keeps native Docker packaging available as an explicit manual validation job")

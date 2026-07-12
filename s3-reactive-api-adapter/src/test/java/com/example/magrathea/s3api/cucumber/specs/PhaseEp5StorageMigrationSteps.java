@@ -10,6 +10,8 @@ import com.example.magrathea.objectstore.domain.valueobject.UploadId;
 import com.example.magrathea.objectstorage.repository.storageengine.adapter.StorageEngineReactiveBucketRepository;
 import com.example.magrathea.objectstorage.repository.storageengine.adapter.StorageEngineReactiveMultipartUploadRepository;
 import com.example.magrathea.objectstorage.repository.storageengine.adapter.StorageEngineReactiveS3ObjectRepository;
+import com.example.magrathea.storageengine.application.port.BucketCapacityPort.BucketCapacity;
+import com.example.magrathea.storageengine.application.port.BucketQuotaExceededException;
 import com.example.magrathea.storageengine.domain.valueobject.BucketId;
 import com.example.magrathea.storageengine.domain.valueobject.BucketRef;
 import com.example.magrathea.storageengine.domain.valueobject.ChecksumAlgorithm;
@@ -35,6 +37,7 @@ import com.example.magrathea.storageengine.domain.valueobject.UploadCompletionTr
 import com.example.magrathea.storageengine.domain.valueobject.UploadMode;
 import com.example.magrathea.storageengine.domain.valueobject.VersionId;
 import com.example.magrathea.storageengine.domain.valueobject.VirtualDevice;
+import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemBucketCapacityStore;
 import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemManifestRepository;
 import com.example.magrathea.s3api.adapter.web.S3ObjectAclStore;
 import io.cucumber.java.en.Given;
@@ -89,6 +92,11 @@ public class PhaseEp5StorageMigrationSteps {
     private String objectAclBucket;
     private String objectAclKey;
     private String committedObjectAclContent;
+    private Path capacityRoot;
+    private Path capacityLedgerFile;
+    private String capacityBucket;
+    private String committedCapacityContent;
+    private BucketCapacity expectedCapacity;
 
     @Given("a sample storage-engine object manifest is saved through the filesystem manifest repository")
     public void sampleStorageEngineObjectManifestIsSaved() throws IOException {
@@ -407,6 +415,90 @@ public class PhaseEp5StorageMigrationSteps {
         assertThatThrownBy(() -> unsupportedStore.find(objectAclBucket, objectAclKey))
             .hasMessageContaining("Unsupported object ACL schema version")
             .hasMessageContaining(unsupportedVersion);
+    }
+
+    @Given("a bucket capacity ledger contains committed usage, a configured quota, and a rejected reservation")
+    public void bucketCapacityLedgerContainsAccountingState() throws IOException {
+        capacityRoot = Files.createTempDirectory("magrathea-ep5-capacity-schema-");
+        capacityBucket = "ep5-capacity-schema-bucket";
+        FileSystemBucketCapacityStore store = new FileSystemBucketCapacityStore(capacityRoot);
+        store.configureQuota(capacityBucket, 1_000).block();
+        var committed = store.reserve(capacityBucket, "objects/committed.bin", 400, 0).block();
+        store.commit(committed, 400).block();
+        assertThatThrownBy(() -> store.reserve(
+                capacityBucket, "objects/rejected.bin", 700, 0).block())
+            .isInstanceOf(BucketQuotaExceededException.class);
+        store.reserve(capacityBucket, "objects/interrupted.bin", 100, 0).block();
+
+        expectedCapacity = store.capacity(capacityBucket).block();
+        assertThat(expectedCapacity).isNotNull();
+        assertThat(expectedCapacity.usedBytes()).isEqualTo(400);
+        assertThat(expectedCapacity.reservedBytes()).isEqualTo(100);
+        assertThat(expectedCapacity.quotaBytes()).isEqualTo(1_000);
+        assertThat(expectedCapacity.rejectedReservations()).isEqualTo(1);
+        assertThat(expectedCapacity.lastRejectedBytes()).isEqualTo(700);
+
+        capacityLedgerFile = capacityRoot.resolve("metadata/bucket-capacity.properties");
+        committedCapacityContent = Files.readString(capacityLedgerFile);
+    }
+
+    @Then("the committed capacity ledger declares schema version {string}")
+    public void committedCapacityLedgerDeclaresSchemaVersion(String version) {
+        assertThat(committedCapacityContent).contains("capacity.schemaVersion=" + version);
+    }
+
+    @Then("the capacity store can read a legacy ledger that omits the schema version as compatibility version {string}")
+    public void capacityStoreCanReadLegacyLedger(String compatibilityVersion) throws IOException {
+        assertThat(compatibilityVersion).isEqualTo("0");
+        String legacy = committedCapacityContent.replaceFirst(
+            "(?m)^capacity\\.schemaVersion=1\\R", "");
+        assertThat(legacy).doesNotContain("capacity.schemaVersion");
+        Files.writeString(capacityLedgerFile, legacy);
+
+        BucketCapacity restored = new FileSystemBucketCapacityStore(capacityRoot)
+            .capacity(capacityBucket).block();
+        assertPreservedCapacityAccounting(restored);
+    }
+
+    @Then("the capacity store rejects a ledger that declares unsupported schema version {string}")
+    public void capacityStoreRejectsUnsupportedSchemaVersion(String unsupportedVersion) throws IOException {
+        Files.writeString(capacityLedgerFile, committedCapacityContent.replaceFirst(
+            "capacity\\.schemaVersion=1", "capacity.schemaVersion=" + unsupportedVersion));
+
+        assertThatThrownBy(() -> new FileSystemBucketCapacityStore(capacityRoot))
+            .hasMessageContaining("Unsupported bucket capacity ledger schema version")
+            .hasMessageContaining(unsupportedVersion);
+    }
+
+    @Then("the capacity store rejects a ledger with malformed schema version {string}")
+    public void capacityStoreRejectsMalformedSchemaVersion(String malformedVersion) throws IOException {
+        Files.writeString(capacityLedgerFile, committedCapacityContent.replaceFirst(
+            "capacity\\.schemaVersion=1", "capacity.schemaVersion=" + malformedVersion));
+
+        assertThatThrownBy(() -> new FileSystemBucketCapacityStore(capacityRoot))
+            .hasMessageContaining("Invalid bucket capacity ledger schema version")
+            .hasMessageContaining(malformedVersion);
+    }
+
+    @Then("reopening the current ledger preserves used bytes, quota bytes, and rejected accounting while clearing stale reservations")
+    public void reopeningCurrentLedgerPreservesAccountingAndClearsReservations() throws IOException {
+        Files.writeString(capacityLedgerFile, committedCapacityContent);
+
+        BucketCapacity restored = new FileSystemBucketCapacityStore(capacityRoot)
+            .capacity(capacityBucket).block();
+        assertPreservedCapacityAccounting(restored);
+        String reopenedContent = Files.readString(capacityLedgerFile);
+        assertThat(reopenedContent).contains("capacity.schemaVersion=1");
+        assertThat(reopenedContent).contains(capacityBucket + ".reservedBytes=0");
+    }
+
+    private void assertPreservedCapacityAccounting(BucketCapacity restored) {
+        assertThat(restored).isNotNull();
+        assertThat(restored.usedBytes()).isEqualTo(expectedCapacity.usedBytes());
+        assertThat(restored.quotaBytes()).isEqualTo(expectedCapacity.quotaBytes());
+        assertThat(restored.rejectedReservations()).isEqualTo(expectedCapacity.rejectedReservations());
+        assertThat(restored.lastRejectedBytes()).isEqualTo(expectedCapacity.lastRejectedBytes());
+        assertThat(restored.reservedBytes()).isZero();
     }
 
     private static String base64Url(String value) {

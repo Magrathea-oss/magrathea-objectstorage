@@ -192,9 +192,28 @@ Business Need: EP-5 operational health probes
       And object "objects/rpo.txt" in bucket "ep5-disaster-recovery-bucket" can be read with body "inside the recovery point"
       And the recovered data satisfies the declared RPO
 
-  Rule: Shipped SLO and alert rules give operators actionable first-response guidance
+  Rule: The supported JVM image preserves committed data across container replacement
 
-    @implemented-not-e2e-validated @REQ-OPS-008 @functional-requirement @non-functional-requirement @slo @alerting @prometheus @loki @runbook
+    @implemented-and-validated @REQ-OPS-025 @functional-requirement @non-functional-requirement @delivery @container @durability @restart-safety @docker-required
+    Scenario: Replacing the single-node JVM container preserves an object on its mounted storage root
+      Given Docker is available for canonical JVM container replacement validation
+      And the expected image source identity is release version "0.1.0" at the current Git revision
+      When operators run the deterministic JVM container replacement validation with persistent volume "/app/data"
+      Then the canonical JVM image runs as a non-root user
+      And the first container accepts S3 bucket "ep5-release-volume-bucket" and object "release/persistent.txt" with exact body "survives container replacement"
+      And the first container exits from SIGTERM without forced removal
+      And a different container starts from the same image and persistent volume
+      And Admin endpoints "/admin/live" and "/admin/ready" report healthy operation after replacement
+      And the replacement container returns the exact persisted object bytes
+      And the running image reports release version "0.1.0", the expected source revision, and the expected source URL
+
+  Rule: Shipped SLO and alert rules give operators actionable first-response guidance
+    This portable bundle contract validates the exact Prometheus rule pack with promtool,
+    its accelerated test copy through Alertmanager delivery in REQ-OPS-021, and the Loki
+    starter rule structure and queries. Running a Loki ruler or an external paging vendor
+    is deployment integration outside the supported single-node preview artifact.
+
+    @implemented-and-validated @REQ-OPS-008 @functional-requirement @non-functional-requirement @slo @alerting @prometheus @loki @runbook
     Scenario: Packaged alerting bundle declares SLOs and first-response alerts for single-node operations
       Given the EP-5 SLO runbook exists at "docs/runbooks/slo-alerts.md"
       And the Prometheus alert rule pack exists at "ops/prometheus/magrathea-objectstorage-alerts.yml"

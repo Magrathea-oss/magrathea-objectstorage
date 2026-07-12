@@ -34,16 +34,16 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |EP-1 (`@implemented-and-validated` for local built-in scope)
 
 |5
-|**Space management and data hygiene absent** — no chunk garbage collection/reference counting beyond on-demand `FileSystemRecoveryScanner`, no quotas, no defined ENOSPC behavior, no background scrubbing.
-|Deleted-object chunks are never reclaimed; disk-full behavior is undefined; latent corruption may go undetected
-|Implement chunk GC/refcounting, per-bucket/tenant quotas, defined ENOSPC → S3 error mapping, and periodic integrity scrubbing
-|EP-4 (`@absent`, high priority)
+|**Space management remains single-node scoped** — typed GC, dedup reachability, quotas, ENOSPC mapping, and transform-aware scrubbing are implemented, but quota coordination and reclamation are not distributed.
+|A future multi-node deployment could race quota or ownership decisions if it reused the single-process coordination model
+|Keep the validated single-node boundary explicit and implement distributed coordination only with EP-10 quorum/metadata semantics
+|EP-4 (`@implemented-and-validated` single-node scope; distributed extension in EP-10)
 
 |6
-|**Operability gaps** — the first CI/operability slice now runs appendix/source-hygiene checks, focused Cucumber/security/semantic/EP-5 gates, root JVM Docker build+smoke, manual native Docker build+smoke, Admin API `/admin/live` + `/admin/ready` probes, SIGTERM shutdown/recovery validation for committed objects plus active PutObject, multipart UploadPart, and CompleteMultipartUpload requests, including two concurrent PutObjects, cancelled-and-aborted part cleanup, abort-wins overlapping multipart completion, and a bounded mixed load of three writes and two throttled reads, first offline backup/restore rehearsal, first single-node DR rehearsal with declared RTO/RPO, object-manifest, multipart-session, bucket-registry, object-configuration, object-reference, and object-ACL schema-version compatibility validation, first Prometheus/Loki SLO alert rule bundle with runbook validation, and opt-in live Prometheus-to-Alertmanager webhook delivery. Online/incremental DR, multi-node DR, live Loki/external paging delivery, schema contracts for any future durable metadata families, larger mixed read/write concurrent draining, repeated contention covering completion-wins multipart races and sustained/production-scale shutdown load behavior are not verified.
-|Recovery procedures beyond offline single-node backup/restore and single-node DR remain undocumented/unrehearsed; alert rules are shipped but not end-to-end fired through Alertmanager/Loki receivers; schema contracts beyond object manifests remain incomplete; broader operational regressions outside the focused CI slice may still reach `main`
-|Expand CI toward the full Maven gate and release hardening; document online/multi-node DR when supported; add broader graceful-shutdown in-flight draining validation
-|EP-5 (`@partial`, high priority)
+|**Operability is bounded to the `0.1.0` single-node JVM preview** — full-gate CI, immutable OCI release rehearsal, persistent-volume replacement, shutdown draining, offline backup/DR, durable schema compatibility, probes, and Prometheus/Alertmanager delivery are validated. Live Loki/external paging and online/multi-node DR are not part of this artifact.
+|Operators must not infer HA, rolling upgrade, online backup, external pager delivery, or production-scale performance from the preview release gates
+|Keep release scope and OCI identity explicit; assign sustained load to EP-6, deployment-specific paging to deployment integration, and multi-node DR/rolling operation to EP-10
+|EP-5 (`@implemented-and-validated` for declared preview scope)
 
 |7
 |**Distributed readiness is modeled, not executed** — placement, quorum, anti-entropy, and rebalance planning are unit-validated in `storage-engine-domain`, but there is no real networked membership, replication execution, or multi-node e2e validation.

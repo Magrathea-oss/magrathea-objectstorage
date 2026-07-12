@@ -18,8 +18,8 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 
 === Summary
 
-* Feature files scanned: 25
-* Scenarios discovered: 424
+* Feature files scanned: 26
+* Scenarios discovered: 429
 * Protocol-smoke scenarios: 122
 
 ==== Status tag counts
@@ -29,8 +29,8 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |Tag |Scenario count
 |`@absent` |3
 |`@config-only` |69
-|`@implemented-and-validated` |142
-|`@implemented-not-e2e-validated` |22
+|`@implemented-and-validated` |148
+|`@implemented-not-e2e-validated` |21
 |`@not-implemented` |6
 |`@placeholder` |9
 |`unknown/not-tagged` |178
@@ -44,6 +44,8 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |`@awscli-required` |61
 |`@bootstrap-integration-required` |4
 |`@component-spec-required` |9
+|`@docker-release-required` |1
+|`@docker-required` |1
 |`@filesystem-inspection-required` |1
 |`@full-process-restart-required` |1
 |`@live-monitoring-required` |1
@@ -54,7 +56,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |`@static-architecture-required` |7
 |`@tracing-inspection-required` |2
 |`@webclient-required` |300
-|`unknown/not-tagged` |69
+|`unknown/not-tagged` |72
 |===
 
 ==== Classification tag counts
@@ -62,8 +64,8 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 [cols="1,1",options="header"]
 |===
 |Tag |Scenario count
-|`@functional-requirement` |200
-|`@non-functional-requirement` |115
+|`@functional-requirement` |201
+|`@non-functional-requirement` |120
 |`unknown/not-tagged` |202
 |===
 
@@ -3127,6 +3129,39 @@ so container platforms and CI smoke gates can distinguish a running process from
   And the recovered data satisfies the declared RPO
 ----
 
+===== REQ-OPS-025
+
+====== Scenario: Replacing the single-node JVM container preserves an object on its mounted storage root
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep5-operability.feature:198`
+|Rule |The supported JVM image preserves committed data across container replacement
+|Requirement ID(s) |`REQ-OPS-025`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep5`, `@operability`, `@admin-api`, `@business-need`, `@delivery`, `@container`, `@durability`, `@restart-safety`
+|Validation mode tags |`@docker-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep5`, `@operability`, `@admin-api`, `@business-need`, `@implemented-and-validated`, `@REQ-OPS-025`, `@functional-requirement`, `@non-functional-requirement`, `@delivery`, `@container`, `@durability`, `@restart-safety`, `@docker-required`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given Docker is available for canonical JVM container replacement validation
+  And the expected image source identity is release version "0.1.0" at the current Git revision
+  When operators run the deterministic JVM container replacement validation with persistent volume "/app/data"
+  Then the canonical JVM image runs as a non-root user
+  And the first container accepts S3 bucket "ep5-release-volume-bucket" and object "release/persistent.txt" with exact body "survives container replacement"
+  And the first container exits from SIGTERM without forced removal
+  And a different container starts from the same image and persistent volume
+  And Admin endpoints "/admin/live" and "/admin/ready" report healthy operation after replacement
+  And the replacement container returns the exact persisted object bytes
+  And the running image reports release version "0.1.0", the expected source revision, and the expected source URL
+----
+
 ===== REQ-OPS-008
 
 ====== Scenario: Packaged alerting bundle declares SLOs and first-response alerts for single-node operations
@@ -3134,16 +3169,24 @@ so container platforms and CI smoke gates can distinguish a running process from
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep5-operability.feature:198`
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep5-operability.feature:217`
 |Rule |Shipped SLO and alert rules give operators actionable first-response guidance
 |Requirement ID(s) |`REQ-OPS-008`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
 |Capability area tags |`@phase-ep5`, `@operability`, `@admin-api`, `@business-need`, `@slo`, `@alerting`, `@prometheus`, `@loki`, `@runbook`
 |Validation mode tags |unknown/not-tagged
-|Declared/validated status |`@implemented-not-e2e-validated`
+|Declared/validated status |`@implemented-and-validated`
 |Protocol smoke |`no`
-|All tags |`@requirement`, `@phase-ep5`, `@operability`, `@admin-api`, `@business-need`, `@implemented-not-e2e-validated`, `@REQ-OPS-008`, `@functional-requirement`, `@non-functional-requirement`, `@slo`, `@alerting`, `@prometheus`, `@loki`, `@runbook`
+|All tags |`@requirement`, `@phase-ep5`, `@operability`, `@admin-api`, `@business-need`, `@implemented-and-validated`, `@REQ-OPS-008`, `@functional-requirement`, `@non-functional-requirement`, `@slo`, `@alerting`, `@prometheus`, `@loki`, `@runbook`
 |===
+
+.Rule description
+----
+This portable bundle contract validates the exact Prometheus rule pack with promtool,
+its accelerated test copy through Alertmanager delivery in REQ-OPS-021, and the Loki
+starter rule structure and queries. Running a Loki ruler or an external paging vendor
+is deployment integration outside the supported single-node preview artifact.
+----
 
 .Gherkin steps
 [source,gherkin]
@@ -3166,7 +3209,7 @@ so container platforms and CI smoke gates can distinguish a running process from
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep5-operability.feature:226`
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep5-operability.feature:245`
 |Rule |Shipped SLO and alert rules give operators actionable first-response guidance
 |Requirement ID(s) |`REQ-OPS-021`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -3176,6 +3219,14 @@ so container platforms and CI smoke gates can distinguish a running process from
 |Protocol smoke |`no`
 |All tags |`@requirement`, `@phase-ep5`, `@operability`, `@admin-api`, `@business-need`, `@implemented-and-validated`, `@REQ-OPS-021`, `@functional-requirement`, `@non-functional-requirement`, `@slo`, `@alerting`, `@prometheus`, `@alertmanager`, `@live-monitoring-required`
 |===
+
+.Rule description
+----
+This portable bundle contract validates the exact Prometheus rule pack with promtool,
+its accelerated test copy through Alertmanager delivery in REQ-OPS-021, and the Loki
+starter rule structure and queries. Running a Loki ruler or an external paging vendor
+is deployment integration outside the supported single-node preview artifact.
+----
 
 .Gherkin steps
 [source,gherkin]
@@ -13368,6 +13419,101 @@ without requiring plaintext or encryption keys in the background job.
   And each completed run atomically replaces the latest operator-readable scrub report
 ----
 
+==== s3-reactive-api-adapter/src/test/features/specs/phase-ep5-delivery.feature
+
+* Feature title: Ability: Reproducible single-node preview delivery
+* Feature tags: `@spec`, `@ep-5`, `@operability`, `@delivery`, `@release`
+* Feature description:
++
+----
+As a maintainer and release operator,
+I want every supported image to come from a complete, version-coherent validation pipeline,
+So that the first single-node preview can be reproduced and replaced without losing committed data.
+----
+
+===== REQ-OPS-022
+
+====== Scenario: CI runs the full Maven and generated-document gates before building the JVM image
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep5-delivery.feature:9`
+|Rule |Pull requests and release tags execute the canonical quality gate
+|Requirement ID(s) |`REQ-OPS-022`
+|Classification |`@non-functional-requirement`
+|Capability area tags |`@spec`, `@ep-5`, `@operability`, `@delivery`, `@release`, `@ci`, `@quality-gate`, `@jvm`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@ep-5`, `@operability`, `@delivery`, `@release`, `@REQ-OPS-022`, `@non-functional-requirement`, `@ci`, `@quality-gate`, `@jvm`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the canonical supported artifact is the Linux JVM 21 OCI image
+  When a pull request or release tag runs the repository CI workflow
+  Then the workflow executes the complete root Maven test gate without fail-never mode
+  And the workflow checks the Gherkin appendix, S3 API coverage, and source hygiene for freshness
+  And the JVM image build starts only after those mandatory gates pass
+  And focused Cucumber jobs may fail fast but cannot replace the complete gate
+----
+
+===== REQ-OPS-023
+
+====== Scenario: A release tag produces one traceable single-node preview image
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep5-delivery.feature:19`
+|Rule |Release identity is coherent and immutable
+|Requirement ID(s) |`REQ-OPS-023`
+|Classification |`@non-functional-requirement`
+|Capability area tags |`@spec`, `@ep-5`, `@operability`, `@delivery`, `@release`, `@versioning`, `@oci`, `@supply-chain`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@ep-5`, `@operability`, `@delivery`, `@release`, `@REQ-OPS-023`, `@non-functional-requirement`, `@versioning`, `@oci`, `@supply-chain`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the release policy declares semantic versioning and the supported single-node preview scope
+  When tag "v0.1.0" starts the release workflow
+  Then Maven release version, Git tag, OCI version label, and image version tag all equal "0.1.0"
+  And the image records source revision, source URL, license, and creation time OCI labels
+  And the registry receives immutable version, minor-line, and commit-SHA tags
+  And the release records the image digest and declares the native image experimental
+----
+
+====== Scenario: Local registry rehearsal proves immutable preview publication semantics
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep5-delivery.feature:28`
+|Rule |Release identity is coherent and immutable
+|Requirement ID(s) |`REQ-OPS-023`
+|Classification |`@non-functional-requirement`
+|Capability area tags |`@spec`, `@ep-5`, `@operability`, `@delivery`, `@release`, `@versioning`, `@oci`
+|Validation mode tags |`@docker-release-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@ep-5`, `@operability`, `@delivery`, `@release`, `@REQ-OPS-023`, `@non-functional-requirement`, `@versioning`, `@oci`, `@docker-release-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the canonical JVM image carries version "0.1.0" and the current source revision
+  When the local release rehearsal publishes version, minor-line, and commit-SHA tags
+  Then all three registry tags resolve to one non-empty immutable digest
+  And a repeated publication attempt is refused rather than overwriting a tag
+----
+
 ==== s3-reactive-api-adapter/src/test/features/specs/phase-ep5-storage-migration.feature
 
 * Feature title: Ability: EP-5 storage-engine manifest schema versioning
@@ -13540,6 +13686,35 @@ so storage-engine files can be migrated safely instead of being parsed as ambigu
   Then the committed object ACL sidecar declares schema version "1"
   And the ACL store can read a legacy sidecar that omits the schema version as compatibility version "0"
   And the ACL store rejects a sidecar that declares unsupported schema version "999"
+----
+
+===== REQ-OPS-024
+
+====== Scenario: Bucket capacity ledger declares its schema and preserves existing quota accounting
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep5-storage-migration.feature:52`
+|Rule |Manifest files declare supported schema versions and retain controlled legacy compatibility
+|Requirement ID(s) |`REQ-OPS-024`
+|Classification |`@non-functional-requirement`
+|Capability area tags |`@spec`, `@operability`, `@schema-migration`, `@storage-engine`, `@capacity-ledger-versioning`, `@migration`, `@durability`, `@restart-safety`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@non-functional-requirement`, `@operability`, `@schema-migration`, `@storage-engine`, `@REQ-OPS-024`, `@capacity-ledger-versioning`, `@migration`, `@durability`, `@restart-safety`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given a bucket capacity ledger contains committed usage, a configured quota, and a rejected reservation
+  Then the committed capacity ledger declares schema version "1"
+  And the capacity store can read a legacy ledger that omits the schema version as compatibility version "0"
+  And the capacity store rejects a ledger that declares unsupported schema version "999"
+  And the capacity store rejects a ledger with malformed schema version "not-a-version"
+  And reopening the current ledger preserves used bytes, quota bytes, and rejected accounting while clearing stale reservations
 ----
 
 ==== s3-reactive-api-adapter/src/test/features/specs/phase-ka5-distribution.feature

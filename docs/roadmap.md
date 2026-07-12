@@ -1,6 +1,6 @@
 # Magrathea ObjectStore — Public Roadmap
 
-> **Status:** Derived from [`PLAN.md`](../PLAN.md) (2026-07-03). All phases start as `@absent` or `@partial` — no completion claims beyond what the evidence table supports. This roadmap is a plan, not a promise of delivery dates.
+> **Status:** Derived from [`PLAN.md`](../PLAN.md) (updated 2026-07-12). Completion claims are limited to the declared and validated scope; this roadmap is not a promise of delivery dates.
 
 ---
 
@@ -24,11 +24,11 @@
 
 | Phase | Priority | Status | Description |
 |---|---|---|---|
-| **EP-2** Complete Metadata Durability | Blocker | `@partial` | Durable bucket registry, multipart state, per-object config metadata (ACL, tags, lock, retention, encryption, restore) in storage-engine mode; move 6 handler-local bucket-config families behind repository ports |
-| **EP-3** Reactive Streaming Completion | Blocker | `@partial` | Stream GetObject without `collectList()`; persist multipart part bodies and assemble real objects; architecture tests guard all fixed paths |
-| **EP-1** Security & Identity | Blocker | `@absent` | SigV4 authentication, deny-by-default authorization, audit logging, real SSE, TLS guidance |
-| **EP-4** Space Management & Data Hygiene | High | `@absent` | Chunk GC, dedup refcounting, quotas, ENOSPC behavior, periodic scrubbing |
-| **EP-5** Operability & Delivery | High | `@absent` | CI pipeline, release/versioning, backup/restore, runbooks, SLOs, probes, graceful shutdown |
+| **EP-2** Complete Metadata Durability | Blocker | `@implemented-and-validated` | Declared storage-engine metadata families survive restart; handler-local configuration state moved behind durable repositories |
+| **EP-3** Reactive Streaming Completion | Blocker | `@implemented-and-validated` | Bounded single-pass upload/read pipelines, multipart assembly, conditional chunking, whole-object units, and physical EC shards |
+| **EP-1** Security & Identity | Blocker | `@implemented-and-validated` for built-in scope | SigV4, deny-by-default authorization, durable audit, SSE-S3, credentials, policy and key services |
+| **EP-4** Space Management & Data Hygiene | High | `@implemented-and-validated` for single-node scope | Typed GC, dedup reachability, quotas, ENOSPC behavior, and transform-aware periodic scrubbing |
+| **EP-5** Operability & Delivery | High | `@implemented-and-validated` for `0.1.0` preview | Full CI gate, SemVer/OCI release workflow, persistent-volume replacement, backup/DR, schema compatibility, SLOs, probes, and graceful shutdown |
 | **EP-6** Performance & Capacity Validation | High | `@absent` | Load/soak/benchmark suite, documented limits, bounded memory under load |
 | **EP-7** Complete Admin Panel | High | `@partial` | Backend read-only catalogs done; full Vue UI (dashboard, policies, devices, disk sets, recovery/GC reports, observability views) — requires frontend workflow handoff |
 | **EP-8** Cluster Architecture ADR & Supply Chain | Medium | `@absent` | ADR deciding inter-node transport, membership, consistency model, failure-domain topology; SBOM, CVE scanning, image hardening |
@@ -36,13 +36,13 @@
 | **EP-9** WebDAV API Adapter | Future | `@absent` | Optional WebDAV protocol adapter; delegates to S3 services (INV-4) |
 | **EP-11** SMB Gateway (Samba VFS) | Future | `@absent` | Optional Samba VFS C module; maps file ops to S3 semantics (INV-4) |
 
-**Enterprise readiness exit criteria** (EP-0 checklist — all unchecked):
+**Enterprise readiness exit criteria:**
 
-- [ ] EP-1: SigV4 authentication, deny-by-default authorization, audit logging, and real SSE validated
-- [ ] EP-2: All metadata families survive restart in storage-engine mode
-- [ ] EP-3: GetObject and multipart paths stream with bounded memory
-- [ ] EP-4: Chunk GC, dedup refcounting, quotas, ENOSPC, scrubbing validated
-- [ ] EP-5: CI pipeline green; backup/restore rehearsed; probes/shutdown validated
+- [x] EP-1: SigV4 authentication, deny-by-default authorization, audit logging, and real SSE validated for built-in scope
+- [x] EP-2: Declared metadata families survive restart in storage-engine mode
+- [x] EP-3: GetObject and multipart paths stream with bounded memory
+- [x] EP-4: Typed GC, dedup reachability, quotas, ENOSPC, and scrubbing validated for single-node scope
+- [x] EP-5: `0.1.0` preview CI/delivery gates, backup/restore, probes, shutdown, and persistent-volume replacement validated
 - [ ] EP-6: Load/soak limits documented and reproducibly validated
 - [ ] EP-7: Complete admin panel delivered and validated
 - [ ] EP-8: Cluster architecture ADR accepted; supply-chain gates wired

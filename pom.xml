@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.example</groupId>
     <artifactId>magrathea-objectstorage</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>0.1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <modules>
@@ -287,7 +287,7 @@
                                     <executable>bash</executable>
                                     <arguments>
                                         <argument>-c</argument>
-                                        <argument>cd ${project.basedir} &amp;&amp; java -jar bootstrap-application/target/bootstrap-application-1.0.0-SNAPSHOT.jar --server.port=8080 &gt; /tmp/magrathea-aws-cli.log 2&gt;&amp;1 &amp; PID=$$!; for i in $(seq 1 30); do curl -s --max-time 1 localhost:8080 &gt;/dev/null 2&gt;&amp;1 &amp;&amp; break; sleep 1; done; echo &quot;PID:$$PID&quot;</argument>
+                                        <argument>cd ${project.basedir} &amp;&amp; java -jar bootstrap-application/target/bootstrap-application-${project.version}.jar --server.port=8080 &gt; /tmp/magrathea-aws-cli.log 2&gt;&amp;1 &amp; PID=$$!; for i in $(seq 1 30); do curl -s --max-time 1 localhost:8080 &gt;/dev/null 2&gt;&amp;1 &amp;&amp; break; sleep 1; done; echo &quot;PID:$$PID&quot;</argument>
                                     </arguments>
                                 </configuration>
                             </execution>

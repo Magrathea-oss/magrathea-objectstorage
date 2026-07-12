@@ -12,7 +12,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 |Element |Description
 
 |Runtime JAR
-|`bootstrap-application-1.0.0-SNAPSHOT.jar` running on the configured HTTP port
+|`bootstrap-application-0.1.0-SNAPSHOT.jar` running on the configured HTTP port
 
 |Static resources
 |Generated Vue/admin documentation assets, ARC42 JSON, ADR JSON, JaCoCo JSON exports, C4 PNGs, and ARC42 images served from classpath `static/**`
@@ -46,7 +46,9 @@ A JVM `Dockerfile`, a native-image `Dockerfile.native`, and `docker-compose.yml`
 * Runs as non-root user `magrathea` with writable `/app/data`
 * Copies YAML storage-policy, storage-device, and disk-set catalogs into `/app/config` and sets `SPRING_PROFILES_ACTIVE=storage-engine`, `MAGRATHEA_OBJECT_STORE_BACKEND=storage-engine`, and `STORAGE_ENGINE_*` paths so packaged single-node containers use the storage-engine backend rather than in-memory repositories
 * Exposes ports 8080 and 8081 and defines an Admin API healthcheck against `/admin/health`; EP-5 also exposes `/admin/live` and `/admin/ready` for process liveness and catalog readiness probes
+* Declares OCI version, revision, and source labels supplied by the deterministic build/release gate
 * Validated first slice: image build, Admin API health/live/ready smoke with ready catalog status, S3 ListBuckets XML and bucket/object PUT/GET smoke, selected storage-engine backend log check, and no Spring Boot generated-password banner in build/runtime logs
+* `REQ-OPS-025` additionally validates the `0.1.0` image as non-root with a named `/app/data` volume, direct SIGTERM exit without a forced kill, removal/recreation from the same image ID and volume, ready Admin probes after replacement, exact persisted S3 object bytes, and expected version/revision/source identity; the release workflow runs this gate before publication
 * Entrypoint: `java -jar /app.jar`
 
 **Dockerfile.native:**
@@ -96,11 +98,11 @@ Every document under `metadata/**` is committed with the same crash-safe discipl
 
 The current single-process deployment is intentionally monolithic for single-node operation. Enterprise Production Readiness phases (`PLAN.md`, EP-0..EP-11) sequence the path to production, including:
 
-* EP-1 (Security & Identity): SigV4 authentication, deny-by-default authorization, audit logging, real SSE
+* EP-1 (Security & Identity): SigV4 authentication, deny-by-default authorization, audit logging, and real SSE are implemented and validated for the built-in scope
 * EP-2 (Complete Metadata Durability): bucket registry, multipart state, and per-object/bucket configuration are durable in storage-engine mode (`@implemented-and-validated` for the declared storage-engine scope; in-memory profile explicitly exempt)
-* EP-3 (Reactive Streaming Completion): bounded-memory GetObject and multipart part-body streaming
-* EP-4 (Space Management & Data Hygiene): chunk GC, dedup refcounting, quotas, ENOSPC behavior, scrubbing
-* EP-5 (Operability & Delivery): CI pipeline, backup/restore, DR, probes, graceful shutdown. SIGTERM validation now proves a storage-engine process exits without forced termination, preserves a committed S3 object across restart, and drains active PutObject, multipart UploadPart, and CompleteMultipartUpload requests with HTTP 200, including two concurrent PutObjects; restart validation verifies the resulting object checksums, completes a multipart upload from a drained part ETag, proves a cancelled-and-aborted UploadPart leaves no object, active upload, or part artifacts, validates the abort-wins outcome when abort overlaps active multipart completion, and drains a bounded mixed load of three writes and two throttled reads. First offline backup/restore validation copies the storage root, simulates primary data loss, restores, restarts, and reads the object back. First single-node DR rehearsal validates RTO 30 seconds and RPO as the last completed offline backup. Object-manifest, multipart-session, bucket-registry, object-configuration, object-reference, and object-ACL schema-versioning validation writes version `1`, accepts legacy omitted schema as compatibility version `0`, and rejects unsupported future versions. First SLO/alerting bundle validation ships Prometheus and Loki starter rules plus an alert response runbook; opt-in Docker validation proves live Prometheus evaluation and Alertmanager webhook delivery; live Loki/external paging delivery, larger mixed read/write concurrent draining, repeated contention covering completion-wins multipart races, sustained/production-scale load validation, and online/multi-node DR remain open.
+* EP-3 (Reactive Streaming Completion): bounded-memory GetObject, upload, multipart, whole-object, and EC artifact pipelines are implemented and validated
+* EP-4 (Space Management & Data Hygiene): typed GC, dedup reachability, quotas, ENOSPC behavior, and scrubbing are implemented and validated for single-node operation
+* EP-5 (Operability & Delivery): implemented and validated for the `0.1.0` single-node JVM 21 preview. Mandatory CI runs the full root gate and generated/source checks before image validation. The tag-driven release workflow enforces SemVer/OCI identity, immutable version/minor/SHA tags, digest recording, persistent-volume container replacement, and live Prometheus-to-Alertmanager delivery before publication. SIGTERM validation covers committed, streaming, multipart, concurrent, cancellation, abort-race, and bounded mixed-load paths. Offline backup/restore and same-node DR validate RTO 30 seconds and RPO as the last completed backup. Typed object manifests use schema `2`; multipart sessions, bucket registry, object configuration, object references, ACL sidecars, and capacity ledgers use schema `1`; all accept documented legacy version `0` and reject unsupported future versions. Live Loki/external paging is deployment integration, sustained/production load belongs to EP-6, and online/multi-node DR belongs to EP-10.
 * EP-10 (S3 Cluster, multi-node): after an accepted cluster architecture ADR (EP-8) — membership, quorum, failover, healing, rebalance validated by multi-node scenarios
 
 No production distributed-cluster claims are made until EP-10 is validated end to end; see `PLAN.md` for current status per phase.

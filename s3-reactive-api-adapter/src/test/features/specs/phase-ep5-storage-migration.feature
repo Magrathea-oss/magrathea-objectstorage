@@ -47,3 +47,12 @@ Ability: EP-5 storage-engine manifest schema versioning
       Then the committed object ACL sidecar declares schema version "1"
       And the ACL store can read a legacy sidecar that omits the schema version as compatibility version "0"
       And the ACL store rejects a sidecar that declares unsupported schema version "999"
+
+    @REQ-OPS-024 @capacity-ledger-versioning @migration @durability @restart-safety @implemented-and-validated
+    Scenario: Bucket capacity ledger declares its schema and preserves existing quota accounting
+      Given a bucket capacity ledger contains committed usage, a configured quota, and a rejected reservation
+      Then the committed capacity ledger declares schema version "1"
+      And the capacity store can read a legacy ledger that omits the schema version as compatibility version "0"
+      And the capacity store rejects a ledger that declares unsupported schema version "999"
+      And the capacity store rejects a ledger with malformed schema version "not-a-version"
+      And reopening the current ledger preserves used bytes, quota bytes, and rejected accounting while clearing stale reservations

@@ -11,8 +11,8 @@ import static io.cucumber.junit.platform.engine.Constants.PLUGIN_PROPERTY_NAME;
 @Suite
 @SelectClasspathResource("requirements/phase-ep5-operability.feature")
 @ConfigurationParameter(key = GLUE_PROPERTY_NAME, value = "com.example.magrathea.s3api.cucumber.requirements")
-@ConfigurationParameter(key = FILTER_TAGS_PROPERTY_NAME,
-    value = "@phase-ep5 and not @not-implemented and not @live-monitoring-required and not @docker-required")
-@ConfigurationParameter(key = PLUGIN_PROPERTY_NAME, value = "pretty,json:target/cucumber-json/phase-ep5-operability.json")
-public class PhaseEp5OperabilityRequirementsCucumberTest {
+@ConfigurationParameter(key = FILTER_TAGS_PROPERTY_NAME, value = "@REQ-OPS-025")
+@ConfigurationParameter(key = PLUGIN_PROPERTY_NAME,
+    value = "pretty,json:target/cucumber-json/phase-ep5-jvm-container-replacement.json")
+public class PhaseEp5JvmContainerReplacementRequirementsCucumberIT {
 }

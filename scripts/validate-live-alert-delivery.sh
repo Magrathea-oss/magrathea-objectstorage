@@ -70,22 +70,14 @@ receivers:
         send_resolved: true
 EOF
 
-cat >"$WORK_DIR/delivery-rules.yml" <<'EOF'
-groups:
-  - name: magrathea-objectstorage.live-delivery
-    interval: 1s
-    rules:
-      - alert: MagratheaAdminLivenessProbeDown
-        expr: probe_success{job="magrathea-admin-live"} == 0
-        for: 0s
-        labels:
-          severity: page
-          service: magrathea-objectstorage
-          objective: admin-liveness
-        annotations:
-          summary: "Magrathea Admin API liveness probe is failing"
-          runbook_url: "docs/runbooks/slo-alerts.md#magratheaadminlivenessprobedown"
-EOF
+# Exercise the shipped rule pack itself. Only evaluation/hold durations are shortened
+# in this test copy; alert names, expressions, labels, annotations, and runbook links
+# remain byte-derived from the released configuration.
+sed -E \
+  -e 's/interval: 30s/interval: 1s/' \
+  -e 's/for: [0-9]+[smh]/for: 0s/' \
+  "$ROOT_DIR/ops/prometheus/magrathea-objectstorage-alerts.yml" \
+  >"$WORK_DIR/delivery-rules.yml"
 
 cat >"$WORK_DIR/prometheus.yml" <<EOF
 global:

@@ -1,0 +1,185 @@
+name: Release single-node JVM preview
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: release-jvm-preview
+  cancel-in-progress: false
+
+jobs:
+  release-jvm-preview:
+    name: Validate and publish immutable JVM preview
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out tagged sources
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Set up Node.js 26
+        uses: actions/setup-node@v4
+        with:
+          node-version: "26"
+          cache: npm
+          cache-dependency-path: |
+            magrathea-ui/package-lock.json
+            bootstrap-application/src/main/scripts/package-lock.json
+
+      - name: Derive and verify release identity
+        id: identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          if [[ ! "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Release tag must be an exact vMAJOR.MINOR.PATCH tag: $TAG" >&2
+            exit 1
+          fi
+          VERSION="${TAG#v}"
+          MINOR_LINE="${VERSION%.*}"
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"
+          CREATED_AT="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          DECLARED_VERSION="$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)"
+          if [[ "$DECLARED_VERSION" != "$VERSION-SNAPSHOT" && "$DECLARED_VERSION" != "$VERSION" ]]; then
+            echo "Tag $TAG does not match declared Maven version $DECLARED_VERSION" >&2
+            exit 1
+          fi
+          mvn -B --no-transfer-progress versions:set -DnewVersion="$VERSION" -DprocessAllModules=true -DgenerateBackupPoms=false
+          ACTUAL_VERSION="$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)"
+          test "$ACTUAL_VERSION" = "$VERSION"
+          python3 - "$VERSION" <<'PY'
+          import pathlib
+          import sys
+          import xml.etree.ElementTree as ET
+
+          expected = sys.argv[1]
+          namespace = {"m": "http://maven.apache.org/POM/4.0.0"}
+          for pom in pathlib.Path(".").glob("**/pom.xml"):
+              if "target" in pom.parts:
+                  continue
+              root = ET.parse(pom).getroot()
+              version = root.findtext("m:version", namespaces=namespace)
+              parent_version = root.findtext("m:parent/m:version", namespaces=namespace)
+              reactor_version = version or parent_version
+              if reactor_version != expected:
+                  raise SystemExit(f"{pom}: reactor version {reactor_version!r} != {expected!r}")
+          PY
+          {
+            echo "version=$VERSION"
+            echo "minor_line=$MINOR_LINE"
+            echo "image=$IMAGE"
+            echo "created_at=$CREATED_AT"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Check generated Gherkin appendix
+        run: python3 scripts/generate-gherkin-requirements-appendix.py --check
+
+      - name: Check generated S3 API semantic coverage
+        run: python3 scripts/generate-s3-api-coverage.py --check
+
+      - name: Check source hygiene
+        run: bash scripts/check-source-hygiene.sh
+
+      - name: Run complete root Maven test gate
+        run: mvn -B --no-transfer-progress test
+
+      - name: Mandatory JVM replacement and immutable local publication gates
+        env:
+          REQ_OPS_025_VERSION: ${{ steps.identity.outputs.version }}
+          REQ_OPS_025_REVISION: ${{ github.sha }}
+          REQ_OPS_025_SOURCE_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          set -o pipefail
+          mvn -B --no-transfer-progress -Pdocker-cucumber-tests -pl s3-reactive-api-adapter -am \
+            -Dsurefire.failIfNoSpecifiedTests=false \
+            -Dtest=PhaseEp5JvmContainerReplacementRequirementsCucumberIT,PhaseEp5LocalReleasePublicationCucumberIT test \
+            | tee req-ops-025-release-gate.log
+          ! grep -q 'Using generated security password' req-ops-025-release-gate.log
+
+      - name: Mandatory live Prometheus and Alertmanager delivery gate
+        run: bash scripts/validate-live-alert-delivery.sh
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Refuse to overwrite immutable tags
+        shell: bash
+        env:
+          IMAGE: ${{ steps.identity.outputs.image }}
+          VERSION: ${{ steps.identity.outputs.version }}
+          MINOR_LINE: ${{ steps.identity.outputs.minor_line }}
+        run: |
+          set -euo pipefail
+          for tag in "$VERSION" "$MINOR_LINE" "sha-$GITHUB_SHA"; do
+            if docker buildx imagetools inspect "$IMAGE:$tag" >/dev/null 2>&1; then
+              echo "Refusing to overwrite immutable image tag $IMAGE:$tag" >&2
+              exit 1
+            fi
+          done
+
+      - name: Build and publish canonical JVM image
+        id: publish
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: |
+            ${{ steps.identity.outputs.image }}:${{ steps.identity.outputs.version }}
+            ${{ steps.identity.outputs.image }}:${{ steps.identity.outputs.minor_line }}
+            ${{ steps.identity.outputs.image }}:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.version=${{ steps.identity.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.created=${{ steps.identity.outputs.created_at }}
+            org.opencontainers.image.title=Magrathea Object Storage
+            org.opencontainers.image.description=Single-node JVM 21 preview
+
+      - name: Record published digest
+        env:
+          IMAGE: ${{ steps.identity.outputs.image }}
+          VERSION: ${{ steps.identity.outputs.version }}
+          DIGEST: ${{ steps.publish.outputs.digest }}
+        run: |
+          set -euo pipefail
+          test -n "$DIGEST"
+          cat > release-digest.md <<EOF
+          # Magrathea Object Storage v$VERSION
+
+          Supported artifact: single-node Linux JVM 21 preview.
+
+          Image: \`$IMAGE:$VERSION\`
+
+          Immutable digest: \`$IMAGE@$DIGEST\`
+
+          The GraalVM native image is experimental, manual-only, and is not published by this release.
+          EOF
+
+      - name: Create GitHub release with digest record
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "$GITHUB_REF_NAME" --verify-tag --title "Magrathea Object Storage $GITHUB_REF_NAME" --notes-file release-digest.md
