@@ -29,6 +29,11 @@ ifndef::imagesdir[:imagesdir: ../images]
 |Domain/unit tests + WebTestClient Cucumber + targeted AWS CLI scenarios + JaCoCo
 |Current evidence is tracked in `docs/test-report.md`; stale counts must not be used as completion claims
 
+|Security / Observability
+|Truthful dependency vulnerability evidence
+|Incomplete vulnerability-data updates or scans fail closed and can never be presented as clean
+|Unsuppressed CVSS >= 7.0 fails verification; scan status, findings, suppressions, and errors remain separate
+
 |Maintainability
 |Domain-Driven Design
 |Pure domain, zero framework dependencies
@@ -63,21 +68,37 @@ ifndef::imagesdir[:imagesdir: ../images]
 - **Response:** Maven verification generates JaCoCo coverage as the current baseline
 - **Metric:** Coverage trend and thresholds are taken from current JaCoCo reports; Clover/OpenClover is optional/legacy
 
-==== Scenario 4 — Restart Safety (Storage Engine backend)
+==== Scenario 4 — Reactor-wide Coverage Evidence (`REQ-QUAL-001`, `REQ-QUAL-002`)
+
+- **Status:** `implementation-informed`, `@partial`
+- **Context:** The production Maven reactor and cross-module Cucumber runners have completed
+- **Stimulus:** Run `mvn -B -Pcoverage clean verify --no-transfer-progress`
+- **Response:** One aggregate HTML/XML/CSV report and one threshold-free JSON summary preserve covered and missed counts for all production modules
+- **Observed metric (2026-07-12, revision `c3fe8bb1`):** 48,191/60,631 instructions (79.48%), 1,957/3,484 branches (56.17%), 8,868/11,367 lines (78.02%), 2,671/3,316 methods (80.55%), and 570/635 classes (89.76%). Lowest instruction coverage: `object-store-reactive-infrastructure` 20.01%, `bootstrap-application` 61.93%, and `object-store-reactive-application` 64.38%. No threshold is enforced and no sufficiency claim is made.
+
+==== Scenario 5 — Fail-closed Dependency Vulnerability Evidence (`REQ-QUAL-003`, `REQ-QUAL-004`)
+
+- **Status:** `implementation-informed`, `@partial`, `needs-review`
+- **Context:** OWASP Dependency-Check scans resolved production-reactor dependencies under the CVSS 7.0 policy
+- **Stimulus:** Run `NVD_API_KEY="$(< /secure/path/nvd-api-key)" scripts/run-dependency-check.sh`, using an access-restricted, non-repository key file or equivalent CI secret injection
+- **Response:** A complete scan publishes `target/dependency-check-report.json` and `.html`; normalized status is written to `target/site/dependency-check-analysis.json`. An incomplete scan fails and emits `target/dependency-check-scan-error.json` plus `target/dependency-check-scan.log` without fabricating clean evidence.
+- **Observed metric (2026-07-12):** Dependency-Check 12.2.2 downloaded 40,000/364,882 NVD records before HTTP 429; `scanStatus=error`, `clean=null`, 8 scan errors, and no JSON/HTML vulnerability report. Therefore there are no vulnerability findings results and no clean-scan claim. Completion requires executable semantic validation and a complete scan.
+
+==== Scenario 6 — Restart Safety (Storage Engine backend)
 
 - **Context:** Storage-engine profile is active; buckets, multipart uploads, and per-object/bucket configuration have been created
 - **Stimulus:** The application process is stopped and started again against the same filesystem root
 - **Response:** The bucket registry, multipart upload sessions, and per-object/bucket configuration are reloaded from durable filesystem documents; no state is lost or torn
 - **Metric:** `MetadataDurabilityRestartTest` (restart-simulation unit tests) and `StorageEngineRestartSafetyTest` (real Spring-context restart) both pass; see `docs/test-report.md` for current run evidence
 
-==== Scenario 5 — Product Extension Isolation and Accessibility
+==== Scenario 7 — Product Extension Isolation and Accessibility
 
 - **Context:** An operator uses the Object Storage Admin Application or a maintainer removes/adds a Product Extension
 - **Stimulus:** Navigate by keyboard and direct URL at supported widths, or remove an extension from the product manifest
 - **Response:** Navigation and content remain accessible; removal eliminates extension routes, navigation, permissions, localization, and screens without modifying Product Shell source
 - **Metric:** 72/72 Vitest tests and 39/39 Playwright/axe tests across 360/768/1440-pixel Chromium viewports; deterministic extension-removal validation passes
 
-==== Scenario 6 — Truthful Operational Unavailability
+==== Scenario 8 — Truthful Operational Unavailability
 
 - **Context:** No real recovery, garbage-collection, scrub, audit, metrics, or traces report provider is configured
 - **Stimulus:** The Admin UI requests an operational report

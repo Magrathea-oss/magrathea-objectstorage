@@ -23,6 +23,9 @@
         <module>object-store-reactive-application</module>
         <module>object-store-reactive-infrastructure</module>
         <module>object-store-reactive-repository-storage-engine-infrastructure</module>
+
+        <!-- Must remain last: it aggregates classes and execution data from every production module. -->
+        <module>coverage-report</module>
     </modules>
 
     <properties>
@@ -206,8 +209,51 @@
     </dependencyManagement>
 
     <profiles>
-        <!-- Canonical coverage profile: use mvn -Pcoverage ... from the reactor root.
-             Module-level coverage profile fragments, if any, only augment this command. -->
+        <!-- Opt-in dependency security gate. Use scripts/run-dependency-check.sh so failures
+             also produce explicit, machine-readable scan-error evidence. -->
+        <profile>
+            <id>dependency-check</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.owasp</groupId>
+                        <artifactId>dependency-check-maven</artifactId>
+                        <version>12.2.2</version>
+                        <inherited>false</inherited>
+                        <configuration>
+                            <formats>
+                                <format>JSON</format>
+                                <format>HTML</format>
+                            </formats>
+                            <outputDirectory>${maven.multiModuleProjectDirectory}/target</outputDirectory>
+                            <name>dependency-check-report</name>
+                            <failBuildOnCVSS>7.0</failBuildOnCVSS>
+                            <failOnError>true</failOnError>
+                            <skipTestScope>true</skipTestScope>
+                            <nvdValidForHours>24</nvdValidForHours>
+                            <dataDirectory>${maven.multiModuleProjectDirectory}/.cache/dependency-check</dataDirectory>
+                            <!-- The plugin reads the key at execution time and masks it in logs. -->
+                            <nvdApiKeyEnvironmentVariable>NVD_API_KEY</nvdApiKeyEnvironmentVariable>
+                            <suppressionFiles>
+                                <suppressionFile>${maven.multiModuleProjectDirectory}/config/dependency-check-suppressions.xml</suppressionFile>
+                            </suppressionFiles>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>reactor-dependency-check</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>aggregate</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- Canonical coverage profile: run clean verify -Pcoverage from the reactor root.
+             Every test JVM writes module-local execution data; coverage-report consumes it once. -->
         <profile>
             <id>coverage</id>
             <build>
@@ -215,20 +261,13 @@
                     <plugin>
                         <groupId>org.jacoco</groupId>
                         <artifactId>jacoco-maven-plugin</artifactId>
-                        <version>0.8.12</version>
+                        <version>0.8.13</version>
                         <executions>
                             <execution>
                                 <id>prepare-agent</id>
                                 <phase>initialize</phase>
                                 <goals>
                                     <goal>prepare-agent</goal>
-                                </goals>
-                            </execution>
-                            <execution>
-                                <id>report</id>
-                                <phase>verify</phase>
-                                <goals>
-                                    <goal>report</goal>
                                 </goals>
                             </execution>
                         </executions>

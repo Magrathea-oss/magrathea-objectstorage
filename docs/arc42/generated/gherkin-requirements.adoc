@@ -18,8 +18,8 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 
 === Summary
 
-* Feature files scanned: 30
-* Scenarios discovered: 476
+* Feature files scanned: 31
+* Scenarios discovered: 486
 * Protocol-smoke scenarios: 122
 
 ==== Status tag counts
@@ -32,6 +32,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |`@implemented-and-validated` |195
 |`@implemented-not-e2e-validated` |21
 |`@not-implemented` |6
+|`@partial` |10
 |`@placeholder` |9
 |`unknown/not-tagged` |178
 |===
@@ -41,7 +42,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 [cols="1,1",options="header"]
 |===
 |Tag |Scenario count
-|`@admin-api-contract-required` |12
+|`@admin-api-contract-required` |13
 |`@awscli-required` |61
 |`@bootstrap-integration-required` |4
 |`@ci-load-required` |10
@@ -52,7 +53,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |`@docker-required` |1
 |`@filesystem-inspection-required` |1
 |`@frontend-contract-required` |5
-|`@frontend-e2e-required` |13
+|`@frontend-e2e-required` |19
 |`@full-process-restart-required` |1
 |`@live-monitoring-required` |1
 |`@log-inspection-required` |3
@@ -63,8 +64,9 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |`@soak-required` |2
 |`@static-architecture-required` |10
 |`@tracing-inspection-required` |2
+|`@visual-regression-required` |1
 |`@webclient-required` |300
-|`unknown/not-tagged` |73
+|`unknown/not-tagged` |77
 |===
 
 ==== Classification tag counts
@@ -72,8 +74,8 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 [cols="1,1",options="header"]
 |===
 |Tag |Scenario count
-|`@functional-requirement` |240
-|`@non-functional-requirement` |142
+|`@functional-requirement` |245
+|`@non-functional-requirement` |151
 |`unknown/not-tagged` |205
 |===
 
@@ -4249,6 +4251,194 @@ request path, response, and audit evidence for a diagnostic request.
 | 768
 | 1440
 |===
+
+===== REQ-ADMIN-032
+
+====== Scenario: Dashboard leads administrators from operational priorities to relevant tasks
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature:323`
+|Rule |The administration experience is task-oriented, polished, and truthful
+|Requirement ID(s) |`REQ-ADMIN-032`
+|Classification |`@functional-requirement`
+|Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-ui`, `@dashboard`, `@navigation`, `@usability`
+|Validation mode tags |`@frontend-e2e-required`
+|Declared/validated status |`@partial`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-032`, `@functional-requirement`, `@admin-ui`, `@dashboard`, `@navigation`, `@usability`, `@frontend-e2e-required`, `@partial`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given readiness is degraded by storage device "node-1-disk-0"
+  And backend "storage-engine" is selected
+  And policy validation and bucket quota administration are available
+  When the administrator opens route "/admin"
+  Then current readiness, the selected backend, and conditions requiring attention have the strongest information priority
+  And navigation groups destinations by the tasks of assessing service health, inspecting storage, validating policy, and managing capacity
+  And the degraded device provides a direct path to its detail page
+  And no dashboard card or navigation item offers bucket or object operations outside the S3 Data Plane
+----
+
+===== REQ-ADMIN-033
+
+====== Scenario: Affordances communicate what can be done before an administrator acts
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature:334`
+|Rule |The administration experience is task-oriented, polished, and truthful
+|Requirement ID(s) |`REQ-ADMIN-033`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-ui`, `@affordance`, `@configuration-as-code`, `@usability`
+|Validation mode tags |`@frontend-e2e-required`
+|Declared/validated status |`@partial`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-033`, `@functional-requirement`, `@non-functional-requirement`, `@admin-ui`, `@affordance`, `@configuration-as-code`, `@usability`, `@frontend-e2e-required`, `@partial`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given storage policy and topology catalogs are read-only configuration-as-code
+  And policy validation is non-persistent
+  And bucket quota administration is available
+  When the administrator reviews the related pages
+  Then links, actions, and read-only values are visually distinguishable and have labels that state their outcome
+  And policy validation is identified as non-persistent before it is submitted
+  And quota administration is presented as an Admin Control Plane action
+  And unsupported catalog mutation and object-management controls are not presented as available actions
+----
+
+===== REQ-ADMIN-034
+
+====== Scenario: Operational pages reveal detail without obscuring the decision summary
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature:345`
+|Rule |The administration experience is task-oriented, polished, and truthful
+|Requirement ID(s) |`REQ-ADMIN-034`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-ui`, `@progressive-disclosure`, `@information-hierarchy`, `@usability`
+|Validation mode tags |`@frontend-e2e-required`
+|Declared/validated status |`@partial`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-034`, `@functional-requirement`, `@non-functional-requirement`, `@admin-ui`, `@progressive-disclosure`, `@information-hierarchy`, `@usability`, `@frontend-e2e-required`, `@partial`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given backend status contains a selected backend, readiness conditions, catalog sources, storage roots, and diagnostic details
+  When the administrator opens route "/admin/backend-status"
+  Then the selected backend, readiness impact, and conditions requiring action are understandable without expanding technical detail
+  And catalog source, storage-root, and diagnostic details can be revealed in their operational context
+  And critical or unavailable conditions are never hidden only because supporting detail is collapsed
+  And revealing or hiding detail preserves the page route, heading context, and keyboard focus
+----
+
+===== REQ-ADMIN-035
+
+====== Scenario Outline: Responsive pages retain a professional and scannable information hierarchy
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature:354`
+|Rule |The administration experience is task-oriented, polished, and truthful
+|Requirement ID(s) |`REQ-ADMIN-035`
+|Classification |`@non-functional-requirement`
+|Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-ui`, `@responsive`, `@information-hierarchy`, `@visual-design`, `@accessibility`
+|Validation mode tags |`@frontend-e2e-required`, `@visual-regression-required`
+|Declared/validated status |`@partial`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-035`, `@non-functional-requirement`, `@admin-ui`, `@responsive`, `@information-hierarchy`, `@visual-design`, `@accessibility`, `@frontend-e2e-required`, `@visual-regression-required`, `@partial`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the Object Storage application viewport is <width> pixels wide
+  And the dashboard contains health, attention, task, and supporting-detail content
+  When the administrator views and traverses the dashboard
+  Then page purpose, current status, primary tasks, and supporting detail remain ordered by importance
+  And typography, spacing, grouping, and status treatment consistently distinguish that hierarchy without relying on color alone
+  And dense content adapts without overlap, clipping, unreadable text, or horizontal page scrolling
+  And contextual actions remain adjacent to the content they affect
+----
+
+.Examples
+[cols="1",options="header"]
+|===
+| width
+| 360
+| 768
+| 1440
+|===
+
+===== REQ-ADMIN-036
+
+====== Scenario: Policy validation gives timely and unambiguous operation feedback
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature:370`
+|Rule |The administration experience is task-oriented, polished, and truthful
+|Requirement ID(s) |`REQ-ADMIN-036`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-ui`, `@operation-feedback`, `@accessibility`
+|Validation mode tags |`@frontend-e2e-required`
+|Declared/validated status |`@partial`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-036`, `@functional-requirement`, `@non-functional-requirement`, `@admin-ui`, `@operation-feedback`, `@accessibility`, `@frontend-e2e-required`, `@partial`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the administrator has entered a proposed policy "ARCHIVE_EC"
+  When the administrator submits it for non-persistent validation
+  Then the application promptly identifies the validation as in progress and prevents an accidental duplicate submission
+  And completion is announced and shown as either a successful validation or an actionable failure
+  And successful feedback reiterates that "ARCHIVE_EC" was not persisted
+  And failure feedback preserves the proposal, explains what can be corrected or retried, and does not imply that the catalog changed
+----
+
+===== REQ-ADMIN-037
+
+====== Scenario: Unavailable capabilities explain impact and valid next steps without false promise
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep7-admin-panel.feature:379`
+|Rule |The administration experience is task-oriented, polished, and truthful
+|Requirement ID(s) |`REQ-ADMIN-037`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-ui`, `@unavailable-state`, `@truthful-ui`, `@usability`
+|Validation mode tags |`@frontend-e2e-required`, `@admin-api-contract-required`
+|Declared/validated status |`@partial`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-037`, `@functional-requirement`, `@non-functional-requirement`, `@admin-ui`, `@unavailable-state`, `@truthful-ui`, `@usability`, `@frontend-e2e-required`, `@admin-api-contract-required`, `@partial`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given recovery, scrub, and metrics report providers return availability "not-configured"
+  When the administrator views the affected operational pages
+  Then each unavailable state names the capability, explains why evidence cannot be shown, and states the operational impact
+  And any next step points only to valid configuration, documentation, retry, or navigation that the administrator can use
+  And unavailable operations are not styled or announced as enabled actions
+  And no empty chart, sample finding, healthy default, or generic success state is presented as runtime evidence
+----
 
 ==== s3-reactive-api-adapter/src/test/features/requirements/single-node-backend-bucket-configuration.feature
 
@@ -15428,6 +15618,162 @@ so Magrathea Object Storage can run without requiring a Java runtime in the fina
   And the CI workflow requires Docker readiness to be ready in storage-engine mode
   And the CI workflow keeps native Docker packaging available as an explicit manual validation job
 ----
+
+==== s3-reactive-api-adapter/src/test/features/specs/quality-security-evidence.feature
+
+* Feature title: Ability: Reactor-wide quality and dependency security evidence
+* Feature tags: `@spec`, `@quality-evidence`, `@non-functional-requirement`, `@security`, `@observability`, `@partial`
+* Feature description:
++
+----
+Maintainers need one reproducible evidence set for production-code coverage and
+dependency vulnerability risk so that coverage gaps, vulnerable dependencies,
+suppressed findings, and incomplete scans remain visible instead of being mistaken
+for a clean build.
+The initial coverage baseline is descriptive evidence. It does not impose an
+arbitrary line, branch, instruction, method, or class coverage threshold.
+Dependency risk is governed separately by the explicit CVSS policy below.
+----
+
+===== REQ-QUAL-001
+
+====== Scenario: Aggregate coverage includes production modules and cross-module Cucumber execution
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/quality-security-evidence.feature:15`
+|Rule |One aggregate JaCoCo report represents the production reactor
+|Requirement ID(s) |`REQ-QUAL-001`
+|Classification |`@non-functional-requirement`
+|Capability area tags |`@spec`, `@quality-evidence`, `@security`, `@observability`, `@test-coverage`, `@jacoco`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@partial`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@quality-evidence`, `@non-functional-requirement`, `@security`, `@observability`, `@partial`, `@REQ-QUAL-001`, `@test-coverage`, `@jacoco`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the root Maven reactor contains all Magrathea production modules
+  And unit, component, integration, and shared Cucumber runners may execute production classes from modules other than the runner module
+  When the canonical reactor verification generates JaCoCo coverage evidence
+  Then exactly one canonical aggregate report set is published at "target/site/jacoco-aggregate"
+  And the report set contains machine-readable "jacoco.xml" and "jacoco.csv" reports and human-readable "index.html"
+  And every production reactor module with instrumentable production classes is represented, including modules with zero covered instructions
+  And execution data from unit, component, integration, and cross-module Cucumber runs is merged before the aggregate reports are generated
+  And coverage of one production class is not counted more than once when multiple runners execute it
+  And runner-local JaCoCo output is treated only as aggregate input and not as a competing canonical report
+----
+
+===== REQ-QUAL-002
+
+====== Scenario: Machine-readable coverage summary reports an honest threshold-free baseline
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/quality-security-evidence.feature:27`
+|Rule |One aggregate JaCoCo report represents the production reactor
+|Requirement ID(s) |`REQ-QUAL-002`
+|Classification |`@non-functional-requirement`
+|Capability area tags |`@spec`, `@quality-evidence`, `@security`, `@observability`, `@test-coverage`, `@baseline`, `@machine-readable`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@partial`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@quality-evidence`, `@non-functional-requirement`, `@security`, `@observability`, `@partial`, `@REQ-QUAL-002`, `@test-coverage`, `@baseline`, `@machine-readable`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the canonical aggregate JaCoCo XML and CSV reports have been generated
+  When the quality evidence summary is generated at "target/site/quality-evidence/summary.json"
+  Then the summary identifies the reactor revision and the canonical JaCoCo report paths
+  And the summary records covered and missed counts for instructions, branches, lines, methods, and classes
+  And the summary records per-module covered and missed counts as well as reactor totals
+  And missed counts and zero-coverage modules remain visible rather than being omitted or converted to covered results
+  And the initial baseline records that no JaCoCo quality threshold is enforced
+  And the summary does not label coverage clean, passing, or sufficient merely because report generation completed
+----
+
+===== REQ-QUAL-003
+
+====== Scenario: Dependency-Check applies the declared CVSS and scan-completeness policy
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/quality-security-evidence.feature:40`
+|Rule |Dependency vulnerability evidence is machine-readable, reviewable, and policy-driven
+|Requirement ID(s) |`REQ-QUAL-003`
+|Classification |`@non-functional-requirement`
+|Capability area tags |`@spec`, `@quality-evidence`, `@security`, `@observability`, `@dependency-vulnerability`, `@owasp-dependency-check`, `@cvss`, `@supply-chain`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@partial`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@quality-evidence`, `@non-functional-requirement`, `@security`, `@observability`, `@partial`, `@REQ-QUAL-003`, `@dependency-vulnerability`, `@owasp-dependency-check`, `@cvss`, `@supply-chain`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given OWASP Dependency-Check scans the resolved dependencies of every production reactor module
+  And the vulnerability policy fails verification for any unsuppressed dependency finding with CVSS score 7.0 or greater
+  And unsuppressed findings below CVSS 7.0 remain reportable evidence even though they do not fail that CVSS gate
+  And each accepted suppression requires a narrowly matched identifier, rationale, owner, and expiry or review date
+  When the canonical reactor verification performs dependency analysis
+  Then machine-readable JSON is published at "target/dependency-check-report.json"
+  And a human-readable HTML report is published at "target/dependency-check-report.html"
+  And the JSON and HTML reports cover the same reactor scan and identify the Dependency-Check and vulnerability-data versions
+  And suppressed findings remain distinguishable from unsuppressed findings in the retained evidence
+  And an expired, unmatched, or overly broad suppression does not silently convert a finding into a clean result
+  And the verification result follows the declared CVSS policy rather than the mere existence of report files
+----
+
+===== REQ-QUAL-004
+
+====== Scenario Outline: Vulnerability analysis never fabricates a clean result when NVD evidence is unavailable
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/quality-security-evidence.feature:54`
+|Rule |Dependency vulnerability evidence is machine-readable, reviewable, and policy-driven
+|Requirement ID(s) |`REQ-QUAL-004`
+|Classification |`@non-functional-requirement`
+|Capability area tags |`@spec`, `@quality-evidence`, `@security`, `@observability`, `@dependency-vulnerability`, `@scan-integrity`, `@nvd`, `@machine-readable`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@partial`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@quality-evidence`, `@non-functional-requirement`, `@security`, `@observability`, `@partial`, `@REQ-QUAL-004`, `@dependency-vulnerability`, `@scan-integrity`, `@nvd`, `@machine-readable`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given Dependency-Check starts with NVD data state "<nvd_state>"
+  And network access to vulnerability data is "<network_state>"
+  When dependency vulnerability evidence and the quality evidence summary are generated
+  Then the dependency scan status is "<scan_status>"
+  And verification handling is "<verification_handling>"
+  And the generated analysis separately records unsuppressed findings, suppressed findings, and scan errors
+  And the analysis records an evidence timestamp, source revision, dependency inventory identity, and vulnerability-data timestamp
+  And scan errors include actionable NVD update, cache, analyzer, or network diagnostics without being counted as vulnerability findings
+  And a complete scan with no unsuppressed findings may report zero unsuppressed findings without erasing suppressed findings
+  And an incomplete or failed scan is not described as clean, passing, or zero-vulnerability evidence
+  And the machine-readable summary and human-readable report communicate the same scan status
+----
+
+.Examples
+[cols="1,1,1,1",options="header"]
+|===
+| nvd_state | network_state | scan_status | verification_handling
+| current local data | available | complete | apply the CVSS policy
+| valid cached data within declared age | unavailable | complete | apply the CVSS policy
+| absent, stale beyond policy, or corrupt | unavailable | error | fail as scan incomplete
+|===
 
 ==== s3-reactive-api-adapter/src/test/features/specs/s3-api-semantic-coverage-report.feature
 

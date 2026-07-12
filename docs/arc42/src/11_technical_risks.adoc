@@ -74,4 +74,10 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |Operators or release notes could infer operational records or administration capabilities that the system cannot provide.
 |Keep HTTP 503 `report-provider-not-configured` explicit, prohibit fabricated records, and retain EP-7 `@partial` until real providers and credential/tenant administration are implemented and semantically validated or formally descoped.
 |EP-7 (`@partial`; human scope review required before closure)
+
+|12
+|**Dependency vulnerability status is currently unknown** — OWASP Dependency-Check 12.2.2 failed closed during its initial NVD update after 40,000/364,882 records because NVD returned HTTP 429. The retained analysis has `scanStatus=error`, `clean=null`, and 8 scan errors; no JSON/HTML vulnerability report was produced.
+|Vulnerable dependencies may remain unidentified. Zero finding counters from the absent report could be misread as a clean scan.
+|Do not make vulnerability-finding or clean-scan claims. Inject `NVD_API_KEY` securely through CI/environment and rerun `scripts/run-dependency-check.sh`; retain the CVSS 7.0 gate and require a complete report plus executable semantic validation before closing `REQ-QUAL-003/004`.
+|Quality/security evidence (`@partial`, `needs-review`)
 |===

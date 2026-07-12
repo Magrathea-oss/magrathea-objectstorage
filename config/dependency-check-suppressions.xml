@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+  <!--
+    This intentionally empty, committed file is the only accepted suppression source.
+
+    A future suppression must be narrow and must include a notes element containing:
+      Rationale: why the finding is not applicable or temporarily accepted
+      Owner: accountable person or team
+      Expires: YYYY-MM-DD (or Review-by: YYYY-MM-DD)
+
+    Match a specific CVE/GHSA plus a specific package URL, SHA-1, or similarly narrow
+    dependency identity. Never add a broad regex or suppress solely to make the gate pass.
+    The report analyzer rejects undocumented, expired, or obviously broad entries.
+  -->
+</suppressions>

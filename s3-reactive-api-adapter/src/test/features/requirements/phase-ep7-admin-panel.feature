@@ -316,3 +316,70 @@ Business Need: EP-7 Object Storage administration through the Magrathea Product 
         | 360   |
         | 768   |
         | 1440  |
+
+  Rule: The administration experience is task-oriented, polished, and truthful
+
+    @REQ-ADMIN-032 @functional-requirement @admin-ui @dashboard @navigation @usability @frontend-e2e-required @partial
+    Scenario: Dashboard leads administrators from operational priorities to relevant tasks
+      Given readiness is degraded by storage device "node-1-disk-0"
+      And backend "storage-engine" is selected
+      And policy validation and bucket quota administration are available
+      When the administrator opens route "/admin"
+      Then current readiness, the selected backend, and conditions requiring attention have the strongest information priority
+      And navigation groups destinations by the tasks of assessing service health, inspecting storage, validating policy, and managing capacity
+      And the degraded device provides a direct path to its detail page
+      And no dashboard card or navigation item offers bucket or object operations outside the S3 Data Plane
+
+    @REQ-ADMIN-033 @functional-requirement @non-functional-requirement @admin-ui @affordance @configuration-as-code @usability @frontend-e2e-required @partial
+    Scenario: Affordances communicate what can be done before an administrator acts
+      Given storage policy and topology catalogs are read-only configuration-as-code
+      And policy validation is non-persistent
+      And bucket quota administration is available
+      When the administrator reviews the related pages
+      Then links, actions, and read-only values are visually distinguishable and have labels that state their outcome
+      And policy validation is identified as non-persistent before it is submitted
+      And quota administration is presented as an Admin Control Plane action
+      And unsupported catalog mutation and object-management controls are not presented as available actions
+
+    @REQ-ADMIN-034 @functional-requirement @non-functional-requirement @admin-ui @progressive-disclosure @information-hierarchy @usability @frontend-e2e-required @partial
+    Scenario: Operational pages reveal detail without obscuring the decision summary
+      Given backend status contains a selected backend, readiness conditions, catalog sources, storage roots, and diagnostic details
+      When the administrator opens route "/admin/backend-status"
+      Then the selected backend, readiness impact, and conditions requiring action are understandable without expanding technical detail
+      And catalog source, storage-root, and diagnostic details can be revealed in their operational context
+      And critical or unavailable conditions are never hidden only because supporting detail is collapsed
+      And revealing or hiding detail preserves the page route, heading context, and keyboard focus
+
+    @REQ-ADMIN-035 @non-functional-requirement @admin-ui @responsive @information-hierarchy @visual-design @accessibility @frontend-e2e-required @visual-regression-required @partial
+    Scenario Outline: Responsive pages retain a professional and scannable information hierarchy
+      Given the Object Storage application viewport is <width> pixels wide
+      And the dashboard contains health, attention, task, and supporting-detail content
+      When the administrator views and traverses the dashboard
+      Then page purpose, current status, primary tasks, and supporting detail remain ordered by importance
+      And typography, spacing, grouping, and status treatment consistently distinguish that hierarchy without relying on color alone
+      And dense content adapts without overlap, clipping, unreadable text, or horizontal page scrolling
+      And contextual actions remain adjacent to the content they affect
+
+      Examples:
+        | width |
+        | 360   |
+        | 768   |
+        | 1440  |
+
+    @REQ-ADMIN-036 @functional-requirement @non-functional-requirement @admin-ui @operation-feedback @accessibility @frontend-e2e-required @partial
+    Scenario: Policy validation gives timely and unambiguous operation feedback
+      Given the administrator has entered a proposed policy "ARCHIVE_EC"
+      When the administrator submits it for non-persistent validation
+      Then the application promptly identifies the validation as in progress and prevents an accidental duplicate submission
+      And completion is announced and shown as either a successful validation or an actionable failure
+      And successful feedback reiterates that "ARCHIVE_EC" was not persisted
+      And failure feedback preserves the proposal, explains what can be corrected or retried, and does not imply that the catalog changed
+
+    @REQ-ADMIN-037 @functional-requirement @non-functional-requirement @admin-ui @unavailable-state @truthful-ui @usability @frontend-e2e-required @admin-api-contract-required @partial
+    Scenario: Unavailable capabilities explain impact and valid next steps without false promise
+      Given recovery, scrub, and metrics report providers return availability "not-configured"
+      When the administrator views the affected operational pages
+      Then each unavailable state names the capability, explains why evidence cannot be shown, and states the operational impact
+      And any next step points only to valid configuration, documentation, retry, or navigation that the administrator can use
+      And unavailable operations are not styled or announced as enabled actions
+      And no empty chart, sample finding, healthy default, or generic success state is presented as runtime evidence
