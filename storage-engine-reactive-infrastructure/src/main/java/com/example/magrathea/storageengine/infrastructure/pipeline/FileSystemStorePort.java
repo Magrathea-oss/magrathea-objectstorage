@@ -8,6 +8,7 @@ import com.example.magrathea.storageengine.domain.valueobject.Fingerprint;
 import com.example.magrathea.storageengine.domain.valueobject.FingerprintAlgorithm;
 import com.example.magrathea.storageengine.domain.valueobject.NodeId;
 import com.example.magrathea.storageengine.infrastructure.filesystem.AtomicChunkWriteProtocol;
+import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemCapacityErrors;
 import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemWriteFaultInjector;
 import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemWriteInterruptedException;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -183,9 +184,16 @@ public class FileSystemStorePort implements StorePort {
                             .onErrorResume(error -> {
                                 boolean preserve = error instanceof FileSystemWriteInterruptedException interrupted
                                         && interrupted.preserveTemporaryArtifacts();
+                                Throwable failure = reactor.core.Exceptions.unwrap(error);
+                                java.io.IOException io = failure instanceof java.io.UncheckedIOException unchecked
+                                        ? unchecked.getCause()
+                                        : failure instanceof java.io.IOException direct ? direct : null;
+                                Throwable mapped = io == null ? error : FileSystemCapacityErrors.translate(
+                                        io, root.getParent().getParent().getParent(), size.get(),
+                                        "Atomic storage artifact write failed");
                                 return Mono.fromRunnable(() ->
                                                 AtomicChunkWriteProtocol.cleanupUncommitted(pending, preserve))
-                                        .then(Mono.error(error));
+                                        .then(Mono.error(mapped));
                             });
 
                     return write.doFinally(signal -> {

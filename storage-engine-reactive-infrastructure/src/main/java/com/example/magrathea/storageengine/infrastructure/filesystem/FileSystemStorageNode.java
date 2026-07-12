@@ -109,7 +109,8 @@ public class FileSystemStorageNode {
             } catch (Exception e) {
                 AtomicChunkWriteProtocol.cleanupUncommitted(pending, preserveTemporaryArtifacts(e));
                 if (e instanceof IOException ioe) {
-                    throw new UncheckedIOException("Atomic chunk write failed for: " + chunkId.value(), ioe);
+                    throw FileSystemCapacityErrors.translate(ioe, nodePath.getParent().getParent(),
+                            data.length, "Atomic chunk write failed for: " + chunkId.value());
                 }
                 throw e;
             }

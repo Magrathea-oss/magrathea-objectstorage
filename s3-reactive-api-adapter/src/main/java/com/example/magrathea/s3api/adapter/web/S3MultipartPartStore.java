@@ -18,6 +18,7 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -78,6 +79,29 @@ public class S3MultipartPartStore {
         return Mono.fromRunnable(() -> deleteRecursively(uploadDirectory(uploadId)))
             .subscribeOn(Schedulers.boundedElastic())
             .then();
+    }
+
+    /**
+     * Idempotently reclaims upload directories whose latest filesystem activity is older
+     * than the supplied cutoff. Active uploads newer than the cutoff are left untouched.
+     */
+    public Mono<Integer> reclaimExpired(Instant cutoff) {
+        return Mono.fromCallable(() -> {
+                if (!Files.isDirectory(root)) {
+                    return 0;
+                }
+                int reclaimed = 0;
+                try (var uploads = Files.list(root)) {
+                    for (Path upload : uploads.filter(Files::isDirectory).toList()) {
+                        if (Files.getLastModifiedTime(upload).toInstant().isBefore(cutoff)) {
+                            deleteRecursively(upload);
+                            reclaimed++;
+                        }
+                    }
+                }
+                return reclaimed;
+            })
+            .subscribeOn(Schedulers.boundedElastic());
     }
 
     public void reset() {

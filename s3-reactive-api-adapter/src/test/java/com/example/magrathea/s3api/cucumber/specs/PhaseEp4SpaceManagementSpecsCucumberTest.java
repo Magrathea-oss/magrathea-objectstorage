@@ -11,7 +11,8 @@ import static io.cucumber.junit.platform.engine.Constants.PLUGIN_PROPERTY_NAME;
 @Suite
 @SelectClasspathResource("specs/phase-ep4-space-management.feature")
 @ConfigurationParameter(key = GLUE_PROPERTY_NAME, value = "com.example.magrathea.s3api.cucumber.specs")
-@ConfigurationParameter(key = FILTER_TAGS_PROPERTY_NAME, value = "@REQ-SCRUB-001 or @REQ-SCRUB-002")
+@ConfigurationParameter(key = FILTER_TAGS_PROPERTY_NAME,
+        value = "@REQ-GC-001 or @REQ-GC-002 or @REQ-GC-003 or @REQ-GC-004 or @REQ-SCRUB-001 or @REQ-SCRUB-002")
 @ConfigurationParameter(key = PLUGIN_PROPERTY_NAME,
         value = "pretty,json:target/cucumber-json/phase-ep4-space-management-specs.json")
 public class PhaseEp4SpaceManagementSpecsCucumberTest {

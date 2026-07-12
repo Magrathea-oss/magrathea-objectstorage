@@ -29,9 +29,9 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |Tag |Scenario count
 |`@absent` |3
 |`@config-only` |69
-|`@implemented-and-validated` |135
+|`@implemented-and-validated` |142
 |`@implemented-not-e2e-validated` |22
-|`@not-implemented` |13
+|`@not-implemented` |6
 |`@placeholder` |9
 |`unknown/not-tagged` |178
 |===
@@ -2576,9 +2576,9 @@ And object key "capacity/2026/existing.bin" contains committed fixture "fixtures
 |Classification |`@functional-requirement`
 |Capability area tags |`@business-need`, `@ep-4`, `@capacity-protection`, `@storage-engine`, `@quota`, `@s3-api`, `@admin-api`
 |Validation mode tags |`@webclient-required`, `@awscli-required`
-|Declared/validated status |`@not-implemented`
+|Declared/validated status |`@implemented-and-validated`
 |Protocol smoke |`no`
-|All tags |`@business-need`, `@ep-4`, `@capacity-protection`, `@storage-engine`, `@REQ-QUOTA-001`, `@functional-requirement`, `@quota`, `@s3-api`, `@admin-api`, `@webclient-required`, `@awscli-required`, `@not-implemented`
+|All tags |`@business-need`, `@ep-4`, `@capacity-protection`, `@storage-engine`, `@REQ-QUOTA-001`, `@functional-requirement`, `@quota`, `@s3-api`, `@admin-api`, `@webclient-required`, `@awscli-required`, `@implemented-and-validated`
 |===
 
 .Gherkin steps
@@ -2594,11 +2594,17 @@ And object key "capacity/2026/existing.bin" contains committed fixture "fixtures
   And the Admin API reports used bytes, reserved bytes, quota bytes, and the rejected reservation
 ----
 
-.Examples
+.Examples: WebTestClient validation `@webclient`
 [cols="1",options="header"]
 |===
 | validation_mode
 | webclient
+|===
+
+.Examples: AWS CLI validation `@awscli`
+[cols="1",options="header"]
+|===
+| validation_mode
 | awscli
 |===
 
@@ -2609,15 +2615,15 @@ And object key "capacity/2026/existing.bin" contains committed fixture "fixtures
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep4-capacity-protection.feature:31`
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep4-capacity-protection.feature:36`
 |Rule |Concurrent reservations cannot oversubscribe a quota
 |Requirement ID(s) |`REQ-QUOTA-002`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
 |Capability area tags |`@business-need`, `@ep-4`, `@capacity-protection`, `@storage-engine`, `@quota`, `@concurrency`, `@s3-api`
 |Validation mode tags |`@webclient-required`, `@awscli-required`
-|Declared/validated status |`@not-implemented`
+|Declared/validated status |`@implemented-and-validated`
 |Protocol smoke |`no`
-|All tags |`@business-need`, `@ep-4`, `@capacity-protection`, `@storage-engine`, `@REQ-QUOTA-002`, `@functional-requirement`, `@non-functional-requirement`, `@quota`, `@concurrency`, `@s3-api`, `@webclient-required`, `@awscli-required`, `@not-implemented`
+|All tags |`@business-need`, `@ep-4`, `@capacity-protection`, `@storage-engine`, `@REQ-QUOTA-002`, `@functional-requirement`, `@non-functional-requirement`, `@quota`, `@concurrency`, `@s3-api`, `@webclient-required`, `@awscli-required`, `@implemented-and-validated`
 |===
 
 .Gherkin steps
@@ -2631,11 +2637,17 @@ And object key "capacity/2026/existing.bin" contains committed fixture "fixtures
   And restart preserves the committed usage and releases the failed reservation
 ----
 
-.Examples
+.Examples: WebTestClient validation `@webclient`
 [cols="1",options="header"]
 |===
 | validation_mode
 | webclient
+|===
+
+.Examples: AWS CLI validation `@awscli`
+[cols="1",options="header"]
+|===
+| validation_mode
 | awscli
 |===
 
@@ -2646,15 +2658,15 @@ And object key "capacity/2026/existing.bin" contains committed fixture "fixtures
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep4-capacity-protection.feature:46`
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep4-capacity-protection.feature:56`
 |Rule |Filesystem exhaustion fails closed
 |Requirement ID(s) |`REQ-CAPACITY-001`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
 |Capability area tags |`@business-need`, `@ep-4`, `@capacity-protection`, `@storage-engine`, `@enospc`, `@integrity`, `@s3-api`
 |Validation mode tags |`@webclient-required`, `@awscli-required`
-|Declared/validated status |`@not-implemented`
+|Declared/validated status |`@implemented-and-validated`
 |Protocol smoke |`no`
-|All tags |`@business-need`, `@ep-4`, `@capacity-protection`, `@storage-engine`, `@REQ-CAPACITY-001`, `@functional-requirement`, `@non-functional-requirement`, `@enospc`, `@integrity`, `@s3-api`, `@webclient-required`, `@awscli-required`, `@not-implemented`
+|All tags |`@business-need`, `@ep-4`, `@capacity-protection`, `@storage-engine`, `@REQ-CAPACITY-001`, `@functional-requirement`, `@non-functional-requirement`, `@enospc`, `@integrity`, `@s3-api`, `@webclient-required`, `@awscli-required`, `@implemented-and-validated`
 |===
 
 .Gherkin steps
@@ -2670,11 +2682,17 @@ And object key "capacity/2026/existing.bin" contains committed fixture "fixtures
   And a capacity failure event exposes backend, storage root, requested bytes, and available bytes without payload content
 ----
 
-.Examples
+.Examples: WebTestClient validation `@webclient`
 [cols="1",options="header"]
 |===
 | validation_mode
 | webclient
+|===
+
+.Examples: AWS CLI validation `@awscli`
+[cols="1",options="header"]
+|===
+| validation_mode
 | awscli
 |===
 
@@ -13148,7 +13166,7 @@ And the scenario starts with no pending reclamation or scrub findings
 
 ===== REQ-GC-001
 
-====== Scenario: Deleting a plain object reclaims its whole-object unit without chunk accounting
+====== Scenario: Deleting or overwriting a plain object durably reclaims its whole-object unit without chunk accounting
 
 [cols="1h,3",options="header"]
 |===
@@ -13157,11 +13175,11 @@ And the scenario starts with no pending reclamation or scrub findings
 |Rule |Plain objects are reclaimed as whole-object units
 |Requirement ID(s) |`REQ-GC-001`
 |Classification |`@functional-requirement`
-|Capability area tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@storage-layout`, `@garbage-collection`
+|Capability area tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@durability`, `@restart-safety`, `@storage-layout`, `@garbage-collection`
 |Validation mode tags |unknown/not-tagged
-|Declared/validated status |`@not-implemented`
+|Declared/validated status |`@implemented-and-validated`
 |Protocol smoke |`no`
-|All tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@REQ-GC-001`, `@functional-requirement`, `@storage-layout`, `@garbage-collection`, `@not-implemented`
+|All tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@REQ-GC-001`, `@functional-requirement`, `@durability`, `@restart-safety`, `@storage-layout`, `@garbage-collection`, `@implemented-and-validated`
 |===
 
 .Gherkin steps
@@ -13169,7 +13187,7 @@ And the scenario starts with no pending reclamation or scrub findings
 ----
   Given a committed plain object uses storage class "PLAIN" with multipart, deduplication, and erasure coding disabled
   And its manifest references one whole-object storage unit and zero chunk artifacts
-  When the owning S3 object reference is deleted and reclamation runs
+  When the owning S3 object reference is deleted or replaced and durable reclamation runs
   Then the whole-object storage unit and obsolete manifest are removed
   And no chunk reference count, dedup index entry, multipart part, or EC shard is created or decremented
   And an idempotent second reclamation run reports no additional deletion
@@ -13188,9 +13206,9 @@ And the scenario starts with no pending reclamation or scrub findings
 |Classification |`@functional-requirement`
 |Capability area tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@dedup`, `@reference-counting`, `@garbage-collection`
 |Validation mode tags |unknown/not-tagged
-|Declared/validated status |`@not-implemented`
+|Declared/validated status |`@implemented-and-validated`
 |Protocol smoke |`no`
-|All tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@REQ-GC-002`, `@functional-requirement`, `@dedup`, `@reference-counting`, `@garbage-collection`, `@not-implemented`
+|All tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@REQ-GC-002`, `@functional-requirement`, `@dedup`, `@reference-counting`, `@garbage-collection`, `@implemented-and-validated`
 |===
 
 .Gherkin steps
@@ -13201,12 +13219,12 @@ And the scenario starts with no pending reclamation or scrub findings
   Then the shared dedup chunk, checksum sidecar, and content-address entry remain readable by the second object
   When the second object is deleted and reclamation runs
   Then the final reference count reaches zero
-  And the dedup chunk, checksum sidecar, and content-address entry are removed atomically
+  And the dedup chunk, checksum sidecar, and content-address entry are removed as one durable reclamation unit
 ----
 
 ===== REQ-GC-003
 
-====== Scenario: Aborted or expired multipart uploads reclaim uncommitted parts
+====== Scenario Outline: Aborted or expired multipart uploads reclaim uncommitted parts
 
 [cols="1h,3",options="header"]
 |===
@@ -13215,21 +13233,30 @@ And the scenario starts with no pending reclamation or scrub findings
 |Rule |Multipart and EC artifacts have independent reclamation rules
 |Requirement ID(s) |`REQ-GC-003`
 |Classification |`@functional-requirement`
-|Capability area tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@multipart`, `@garbage-collection`
+|Capability area tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@durability`, `@multipart`, `@garbage-collection`
 |Validation mode tags |unknown/not-tagged
-|Declared/validated status |`@not-implemented`
+|Declared/validated status |`@implemented-and-validated`
 |Protocol smoke |`no`
-|All tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@REQ-GC-003`, `@functional-requirement`, `@multipart`, `@garbage-collection`, `@not-implemented`
+|All tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@REQ-GC-003`, `@functional-requirement`, `@durability`, `@multipart`, `@garbage-collection`, `@implemented-and-validated`
 |===
 
 .Gherkin steps
 [source,gherkin]
 ----
   Given a multipart upload has persisted parts but has no committed object manifest
-  When the upload is aborted or expires and multipart reclamation runs
+  When the upload is <reclamation_reason> and multipart reclamation runs
   Then every uncommitted part and temporary checksum artifact is removed
   And chunks belonging to committed dedup or EC objects are unchanged
+  And a repeated multipart reclamation run is idempotent
 ----
+
+.Examples
+[cols="1",options="header"]
+|===
+| reclamation_reason
+| aborted
+| expired
+|===
 
 ===== REQ-GC-004
 
@@ -13238,15 +13265,15 @@ And the scenario starts with no pending reclamation or scrub findings
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep4-space-management.feature:46`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep4-space-management.feature:52`
 |Rule |Multipart and EC artifacts have independent reclamation rules
 |Requirement ID(s) |`REQ-GC-004`
 |Classification |`@functional-requirement`
-|Capability area tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@erasure-coding`, `@garbage-collection`
+|Capability area tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@durability`, `@erasure-coding`, `@garbage-collection`
 |Validation mode tags |unknown/not-tagged
-|Declared/validated status |`@not-implemented`
+|Declared/validated status |`@implemented-and-validated`
 |Protocol smoke |`no`
-|All tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@REQ-GC-004`, `@functional-requirement`, `@erasure-coding`, `@garbage-collection`, `@not-implemented`
+|All tags |`@spec`, `@ep-4`, `@space-management`, `@storage-engine`, `@REQ-GC-004`, `@functional-requirement`, `@durability`, `@erasure-coding`, `@garbage-collection`, `@implemented-and-validated`
 |===
 
 .Gherkin steps
@@ -13265,7 +13292,7 @@ And the scenario starts with no pending reclamation or scrub findings
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep4-space-management.feature:59`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep4-space-management.feature:65`
 |Rule |Periodic scrubbing verifies typed and transformed artifacts without changing valid data
 |Requirement ID(s) |`REQ-SCRUB-001`
 |Classification |`@non-functional-requirement`
@@ -13313,7 +13340,7 @@ without requiring plaintext or encryption keys in the background job.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep4-space-management.feature:76`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep4-space-management.feature:82`
 |Rule |Periodic scrubbing verifies typed and transformed artifacts without changing valid data
 |Requirement ID(s) |`REQ-SCRUB-002`
 |Classification |`@non-functional-requirement`

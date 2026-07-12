@@ -1,10 +1,13 @@
 package com.example.magrathea.storageengine.infrastructure.filesystem;
 
+import com.example.magrathea.storageengine.application.exception.StorageCapacityException;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Property-driven filesystem write fault injector.
@@ -19,18 +22,36 @@ public final class PropertyControlledFileSystemWriteFaultInjector implements Fil
     private final boolean interruptAfterChunkTempWrite;
     private final boolean interruptAfterManifestTempWrite;
     private final boolean leavePartialTemporaryArtifacts;
+    private final long enospcOnChunkWriteAttempt;
+    private final AtomicLong chunkWriteAttempts = new AtomicLong();
 
     public PropertyControlledFileSystemWriteFaultInjector(
             boolean interruptAfterChunkTempWrite,
             boolean interruptAfterManifestTempWrite,
             boolean leavePartialTemporaryArtifacts) {
+        this(interruptAfterChunkTempWrite, interruptAfterManifestTempWrite,
+                leavePartialTemporaryArtifacts, -1);
+    }
+
+    public PropertyControlledFileSystemWriteFaultInjector(
+            boolean interruptAfterChunkTempWrite,
+            boolean interruptAfterManifestTempWrite,
+            boolean leavePartialTemporaryArtifacts,
+            long enospcOnChunkWriteAttempt) {
         this.interruptAfterChunkTempWrite = interruptAfterChunkTempWrite;
         this.interruptAfterManifestTempWrite = interruptAfterManifestTempWrite;
         this.leavePartialTemporaryArtifacts = leavePartialTemporaryArtifacts;
+        this.enospcOnChunkWriteAttempt = enospcOnChunkWriteAttempt;
     }
 
     @Override
     public void afterChunkTempFileWritten(ChunkWriteContext context) {
+        long attempt = chunkWriteAttempts.incrementAndGet();
+        if (enospcOnChunkWriteAttempt > 0 && attempt == enospcOnChunkWriteAttempt) {
+            Path storageRoot = context.tempFile().getParent().getParent().getParent().getParent();
+            throw new StorageCapacityException(
+                    "storage-engine", storageRoot, context.expectedBytes(), 0);
+        }
         if (!interruptAfterChunkTempWrite) {
             return;
         }

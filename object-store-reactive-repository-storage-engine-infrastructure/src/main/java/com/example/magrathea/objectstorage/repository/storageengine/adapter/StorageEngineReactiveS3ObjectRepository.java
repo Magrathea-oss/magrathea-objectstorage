@@ -13,8 +13,12 @@ import com.example.magrathea.objectstore.reactive.repository.application.S3Objec
 import com.example.magrathea.objectstore.reactive.repository.application.S3ObjectQueryRepository;
 import com.example.magrathea.objectstore.reactive.repository.application.CommandResult;
 import com.example.magrathea.objectstore.reactive.repository.application.StorageObjectIntegrityException;
+import com.example.magrathea.objectstore.reactive.repository.application.ObjectStorageCapacityException;
 import com.example.magrathea.storageengine.application.exception.ChunkIntegrityException;
+import com.example.magrathea.storageengine.application.exception.StorageCapacityException;
 import com.example.magrathea.storageengine.application.exception.ManifestIntegrityException;
+import com.example.magrathea.storageengine.application.port.BucketCapacityPort;
+import com.example.magrathea.storageengine.application.port.BucketQuotaExceededException;
 import com.example.magrathea.objectstorage.repository.storageengine.acl.ChecksumDescriptor;
 import com.example.magrathea.objectstorage.repository.storageengine.acl.EncryptionDescriptor;
 import com.example.magrathea.objectstorage.repository.storageengine.acl.ObjectStoreToStorageEngineTranslator;
@@ -45,6 +49,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.context.annotation.Profile;
 
 /**
@@ -63,6 +68,8 @@ public class StorageEngineReactiveS3ObjectRepository
     private final ObjectStoreToStorageEngineTranslator translator;
     private final ReactiveStorageOrchestrator orchestrator;
     private final S3ObjectManifestReferenceStore referenceStore;
+    private final FileSystemArtifactGarbageCollector garbageCollector;
+    private final BucketCapacityPort bucketCapacity;
     private final Map<String, S3Object> storeByKey = new ConcurrentHashMap<>();
     private final Map<String, ManifestId> manifestByKey = new ConcurrentHashMap<>();
     private final AtomicLong versionCounter = new AtomicLong(1);
@@ -78,16 +85,27 @@ public class StorageEngineReactiveS3ObjectRepository
         this(translator, orchestrator, "");
     }
 
+    public StorageEngineReactiveS3ObjectRepository(
+            ObjectStoreToStorageEngineTranslator translator,
+            ReactiveStorageOrchestrator orchestrator,
+            String storageRoot) {
+        this(translator, orchestrator, storageRoot, new UnboundedBucketCapacity());
+    }
+
     @Autowired
     public StorageEngineReactiveS3ObjectRepository(
             ObjectStoreToStorageEngineTranslator translator,
             ReactiveStorageOrchestrator orchestrator,
-            @Value("${storage.engine.filesystem.root:}") String storageRoot) {
+            @Value("${storage.engine.filesystem.root:}") String storageRoot,
+            BucketCapacityPort bucketCapacity) {
         this.translator = translator;
         this.orchestrator = orchestrator;
-        Path metadataRoot = resolveStorageRoot(storageRoot).resolve("metadata");
+        this.bucketCapacity = bucketCapacity;
+        Path resolvedStorageRoot = resolveStorageRoot(storageRoot);
+        Path metadataRoot = resolvedStorageRoot.resolve("metadata");
         this.referenceStore = new S3ObjectManifestReferenceStore(
             metadataRoot.resolve("s3-object-references"));
+        this.garbageCollector = new FileSystemArtifactGarbageCollector(resolvedStorageRoot);
         this.objectConfigStore = new ObjectConfigMetadataStore(
             metadataRoot.resolve("object-config"));
     }
@@ -157,22 +175,34 @@ public class StorageEngineReactiveS3ObjectRepository
 
     @Override
     public Mono<CommandResult<S3Object>> delete(S3Object object) {
-        return Mono.defer(() -> {
-            var storeKey = storeKey(object.key().bucket(), object.key().key());
+        String bucket = object.key().bucket();
+        String key = object.key().key();
+        return referenceStore.find(bucket, key).flatMap(reference -> Mono.defer(() -> {
+            var storeKey = storeKey(bucket, key);
             S3Object removed = storeByKey.remove(storeKey);
             manifestByKey.remove(storeKey);
             if (removed == null) {
-                return Mono.error(new RuntimeException(
-                    "S3Object not found: " + object.key().bucket() + "/" + object.key().key()));
+                return Mono.error(new RuntimeException("S3Object not found: " + bucket + "/" + key));
             }
             long version = versionCounter.getAndIncrement();
-            return Mono.just(new CommandResult.Deleted<>(removed, object.domainEvents(), version));
-        }).flatMap(result -> referenceStore
-            .delete(object.key().bucket(), object.key().key())
-            .then(Mono.fromRunnable(() ->
-                objectConfigStore.delete(object.key().bucket(), object.key().key()))
-                .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()))
-            .thenReturn(result));
+            long removedBytes = reference.map(S3ObjectManifestReferenceStore.Reference::size)
+                .orElse(Math.max(0, removed.size()));
+            reference.map(S3ObjectManifestReferenceStore.Reference::manifestId)
+                .ifPresent(manifestId -> garbageCollector.prepare(manifestId.value()));
+            return Mono.usingWhen(
+                bucketCapacity.reserve(bucket, key, 0, removedBytes),
+                reservation -> referenceStore.delete(bucket, key)
+                    .then(Mono.fromRunnable(() -> objectConfigStore.delete(bucket, key))
+                        .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()))
+                    .then(reference.map(S3ObjectManifestReferenceStore.Reference::manifestId)
+                        .map(this::reclaimObsoleteManifest).orElseGet(Mono::empty))
+                    .then(bucketCapacity.commit(reservation, 0))
+                    .thenReturn((CommandResult<S3Object>) new CommandResult.Deleted<>(
+                        removed, object.domainEvents(), version)),
+                ignored -> Mono.empty(),
+                (reservation, error) -> bucketCapacity.release(reservation),
+                bucketCapacity::release);
+        }));
     }
 
     @Override
@@ -220,8 +250,11 @@ public class StorageEngineReactiveS3ObjectRepository
         // Use orchestrator to store content. The upload's own bytes are measured while
         // streaming so the committed reference is composed entirely from THIS upload's
         // result (versionId + manifestId + etag + size) — single-writer compose.
-        return Mono.defer(() -> {
+        return withCapacityReservation(
+                object.key().bucket(), object.key().key(), object.size(),
+                reservation -> Mono.defer(() -> {
             UploadMeasurement measurement = new UploadMeasurement();
+            AtomicReference<ManifestId> obsoleteManifest = new AtomicReference<>();
             return orchestrator.store(command, content.doOnNext(measurement::update))
                 .flatMap(storedObject -> {
                     var storeKey = storeKey(object.key().bucket(), object.key().key());
@@ -230,17 +263,36 @@ public class StorageEngineReactiveS3ObjectRepository
                     long version = versionCounter.getAndIncrement();
                     CommandResult<S3Object> result =
                         new CommandResult.Created<>(committed, object.domainEvents(), version);
-                    return referenceStore.commitLatest(
+                    return bucketCapacity.resize(reservation, measurement.size())
+                        .flatMap(adjusted -> referenceStore.commitLatest(
                             object.key().bucket(), object.key().key(),
                             current -> {
+                                current.map(S3ObjectManifestReferenceStore.Reference::manifestId)
+                                    .filter(previous -> !previous.equals(storedObject.manifestId()))
+                                    .ifPresent(previous -> {
+                                        garbageCollector.prepare(previous.value());
+                                        obsoleteManifest.set(previous);
+                                    });
                                 storeByKey.put(storeKey, committed);
                                 manifestByKey.put(storeKey, storedObject.manifestId());
                                 return Optional.of(S3ObjectManifestReferenceStore.Reference.from(
                                     committed, storedObject.manifestId(), storedObject.versionId()));
                             })
+                            .onErrorResume(error -> {
+                                storeByKey.remove(storeKey);
+                                manifestByKey.remove(storeKey);
+                                return reclaimObsoleteManifest(storedObject.manifestId())
+                                    .then(Mono.error(error));
+                            })
+                            .then(bucketCapacity.commit(adjusted, measurement.size())))
+                        .then(Mono.defer(() -> obsoleteManifest.get() == null
+                            ? Mono.empty() : reclaimObsoleteManifest(obsoleteManifest.get())))
                         .thenReturn(result);
                 });
-        });
+        })).onErrorMap(BucketQuotaExceededException.class,
+                error -> capacityFailure(ObjectStorageCapacityException.Kind.QUOTA, error))
+            .onErrorMap(StorageCapacityException.class,
+                error -> capacityFailure(ObjectStorageCapacityException.Kind.BACKEND, error));
     }
 
     @Override
@@ -257,8 +309,11 @@ public class StorageEngineReactiveS3ObjectRepository
             Optional.empty(),
             Optional.empty());
 
-        return Mono.defer(() -> {
+        return withCapacityReservation(
+                objectKey.bucket(), objectKey.key(), 0,
+                reservation -> Mono.defer(() -> {
             UploadMeasurement measurement = new UploadMeasurement();
+            AtomicReference<ManifestId> obsoleteManifest = new AtomicReference<>();
             return orchestrator.store(command, content.doOnNext(measurement::update))
                 .flatMap(storedObject -> {
                     // Create an ActiveS3Object from the stored result, completed with
@@ -280,17 +335,36 @@ public class StorageEngineReactiveS3ObjectRepository
                     CommandResult<S3Object> result =
                         new CommandResult.Created<>(
                             committed, committed.domainEvents(), version);
-                    return referenceStore.commitLatest(
+                    return bucketCapacity.resize(reservation, measurement.size())
+                        .flatMap(adjusted -> referenceStore.commitLatest(
                             committed.key().bucket(), committed.key().key(),
                             current -> {
+                                current.map(S3ObjectManifestReferenceStore.Reference::manifestId)
+                                    .filter(previous -> !previous.equals(storedObject.manifestId()))
+                                    .ifPresent(previous -> {
+                                        garbageCollector.prepare(previous.value());
+                                        obsoleteManifest.set(previous);
+                                    });
                                 storeByKey.put(storeKey, committed);
                                 manifestByKey.put(storeKey, storedObject.manifestId());
                                 return Optional.of(S3ObjectManifestReferenceStore.Reference.from(
                                     committed, storedObject.manifestId(), storedObject.versionId()));
                             })
+                            .onErrorResume(error -> {
+                                storeByKey.remove(storeKey);
+                                manifestByKey.remove(storeKey);
+                                return reclaimObsoleteManifest(storedObject.manifestId())
+                                    .then(Mono.error(error));
+                            })
+                            .then(bucketCapacity.commit(adjusted, measurement.size())))
+                        .then(Mono.defer(() -> obsoleteManifest.get() == null
+                            ? Mono.empty() : reclaimObsoleteManifest(obsoleteManifest.get())))
                         .thenReturn(result);
                 });
-        });
+        })).onErrorMap(BucketQuotaExceededException.class,
+                error -> capacityFailure(ObjectStorageCapacityException.Kind.QUOTA, error))
+            .onErrorMap(StorageCapacityException.class,
+                error -> capacityFailure(ObjectStorageCapacityException.Kind.BACKEND, error));
     }
 
     @Override
@@ -498,6 +572,36 @@ public class StorageEngineReactiveS3ObjectRepository
         return object;
     }
 
+    private static ObjectStorageCapacityException capacityFailure(
+            ObjectStorageCapacityException.Kind kind, Throwable error) {
+        return new ObjectStorageCapacityException(kind, error.getMessage(), error);
+    }
+
+    private <T> Mono<T> withCapacityReservation(
+            String bucket,
+            String key,
+            long declaredBytes,
+            java.util.function.Function<BucketCapacityPort.Reservation, Mono<T>> operation) {
+        return referenceStore.find(bucket, key)
+            .map(reference -> reference.map(S3ObjectManifestReferenceStore.Reference::size).orElse(0L))
+            .flatMap(replacedBytes -> Mono.usingWhen(
+                bucketCapacity.reserve(bucket, key, Math.max(0, declaredBytes), replacedBytes),
+                operation,
+                ignored -> Mono.empty(),
+                (reservation, error) -> bucketCapacity.release(reservation),
+                bucketCapacity::release));
+    }
+
+    private Mono<Void> reclaimObsoleteManifest(ManifestId manifestId) {
+        return referenceStore.liveManifestIds()
+            .flatMap(live -> Mono.fromRunnable(() -> {
+                    garbageCollector.resume(live);
+                    garbageCollector.reclaim(manifestId.value(), live);
+                })
+                .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()))
+            .then();
+    }
+
     private static Path resolveStorageRoot(String configuredRoot) {
         if (configuredRoot == null || configuredRoot.isBlank()) {
             return Path.of(System.getProperty("java.io.tmpdir"),
@@ -606,6 +710,41 @@ public class StorageEngineReactiveS3ObjectRepository
             } catch (NoSuchAlgorithmException e) {
                 throw new IllegalStateException("MD5 algorithm unavailable", e);
             }
+        }
+    }
+
+    private static final class UnboundedBucketCapacity implements BucketCapacityPort {
+        @Override
+        public Mono<Reservation> reserve(String bucket, String objectKey,
+                long requestedBytes, long replacedBytes) {
+            return Mono.just(new Reservation(java.util.UUID.randomUUID().toString(), bucket,
+                    objectKey, requestedBytes, replacedBytes));
+        }
+
+        @Override
+        public Mono<Reservation> resize(Reservation reservation, long requestedBytes) {
+            return Mono.just(new Reservation(reservation.id(), reservation.bucket(),
+                    reservation.objectKey(), requestedBytes, reservation.replacedBytes()));
+        }
+
+        @Override
+        public Mono<BucketCapacity> configureQuota(String bucket, long quotaBytes) {
+            return Mono.just(new BucketCapacity(bucket, 0, 0, quotaBytes, 0, 0));
+        }
+
+        @Override
+        public Mono<BucketCapacity> capacity(String bucket) {
+            return Mono.just(new BucketCapacity(bucket, 0, 0, -1, 0, 0));
+        }
+
+        @Override
+        public Mono<BucketCapacity> commit(Reservation reservation, long committedBytes) {
+            return capacity(reservation.bucket());
+        }
+
+        @Override
+        public Mono<Void> release(Reservation reservation) {
+            return Mono.empty();
         }
     }
 

@@ -115,6 +115,38 @@ final class S3ObjectManifestReferenceStore {
             .flatMapMany(Flux::fromIterable);
     }
 
+    Mono<Set<UUID>> liveManifestIds() {
+        return Mono.fromCallable(this::liveManifestIdsBlocking)
+            .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    Set<UUID> liveManifestIdsBlocking() {
+        if (!Files.isDirectory(referencesRoot)) {
+            return Set.of();
+        }
+        try (var paths = Files.walk(referencesRoot)) {
+            return paths.filter(Files::isRegularFile)
+                .filter(path -> path.getFileName().toString().endsWith(".properties"))
+                .map(path -> {
+                    try {
+                        Properties properties = new Properties();
+                        properties.load(new StringReader(Files.readString(path)));
+                        String manifestId = properties.getProperty("manifestId");
+                        if (manifestId == null || manifestId.isBlank()) {
+                            throw new IllegalArgumentException(
+                                "Object reference is missing manifestId: " + path);
+                        }
+                        return UUID.fromString(manifestId);
+                    } catch (IOException error) {
+                        throw new UncheckedIOException("Failed to read S3 object reference", error);
+                    }
+                })
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        } catch (IOException error) {
+            throw new UncheckedIOException("Failed to list S3 object references", error);
+        }
+    }
+
     Mono<Void> delete(String bucket, String key) {
         return commitLatest(bucket, key, current -> Optional.empty());
     }

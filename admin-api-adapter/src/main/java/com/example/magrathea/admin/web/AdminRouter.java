@@ -1,10 +1,12 @@
 package com.example.magrathea.admin.web;
 
+import com.example.magrathea.storageengine.application.port.BucketCapacityPort;
 import com.example.magrathea.storageengine.application.port.DiskSetCatalog;
 import com.example.magrathea.storageengine.application.port.StorageDeviceCatalog;
 import com.example.magrathea.storageengine.application.port.StoragePolicyCatalog;
 import com.example.magrathea.storageengine.domain.valueobject.*;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
@@ -36,14 +38,25 @@ public class AdminRouter {
     private final ObjectProvider<StoragePolicyCatalog> storagePolicyCatalog;
     private final ObjectProvider<StorageDeviceCatalog> storageDeviceCatalog;
     private final ObjectProvider<DiskSetCatalog> diskSetCatalog;
+    private final ObjectProvider<BucketCapacityPort> bucketCapacity;
 
     public AdminRouter(
             ObjectProvider<StoragePolicyCatalog> storagePolicyCatalog,
             ObjectProvider<StorageDeviceCatalog> storageDeviceCatalog,
             ObjectProvider<DiskSetCatalog> diskSetCatalog) {
+        this(storagePolicyCatalog, storageDeviceCatalog, diskSetCatalog, null);
+    }
+
+    @Autowired
+    public AdminRouter(
+            ObjectProvider<StoragePolicyCatalog> storagePolicyCatalog,
+            ObjectProvider<StorageDeviceCatalog> storageDeviceCatalog,
+            ObjectProvider<DiskSetCatalog> diskSetCatalog,
+            ObjectProvider<BucketCapacityPort> bucketCapacity) {
         this.storagePolicyCatalog = storagePolicyCatalog;
         this.storageDeviceCatalog = storageDeviceCatalog;
         this.diskSetCatalog = diskSetCatalog;
+        this.bucketCapacity = bucketCapacity;
     }
 
     @Bean
@@ -60,7 +73,9 @@ public class AdminRouter {
             .andRoute(GET("/admin/storage-devices"), this::listStorageDevices)
             .andRoute(GET("/admin/storage-devices/{id}"), this::getStorageDevice)
             .andRoute(GET("/admin/disk-sets"), this::listDiskSets)
-            .andRoute(GET("/admin/disk-sets/{id}"), this::getDiskSet);
+            .andRoute(GET("/admin/disk-sets/{id}"), this::getDiskSet)
+            .andRoute(PUT("/admin/buckets/{bucket}/quota"), this::configureBucketQuota)
+            .andRoute(GET("/admin/buckets/{bucket}/capacity"), this::getBucketCapacity);
     }
 
     private Mono<ServerResponse> health(ServerRequest request) {
@@ -218,6 +233,39 @@ public class AdminRouter {
                     "/admin/storage-devices/" + id,
                     Map.of("collection", link("/admin/storage-devices"))));
         }).onErrorResume(error -> serviceError(STORAGE_DEVICE_CATALOG, error, "/admin/storage-devices/" + id));
+    }
+
+    private Mono<ServerResponse> configureBucketQuota(ServerRequest request) {
+        String bucket = request.pathVariable("bucket");
+        BucketCapacityPort capacity = bucketCapacity == null ? null : bucketCapacity.getIfAvailable();
+        if (capacity == null) {
+            return notConfigured("bucket-capacity", request.path());
+        }
+        return request.bodyToMono(BucketQuotaCommand.class)
+            .switchIfEmpty(Mono.error(new IllegalArgumentException("Request body is required")))
+            .flatMap(command -> capacity.configureQuota(bucket, command.quotaBytes()))
+            .flatMap(state -> ok(toCapacityMap(state)))
+            .onErrorResume(IllegalArgumentException.class,
+                error -> badRequest("invalid-bucket-quota", error.getMessage(), request.path()));
+    }
+
+    private Mono<ServerResponse> getBucketCapacity(ServerRequest request) {
+        String bucket = request.pathVariable("bucket");
+        BucketCapacityPort capacity = bucketCapacity == null ? null : bucketCapacity.getIfAvailable();
+        if (capacity == null) {
+            return notConfigured("bucket-capacity", request.path());
+        }
+        return capacity.capacity(bucket).flatMap(state -> ok(toCapacityMap(state)));
+    }
+
+    private Map<String, Object> toCapacityMap(BucketCapacityPort.BucketCapacity state) {
+        return Map.of(
+            "bucket", state.bucket(),
+            "usedBytes", state.usedBytes(),
+            "reservedBytes", state.reservedBytes(),
+            "quotaBytes", state.quotaBytes(),
+            "rejectedReservations", state.rejectedReservations(),
+            "lastRejectedBytes", state.lastRejectedBytes());
     }
 
     private Mono<ServerResponse> listDiskSets(ServerRequest request) {
@@ -429,6 +477,8 @@ public class AdminRouter {
     private static String safeMessage(Throwable error) {
         return error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();
     }
+
+    record BucketQuotaCommand(long quotaBytes) { }
 
     record StoragePolicyCommand(
             String storageClassId,

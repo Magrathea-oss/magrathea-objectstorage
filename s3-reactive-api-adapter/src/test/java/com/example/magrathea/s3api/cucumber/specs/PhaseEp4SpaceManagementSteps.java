@@ -2,6 +2,8 @@ package com.example.magrathea.s3api.cucumber.specs;
 
 import com.example.magrathea.storageengine.domain.valueobject.StepId;
 import com.example.magrathea.storageengine.domain.valueobject.StorageArtifactKind;
+import com.example.magrathea.s3api.adapter.web.S3MultipartPartStore;
+import com.example.magrathea.objectstorage.repository.storageengine.adapter.FileSystemArtifactGarbageCollector;
 import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemIntegrityScrubJob;
 import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemIntegrityScrubber;
 import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemStorageCluster;
@@ -9,6 +11,7 @@ import io.cucumber.java.Before;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
+import reactor.test.StepVerifier;
 
 import java.io.IOException;
 import java.io.StringWriter;
@@ -16,6 +19,8 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import java.time.Instant;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
@@ -28,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 public class PhaseEp4SpaceManagementSteps {
 
@@ -44,12 +50,25 @@ public class PhaseEp4SpaceManagementSteps {
     private FileSystemIntegrityScrubber.ScrubReport firstReport;
     private FileSystemIntegrityScrubber.ScrubReport secondReport;
     private boolean schedulingEnabled;
+    private FileSystemArtifactGarbageCollector garbageCollector;
+    private final List<UUID> gcManifests = new java.util.ArrayList<>();
+    private final List<Path> gcArtifacts = new java.util.ArrayList<>();
+    private FileSystemArtifactGarbageCollector.ReclamationReport reclamationReport;
+    private UUID sharedArtifactId;
+    private Path contentAddressEntry;
+    private S3MultipartPartStore multipartPartStore;
+    private Path multipartUploadDirectory;
+    private String multipartReason;
 
     @Before
     public void reset() {
         storageRoot = Path.of("target", "storage-engine-it", "REQ-SCRUB-001-" + UUID.randomUUID());
         deleteRecursively(storageRoot);
         scrubber = new FileSystemIntegrityScrubber();
+        garbageCollector = new FileSystemArtifactGarbageCollector(storageRoot);
+        gcManifests.clear();
+        gcArtifacts.clear();
+        reclamationReport = null;
     }
 
     @Given("periodic integrity scrubbing is disabled by default")
@@ -94,6 +113,167 @@ public class PhaseEp4SpaceManagementSteps {
     @Given("the scenario starts with no pending reclamation or scrub findings")
     public void scenarioStartsClean() {
         assertFalse(Files.exists(storageRoot.resolve("quarantine")));
+    }
+
+    @Given("a committed plain object uses storage class {string} with multipart, deduplication, and erasure coding disabled")
+    public void committedPlainObject(String storageClass) throws IOException {
+        assertEquals("PLAIN", storageClass);
+        UUID artifactId = createGcArtifact(StorageArtifactKind.WHOLE_OBJECT, "plain-object");
+        gcManifests.add(writeGcManifest(List.of(new GcArtifact(StorageArtifactKind.WHOLE_OBJECT, artifactId))));
+    }
+
+    @Given("its manifest references one whole-object storage unit and zero chunk artifacts")
+    public void plainManifestHasNoChunks() {
+        assertEquals(1, gcArtifacts.size());
+        assertTrue(gcArtifacts.getFirst().toString().contains("whole-objects"));
+    }
+
+    @When("the owning S3 object reference is deleted or replaced and durable reclamation runs")
+    public void plainReferenceRemoved() {
+        reclamationReport = garbageCollector.reclaim(gcManifests.getFirst(), java.util.Set.of());
+    }
+
+    @Then("the whole-object storage unit and obsolete manifest are removed")
+    public void wholeObjectAndManifestRemoved() {
+        assertFalse(Files.exists(gcArtifacts.getFirst()));
+        assertFalse(Files.exists(Path.of(gcArtifacts.getFirst() + ".sha256")));
+        assertFalse(Files.exists(manifestFile(gcManifests.getFirst())));
+    }
+
+    @Then("no chunk reference count, dedup index entry, multipart part, or EC shard is created or decremented")
+    public void noSegmentedAccountingWasInvented() {
+        assertFalse(Files.exists(storageRoot.resolve("metadata/content-address-index")));
+        assertEquals(1, reclamationReport.artifactsDeleted());
+    }
+
+    @Then("an idempotent second reclamation run reports no additional deletion")
+    public void secondReclamationIsIdempotent() {
+        assertEquals(0, garbageCollector.reclaim(gcManifests.getFirst(), java.util.Set.of()).totalDeleted());
+    }
+
+    @Given("two committed objects reference the same dedup chunk fingerprint in one bucket scope")
+    public void twoObjectsShareDedupChunk() throws IOException {
+        sharedArtifactId = createGcArtifact(StorageArtifactKind.DEDUP_CHUNK, "shared-dedup");
+        GcArtifact shared = new GcArtifact(StorageArtifactKind.DEDUP_CHUNK, sharedArtifactId);
+        gcManifests.add(writeGcManifest(List.of(shared)));
+        gcManifests.add(writeGcManifest(List.of(shared)));
+        contentAddressEntry = storageRoot.resolve("metadata/content-address-index/device-a/fingerprint-a");
+        Files.createDirectories(contentAddressEntry.getParent());
+        Files.writeString(contentAddressEntry, sharedArtifactId.toString());
+    }
+
+    @When("the first object is deleted and reclamation runs")
+    public void firstDedupOwnerDeleted() {
+        reclamationReport = garbageCollector.reclaim(gcManifests.get(0), java.util.Set.of(gcManifests.get(1)));
+    }
+
+    @Then("the shared dedup chunk, checksum sidecar, and content-address entry remain readable by the second object")
+    public void sharedDedupRemains() {
+        assertTrue(Files.isRegularFile(gcArtifacts.getFirst()));
+        assertTrue(Files.isRegularFile(Path.of(gcArtifacts.getFirst() + ".sha256")));
+        assertTrue(Files.isRegularFile(contentAddressEntry));
+    }
+
+    @When("the second object is deleted and reclamation runs")
+    public void secondDedupOwnerDeleted() {
+        reclamationReport = garbageCollector.reclaim(gcManifests.get(1), java.util.Set.of());
+    }
+
+    @Then("the final reference count reaches zero")
+    public void finalReferenceCountIsZero() {
+        assertEquals(1, reclamationReport.artifactsDeleted());
+    }
+
+    @Then("the dedup chunk, checksum sidecar, and content-address entry are removed as one durable reclamation unit")
+    public void dedupArtifactsRemoved() {
+        assertFalse(Files.exists(gcArtifacts.getFirst()));
+        assertFalse(Files.exists(Path.of(gcArtifacts.getFirst() + ".sha256")));
+        assertFalse(Files.exists(contentAddressEntry));
+    }
+
+    @Given("a multipart upload has persisted parts but has no committed object manifest")
+    public void multipartUploadHasUncommittedParts() throws IOException {
+        Path partsRoot = storageRoot.resolve("multipart-parts");
+        multipartPartStore = new S3MultipartPartStore(partsRoot);
+        multipartUploadDirectory = partsRoot.resolve("gcupload");
+        Files.createDirectories(multipartUploadDirectory);
+        Files.writeString(multipartUploadDirectory.resolve("part-1.bin"), "uncommitted-part");
+        Files.writeString(multipartUploadDirectory.resolve("part-1.bin.sha256"), "temporary-checksum");
+        Files.setLastModifiedTime(multipartUploadDirectory, FileTime.from(Instant.EPOCH));
+        createGcArtifact(StorageArtifactKind.DEDUP_CHUNK, "unrelated-committed-dedup");
+        createGcArtifact(StorageArtifactKind.EC_DATA_SHARD, "unrelated-committed-ec");
+    }
+
+    @When("the upload is {word} and multipart reclamation runs")
+    public void multipartReclamationRuns(String reason) {
+        multipartReason = reason;
+        if ("aborted".equals(reason)) {
+            StepVerifier.create(multipartPartStore.deleteUpload(
+                    com.example.magrathea.objectstore.domain.valueobject.UploadId.of("gcupload")))
+                .verifyComplete();
+        } else {
+            StepVerifier.create(multipartPartStore.reclaimExpired(Instant.now()))
+                .expectNext(1)
+                .verifyComplete();
+        }
+    }
+
+    @Then("every uncommitted part and temporary checksum artifact is removed")
+    public void uncommittedPartsRemoved() {
+        assertFalse(Files.exists(multipartUploadDirectory));
+    }
+
+    @Then("chunks belonging to committed dedup or EC objects are unchanged")
+    public void committedSegmentedArtifactsUnchanged() {
+        assertTrue(Files.exists(gcArtifacts.get(0)));
+        assertTrue(Files.exists(gcArtifacts.get(1)));
+    }
+
+    @Then("a repeated multipart reclamation run is idempotent")
+    public void repeatedMultipartReclamationIsIdempotent() {
+        if ("aborted".equals(multipartReason)) {
+            assertDoesNotThrow(() -> StepVerifier.create(multipartPartStore.deleteUpload(
+                    com.example.magrathea.objectstore.domain.valueobject.UploadId.of("gcupload")))
+                .verifyComplete());
+        } else {
+            StepVerifier.create(multipartPartStore.reclaimExpired(Instant.now()))
+                .expectNext(0)
+                .verifyComplete();
+        }
+    }
+
+    @Given("a committed EC object manifest references four data shards and two parity shards")
+    public void committedEcManifest() throws IOException {
+        List<GcArtifact> shards = new java.util.ArrayList<>();
+        for (int index = 0; index < 4; index++) {
+            shards.add(new GcArtifact(StorageArtifactKind.EC_DATA_SHARD,
+                    createGcArtifact(StorageArtifactKind.EC_DATA_SHARD, "data-" + index)));
+        }
+        for (int index = 0; index < 2; index++) {
+            shards.add(new GcArtifact(StorageArtifactKind.EC_PARITY_SHARD,
+                    createGcArtifact(StorageArtifactKind.EC_PARITY_SHARD, "parity-" + index)));
+        }
+        gcManifests.add(writeGcManifest(shards));
+        createGcArtifact(StorageArtifactKind.WHOLE_OBJECT, "unrelated-whole-object");
+        createGcArtifact(StorageArtifactKind.DEDUP_CHUNK, "unrelated-dedup");
+    }
+
+    @When("the final owning object is deleted and EC reclamation runs")
+    public void ecObjectDeleted() {
+        reclamationReport = garbageCollector.reclaim(gcManifests.getFirst(), java.util.Set.of());
+    }
+
+    @Then("all six shard artifacts and checksum metadata are removed")
+    public void allEcShardsRemoved() {
+        assertEquals(6, reclamationReport.artifactsDeleted());
+        assertEquals(6, reclamationReport.sidecarsDeleted());
+        gcArtifacts.subList(0, 6).forEach(path -> assertFalse(Files.exists(path)));
+    }
+
+    @Then("no whole-object unit or unrelated dedup chunk is removed")
+    public void unrelatedArtifactsRemain() {
+        assertTrue(Files.exists(gcArtifacts.get(6)));
+        assertTrue(Files.exists(gcArtifacts.get(7)));
     }
 
     @Given("a committed {string} artifact with applied transformations {string} has a mismatching final persisted checksum")
@@ -168,6 +348,39 @@ public class PhaseEp4SpaceManagementSteps {
         assertTrue(secondReport.findings().isEmpty());
         assertArrayEquals(healthyBytes, readBytes(healthyArtifact));
     }
+
+    private UUID createGcArtifact(StorageArtifactKind kind, String content) throws IOException {
+        UUID id = UUID.randomUUID();
+        Path path = artifactPath(kind, id);
+        writeArtifact(path, content.getBytes(StandardCharsets.UTF_8));
+        gcArtifacts.add(path);
+        return id;
+    }
+
+    private UUID writeGcManifest(List<GcArtifact> artifacts) throws IOException {
+        UUID id = UUID.randomUUID();
+        Properties properties = new Properties();
+        properties.setProperty("manifest.schemaVersion", "2");
+        properties.setProperty("manifestId", id.toString());
+        properties.setProperty("artifactCount", Integer.toString(artifacts.size()));
+        for (int index = 0; index < artifacts.size(); index++) {
+            GcArtifact artifact = artifacts.get(index);
+            properties.setProperty("artifact." + index + ".kind", artifact.kind().name());
+            properties.setProperty("artifact." + index + ".artifactId", artifact.id().toString());
+        }
+        Files.createDirectories(manifestFile(id).getParent());
+        try (StringWriter writer = new StringWriter()) {
+            properties.store(writer, "EP-4 garbage collection fixture");
+            Files.writeString(manifestFile(id), writer.toString());
+        }
+        return id;
+    }
+
+    private Path manifestFile(UUID id) {
+        return storageRoot.resolve("metadata/manifests").resolve(id + ".properties");
+    }
+
+    private record GcArtifact(StorageArtifactKind kind, UUID id) { }
 
     private Path artifactPath(StorageArtifactKind kind, UUID artifactId) {
         String namespace = kind == StorageArtifactKind.WHOLE_OBJECT ? "whole-objects" : "chunks";

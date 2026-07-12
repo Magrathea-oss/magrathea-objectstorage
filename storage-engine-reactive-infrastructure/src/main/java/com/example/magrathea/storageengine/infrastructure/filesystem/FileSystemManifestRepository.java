@@ -129,7 +129,9 @@ public class FileSystemManifestRepository implements ObjectManifestRepository {
                                 try { Files.deleteIfExists(tempPath); } catch (Exception ignored) { /* best effort */ }
                             }
                             if (e instanceof IOException ioe) {
-                                throw new UncheckedIOException("Atomic manifest write failed", ioe);
+                                throw FileSystemCapacityErrors.translate(ioe, manifestsRoot.getParent().getParent(),
+                                        finalContent.getBytes(StandardCharsets.UTF_8).length,
+                                        "Atomic manifest write failed");
                             }
                             throw e;
                         }

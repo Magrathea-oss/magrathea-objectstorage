@@ -10,7 +10,7 @@ Business Need: Capacity failures reject writes without corrupting committed S3 o
     And object key "capacity/2026/existing.bin" contains committed fixture "fixtures/upload/small-object.txt"
 
   Rule: Bucket quotas are enforced before object publication
-    @REQ-QUOTA-001 @functional-requirement @quota @s3-api @admin-api @webclient-required @awscli-required @not-implemented
+    @REQ-QUOTA-001 @functional-requirement @quota @s3-api @admin-api @webclient-required @awscli-required @implemented-and-validated
     Scenario Outline: PutObject exceeding a bucket byte quota is rejected atomically
       Given validation mode "<validation_mode>" is selected for requirement "REQ-QUOTA-001"
       And the administrator configures bucket "capacity-protection-bucket" with byte quota 1048576
@@ -21,13 +21,18 @@ Business Need: Capacity failures reject writes without corrupting committed S3 o
       And the previously committed object remains readable with its original checksum
       And the Admin API reports used bytes, reserved bytes, quota bytes, and the rejected reservation
 
-      Examples:
+      @webclient
+      Examples: WebTestClient validation
         | validation_mode |
         | webclient       |
+
+      @awscli
+      Examples: AWS CLI validation
+        | validation_mode |
         | awscli          |
 
   Rule: Concurrent reservations cannot oversubscribe a quota
-    @REQ-QUOTA-002 @functional-requirement @non-functional-requirement @quota @concurrency @s3-api @webclient-required @awscli-required @not-implemented
+    @REQ-QUOTA-002 @functional-requirement @non-functional-requirement @quota @concurrency @s3-api @webclient-required @awscli-required @implemented-and-validated
     Scenario Outline: Concurrent uploads reserve capacity atomically
       Given validation mode "<validation_mode>" is selected for requirement "REQ-QUOTA-002"
       And bucket "capacity-protection-bucket" has quota for exactly one 2 MiB object beyond current usage
@@ -36,13 +41,18 @@ Business Need: Capacity failures reject writes without corrupting committed S3 o
       And reported used plus reserved bytes never exceeds the configured quota
       And restart preserves the committed usage and releases the failed reservation
 
-      Examples:
+      @webclient
+      Examples: WebTestClient validation
         | validation_mode |
         | webclient       |
+
+      @awscli
+      Examples: AWS CLI validation
+        | validation_mode |
         | awscli          |
 
   Rule: Filesystem exhaustion fails closed
-    @REQ-CAPACITY-001 @functional-requirement @non-functional-requirement @enospc @integrity @s3-api @webclient-required @awscli-required @not-implemented
+    @REQ-CAPACITY-001 @functional-requirement @non-functional-requirement @enospc @integrity @s3-api @webclient-required @awscli-required @implemented-and-validated
     Scenario Outline: ENOSPC during artifact persistence returns a deterministic S3 error and cleans partial state
       Given validation mode "<validation_mode>" is selected for requirement "REQ-CAPACITY-001"
       And deterministic fault injection reports ENOSPC after at least one temporary artifact is written
@@ -53,7 +63,12 @@ Business Need: Capacity failures reject writes without corrupting committed S3 o
       And the previously committed object remains readable with its original checksum
       And a capacity failure event exposes backend, storage root, requested bytes, and available bytes without payload content
 
-      Examples:
+      @webclient
+      Examples: WebTestClient validation
         | validation_mode |
         | webclient       |
+
+      @awscli
+      Examples: AWS CLI validation
+        | validation_mode |
         | awscli          |

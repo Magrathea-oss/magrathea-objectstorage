@@ -12,6 +12,7 @@ import com.example.magrathea.storageengine.domain.valueobject.UploadRequestConte
 import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemStorageCluster;
 import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemWriteFaultInjector;
 import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemWriteInterruptedException;
+import com.example.magrathea.storageengine.application.exception.StorageCapacityException;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
@@ -173,6 +174,7 @@ public class RequirementsTestApp {
         private final AtomicBoolean interruptAfterChunkTempWrite = new AtomicBoolean(false);
         private final AtomicBoolean interruptAfterManifestTempWrite = new AtomicBoolean(false);
         private final AtomicBoolean leavePartialTemporaryArtifacts = new AtomicBoolean(true);
+        private final AtomicBoolean enospcAfterNextChunkTempWrite = new AtomicBoolean(false);
         private volatile String failureReason;
         private volatile List<Path> committedChunksAtManifestInterruption = List.of();
         private volatile boolean committedChunkChecksumsValidAtManifestInterruption;
@@ -199,9 +201,16 @@ public class RequirementsTestApp {
             this.failureReason = failureReason;
         }
 
+        public void enospcAfterNextChunkTempWrite() {
+            interruptAfterChunkTempWrite.set(false);
+            interruptAfterManifestTempWrite.set(false);
+            enospcAfterNextChunkTempWrite.set(true);
+        }
+
         public void disable() {
             interruptAfterChunkTempWrite.set(false);
             interruptAfterManifestTempWrite.set(false);
+            enospcAfterNextChunkTempWrite.set(false);
             leavePartialTemporaryArtifacts.set(true);
             failureReason = null;
             committedChunksAtManifestInterruption = List.of();
@@ -218,6 +227,11 @@ public class RequirementsTestApp {
 
         @Override
         public void afterChunkTempFileWritten(ChunkWriteContext context) {
+            if (enospcAfterNextChunkTempWrite.compareAndSet(true, false)) {
+                Path storageRoot = context.tempFile().getParent().getParent().getParent().getParent();
+                throw new StorageCapacityException("storage-engine", storageRoot,
+                    context.expectedBytes(), 0);
+            }
             if (!interruptAfterChunkTempWrite.get()) {
                 return;
             }

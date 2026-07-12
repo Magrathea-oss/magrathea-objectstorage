@@ -29,7 +29,7 @@ public final class StorageOperationalLoggingEventListener implements StorageEven
         }
         Map<String, String> fields = StorageObservabilityFields.safeFields(event);
         if (event.type() == StorageEventType.STAGE_FAILED) {
-            log.warn("Storage pipeline event correlationId={} requestId={} operation={} stage={} outcome={} failureClassification={} backend={} manifestId={} durationMs={}",
+            log.warn("Storage pipeline event correlationId={} requestId={} operation={} stage={} outcome={} failureClassification={} backend={} storageRoot={} requestedBytes={} availableBytes={} manifestId={} durationMs={}",
                     fields.get("correlation.id"),
                     fields.get("request.id"),
                     fields.get("operation"),
@@ -37,6 +37,9 @@ public final class StorageOperationalLoggingEventListener implements StorageEven
                     fields.get("outcome"),
                     fields.get("failure.classification"),
                     fields.get("backend"),
+                    fields.getOrDefault("storage.root", "none"),
+                    fields.getOrDefault("requested.bytes", "none"),
+                    fields.getOrDefault("available.bytes", "none"),
                     fields.getOrDefault("manifest.id", "none"),
                     fields.getOrDefault("duration.ms", "0"));
             return;

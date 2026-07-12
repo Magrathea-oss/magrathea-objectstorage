@@ -10,6 +10,7 @@ import com.example.magrathea.s3api.adapter.web.headers.S3RequestExtractor;
 import com.example.magrathea.s3api.adapter.web.headers.S3ResponseBuilder;
 import com.example.magrathea.objectstore.reactive.repository.application.BucketNotFoundException;
 import com.example.magrathea.objectstore.reactive.repository.application.StorageObjectIntegrityException;
+import com.example.magrathea.objectstore.reactive.repository.application.ObjectStorageCapacityException;
 import com.example.magrathea.s3api.dto.command.DeleteObjectsCommand;
 import com.example.magrathea.s3api.dto.command.RestoreObjectCommand;
 import com.example.magrathea.s3api.dto.command.SelectObjectContentCommand;
@@ -86,6 +87,12 @@ public class S3ObjectOperationsHandler {
             })
             .onErrorResume(BucketNotFoundException.class,
                 e -> S3WebSupport.xmlError(HttpStatus.NOT_FOUND, "NoSuchBucket", "Bucket not found"))
+            .onErrorResume(ObjectStorageCapacityException.class,
+                e -> e.kind() == ObjectStorageCapacityException.Kind.QUOTA
+                    ? S3WebSupport.xmlError(HttpStatus.INSUFFICIENT_STORAGE, "QuotaExceeded",
+                        "Bucket logical-byte quota exceeded")
+                    : S3WebSupport.xmlError(HttpStatus.INSUFFICIENT_STORAGE, "InsufficientStorage",
+                        "Storage backend has insufficient capacity"))
             .onErrorResume(Throwable.class,
                 e -> S3WebSupport.xmlError(HttpStatus.INTERNAL_SERVER_ERROR, "InternalError", e.getMessage()));
     }

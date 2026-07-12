@@ -44,7 +44,10 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Optional;
@@ -53,6 +56,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class StorageEngineReactiveS3ObjectRepositoryTest {
 
@@ -148,6 +153,37 @@ class StorageEngineReactiveS3ObjectRepositoryTest {
     }
 
     @Test
+    void overwriteAndDeleteReclaimObsoleteFilesystemManifestAndWholeObject() {
+        Path storageRoot = tempDir.resolve("gc-storage-engine");
+        StorageEngineReactiveS3ObjectRepository repository = realFilesystemRepository(storageRoot);
+        ObjectKey key = ObjectKey.of("bucket", "gc/replace-me.txt");
+        S3Object object = S3Object.createPending(key, "TEST", Map.of(), null);
+
+        StepVerifier.create(repository.saveWithContent(
+                object, Flux.just(BUFFER_FACTORY.wrap("first".getBytes(StandardCharsets.UTF_8))), "TEST"))
+            .expectNextCount(1)
+            .verifyComplete();
+        Path firstManifest = onlyRegularFile(storageRoot.resolve("metadata/manifests"));
+        Path firstWholeObject = onlyRegularFileWithoutSidecar(storageRoot.resolve("nodes/node-001/whole-objects"));
+
+        StepVerifier.create(repository.saveWithContent(
+                object, Flux.just(BUFFER_FACTORY.wrap("second".getBytes(StandardCharsets.UTF_8))), "TEST"))
+            .expectNextCount(1)
+            .verifyComplete();
+        assertFalse(Files.exists(firstManifest));
+        assertFalse(Files.exists(firstWholeObject));
+        assertEquals(1, regularFileCount(storageRoot.resolve("metadata/manifests")));
+        assertEquals(1, regularFileCountWithoutSidecars(storageRoot.resolve("nodes/node-001/whole-objects")));
+
+        StepVerifier.create(repository.findByBucketAndKey(key).flatMap(repository::delete))
+            .expectNextCount(1)
+            .verifyComplete();
+        assertEquals(0, regularFileCount(storageRoot.resolve("metadata/manifests")));
+        assertEquals(0, regularFileCountWithoutSidecars(storageRoot.resolve("nodes/node-001/whole-objects")));
+        assertTrue(Files.exists(storageRoot.resolve("metadata/gc/pending")));
+    }
+
+    @Test
     void saveWithContentThenGetContentReturnsOriginalBytes() {
         FakeOrchestrator orchestrator = new FakeOrchestrator();
         StorageEngineReactiveS3ObjectRepository repository = new StorageEngineReactiveS3ObjectRepository(
@@ -163,6 +199,42 @@ class StorageEngineReactiveS3ObjectRepositoryTest {
         StepVerifier.create(repository.getContent(key).reduce(new byte[0], this::append))
                 .assertNext(actual -> assertArrayEquals(content, actual))
                 .verifyComplete();
+    }
+
+    private static Path onlyRegularFile(Path directory) {
+        try (var paths = Files.list(directory)) {
+            return paths.filter(Files::isRegularFile).findFirst().orElseThrow();
+        } catch (IOException error) {
+            throw new UncheckedIOException(error);
+        }
+    }
+
+    private static Path onlyRegularFileWithoutSidecar(Path directory) {
+        try (var paths = Files.list(directory)) {
+            return paths.filter(Files::isRegularFile)
+                .filter(path -> !path.getFileName().toString().endsWith(".sha256"))
+                .findFirst().orElseThrow();
+        } catch (IOException error) {
+            throw new UncheckedIOException(error);
+        }
+    }
+
+    private static long regularFileCount(Path directory) {
+        try (var paths = Files.list(directory)) {
+            return paths.filter(Files::isRegularFile).count();
+        } catch (IOException error) {
+            throw new UncheckedIOException(error);
+        }
+    }
+
+    private static long regularFileCountWithoutSidecars(Path directory) {
+        try (var paths = Files.list(directory)) {
+            return paths.filter(Files::isRegularFile)
+                .filter(path -> !path.getFileName().toString().endsWith(".sha256"))
+                .count();
+        } catch (IOException error) {
+            throw new UncheckedIOException(error);
+        }
     }
 
     private StorageEngineReactiveS3ObjectRepository realFilesystemRepository(Path storageRoot) {

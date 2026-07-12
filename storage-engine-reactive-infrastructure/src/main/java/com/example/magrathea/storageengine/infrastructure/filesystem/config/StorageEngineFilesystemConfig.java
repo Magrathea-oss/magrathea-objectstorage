@@ -1,6 +1,7 @@
 package com.example.magrathea.storageengine.infrastructure.filesystem.config;
 
 import com.example.magrathea.storageengine.application.port.AlterationPort;
+import com.example.magrathea.storageengine.application.port.BucketCapacityPort;
 import com.example.magrathea.storageengine.application.port.ChunkStorePort;
 import com.example.magrathea.storageengine.application.port.ContentAddressIndex;
 import com.example.magrathea.storageengine.application.port.DataTransformPort;
@@ -16,6 +17,7 @@ import com.example.magrathea.storageengine.domain.service.EffectivePolicyResolve
 import com.example.magrathea.storageengine.domain.service.PersistencePlanner;
 import com.example.magrathea.storageengine.domain.service.VirtualDeviceResolver;
 import com.example.magrathea.storageengine.infrastructure.filesystem.AesGcmEncryptionAdapter;
+import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemBucketCapacityStore;
 import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemChunkStorePort;
 import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemDataTransformPort;
 import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemStorageCluster;
@@ -51,7 +53,9 @@ public class StorageEngineFilesystemConfig {
             @Value("${storage.engine.filesystem.fault-injection.interrupt-after-manifest-temp-write:false}")
                     boolean interruptAfterManifestTempWrite,
             @Value("${storage.engine.filesystem.fault-injection.leave-partial-temporary-artifacts:true}")
-                    boolean leavePartialTemporaryArtifacts) {
+                    boolean leavePartialTemporaryArtifacts,
+            @Value("${storage.engine.filesystem.fault-injection.enospc-on-chunk-write-attempt:-1}")
+                    long enospcOnChunkWriteAttempt) {
         Path clusterRoot = (root == null || root.isBlank())
             ? Path.of(System.getProperty("java.io.tmpdir"), "magrathea-objectstorage", "storage-engine")
             : Path.of(root);
@@ -61,7 +65,17 @@ public class StorageEngineFilesystemConfig {
                 new PropertyControlledFileSystemWriteFaultInjector(
                         interruptAfterChunkTempWrite,
                         interruptAfterManifestTempWrite,
-                        leavePartialTemporaryArtifacts));
+                        leavePartialTemporaryArtifacts,
+                        enospcOnChunkWriteAttempt));
+    }
+
+    @Bean
+    public BucketCapacityPort bucketCapacityPort(
+            @Value("${storage.engine.filesystem.root:}") String root) {
+        Path storageRoot = (root == null || root.isBlank())
+                ? Path.of(System.getProperty("java.io.tmpdir"), "magrathea-objectstorage", "storage-engine")
+                : Path.of(root);
+        return new FileSystemBucketCapacityStore(storageRoot);
     }
 
     @Bean

@@ -33,6 +33,10 @@ public final class StorageObservabilityFields {
         event.bucket().map(StorageObservabilityFields::sha256Hex).ifPresent(value -> fields.put("bucket.hash", value));
         event.objectKey().map(StorageObservabilityFields::sha256Hex).ifPresent(value -> fields.put("object.key.hash", value));
         event.manifestId().ifPresent(value -> fields.put("manifest.id", value));
+        if (event instanceof StorageEvent.StageFailed failed
+                && failed.reason().startsWith("Storage capacity exhausted:")) {
+            addCapacityFields(fields, failed.reason());
+        }
         if (event instanceof StorageEvent.RecoveryArtifactQuarantined quarantined) {
             fields.put("artifact.type", quarantined.artifactType());
             fields.put("artifact.hash", quarantined.artifactHash());
@@ -67,6 +71,9 @@ public final class StorageObservabilityFields {
             return "none";
         }
         String outcome = event.outcome().orElse("").toLowerCase();
+        if (outcome.contains("storage capacity exhausted")) {
+            return "capacity-exhausted";
+        }
         if (outcome.contains("checksum") || outcome.contains("integrity") || outcome.contains("corrupt")) {
             return "integrity-failure";
         }
@@ -90,6 +97,25 @@ public final class StorageObservabilityFields {
             case RECOVERY_SCAN_COMPLETED -> event.outcome().orElse("completed");
             default -> "success";
         };
+    }
+
+    private static void addCapacityFields(Map<String, String> fields, String reason) {
+        String details = reason.substring(reason.indexOf(':') + 1).trim();
+        for (String token : details.split(" ")) {
+            int separator = token.indexOf('=');
+            if (separator <= 0 || separator == token.length() - 1) {
+                continue;
+            }
+            String key = token.substring(0, separator);
+            String value = token.substring(separator + 1);
+            switch (key) {
+                case "backend" -> fields.put("backend", value);
+                case "storageRoot" -> fields.put("storage.root", value);
+                case "requestedBytes" -> fields.put("requested.bytes", value);
+                case "availableBytes" -> fields.put("available.bytes", value);
+                default -> { }
+            }
+        }
     }
 
     private static void putMeasurements(Map<String, String> fields, StorageEventMeasurements measurements) {
