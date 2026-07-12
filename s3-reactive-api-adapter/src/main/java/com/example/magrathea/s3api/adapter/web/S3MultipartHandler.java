@@ -10,6 +10,7 @@ import com.example.magrathea.objectstore.domain.valueobject.UploadId;
 import com.example.magrathea.reactive.application.service.ReactiveMultipartUploadService;
 import com.example.magrathea.reactive.application.service.ReactiveObjectService;
 import com.example.magrathea.s3api.adapter.web.headers.S3RequestExtractor;
+import com.example.magrathea.s3api.capacity.S3CapacityProperties;
 import com.example.magrathea.s3api.dto.query.ErrorQuery;
 import com.example.magrathea.s3api.dto.query.InitiateMultipartUploadQuery;
 import com.example.magrathea.s3api.dto.query.UploadPartResultQuery;
@@ -52,13 +53,22 @@ public class S3MultipartHandler {
     private final ReactiveMultipartUploadService multipartUploadService;
     private final ReactiveObjectService objectService;
     private final S3MultipartPartStore partStore;
+    private final S3CapacityProperties capacityProperties;
 
     public S3MultipartHandler(ReactiveMultipartUploadService multipartUploadService,
                               ReactiveObjectService objectService,
                               S3MultipartPartStore partStore) {
+        this(multipartUploadService, objectService, partStore, new S3CapacityProperties());
+    }
+
+    public S3MultipartHandler(ReactiveMultipartUploadService multipartUploadService,
+                              ReactiveObjectService objectService,
+                              S3MultipartPartStore partStore,
+                              S3CapacityProperties capacityProperties) {
         this.multipartUploadService = multipartUploadService;
         this.objectService = objectService;
         this.partStore = partStore;
+        this.capacityProperties = capacityProperties;
     }
 
     /** POST /{bucket}/{key}?uploads — Initiate multipart upload */
@@ -104,7 +114,13 @@ public class S3MultipartHandler {
                     return xmlError(HttpStatus.NOT_FOUND, "NoSuchUpload", "UploadId not found");
                 }
                 return objectService.getObject(sourceObjectKey)
-                .flatMap(sourceObject -> partStore.savePart(uploadId, targetPartNumber, objectService.getContent(sourceObjectKey))
+                .flatMap(sourceObject -> {
+                    if (capacityProperties.isEnabled()
+                        && sourceObject.size() > capacityProperties.getMaxMultipartPartBytes()) {
+                        return xmlError(HttpStatus.PAYLOAD_TOO_LARGE, "EntityTooLarge",
+                            "The copied part exceeds the configured maximum allowed part size");
+                    }
+                    return partStore.savePart(uploadId, targetPartNumber, objectService.getContent(sourceObjectKey))
                     .flatMap(storedPart -> {
                         var part = com.example.magrathea.objectstore.domain.valueobject.UploadPart.create(
                             targetPartNumber, storedPart.etag(), storedPart.size());
@@ -114,7 +130,8 @@ public class S3MultipartHandler {
                                 .header("ETag", storedPart.etag())
                                 .contentType(MediaType.APPLICATION_XML)
                                 .bodyValue(UploadPartCopyResultQuery.from(storedPart.etag())));
-                    }))
+                    });
+                })
                 .switchIfEmpty(ServerResponse.status(HttpStatus.NOT_FOUND)
                     .contentType(MediaType.APPLICATION_XML)
                     .bodyValue(ErrorQuery.from("NoSuchKey", "Copy source not found")));
@@ -168,9 +185,9 @@ public class S3MultipartHandler {
                 try {
                     requestedParts = parseCompleteMultipartUploadParts(body);
                 } catch (IllegalArgumentException ex) {
-                    return xmlError(HttpStatus.BAD_REQUEST, "MalformedXML", "The XML you provided was not well-formed or did not validate against our published schema");
+                    return xmlError(HttpStatus.BAD_REQUEST, "MalformedXML",
+                        "The XML you provided was not well-formed or did not validate against our published schema");
                 }
-
                 return multipartUploadService.findById(uploadId)
                     .flatMap(upload -> {
                         if (!upload.isActive()) {
@@ -191,7 +208,20 @@ public class S3MultipartHandler {
                         }
 
                         var objectKey = ObjectKey.of(bucket, key);
-                        long totalSize = sortedParts.stream().mapToLong(part -> part.size()).sum();
+                        long totalSize;
+                        try {
+                            totalSize = sortedParts.stream().mapToLong(part -> part.size()).reduce(0L, Math::addExact);
+                        } catch (ArithmeticException overflow) {
+                            totalSize = Long.MAX_VALUE;
+                        }
+                        if (capacityProperties.isEnabled()
+                            && totalSize > capacityProperties.getMaxAssembledMultipartBytes()) {
+                            var aborted = upload.withAborted();
+                            return multipartUploadService.saveUpload(aborted)
+                                .then(partStore.deleteUpload(uploadId))
+                                .then(xmlError(HttpStatus.PAYLOAD_TOO_LARGE, "EntityTooLarge",
+                                    "The assembled object exceeds the configured maximum allowed object size"));
+                        }
                         var completedObject = ActiveS3Object.create(
                                 objectKey,
                                 "STANDARD",
@@ -301,8 +331,7 @@ public class S3MultipartHandler {
             var nodes = root.getElementsByTagName("Part");
             var parts = new ArrayList<CompletePartSpec>();
             for (int i = 0; i < nodes.getLength(); i++) {
-                var partNode = nodes.item(i);
-                var children = partNode.getChildNodes();
+                var children = nodes.item(i).getChildNodes();
                 String partNumber = null;
                 String etag = null;
                 for (int j = 0; j < children.getLength(); j++) {

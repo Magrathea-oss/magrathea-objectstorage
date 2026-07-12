@@ -6,12 +6,15 @@ import com.example.magrathea.objectstore.domain.valueobject.ObjectChecksum;
 import com.example.magrathea.objectstore.domain.valueobject.ObjectKey;
 import com.example.magrathea.reactive.application.service.ReactiveObjectService;
 import com.example.magrathea.s3api.adapter.web.headers.S3Header;
+import com.example.magrathea.s3api.capacity.S3CapacityProperties;
+import com.example.magrathea.s3api.capacity.S3EntityTooLargeException;
 import com.example.magrathea.s3api.adapter.web.headers.S3RequestExtractor;
 import com.example.magrathea.s3api.adapter.web.headers.S3ResponseBuilder;
 import com.example.magrathea.objectstore.reactive.repository.application.BucketNotFoundException;
 import com.example.magrathea.objectstore.reactive.repository.application.StorageObjectIntegrityException;
 import com.example.magrathea.objectstore.reactive.repository.application.ObjectStorageCapacityException;
 import com.example.magrathea.s3api.dto.command.DeleteObjectsCommand;
+import com.example.magrathea.s3api.security.S3PayloadHashMismatchException;
 import com.example.magrathea.s3api.dto.command.RestoreObjectCommand;
 import com.example.magrathea.s3api.dto.command.SelectObjectContentCommand;
 import com.example.magrathea.s3api.dto.query.CopyObjectResultQuery;
@@ -46,9 +49,15 @@ import java.util.regex.Pattern;
 public class S3ObjectOperationsHandler {
 
     private final ReactiveObjectService objectService;
+    private final S3CapacityProperties capacityProperties;
 
     public S3ObjectOperationsHandler(ReactiveObjectService objectService) {
+        this(objectService, new S3CapacityProperties());
+    }
+
+    public S3ObjectOperationsHandler(ReactiveObjectService objectService, S3CapacityProperties capacityProperties) {
         this.objectService = objectService;
+        this.capacityProperties = capacityProperties;
     }
 
     // ─────────────────────────────────────────────────────
@@ -93,7 +102,8 @@ public class S3ObjectOperationsHandler {
                         "Bucket logical-byte quota exceeded")
                     : S3WebSupport.xmlError(HttpStatus.INSUFFICIENT_STORAGE, "InsufficientStorage",
                         "Storage backend has insufficient capacity"))
-            .onErrorResume(Throwable.class,
+            .onErrorResume(error -> !(error instanceof S3EntityTooLargeException)
+                    && !(error instanceof S3PayloadHashMismatchException),
                 e -> S3WebSupport.xmlError(HttpStatus.INTERNAL_SERVER_ERROR, "InternalError", e.getMessage()));
     }
 
@@ -179,6 +189,10 @@ public class S3ObjectOperationsHandler {
     private Mono<ServerResponse> copyObjectWithContent(
             S3Object sourceObject, ObjectKey targetKey, ServerRequest request) {
         var size = sourceObject.size();
+        if (capacityProperties.isEnabled() && size > capacityProperties.getMaxSinglePutBytes()) {
+            return S3WebSupport.xmlError(HttpStatus.PAYLOAD_TOO_LARGE, "EntityTooLarge",
+                "The copied object exceeds the configured maximum allowed object size");
+        }
         var checksum = sourceObject.checksum();
         var encryption = sourceObject.encryption();
         var metadata = sourceObject.userMetadata();

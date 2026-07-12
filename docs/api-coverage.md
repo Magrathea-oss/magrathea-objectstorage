@@ -10,17 +10,17 @@ This is deliberately conservative: `pending-evidence` can mean absent, placehold
 
 - Official operations: **111**
 - Operations with a mapped router handler: **108**
-- Implemented-and-validated with explicit operation-linked evidence: **20**
-- Not yet eligible for a 100% completion claim: **91**
+- Implemented-and-validated with explicit operation-linked evidence: **21**
+- Not yet eligible for a 100% completion claim: **90**
 
 ## Semantic status summary
 
 | Status | Operations |
 |---|---:|
-| `implemented-and-validated` | 20 |
+| `implemented-and-validated` | 21 |
 | `implemented-not-e2e-validated` | 1 |
 | `not-implemented` | 4 |
-| `pending-evidence` | 86 |
+| `pending-evidence` | 85 |
 
 ## Operation matrix
 
@@ -49,7 +49,7 @@ This is deliberately conservative: `pending-evidence` can mean absent, placehold
 | `DeleteBucketReplication` | Yes | deleteBucketReplication | `pending-evidence` | — | — |
 | `DeleteBucketTagging` | Yes | deleteBucketTagging | `pending-evidence` | — | — |
 | `DeleteBucketWebsite` | Yes | deleteBucketWebsite | `pending-evidence` | — | — |
-| `DeleteObject` | Yes | deleteObject | `pending-evidence` | — | — |
+| `DeleteObject` | Yes | deleteObject | `implemented-and-validated` | — | s3-reactive-api-adapter/src/test/features/specs/phase-ep6-resource-bounds.feature: Eight deterministic workers sustain mixed S3 load for 45 seconds under Xmx256m |
 | `DeleteObjectTagging` | Yes | deleteObjectTagging | `implemented-and-validated` | WebTestClient | s3-reactive-api-adapter/src/test/features/requirements/phase-5-s3-semantic-compatibility.feature: DeleteObjectTagging removes all tags and subsequent GetObjectTagging returns an empty tag set |
 | `DeleteObjects` | Yes | deleteObjects | `pending-evidence` | — | — |
 | `DeletePublicAccessBlock` | Yes | deletePublicAccessBlock | `pending-evidence` | — | — |
@@ -88,7 +88,7 @@ This is deliberately conservative: `pending-evidence` can mean absent, placehold
 | `GetObjectTorrent` | Yes | getObjectTorrent | `pending-evidence` | — | — |
 | `GetPublicAccessBlock` | Yes | getPublicAccessBlock | `pending-evidence` | — | — |
 | `HeadBucket` | Yes | headBucket | `implemented-and-validated` | full-process restart | s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature: All EP-2 metadata families survive one combined restart<br>s3-reactive-api-adapter/src/test/features/requirements/phase-ep2-metadata-durability.feature: Bucket registry survives restart in storage-engine mode |
-| `HeadObject` | Yes | headObject | `implemented-and-validated` | WebTestClient | s3-reactive-api-adapter/src/test/features/requirements/phase-5-s3-semantic-compatibility.feature: HeadObject for a previously stored object returns the same ETag as the PutObject response<br>s3-reactive-api-adapter/src/test/features/requirements/phase-5-s3-semantic-compatibility.feature: HeadObject on the copy destination returns the same ETag as the CopyObject response |
+| `HeadObject` | Yes | headObject | `implemented-and-validated` | WebTestClient | s3-reactive-api-adapter/src/test/features/requirements/phase-5-s3-semantic-compatibility.feature: HeadObject for a previously stored object returns the same ETag as the PutObject response<br>s3-reactive-api-adapter/src/test/features/requirements/phase-5-s3-semantic-compatibility.feature: HeadObject on the copy destination returns the same ETag as the CopyObject response<br>s3-reactive-api-adapter/src/test/features/specs/phase-ep6-resource-bounds.feature: Eight deterministic workers sustain mixed S3 load for 45 seconds under Xmx256m |
 | `ListBucketAnalyticsConfigurations` | Yes | listBucketAnalyticsConfigurations | `pending-evidence` | — | — |
 | `ListBucketIntelligentTieringConfigurations` | No | — | `pending-evidence` | — | — |
 | `ListBucketInventoryConfigurations` | Yes | listBucketInventoryConfigurations | `pending-evidence` | — | — |

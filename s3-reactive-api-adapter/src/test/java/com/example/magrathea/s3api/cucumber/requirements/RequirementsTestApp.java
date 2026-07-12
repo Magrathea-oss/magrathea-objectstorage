@@ -15,14 +15,20 @@ import com.example.magrathea.storageengine.infrastructure.filesystem.FileSystemW
 import com.example.magrathea.storageengine.application.exception.StorageCapacityException;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import io.micrometer.core.instrument.Meter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Measurement;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Primary;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.reactive.function.server.HandlerStrategies;
+import org.springframework.web.reactive.function.server.RequestPredicates;
 import org.springframework.web.reactive.function.server.RouterFunction;
+import org.springframework.web.reactive.function.server.RouterFunctions;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import tools.jackson.dataformat.xml.XmlMapper;
 
@@ -37,6 +43,9 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @SpringBootApplication
@@ -51,6 +60,33 @@ public class RequirementsTestApp {
 
     public static void main(String[] args) {
         SpringApplication.run(RequirementsTestApp.class, args);
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "test.ep6.metrics-probe.enabled", havingValue = "true")
+    public RouterFunction<ServerResponse> ep6MetricsProbe(MeterRegistry registry) {
+        return RouterFunctions.route(RequestPredicates.GET("/admin/_test/metrics/{meter}"), request -> {
+            String name = request.pathVariable("meter");
+            List<Meter> meters = registry.find(name).meters().stream().toList();
+            String requestedTag = request.queryParam("tag").orElse("");
+            if (!requestedTag.isBlank()) {
+                String[] tag = requestedTag.split(":", 2);
+                if (tag.length == 2) {
+                    meters = meters.stream().filter(meter -> tag[1].equals(meter.getId().getTag(tag[0]))).toList();
+                }
+            }
+            if (meters.isEmpty()) return ServerResponse.notFound().build();
+            double value = meters.stream()
+                .flatMap(meter -> StreamSupport.stream(meter.measure().spliterator(), false))
+                .mapToDouble(Measurement::getValue).sum();
+            List<Map<String, String>> tags = meters.stream().flatMap(meter -> meter.getId().getTags().stream())
+                .map(tag -> tag.getKey()).distinct().sorted()
+                .map(tag -> Map.of("tag", tag)).collect(Collectors.toList());
+            return ServerResponse.ok().bodyValue(Map.of(
+                "name", name,
+                "measurements", List.of(Map.of("value", value)),
+                "availableTags", tags));
+        });
     }
 
     @Bean

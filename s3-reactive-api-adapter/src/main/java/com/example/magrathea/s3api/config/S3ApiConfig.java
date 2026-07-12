@@ -13,15 +13,26 @@ import com.example.magrathea.s3api.adapter.web.S3ObjectMetadataHandler;
 import com.example.magrathea.s3api.adapter.web.S3ObjectOperationsHandler;
 import com.example.magrathea.s3api.adapter.web.S3PathRouter;
 import com.example.magrathea.s3api.adapter.web.S3SessionHandler;
+import com.example.magrathea.s3api.capacity.S3CapacityMetrics;
+import com.example.magrathea.s3api.capacity.S3CapacityProperties;
+import com.example.magrathea.s3api.capacity.S3CapacityWebFilter;
+import com.example.magrathea.s3api.capacity.S3ConnectionTracker;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.reactor.netty.NettyReactiveWebServerFactory;
+import org.springframework.boot.web.server.WebServerFactoryCustomizer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 
 import java.nio.file.Path;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerResponse;
+import reactor.netty.ConnectionObserver;
 
 /**
  * Auto-configuration for S3 Reactive API Adapter module.
@@ -35,7 +46,48 @@ import org.springframework.web.reactive.function.server.ServerResponse;
 @AutoConfiguration
 @ConditionalOnClass({ ReactiveBucketService.class, ReactiveObjectService.class })
 @ConditionalOnProperty(name = "s3.api.enabled", havingValue = "true", matchIfMissing = true)
+@EnableConfigurationProperties(S3CapacityProperties.class)
 public class S3ApiConfig {
+
+    @Bean
+    @ConditionalOnMissingBean(MeterRegistry.class)
+    public MeterRegistry s3CapacityMeterRegistry() {
+        return new SimpleMeterRegistry();
+    }
+
+    @Bean
+    public S3CapacityMetrics s3CapacityMetrics(MeterRegistry meterRegistry) {
+        return new S3CapacityMetrics(meterRegistry);
+    }
+
+    @Bean
+    public S3CapacityWebFilter s3CapacityWebFilter(S3CapacityProperties properties,
+                                                   S3CapacityMetrics metrics) {
+        return new S3CapacityWebFilter(properties, metrics);
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "s3.capacity.enabled", havingValue = "true", matchIfMissing = true)
+    public S3ConnectionTracker s3ConnectionTracker(S3CapacityProperties properties,
+                                                   MeterRegistry meterRegistry) {
+        return new S3ConnectionTracker(properties, meterRegistry);
+    }
+
+    /**
+     * Customizes only Spring Boot's main reactive server. The independently constructed Admin
+     * {@code HttpServer} does not use this factory and therefore retains its own connection capacity.
+     */
+    @Bean
+    @ConditionalOnProperty(name = "s3.capacity.enabled", havingValue = "true", matchIfMissing = true)
+    public WebServerFactoryCustomizer<NettyReactiveWebServerFactory> s3ConnectionCapCustomizer(
+            S3ConnectionTracker tracker) {
+        return factory -> factory.addServerCustomizers(httpServer ->
+            httpServer.childObserve((connection, state) -> {
+                if (state == ConnectionObserver.State.CONNECTED) {
+                    tracker.connected(connection);
+                }
+            }));
+    }
 
     @Bean
     public S3BucketOperationsHandler s3BucketOperationsHandler(ReactiveBucketService bucketService,
@@ -49,8 +101,9 @@ public class S3ApiConfig {
     }
 
     @Bean
-    public S3ObjectOperationsHandler s3ObjectOperationsHandler(ReactiveObjectService objectService) {
-        return new S3ObjectOperationsHandler(objectService);
+    public S3ObjectOperationsHandler s3ObjectOperationsHandler(ReactiveObjectService objectService,
+                                                               S3CapacityProperties capacityProperties) {
+        return new S3ObjectOperationsHandler(objectService, capacityProperties);
     }
 
     @Bean
@@ -79,8 +132,9 @@ public class S3ApiConfig {
     @Bean
     public S3MultipartHandler s3MultipartHandler(ReactiveMultipartUploadService multipartUploadService,
                                                  ReactiveObjectService objectService,
-                                                 S3MultipartPartStore multipartPartStore) {
-        return new S3MultipartHandler(multipartUploadService, objectService, multipartPartStore);
+                                                 S3MultipartPartStore multipartPartStore,
+                                                 S3CapacityProperties capacityProperties) {
+        return new S3MultipartHandler(multipartUploadService, objectService, multipartPartStore, capacityProperties);
     }
 
     @Bean

@@ -22,10 +22,10 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |Ongoing (S3 API Semantic Completion Plan, `PLAN.md`)
 
 |3
-|**Streaming and storage-artifact taxonomy gap** — known full-body/full-part aggregation defects have been removed from PutObject, GetObject, UploadPart, UploadPartCopy, and multipart part-store paths. Pipeline-unit and WebTestClient Cucumber stream deterministic 256 MiB REQ-PIPELINE-002 writes and REQ-PIPELINE-003 reads through the production staged pipeline and real filesystem without test-side whole-object retention. ADR 0025 now requires chunks only for multipart, dedup, and EC; the current chunk-only manifest representation still misclassifies plain `FileUnit` persistence and must migrate to typed storage artifacts. REQ-PIPELINE-013 separately observes a shared four-DataBuffer demand ceiling at existing adapter boundaries.
-|`OutOfMemoryError` risk is reduced for the validated large write and adapter boundaries; client-driven loopback HTTP cancellation now validates cleanup, but deterministic pre-response integrity checking currently adds a second filesystem read with unvalidated first-byte latency impact
-|Keep Cucumber static architecture, staged pipeline-unit/WebTestClient, client-cancellation, and finite-demand runtime coverage; benchmark or redesign the integrity-preflight latency trade-off
-|EP-3 (`@partial` — selected staged lifecycle/publication/cleanup behavior, large pipeline-unit/WebTestClient writes, client-driven cancellation, and finite adapter demand are validated; the read preflight trade-off remains open)
+|**Streaming remains bounded to the validated preview envelope** — EP-3 removed full-object aggregation and introduced typed whole-object/dedup/EC artifacts; EP-6 now enforces and validates the 256 MiB object envelope under `-Xmx256m`.
+|Larger objects, higher concurrency, or changed limits may exceed the tested memory/latency envelope even though the streaming architecture remains bounded
+|Treat configured EP-6 bounds as preview safety limits; rerun capacity/load/soak evidence after raising them and reserve portable performance claims for KA-6
+|EP-3 and EP-6 (`@implemented-and-validated` for declared single-node scopes)
 
 |4
 |**Security must be explicitly enabled** — EP-1 secured mode now proves SigV4, exact payload hashes, deny-by-default, explicit deny, PublicAccessBlock/public ACL denial, expected-owner mismatch, durable redacted tamper-evident audit, durable credentials/policies, and SSE-S3 encrypted-at-rest inspection through Spring Security Reactive plus WebTestClient/AWS CLI/component specs. The remaining risk is operational: the default profile is still anonymous/permit-all for trusted environments.
@@ -46,6 +46,12 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |EP-5 (`@implemented-and-validated` for declared preview scope)
 
 |7
+|**Performance evidence is runner-specific, not sizing guidance** — deterministic CI and soak runs prove bounded behavior on their recorded JVM/OS/CPU environment but do not establish portable throughput, hardware sizing, or competitor comparisons.
+|Operators could overgeneralize observed p99/operation counts to different disks, CPUs, kernels, or workloads
+|Publish machine-readable run manifests and the mandatory non-benchmark disclaimer; use KA-6 for pinned-hardware repeated comparative methodology
+|EP-6 (`@implemented-and-validated` safety envelope; KA-6 remains pending)
+
+|8
 |**Distributed readiness is modeled, not executed** — placement, quorum, anti-entropy, and rebalance planning are unit-validated in `storage-engine-domain`, but there is no real networked membership, replication execution, or multi-node e2e validation.
 |Multi-node/cluster claims would be premature; no HA guarantee exists today
 |Do not claim cluster readiness until EP-10 (S3 Cluster) is validated end to end by multi-node scenarios, gated on the EP-8 cluster architecture ADR

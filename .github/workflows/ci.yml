@@ -1,6 +1,8 @@
 name: Magrathea CI
 
 on:
+  schedule:
+    - cron: "17 3 * * 0"
   pull_request:
   push:
     branches:
@@ -20,6 +22,14 @@ on:
           - "true"
       run-live-alert-delivery:
         description: "Validate live Prometheus and Alertmanager webhook delivery"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      run-ep6-soak:
+        description: "Run the opt-in 15-minute EP-6 soak validation"
         required: false
         default: "false"
         type: choice
@@ -86,6 +96,65 @@ jobs:
           mkdir -p target
           mvn -B --no-transfer-progress -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false -Dtest=PhaseEp1SecurityIdentityRequirementsCucumberTest,PhaseEp1SecurityIdentityAwsCliCucumberTest,Ep1SecurityServicesSpecsCucumberTest,PhaseEp2MetadataDurabilityCucumberTest,PhaseEp2MetadataDurabilityFullRestartCucumberTest,Phase3ReactivePipelineStaticArchitectureSpecsCucumberTest,Phase3RuntimeBackpressureSpecsCucumberTest,PhaseEp4SpaceManagementSpecsCucumberTest,PhaseEp4CapacityWebCucumberTest,PhaseEp4CapacityAwsCliCucumberTest,PhaseEp5OperabilityRequirementsCucumberTest,PhaseEp5StorageMigrationSpecsCucumberTest,PhaseEp5DeliverySpecsCucumberTest,S3ApiSemanticCoverageReportSpecsCucumberTest,Phase5S3SemanticCompatibilityRequirementsCucumberTest,Phase5S3SemanticCompatibilityAwsCliCucumberTest,Phase5MultipartFullRestartCucumberTest test | tee target/focused-cucumber.log
           ! grep -q 'Using generated security password' target/focused-cucumber.log
+
+  ep6-ci-load:
+    name: EP-6 deterministic 45-second load validation
+    runs-on: ubuntu-latest
+    needs: canonical-quality-gate
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Validate EP-6 object, multipart, timeout, concurrency, and rate limits
+        run: mvn -B --no-transfer-progress -Pep6-performance-capacity-tests -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false test
+
+      - name: Validate EP-6 real TCP connection cap
+        run: mvn -B --no-transfer-progress -Pep6-connection-cap-tests -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false test
+
+      - name: Run EP-6 CI load profile
+        run: mvn -B --no-transfer-progress -Pep6-ci -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false test
+
+      - name: Upload EP-6 CI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ep6-ci-${{ github.run_id }}
+          path: s3-reactive-api-adapter/target/ep6/results/ci/
+          if-no-files-found: error
+
+  ep6-soak-scheduled-or-manual:
+    name: EP-6 opt-in 15-minute soak validation
+    runs-on: ubuntu-latest
+    needs: canonical-quality-gate
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run-ep6-soak == 'true')
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Run EP-6 soak profile
+        run: mvn -B --no-transfer-progress -Pep6-soak -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false test
+
+      - name: Upload EP-6 soak evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ep6-soak-${{ github.run_id }}
+          path: s3-reactive-api-adapter/target/ep6/results/soak/
+          if-no-files-found: error
 
   root-jvm-docker:
     name: Root JVM Docker image

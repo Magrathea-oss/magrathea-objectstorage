@@ -2,7 +2,6 @@ package com.example.magrathea.s3api.security;
 
 import org.springframework.core.Ordered;
 import org.springframework.core.io.buffer.DataBuffer;
-import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -13,7 +12,6 @@ import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
@@ -71,25 +69,13 @@ public final class S3SecurityWebFilter implements WebFilter, Ordered {
 
         String declaredPayloadHash = exchange.getRequest().getHeaders().getFirst("X-Amz-Content-SHA256");
         if (requiresPayloadHashVerification(declaredPayloadHash)) {
-            return bufferBody(exchange)
-                .flatMap(body -> {
-                    String actualPayloadHash = sha256Hex(body);
-                    if (!MessageDigest.isEqual(
-                        actualPayloadHash.getBytes(StandardCharsets.UTF_8),
-                        declaredPayloadHash.getBytes(StandardCharsets.UTF_8)
-                    )) {
-                        return xmlError(
-                            exchange,
-                            HttpStatus.FORBIDDEN,
-                            "XAmzContentSHA256Mismatch",
-                            "The provided X-Amz-Content-SHA256 header does not match the request body"
-                        );
-                    }
-                    return chain.filter(securedExchange(exchange, result.principal(), body));
-                });
+            return chain.filter(securedStreamingExchange(exchange, result.principal(), declaredPayloadHash))
+                .onErrorResume(S3PayloadHashMismatchException.class, error -> xmlError(
+                    exchange, HttpStatus.FORBIDDEN, "XAmzContentSHA256Mismatch",
+                    "The provided X-Amz-Content-SHA256 header does not match the request body"));
         }
 
-        return chain.filter(securedExchange(exchange, result.principal(), null));
+        return chain.filter(securedExchange(exchange, result.principal()));
     }
 
     private static boolean requiresPayloadHashVerification(String declaredPayloadHash) {
@@ -98,42 +84,38 @@ public final class S3SecurityWebFilter implements WebFilter, Ordered {
             && !"UNSIGNED-PAYLOAD".equals(declaredPayloadHash);
     }
 
-    private static Mono<byte[]> bufferBody(ServerWebExchange exchange) {
-        return exchange.getRequest().getBody()
-            .collectList()
-            .map(buffers -> {
-                ByteArrayOutputStream output = new ByteArrayOutputStream();
-                for (DataBuffer buffer : buffers) {
-                    byte[] chunk = new byte[buffer.readableByteCount()];
-                    buffer.read(chunk);
-                    output.writeBytes(chunk);
-                    DataBufferUtils.release(buffer);
-                }
-                return output.toByteArray();
-            });
+    private static ServerWebExchange securedExchange(ServerWebExchange exchange, String principal) {
+        return exchange.mutate().request(exchange.getRequest().mutate()
+            .header("x-magrathea-principal", principal).build()).build();
     }
 
-    private static ServerWebExchange securedExchange(ServerWebExchange exchange, String principal, byte[] cachedBody) {
-        var requestBuilder = exchange.getRequest().mutate()
-            .header("x-magrathea-principal", principal);
-        if (cachedBody == null) {
-            return exchange.mutate().request(requestBuilder.build()).build();
-        }
-        var originalRequest = requestBuilder.build();
-        var decoratedRequest = new ServerHttpRequestDecorator(originalRequest) {
+    private static ServerWebExchange securedStreamingExchange(ServerWebExchange exchange, String principal,
+                                                               String declaredPayloadHash) {
+        var original = exchange.getRequest().mutate().header("x-magrathea-principal", principal).build();
+        var decorated = new ServerHttpRequestDecorator(original) {
             @Override
             public Flux<DataBuffer> getBody() {
-                DataBuffer buffer = exchange.getResponse().bufferFactory().wrap(cachedBody);
-                return Flux.just(buffer);
+                MessageDigest digest = sha256();
+                return super.getBody()
+                    .doOnNext(buffer -> {
+                        try (DataBuffer.ByteBufferIterator iterator = buffer.readableByteBuffers()) {
+                            while (iterator.hasNext()) digest.update(iterator.next());
+                        }
+                    })
+                    .concatWith(Mono.defer(() -> {
+                        String actual = HexFormat.of().formatHex(digest.digest());
+                        return MessageDigest.isEqual(actual.getBytes(StandardCharsets.UTF_8),
+                                declaredPayloadHash.getBytes(StandardCharsets.UTF_8))
+                            ? Mono.empty() : Mono.error(new S3PayloadHashMismatchException());
+                    }));
             }
         };
-        return exchange.mutate().request(decoratedRequest).build();
+        return exchange.mutate().request(decorated).build();
     }
 
-    private static String sha256Hex(byte[] body) {
+    private static MessageDigest sha256() {
         try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(digest.digest(body));
+            return MessageDigest.getInstance("SHA-256");
         } catch (Exception e) {
             throw new IllegalStateException("SHA-256 unavailable", e);
         }

@@ -18,8 +18,8 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 
 === Summary
 
-* Feature files scanned: 26
-* Scenarios discovered: 429
+* Feature files scanned: 28
+* Scenarios discovered: 445
 * Protocol-smoke scenarios: 122
 
 ==== Status tag counts
@@ -29,7 +29,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |Tag |Scenario count
 |`@absent` |3
 |`@config-only` |69
-|`@implemented-and-validated` |148
+|`@implemented-and-validated` |164
 |`@implemented-not-e2e-validated` |21
 |`@not-implemented` |6
 |`@placeholder` |9
@@ -43,7 +43,9 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |Tag |Scenario count
 |`@awscli-required` |61
 |`@bootstrap-integration-required` |4
-|`@component-spec-required` |9
+|`@ci-load-required` |10
+|`@component-spec-required` |12
+|`@connection-validation-required` |2
 |`@docker-release-required` |1
 |`@docker-required` |1
 |`@filesystem-inspection-required` |1
@@ -53,10 +55,11 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |`@metrics-inspection-required` |3
 |`@pipeline-unit-required` |15
 |`@runtime-backpressure-required` |1
+|`@soak-required` |2
 |`@static-architecture-required` |7
 |`@tracing-inspection-required` |2
 |`@webclient-required` |300
-|`unknown/not-tagged` |72
+|`unknown/not-tagged` |73
 |===
 
 ==== Classification tag counts
@@ -64,9 +67,9 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 [cols="1,1",options="header"]
 |===
 |Tag |Scenario count
-|`@functional-requirement` |201
-|`@non-functional-requirement` |120
-|`unknown/not-tagged` |202
+|`@functional-requirement` |209
+|`@non-functional-requirement` |133
+|`unknown/not-tagged` |205
 |===
 
 === Scenarios by Stakeholder Audience, Feature, and Requirement ID
@@ -3236,6 +3239,261 @@ is deployment integration outside the supported single-node preview artifact.
   Then the shipped Prometheus rule pack passes Prometheus rule validation
   And Prometheus evaluates the Admin liveness alert against a failing probe signal
   And Alertmanager delivers alert "MagratheaAdminLivenessProbeDown" to the operator webhook receiver
+----
+
+==== s3-reactive-api-adapter/src/test/features/requirements/phase-ep6-performance-capacity.feature
+
+* Feature title: Business Need: EP-6 bounded S3 service envelope for the 0.1.x single-node preview
+* Feature tags: `@requirement`, `@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@business-need`
+* Feature description:
++
+----
+S3 clients and operators need a reproducible capacity envelope for the 0.1.x single-node preview
+so they can distinguish supported bounded operation from production-scale or competitive benchmark claims.
+The CI load validation mode runs for 45 seconds and is suitable for the mandatory build gate.
+The soak validation mode is an explicit 15-minute opt-in profile and is not part of the default test gate.
+The connection validation mode uses real TCP clients against a child process rather than an in-process router.
+----
+
+===== REQ-PERF-001
+
+====== Scenario: A client stores and reads the maximum supported single object
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep6-performance-capacity.feature:13`
+|Rule |The supported object-size envelope is explicit and fails without publishing partial state
+|Requirement ID(s) |`REQ-PERF-001`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@business-need`, `@streaming`, `@integrity`
+|Validation mode tags |`@ci-load-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@business-need`, `@implemented-and-validated`, `@REQ-PERF-001`, `@functional-requirement`, `@non-functional-requirement`, `@streaming`, `@integrity`, `@ci-load-required`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the 0.1.x single-node S3 process runs with maximum heap "256m"
+  And bucket "ep6-object-limit-bucket" exists on filesystem root "target/ep6/object-limit"
+  And fixture "fixtures/upload/large-object.bin" contains 268435456 deterministic bytes
+  When the client uploads the fixture as object "limits/single-256-mib.bin"
+  Then PutObject succeeds without an out-of-memory error
+  And GetObject returns 268435456 bytes with the fixture checksum
+  And the committed object has no truncated or unpublished storage artifacts
+----
+
+===== REQ-PERF-002
+
+====== Scenario: A single object larger than 256 MiB is rejected before publication
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep6-performance-capacity.feature:23`
+|Rule |The supported object-size envelope is explicit and fails without publishing partial state
+|Requirement ID(s) |`REQ-PERF-002`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@business-need`, `@streaming`, `@fail-closed`
+|Validation mode tags |`@ci-load-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@business-need`, `@implemented-and-validated`, `@REQ-PERF-002`, `@functional-requirement`, `@non-functional-requirement`, `@streaming`, `@fail-closed`, `@ci-load-required`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the 0.1.x single-node S3 process limits a single object to 268435456 bytes
+  And bucket "ep6-object-rejection-bucket" exists on filesystem root "target/ep6/object-rejection"
+  When the client attempts PutObject for "limits/single-too-large.bin" with content length 268435457
+  Then the S3 response reports "EntityTooLarge"
+  And object "limits/single-too-large.bin" does not exist
+  And no temporary whole-object, deduplication, or erasure-coding artifact remains for the rejected request
+----
+
+===== REQ-PERF-003
+
+====== Scenario: Multipart limits allow 64 MiB parts and a 256 MiB assembled object
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep6-performance-capacity.feature:32`
+|Rule |The supported object-size envelope is explicit and fails without publishing partial state
+|Requirement ID(s) |`REQ-PERF-003`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@business-need`, `@multipart`, `@streaming`, `@integrity`
+|Validation mode tags |`@ci-load-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@business-need`, `@implemented-and-validated`, `@REQ-PERF-003`, `@functional-requirement`, `@non-functional-requirement`, `@multipart`, `@streaming`, `@integrity`, `@ci-load-required`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the 0.1.x single-node S3 process limits each multipart part to 67108864 bytes
+  And the assembled multipart object limit is 268435456 bytes
+  And bucket "ep6-multipart-limit-bucket" exists on filesystem root "target/ep6/multipart-limit"
+  When the client uploads four deterministic 67108864-byte parts for object "limits/multipart-256-mib.bin"
+  And the client completes the multipart upload in part-number order
+  Then CompleteMultipartUpload succeeds without an out-of-memory error
+  And GetObject returns 268435456 bytes with the checksum of the ordered parts
+----
+
+===== REQ-PERF-004
+
+====== Scenario Outline: Multipart requests beyond the declared limits are rejected without a partial object
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep6-performance-capacity.feature:42`
+|Rule |The supported object-size envelope is explicit and fails without publishing partial state
+|Requirement ID(s) |`REQ-PERF-004`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@business-need`, `@multipart`, `@fail-closed`
+|Validation mode tags |`@ci-load-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@business-need`, `@implemented-and-validated`, `@REQ-PERF-004`, `@functional-requirement`, `@non-functional-requirement`, `@multipart`, `@fail-closed`, `@ci-load-required`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the 0.1.x single-node multipart limits are 67108864 bytes per part and 268435456 bytes assembled
+  And bucket "ep6-multipart-rejection-bucket" exists on filesystem root "target/ep6/multipart-rejection"
+  When the client attempts <operation> for object "<object-key>" with <bytes> bytes
+  Then the S3 response reports "EntityTooLarge"
+  And object "<object-key>" does not exist
+  And no committed multipart part or assembled-object artifact remains from the rejected operation
+----
+
+.Examples
+[cols="1,1,1",options="header"]
+|===
+| operation | object-key | bytes
+| UploadPart | limits/part-too-large.bin | 67108865
+| CompleteMultipartUpload | limits/assembled-too-large.bin | 268435457
+|===
+
+===== REQ-PERF-005
+
+====== Scenario: A request that exceeds the configured request timeout is cancelled and reported
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep6-performance-capacity.feature:58`
+|Rule |Overload controls return observable S3 outcomes instead of silently queueing work
+|Requirement ID(s) |`REQ-PERF-005`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@business-need`, `@timeout`, `@fail-closed`
+|Validation mode tags |`@ci-load-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@business-need`, `@implemented-and-validated`, `@REQ-PERF-005`, `@functional-requirement`, `@non-functional-requirement`, `@timeout`, `@fail-closed`, `@ci-load-required`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the 0.1.x single-node S3 process has a finite request timeout
+  And bucket "ep6-timeout-bucket" exists on filesystem root "target/ep6/timeout"
+  When a client deliberately stalls PutObject for "limits/timed-out.bin" beyond the configured timeout
+  Then the S3 response reports "RequestTimeout"
+  And the timed-out request releases its admission permit
+  And object "limits/timed-out.bin" and its temporary artifacts do not exist
+----
+
+===== REQ-PERF-006
+
+====== Scenario: Work above the configured concurrency limit is rejected immediately without a queue
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep6-performance-capacity.feature:67`
+|Rule |Overload controls return observable S3 outcomes instead of silently queueing work
+|Requirement ID(s) |`REQ-PERF-006`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@business-need`, `@concurrency`, `@backpressure`, `@fail-fast`
+|Validation mode tags |`@ci-load-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@business-need`, `@implemented-and-validated`, `@REQ-PERF-006`, `@functional-requirement`, `@non-functional-requirement`, `@concurrency`, `@backpressure`, `@fail-fast`, `@ci-load-required`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the 0.1.x single-node S3 process has a configured active-request concurrency limit
+  And every concurrency permit is held by an active streaming S3 request
+  When one additional S3 request arrives
+  Then the additional request receives S3 error "SlowDown"
+  And the rejection occurs without entering a pending request queue
+  And releasing one active request allows a subsequent request to acquire the freed permit
+----
+
+===== REQ-PERF-007
+
+====== Scenario: Token-bucket rate limiting permits the burst and throttles excess requests
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep6-performance-capacity.feature:76`
+|Rule |Overload controls return observable S3 outcomes instead of silently queueing work
+|Requirement ID(s) |`REQ-PERF-007`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@business-need`, `@rate-limiting`, `@token-bucket`
+|Validation mode tags |`@ci-load-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@business-need`, `@implemented-and-validated`, `@REQ-PERF-007`, `@functional-requirement`, `@non-functional-requirement`, `@rate-limiting`, `@token-bucket`, `@ci-load-required`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the 0.1.x single-node S3 process has a configured token-bucket refill rate and burst capacity
+  When one client sends a deterministic burst that consumes the available tokens and then sends one excess request
+  Then requests covered by available tokens are admitted
+  And the excess request receives S3 error "SlowDown" with a retry hint
+  And a request is admitted again after the configured token refill interval
+----
+
+===== REQ-PERF-008
+
+====== Scenario: The TCP connection cap refuses excess sockets and recovers capacity
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/requirements/phase-ep6-performance-capacity.feature:84`
+|Rule |Overload controls return observable S3 outcomes instead of silently queueing work
+|Requirement ID(s) |`REQ-PERF-008`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@business-need`, `@connection-limit`, `@fail-fast`
+|Validation mode tags |`@connection-validation-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@requirement`, `@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@business-need`, `@implemented-and-validated`, `@REQ-PERF-008`, `@functional-requirement`, `@non-functional-requirement`, `@connection-limit`, `@fail-fast`, `@connection-validation-required`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given a real 0.1.x single-node S3 child process has a configured TCP connection cap
+  And real TCP clients hold every allowed connection open
+  When one additional TCP client attempts to connect
+  Then the additional connection is refused or closed within the connection validation deadline
+  And the S3 process remains live
+  And closing one accepted connection permits a subsequent TCP client connection
 ----
 
 ==== s3-reactive-api-adapter/src/test/features/requirements/single-node-backend-bucket-configuration.feature
@@ -13715,6 +13973,268 @@ so storage-engine files can be migrated safely instead of being parsed as ambigu
   And the capacity store rejects a ledger that declares unsupported schema version "999"
   And the capacity store rejects a ledger with malformed schema version "not-a-version"
   And reopening the current ledger preserves used bytes, quota bytes, and rejected accounting while clearing stale reservations
+----
+
+==== s3-reactive-api-adapter/src/test/features/specs/phase-ep6-resource-bounds.feature
+
+* Feature title: Ability: Reproducible EP-6 resource-bound validation
+* Feature tags: `@spec`, `@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@resource-bounds`
+* Feature description:
++
+----
+As a maintainer of the 0.1.x single-node preview,
+I want deterministic CI and opt-in soak evidence with redacted telemetry,
+So that capacity regressions are reproducible without presenting this validation as a production or competitive benchmark.
+The CI load validation mode runs for 45 seconds in the mandatory build envelope.
+The soak validation mode runs for 15 minutes only when explicitly selected.
+Connection-limit behavior is owned by the separate real-socket connection validation mode.
+----
+
+===== REQ-PERF-009
+
+====== Scenario: Eight deterministic workers sustain mixed S3 load for 45 seconds under Xmx256m
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep6-resource-bounds.feature:14`
+|Rule |Deterministic mixed load remains bounded by the declared JVM envelope
+|Requirement ID(s) |`REQ-PERF-009`
+|Classification |`@non-functional-requirement`
+|Capability area tags |`@spec`, `@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@resource-bounds`, `@load`, `@bounded-memory`, `@streaming`, `@ci`
+|Validation mode tags |`@ci-load-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@resource-bounds`, `@implemented-and-validated`, `@REQ-PERF-009`, `@non-functional-requirement`, `@load`, `@bounded-memory`, `@streaming`, `@ci`, `@ci-load-required`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given a storage-engine S3 child process runs with "-Xmx256m" and filesystem root "target/ep6/ci-load"
+  And load seed "ep6-ci-0.1.x" assigns these repeating operations to eight workers:
+  When the eight workers execute the seeded schedule for 45 seconds
+  Then the child process exits the load window without an out-of-memory error or forced restart
+  And observed heap usage never exceeds the configured 268435456-byte maximum
+  And every acknowledged write remains checksum-readable
+  And every failed operation is classified in the result manifest rather than discarded
+----
+
+===== REQ-PERF-010
+
+====== Scenario: The opt-in 15-minute soak detects resource growth and preserves acknowledged data
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep6-resource-bounds.feature:31`
+|Rule |Deterministic mixed load remains bounded by the declared JVM envelope
+|Requirement ID(s) |`REQ-PERF-010`
+|Classification |`@non-functional-requirement`
+|Capability area tags |`@spec`, `@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@resource-bounds`, `@soak`, `@bounded-memory`, `@streaming`, `@opt-in`
+|Validation mode tags |`@soak-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@resource-bounds`, `@implemented-and-validated`, `@REQ-PERF-010`, `@non-functional-requirement`, `@soak`, `@bounded-memory`, `@streaming`, `@opt-in`, `@soak-required`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given the same eight-worker workload and seed family used by CI validation
+  And a storage-engine S3 child process runs with "-Xmx256m" and filesystem root "target/ep6/soak"
+  When the opt-in soak profile runs the mixed workload for 15 minutes
+  Then the process completes without an out-of-memory error, deadlock, or forced restart
+  And heap, active requests, open connections, and temporary storage return to their declared idle bounds after the load stops
+  And every sampled acknowledged write remains checksum-readable
+  And the result manifest identifies validation mode "soak" and duration 900 seconds
+----
+
+===== REQ-PERF-011
+
+====== Scenario: Load and overload metrics explain resource use and rejection decisions
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep6-resource-bounds.feature:43`
+|Rule |Capacity controls expose useful metrics without leaking client data
+|Requirement ID(s) |`REQ-PERF-011`
+|Classification |`@non-functional-requirement`
+|Capability area tags |`@spec`, `@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@resource-bounds`, `@observability`, `@metrics`, `@redaction`
+|Validation mode tags |`@ci-load-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@resource-bounds`, `@implemented-and-validated`, `@REQ-PERF-011`, `@non-functional-requirement`, `@observability`, `@metrics`, `@redaction`, `@ci-load-required`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given CI load records accepted, concurrency-rejected, rate-limited, and timed-out request counts
+  When the validation captures process and application metrics
+  Then the evidence includes heap usage, active requests, open TCP connections, accepted requests, concurrency rejections, rate-limit rejections, and request timeouts
+  And counters distinguish operation and outcome without recording access keys, authorization signatures, object bodies, user metadata, bucket names, or object keys
+  And logs and metric labels comply with the existing telemetry redaction policy
+----
+
+===== REQ-PERF-COMP-001
+
+====== Scenario: The S3 capacity envelope has safe preview defaults
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep6-resource-bounds.feature:53`
+|Rule |Capacity-control components are deterministic before load validation
+|Requirement ID(s) |`REQ-PERF-COMP-001`
+|Classification |unknown/not-tagged
+|Capability area tags |`@spec`, `@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@resource-bounds`, `@configuration`
+|Validation mode tags |`@component-spec-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@resource-bounds`, `@implemented-and-validated`, `@REQ-PERF-COMP-001`, `@component-spec-required`, `@configuration`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given a default S3 capacity configuration
+  Then capacity controls are enabled with 268435456 single PUT bytes, 67108864 multipart part bytes, and 268435456 assembled bytes
+  And the defaults allow 16 concurrent requests with a 300 second timeout
+  And the default token bucket refills 100 requests per second with burst 200
+----
+
+===== REQ-PERF-COMP-002
+
+====== Scenario: Body limits reject declared and streamed excess without aggregation
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep6-resource-bounds.feature:60`
+|Rule |Capacity-control components are deterministic before load validation
+|Requirement ID(s) |`REQ-PERF-COMP-002`
+|Classification |unknown/not-tagged
+|Capability area tags |`@spec`, `@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@resource-bounds`, `@streaming`, `@fail-closed`
+|Validation mode tags |`@component-spec-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@resource-bounds`, `@implemented-and-validated`, `@REQ-PERF-COMP-002`, `@component-spec-required`, `@streaming`, `@fail-closed`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given a component capacity filter with a 4 byte single PUT limit
+  When PUT declares a 5 byte Content-Length
+  Then the filter rejects it as "EntityTooLarge" without invoking downstream storage
+  When an unknown-length PUT streams chunks of 3 and 2 bytes
+  Then the filter rejects it incrementally as "EntityTooLarge" after observing the excess chunk
+----
+
+===== REQ-PERF-COMP-003
+
+====== Scenario: Admission controls fail fast, recover permits, and emit bounded telemetry
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep6-resource-bounds.feature:68`
+|Rule |Capacity-control components are deterministic before load validation
+|Requirement ID(s) |`REQ-PERF-COMP-003`
+|Classification |unknown/not-tagged
+|Capability area tags |`@spec`, `@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@resource-bounds`, `@concurrency`, `@timeout`, `@rate-limiting`, `@metrics`, `@redaction`
+|Validation mode tags |`@component-spec-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@resource-bounds`, `@implemented-and-validated`, `@REQ-PERF-COMP-003`, `@component-spec-required`, `@concurrency`, `@timeout`, `@rate-limiting`, `@metrics`, `@redaction`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given deterministic capacity controls with one concurrency permit, a 50 millisecond timeout, and a two-token burst
+  Then a third immediate token request is rejected as "SlowDown" with Retry-After "1"
+  And advancing one refill interval admits another token request
+  When one request holds the only concurrency permit
+  Then another request is rejected immediately as "SlowDown" without a pending subscription
+  And cancelling the holder permits the next request
+  When an admitted request remains stalled beyond 50 milliseconds
+  Then it is cancelled as "RequestTimeout" and its permit is reusable
+  And capacity metric tags contain only operation and outcome vocabularies
+----
+
+===== REQ-PERF-012
+
+====== Scenario Outline: A validation run writes a machine-readable result manifest
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep6-resource-bounds.feature:82`
+|Rule |Every result is reproducible and explicitly not a benchmark claim
+|Requirement ID(s) |`REQ-PERF-012`
+|Classification |`@non-functional-requirement`
+|Capability area tags |`@spec`, `@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@resource-bounds`, `@reproducibility`, `@reporting`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@resource-bounds`, `@implemented-and-validated`, `@REQ-PERF-012`, `@non-functional-requirement`, `@reproducibility`, `@reporting`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given EP-6 runs in validation mode "<mode>" for <duration> seconds
+  When the run finishes
+  Then its result directory contains a machine-readable manifest
+  And the manifest records Git revision, release line "0.1.x", dirty-tree state, validation mode, workload seed, worker count 8, duration, JVM vendor and version, maximum heap "256m", operating system, processor count, backend, filesystem root, object and multipart limits, timeout, concurrency limit, rate-limit settings, TCP connection cap, operation counts, error counts, latency summary, peak heap, and artifact checksums
+  And rerunning with the recorded configuration and seed reproduces the operation schedule
+  And the manifest states "Capacity validation only; not a production sizing, comparative, or competitive benchmark"
+----
+
+.Examples: CI load `@ci-load-required`
+[cols="1,1",options="header"]
+|===
+| mode | duration
+| ci | 45
+|===
+
+.Examples: Opt-in soak `@soak-required`
+[cols="1,1",options="header"]
+|===
+| mode | duration
+| soak | 900
+|===
+
+===== REQ-PERF-013
+
+====== Scenario: Human-readable EP-6 results preserve the non-benchmark scope
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep6-resource-bounds.feature:101`
+|Rule |Every result is reproducible and explicitly not a benchmark claim
+|Requirement ID(s) |`REQ-PERF-013`
+|Classification |`@non-functional-requirement`
+|Capability area tags |`@spec`, `@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@resource-bounds`, `@reporting`, `@benchmark-disclaimer`
+|Validation mode tags |`@ci-load-required`, `@soak-required`, `@connection-validation-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-ep6`, `@performance`, `@capacity`, `@single-node`, `@resource-bounds`, `@implemented-and-validated`, `@REQ-PERF-013`, `@non-functional-requirement`, `@reporting`, `@benchmark-disclaimer`, `@ci-load-required`, `@soak-required`, `@connection-validation-required`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given CI, soak, or connection validation has produced a result manifest
+  When maintainers publish the EP-6 result summary
+  Then the summary links to the exact result manifest and its artifact checksums
+  And it identifies the tested 0.1.x single-node hardware and software envelope
+  And it separates observed values from configured limits and pass criteria
+  And it states that the result is not production sizing guidance and not a comparison with another object store
 ----
 
 ==== s3-reactive-api-adapter/src/test/features/specs/phase-ka5-distribution.feature

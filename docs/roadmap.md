@@ -29,7 +29,7 @@
 | **EP-1** Security & Identity | Blocker | `@implemented-and-validated` for built-in scope | SigV4, deny-by-default authorization, durable audit, SSE-S3, credentials, policy and key services |
 | **EP-4** Space Management & Data Hygiene | High | `@implemented-and-validated` for single-node scope | Typed GC, dedup reachability, quotas, ENOSPC behavior, and transform-aware periodic scrubbing |
 | **EP-5** Operability & Delivery | High | `@implemented-and-validated` for `0.1.0` preview | Full CI gate, SemVer/OCI release workflow, persistent-volume replacement, backup/DR, schema compatibility, SLOs, probes, and graceful shutdown |
-| **EP-6** Performance & Capacity Validation | High | `@absent` | Load/soak/benchmark suite, documented limits, bounded memory under load |
+| **EP-6** Performance & Capacity Validation | High | `@implemented-and-validated` for single-node envelope | Enforced object/admission/timeout/connection limits, deterministic 45-second CI load, 15-minute soak, bounded-memory and reproducible result manifests |
 | **EP-7** Complete Admin Panel | High | `@partial` | Backend read-only catalogs done; full Vue UI (dashboard, policies, devices, disk sets, recovery/GC reports, observability views) — requires frontend workflow handoff |
 | **EP-8** Cluster Architecture ADR & Supply Chain | Medium | `@absent` | ADR deciding inter-node transport, membership, consistency model, failure-domain topology; SBOM, CVE scanning, image hardening |
 | **EP-10** S3 Cluster (Multi-Node) | High | `@absent` | Node membership, replica/EC-shard placement, quorum writes/reads, manifest replication, anti-entropy healing, rebalance |
@@ -43,7 +43,7 @@
 - [x] EP-3: GetObject and multipart paths stream with bounded memory
 - [x] EP-4: Typed GC, dedup reachability, quotas, ENOSPC, and scrubbing validated for single-node scope
 - [x] EP-5: `0.1.0` preview CI/delivery gates, backup/restore, probes, shutdown, and persistent-volume replacement validated
-- [ ] EP-6: Load/soak limits documented and reproducibly validated
+- [x] EP-6: Single-node load/soak limits documented and reproducibly validated under `-Xmx256m` (non-benchmark scope)
 - [ ] EP-7: Complete admin panel delivered and validated
 - [ ] EP-8: Cluster architecture ADR accepted; supply-chain gates wired
 - [ ] EP-10: Cluster behavior validated by multi-node e2e scenarios
