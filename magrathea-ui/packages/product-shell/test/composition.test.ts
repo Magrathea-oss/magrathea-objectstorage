@@ -33,6 +33,48 @@ describe('deterministic product extension composition', () => {
     expect(empty.localization.map((bundle) => bundle.namespace)).toEqual(['shell'])
   })
 
+  it('composes task groups with navigation metadata and removes them with their extension', async () => {
+    const extension = exampleExtension({
+      navigationGroups: [{
+        id: 'assess',
+        labelKey: 'example.navigation.assess',
+        descriptionKey: 'example.navigation.assessDescription',
+        icon: 'overview',
+      }],
+      navigation: [{
+        id: 'example-status',
+        labelKey: 'example.navigation.status',
+        descriptionKey: 'example.navigation.statusDescription',
+        route: '/example/status',
+        groupId: 'assess',
+        icon: 'activity',
+        status: { labelKey: 'example.navigation.attention', tone: 'warning' },
+      }],
+    })
+
+    const composed = await createExtensionComposer([extension]).start()
+    expect(composed.navigationGroups).toEqual(extension.navigationGroups)
+    expect(composed.navigation[0]).toMatchObject({
+      groupId: 'assess', icon: 'activity', status: { tone: 'warning' },
+    })
+    expect((await createExtensionComposer([]).start()).navigationGroups).toEqual([])
+  })
+
+  it('isolates a navigation entry that references an undeclared task group', async () => {
+    const composed = await createExtensionComposer([exampleExtension({
+      navigation: [{
+        id: 'example-status', labelKey: 'example.navigation.status', route: '/example/status', groupId: 'missing',
+      }],
+    })]).start()
+
+    expect(composed.navigation).toEqual([])
+    expect(composed.failures).toEqual([{
+      extensionId: 'magrathea-example',
+      stage: 'contract',
+      message: 'Unknown navigation group missing for navigation entry: example-status',
+    }])
+  })
+
   it('orders equal-priority extensions and contributions by stable identifiers', async () => {
     const later = exampleExtension({ id: 'zeta', navigation: [{ id: 'zeta', labelKey: 'zeta.label', route: '/zeta' }] })
     const earlier = exampleExtension({ id: 'alpha', navigation: [{ id: 'alpha', labelKey: 'alpha.label', route: '/alpha' }] })

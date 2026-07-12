@@ -16,12 +16,105 @@ test('REQ-ADMIN-001/002 dashboard and backend status remain truthful', async ({ 
   await page.goto('/admin/backend-status')
   await expect(mainHeading(page)).toHaveText('Backend status')
   await expect(page.getByText('storage-engine', { exact: true }).first()).toBeVisible()
+  await page.getByText('Show the property that selected this backend').click()
   await expect(page.getByText('magrathea.object-store.backend = storage-engine')).toBeVisible()
+  await page.getByText('Show catalog availability, counts, and source paths').click()
   for (const source of ['storage-policies', 'storage-devices', 'disk-sets']) {
     await expect(page.getByText(new RegExp(`target/ep7-admin-api/config/${source}`))).toBeVisible()
   }
+  await page.getByText('Show configured paths and availability').click()
   await expect(page.getByText(/target\/ep7-admin-api\/storage-engine.*available/)).toBeVisible()
   await expect(page.getByText(/target\/ep7-admin-api\/recovery.*not-configured/)).toBeVisible()
+})
+
+/** REQ-ADMIN-032..035: operational priority, task navigation, affordance, and disclosure hierarchy. */
+test('REQ-ADMIN-032..035 dashboard prioritizes attention and legitimate Admin Control Plane tasks', async ({ page }) => {
+  await page.goto('/admin')
+  await expect(page.getByRole('heading', { name: 'Service requires attention' })).toBeVisible()
+  await expect(page.getByText('Selected backend: storage-engine')).toBeVisible()
+  await expect(page.getByRole('link', { name: /Inspect degraded device node-1-disk-0/ })).toHaveAttribute('href', '/admin/storage-devices/node-1-disk-0')
+  if (await page.locator('button[aria-controls="primary-navigation"]').isVisible()) {
+    await page.locator('button[aria-controls="primary-navigation"]').click()
+  }
+  for (const group of ['Assess service health', 'Inspect storage', 'Administer configuration']) {
+    await expect(page.getByRole('heading', { name: group })).toBeVisible()
+  }
+  for (const task of ['Inspect storage', 'Validate a policy', 'Manage bucket quota', 'Open documentation']) {
+    await expect(page.getByRole('link', { name: new RegExp(task) })).toBeVisible()
+  }
+  await expect(page.getByRole('link', { name: /browse (buckets|objects)|upload object|create bucket/i })).toHaveCount(0)
+
+  await page.goto('/admin/storage-policies')
+  await expect(page.getByText('Read-only configuration-as-code', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: /create|edit|save|delete/i })).toHaveCount(0)
+  await page.goto('/admin/storage-policies/validate')
+  await expect(page.getByText('Validation only — non-persistent', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Validate proposal without saving' })).toBeVisible()
+  await page.goto('/admin/capacity/archive-2026')
+  await expect(page.getByRole('button', { name: 'Update quota' })).toBeVisible()
+  await expect(page.getByText('No bucket or object browsing is available.')).toBeVisible()
+})
+
+/** REQ-ADMIN-034: collapsed diagnostics never hide critical evidence or disrupt context. */
+test('REQ-ADMIN-034 backend disclosure preserves critical conditions, route, heading, and focus', async ({ page }) => {
+  await page.goto('/admin/backend-status')
+  const critical = page.getByText('Storage root is not-configured.')
+  await expect(critical).toBeVisible()
+  await expect(page.getByText('recovery storage root', { exact: true })).toBeVisible()
+  const disclosure = page.locator('summary', { hasText: 'Show catalog availability, counts, and source paths' })
+  await disclosure.focus()
+  await disclosure.press('Enter')
+  await expect(disclosure).toBeFocused()
+  await expect(page).toHaveURL(/\/admin\/backend-status$/)
+  await expect(mainHeading(page)).toHaveText('Backend status')
+  await expect(critical).toBeVisible()
+  await disclosure.press('Enter')
+  await expect(disclosure).toBeFocused()
+  await expect(critical).toBeVisible()
+})
+
+/** REQ-ADMIN-036: pending validation is announced, deduplicated, and explicitly non-persistent. */
+test('REQ-ADMIN-036 policy validation exposes pending and success feedback without losing input', async ({ page }) => {
+  let release!: () => void
+  let validationRequests = 0
+  const validationGate = new Promise<void>((resolve) => { release = resolve })
+  await page.route('**/admin/storage-policies/validate', async (route) => {
+    if (route.request().resourceType() === 'document') return route.fallback()
+    validationRequests += 1
+    await validationGate
+    await route.fulfill({ status: 200, contentType: 'application/json', json: { valid: true, errors: [], _links: {} } })
+  })
+  await page.goto('/admin/storage-policies/validate')
+  await page.getByLabel('Storage class ID').fill('ARCHIVE_EC')
+  await page.getByRole('button', { name: 'Validate proposal without saving' }).click()
+  const pending = page.getByRole('button', { name: 'Validating proposal…' })
+  await expect(pending).toBeDisabled()
+  await expect(page.getByRole('status')).toContainText('will not be persisted')
+  await pending.click({ force: true })
+  expect(validationRequests).toBe(1)
+  release()
+  await expect(page.getByText('Proposal ARCHIVE_EC was not persisted.')).toBeVisible()
+  await expect(page.getByLabel('Storage class ID')).toHaveValue('ARCHIVE_EC')
+})
+
+test('REQ-ADMIN-036 failed validation preserves input and offers correction or retry', async ({ page }) => {
+  await page.route('**/admin/storage-policies/validate', async (route) => {
+    if (route.request().resourceType() === 'document') return route.fallback()
+    await route.fulfill({
+      status: 422,
+      contentType: 'application/json',
+      json: { error: { code: 'invalid-policy', message: 'Parity blocks exceed available failure domains', path: '/admin/storage-policies/validate' } },
+    })
+  })
+  await page.goto('/admin/storage-policies/validate')
+  await page.getByLabel('Storage class ID').fill('ARCHIVE_EC')
+  await page.getByLabel('Parity blocks').fill('99')
+  await page.getByRole('button', { name: 'Validate proposal without saving' }).click()
+  await expect(page.getByText('Policy validation could not be completed', { exact: true })).toBeVisible()
+  await expect(page.getByText(/Your proposal is preserved.*Correct it or retry.*catalog was not changed/)).toBeVisible()
+  await expect(page.getByLabel('Storage class ID')).toHaveValue('ARCHIVE_EC')
+  await expect(page.getByLabel('Parity blocks')).toHaveValue('99')
+  await expect(page.getByRole('button', { name: 'Validate proposal without saving' })).toBeEnabled()
 })
 
 /** REQ-ADMIN-003: the configured storage-class link must use the promised canonical route. */
@@ -46,7 +139,7 @@ test('REQ-ADMIN-004 policy validation is observed as non-persistent', async ({ p
   await page.getByLabel('Data blocks').fill('8')
   await page.getByLabel('Parity blocks').fill('4')
   await page.getByLabel('Replication factor').fill('1')
-  await page.getByRole('button', { name: 'Validate proposal' }).click()
+  await page.getByRole('button', { name: 'Validate proposal without saving' }).click()
   await expect(page.getByRole('heading', { name: 'Validation report: Valid' })).toBeVisible()
   await expect(page.getByText('Catalog unchanged — the proposal was not persisted.')).toBeVisible()
   await expect(page.getByText('Before: MINIO_STANDARD')).toBeVisible()
@@ -114,14 +207,25 @@ test('REQ-ADMIN-008 bucket capacity lookup exposes accounting without object bro
 })
 
 /** REQ-ADMIN-009, REQ-ADMIN-010: unavailable provider panels never display fixture evidence. */
-test('REQ-ADMIN-009/010 report panels honestly identify unavailable providers', async ({ page }) => {
+test('REQ-ADMIN-009/010/037 report panels honestly identify unavailable providers', async ({ page }) => {
   for (const route of ['/admin/data-hygiene', '/admin/observability']) {
     await page.goto(route)
     await expect(page.getByRole('heading', { name: 'Provider not configured' })).toHaveCount(3)
+    await expect(page.getByText(/Operational impact:/)).toHaveCount(3)
+    await expect(page.getByRole('link', { name: 'Open configuration documentation' })).toHaveCount(3)
     await expect(page.getByText(/report provider is not configured/)).toHaveCount(3)
     await expect(page.locator('pre')).toHaveCount(0)
     await expect(page.getByText(/playwright-fixture|sample|healthy default/i)).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /run recovery|run scrub|enable metrics/i })).toHaveCount(0)
   }
+  await page.goto('/admin/data-hygiene')
+  for (const capability of ['recovery', 'scrub']) {
+    await expect(page.getByRole('heading', { name: `${capability} evidence unavailable` })).toBeVisible()
+    await expect(page.getByText(`The ${capability} operation is not available from this page.`)).toBeVisible()
+  }
+  await page.goto('/admin/observability')
+  await expect(page.getByRole('heading', { name: 'metrics evidence unavailable' })).toBeVisible()
+  await expect(page.getByText('Current runtime trends and alert evidence cannot be assessed on this page.')).toBeVisible()
 })
 
 /** REQ-ADMIN-011: interception proves destination, method, signer profile, and forbidden-route absence. */
@@ -196,8 +300,9 @@ test('REQ-ADMIN-013/021 every navigation action is keyboard reachable, focused, 
   await page.reload()
 
   await page.evaluate(() => {
-    const list = document.querySelector('#primary-navigation ul')
-    const existingEntries = list?.querySelectorAll('a').length ?? 0
+    const navigation = document.querySelector('#primary-navigation')
+    const list = navigation?.querySelector('ul')
+    const existingEntries = navigation?.querySelectorAll('a').length ?? 0
     for (let number = existingEntries + 1; number <= 12; number += 1) {
       const item = document.createElement('li')
       const link = document.createElement('a')
@@ -274,6 +379,26 @@ test('REQ-ADMIN-013/021 every navigation action is keyboard reachable, focused, 
   expect(overflow.body).toBeLessThanOrEqual(overflow.viewport)
 })
 
+/** REQ-ADMIN-035: appearance persists while system mode follows a deterministic OS fallback. */
+test('REQ-ADMIN-035 appearance persists and system mode follows operating-system changes', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await page.goto('/admin')
+  const appearance = page.getByRole('combobox', { name: 'Appearance' })
+  await expect(appearance).toHaveValue('system')
+  await expect(page.locator('html')).toHaveAttribute('data-resolved-appearance', 'dark')
+
+  await appearance.selectOption('light')
+  await expect(page.locator('html')).toHaveAttribute('data-resolved-appearance', 'light')
+  await page.reload()
+  await expect(page.getByRole('combobox', { name: 'Appearance' })).toHaveValue('light')
+  await expect(page.locator('html')).toHaveAttribute('data-resolved-appearance', 'light')
+
+  await page.getByRole('combobox', { name: 'Appearance' }).selectOption('system')
+  await expect(page.locator('html')).toHaveAttribute('data-resolved-appearance', 'dark')
+  await page.emulateMedia({ colorScheme: 'light' })
+  await expect(page.locator('html')).toHaveAttribute('data-resolved-appearance', 'light')
+})
+
 /** REQ-ADMIN-017: operating-system accessibility preferences alter the rendered shell at runtime. */
 test('REQ-ADMIN-017 forced colors preserve focus and reduced motion disables shell movement', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
@@ -306,6 +431,22 @@ test('REQ-ADMIN-017 forced colors preserve focus and reduced motion disables she
   } else {
     await expect(page.getByRole('navigation', { name: 'Primary navigation' })).toBeVisible()
   }
+})
+
+/** REQ-ADMIN-035: deterministic visual baselines for hierarchy and key operational states. */
+test('REQ-ADMIN-035 redesigned dashboard and operational states match visual baselines', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' })
+  await page.goto('/admin')
+  await expect(page).toHaveScreenshot('ep7-dashboard.png', { fullPage: true, animations: 'disabled' })
+  await page.goto('/admin/backend-status')
+  await expect(page).toHaveScreenshot('ep7-backend-attention-collapsed.png', { fullPage: true, animations: 'disabled' })
+  await page.goto('/admin/data-hygiene')
+  await expect(page).toHaveScreenshot('ep7-unavailable-reports.png', { fullPage: true, animations: 'disabled' })
+  await page.goto('/admin/storage-policies/validate')
+  await page.getByLabel('Storage class ID').fill('ARCHIVE_EC')
+  await page.getByRole('button', { name: 'Validate proposal without saving' }).click()
+  await expect(page.getByText('Proposal ARCHIVE_EC was not persisted.')).toBeVisible()
+  await expect(page).toHaveScreenshot('ep7-validation-success.png', { fullPage: true, animations: 'disabled' })
 })
 
 /** REQ-ADMIN-013, REQ-ADMIN-017..021: real-browser axe scan in every viewport project. */

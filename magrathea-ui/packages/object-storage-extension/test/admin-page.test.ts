@@ -66,6 +66,9 @@ describe('EP-7 Object Storage administration pages', () => {
         components: [{ name: 'storage-device-catalog', status: 'not-configured', reason: 'Catalog directory is not configured' }],
         _links: {},
       })),
+      getBackendStatus: vi.fn(async () => ({ selectedBackend: 'storage-engine' } as any)),
+      listDevices: vi.fn(async () => ({ count: 1, storageDevices: [{ id: 'node-1-disk-0', health: 'DEGRADED' }], _links: {} } as any)),
+
     })
 
     const wrapper = await mountRoute('/admin', client)
@@ -74,6 +77,9 @@ describe('EP-7 Object Storage administration pages', () => {
     expect(wrapper.text()).toContain('not-ready')
     expect(wrapper.text()).toContain('storage-device-catalog')
     expect(wrapper.text()).toContain('not-configured')
+    expect(wrapper.text()).toContain('Selected backend: storage-engine')
+    expect(wrapper.get('a[href="/admin/storage-devices/node-1-disk-0"]').text()).toContain('Inspect degraded device')
+    for (const task of ['Inspect storage', 'Validate a policy', 'Manage bucket quota', 'Open documentation']) expect(wrapper.text()).toContain(task)
     expect(wrapper.text()).not.toContain('All dependencies are ready')
   })
 
@@ -150,6 +156,10 @@ describe('EP-7 Object Storage administration pages', () => {
     expect(wrapper.text()).toMatch(/Device catalog[\s\S]*Catalog count[\s\S]*2[\s\S]*Source path[\s\S]*target\/ep7-admin-api\/config\/storage-devices/)
     expect(wrapper.text()).toMatch(/Disk-set catalog[\s\S]*Catalog count[\s\S]*1[\s\S]*Source path[\s\S]*Unavailable — not returned by the Admin API/)
     expect(wrapper.text()).toContain('target/ep7-admin-api/storage-engine — available')
+    expect(wrapper.text()).toContain('Disk-set catalog')
+    expect(wrapper.text()).toContain('Catalog is not-configured')
+    expect(wrapper.findAll('details')).toHaveLength(3)
+    expect(wrapper.findAll('details').every((detail) => detail.attributes('open') === undefined)).toBe(true)
   })
 
   it('validates a realistic policy proposal as explicitly non-persistent without catalog mutation calls', async () => {
@@ -178,6 +188,28 @@ describe('EP-7 Object Storage administration pages', () => {
     expect(wrapper.text()).toContain('Before: MINIO_STANDARD')
     expect(wrapper.text()).toContain('After refresh: MINIO_STANDARD')
     expect(client.listPolicies).toHaveBeenCalledTimes(2)
+  })
+
+  it('prevents duplicate policy validation while pending and preserves the proposal after an actionable error', async () => {
+    let rejectValidation!: (reason: Error) => void
+    const validatePolicy = vi.fn(() => new Promise<any>((_, reject) => { rejectValidation = reject }))
+    const wrapper = await mountRoute('/admin/storage-policies/validate', adminClient({ validatePolicy }))
+    await wrapper.get('input').setValue('ARCHIVE_EC')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    const submit = wrapper.get('button[type="submit"]')
+    expect(submit.attributes('disabled')).toBeDefined()
+    expect(submit.text()).toBe('Validating proposal…')
+    await wrapper.get('form').trigger('submit')
+    expect(validatePolicy).toHaveBeenCalledTimes(1)
+
+    rejectValidation(new Error('Parity blocks exceed the available failure domains'))
+    await flushPromises()
+    expect(wrapper.get('input').element.value).toBe('ARCHIVE_EC')
+    expect(wrapper.text()).toContain('Your proposal is preserved')
+    expect(wrapper.text()).toContain('the catalog was not changed')
+    expect(submit.attributes('disabled')).toBeUndefined()
   })
 
   it('replaces a failed policy catalog with a truthful retry state and never renders stale rows', async () => {

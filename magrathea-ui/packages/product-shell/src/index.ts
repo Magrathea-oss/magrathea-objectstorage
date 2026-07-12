@@ -1,6 +1,8 @@
 import './theme.css'
 
 export type {
+  AppearancePreference,
+  AppearancePreferencePort,
   BrandTokenOverrides,
   BrandTokenSlot,
   CapabilityDeclaration,
@@ -21,8 +23,14 @@ export type {
   ProductExtension,
   ProductIdentity,
   ProductNavigationEntry,
+  ProductNavigationGroup,
+  ProductNavigationIconId,
+  ProductNavigationStatus,
+  ProductNavigationStatusTone,
   ProductRouteRegistration,
   ProductShellConfiguration,
+  ResolvedAppearance,
+  SystemAppearancePort,
 } from './contracts'
 export type {
   ApplicationState,
@@ -50,15 +58,24 @@ export {
   resolveProductIdentity,
 } from './identity'
 export { default as ProductShell } from './components/ProductShell.vue'
-export type { ProductShellLabels, ShellBreadcrumb, ShellTableColumn } from './presentation'
+export type { ProductShellLabels, ShellBreadcrumb, ShellNavigationSection, ShellTableColumn } from './presentation'
+export {
+  createNavigationSections,
+  loadAppearancePreference,
+  persistAppearancePreference,
+  resolveAppearance,
+} from './presentation'
 export { default as ShellBadge } from './components/ShellBadge.vue'
 export { default as ShellBanner } from './components/ShellBanner.vue'
 export { default as ShellCard } from './components/ShellCard.vue'
 export { default as ShellDataTable } from './components/ShellDataTable.vue'
 export { default as ShellDialog } from './components/ShellDialog.vue'
+export { default as ShellDisclosure } from './components/ShellDisclosure.vue'
 export { default as ShellField } from './components/ShellField.vue'
+export { default as ShellIcon } from './components/ShellIcon.vue'
 export { default as ShellPageState } from './components/ShellPageState.vue'
 export { default as ShellSkeleton } from './components/ShellSkeleton.vue'
+export { default as ShellTooltip } from './components/ShellTooltip.vue'
 export type { LocalizationCatalog } from './localization'
 export {
   createLocalizationCatalog,

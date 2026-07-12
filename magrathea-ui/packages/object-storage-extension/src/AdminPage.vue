@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, inject, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { ShellBadge, ShellBanner, ShellCard, ShellPageState } from '@magrathea/product-shell'
+import { ShellBadge, ShellBanner, ShellCard, ShellDisclosure, ShellPageState } from '@magrathea/product-shell'
 import { AdminClientError, type OperationalReportType, type StoragePolicyProposal } from './adapters/admin-api-client'
 import { adminApiClientKey, s3HeadObjectClientKey } from './context'
 import { storagePolicyDetailRoute } from './storage-policy-routes'
@@ -15,7 +15,9 @@ const client = injectedClient
 
 const kind = computed(() => String(route.meta.kind || 'dashboard'))
 const loading = ref(false)
+const operationLoading = ref(false)
 const error = ref<unknown>()
+const operationError = ref<unknown>()
 const data = ref<any>()
 const reports = ref<Record<string, { state: 'ready' | 'unavailable' | 'error'; value?: unknown; message?: string }>>({})
 const bucket = ref(String(route.params.bucket || ''))
@@ -72,7 +74,12 @@ async function load(): Promise<void> {
   loading.value = true; error.value = undefined; data.value = undefined; reports.value = {}
   try {
     const id = String(route.params.id || '')
-    if (kind.value === 'dashboard') data.value = await Promise.all([client.getHealth(), client.getLiveness(), client.getReadiness()])
+    if (kind.value === 'dashboard') {
+      const [health, liveness, readiness, backend, devices] = await Promise.all([
+        client.getHealth(), client.getLiveness(), client.getReadiness(), client.getBackendStatus(), client.listDevices(),
+      ])
+      data.value = { health, liveness, readiness, backend: backend || {}, devices: devices || { storageDevices: [] } }
+    }
     else if (kind.value === 'backend') data.value = await client.getBackendStatus()
     else if (kind.value === 'policies') data.value = await client.listPolicies()
     else if (kind.value === 'policy-detail') data.value = await client.getPolicy(id)
@@ -97,13 +104,14 @@ async function loadReports(types: OperationalReportType[]): Promise<void> {
 }
 async function validatePolicy(): Promise<void> {
   const payload: StoragePolicyProposal = { storageClassId: proposal.value.storageClassId, erasureCoding: { dataBlocks: proposal.value.dataBlocks, parityBlocks: proposal.value.parityBlocks }, replication: { factor: proposal.value.replicationFactor } }
-  loading.value = true; error.value = undefined; policyCatalogEvidence.value = undefined
+  if (operationLoading.value) return
+  operationLoading.value = true; operationError.value = undefined; policyCatalogEvidence.value = undefined; data.value = undefined
   try {
     const before = await policyIds()
     data.value = await client.validatePolicy(payload)
     const after = await policyIds()
     policyCatalogEvidence.value = { before, after, unchanged: JSON.stringify(before) === JSON.stringify(after) }
-  } catch (caught) { error.value = caught } finally { loading.value = false }
+  } catch (caught) { operationError.value = caught } finally { operationLoading.value = false }
 }
 async function policyIds(): Promise<readonly string[]> {
   const catalog = await client.listPolicies()
@@ -114,6 +122,25 @@ async function updateQuota(): Promise<void> {
   if (quotaBytes.value === undefined) return
   loading.value = true
   try { data.value = await client.configureBucketQuota(String(route.params.bucket), quotaBytes.value) } catch (caught) { error.value = caught } finally { loading.value = false }
+}
+function reportImpact(type: string): string {
+  if (type === 'metrics') return 'Current runtime trends and alert evidence cannot be assessed on this page.'
+  if (type === 'recovery') return 'Recovery findings cannot be reviewed from the Admin Control Plane.'
+  if (type === 'scrub') return 'At-rest integrity findings and the latest scrub outcome cannot be verified here.'
+  if (type === 'garbage-collection') return 'Reclamation findings and outcomes cannot be reviewed here.'
+  if (type === 'audit') return 'Administrative audit evidence cannot be reviewed here.'
+  return 'Provider-backed operational evidence cannot be shown on this page.'
+}
+function backendAttention(status: any): Array<{ name: string; message: string }> {
+  if (!status) return []
+  const findings: Array<{ name: string; message: string }> = []
+  for (const [name, catalog] of Object.entries(status.catalogs || {}) as Array<[string, any]>) {
+    if (catalog.availability !== 'available') findings.push({ name: `${catalogLabels[name] || name}`, message: `Catalog is ${catalog.availability}. ${catalog.error || 'Configuration evidence is unavailable.'}` })
+  }
+  for (const [name, root] of Object.entries(status.storageRoots || {}) as Array<[string, any]>) {
+    if (root.availability !== 'available') findings.push({ name: `${name} storage root`, message: `Storage root is ${root.availability}.` })
+  }
+  return findings
 }
 async function runDiagnostic(): Promise<void> {
   if (!s3Client) { error.value = new Error('S3 diagnostics are unavailable because no separately configured S3 client is installed.'); return }
@@ -132,18 +159,43 @@ watch(() => route.fullPath, load)
     <ShellPageState v-else-if="error" :state="pageState()" :message="errorMessage()" @recover="load" />
 
     <template v-else-if="kind === 'dashboard' && data">
-      <div class="card-grid">
-        <ShellCard title="Admin API" eyebrow="Health"><ShellBadge tone="positive" :label="data[0].status" /><p>{{ data[0].message }}</p><p>Mode: {{ data[0].mode }}</p></ShellCard>
-        <ShellCard title="Liveness" eyebrow="Process"><ShellBadge tone="positive" :label="data[1].status" /><p>{{ data[1].message }}</p></ShellCard>
-        <ShellCard title="Readiness" eyebrow="Dependencies"><ShellBadge :tone="data[2].status === 'ready' ? 'positive' : 'warning'" :label="data[2].status" /><ul><li v-for="item in data[2].components" :key="item.name"><strong>{{ item.name }}</strong>: {{ item.status }}<span v-if="item.reason"> — {{ item.reason }}</span></li></ul></ShellCard>
+      <section class="priority-summary" :class="{ 'priority-summary--attention': data.readiness.status !== 'ready' }" aria-labelledby="operational-summary">
+        <div><p class="section-kicker">Operational summary</p><h3 id="operational-summary">{{ data.readiness.status === 'ready' ? 'Service is ready' : 'Service requires attention' }}</h3><p>Selected backend: <strong>{{ data.backend.selectedBackend || 'Unavailable' }}</strong></p></div>
+        <ShellBadge :tone="data.readiness.status === 'ready' ? 'positive' : 'danger'" :label="data.readiness.status" />
+      </section>
+      <ShellCard v-if="data.readiness.status !== 'ready'" title="Conditions requiring attention" eyebrow="Act first">
+        <ul class="attention-list"><li v-for="item in data.readiness.components.filter((component: any) => component.status !== 'ready')" :key="item.name"><strong>{{ item.name }}</strong><span>{{ item.status }}<template v-if="item.reason"> — {{ item.reason }}</template></span></li></ul>
+        <div v-if="data.devices.storageDevices.some((device: any) => String(device.health).toUpperCase() !== 'HEALTHY')" class="context-actions">
+          <RouterLink v-for="device in data.devices.storageDevices.filter((item: any) => String(item.health).toUpperCase() !== 'HEALTHY')" :key="device.id" class="shell-button shell-button--secondary" :to="`/admin/storage-devices/${encodeURIComponent(device.id)}`">Inspect degraded device {{ device.id }}</RouterLink>
+        </div>
+      </ShellCard>
+      <div class="card-grid supporting-status">
+        <ShellCard title="Admin API" eyebrow="Control Plane"><ShellBadge tone="positive" :label="data.health.status" /><p>{{ data.health.message }}</p></ShellCard>
+        <ShellCard title="Process" eyebrow="Liveness"><ShellBadge tone="positive" :label="data.liveness.status" /><p>{{ data.liveness.message }}</p></ShellCard>
       </div>
+      <section aria-labelledby="quick-tasks">
+<p class="section-kicker">Admin Control Plane</p><h3 id="quick-tasks">Quick tasks</h3><div class="task-grid">
+        <RouterLink class="task-link" to="/admin/storage-devices"><strong>Inspect storage</strong><span>Review read-only device and topology evidence.</span></RouterLink>
+        <RouterLink class="task-link" to="/admin/storage-policies/validate"><strong>Validate a policy</strong><span>Check a proposal without persisting it.</span></RouterLink>
+        <RouterLink class="task-link" to="/admin/capacity"><strong>Manage bucket quota</strong><span>Update capacity limits; no object access.</span></RouterLink>
+        <RouterLink class="task-link" to="/admin/docs"><strong>Open documentation</strong><span>Read product and operations guidance.</span></RouterLink>
+      </div>
+</section>
     </template>
 
-    <ShellCard v-else-if="kind === 'backend' && data" title="Runtime selection" eyebrow="Configuration evidence">
-      <dl class="facts"><dt>Selected backend</dt><dd>{{ data.selectedBackend || 'Unavailable' }}</dd><dt>Profile</dt><dd>{{ data.selection?.profile || 'Unavailable' }}</dd><dt>Selecting property</dt><dd>{{ data.selection?.property?.name || 'Unavailable' }} = {{ data.selection?.property?.value || 'Unavailable' }}</dd></dl>
-      <h3>Catalogs</h3><div class="card-grid compact"><article v-for="(catalog, name) in data.catalogs" :key="name"><strong>{{ catalogLabels[String(name)] || name }}</strong><dl class="facts"><dt>Catalog count</dt><dd>{{ catalog.itemCount ?? 'Unavailable' }}</dd><dt>Source path</dt><dd>{{ catalog.sourceDirectory || 'Unavailable — not returned by the Admin API' }}</dd></dl><ShellBadge :label="catalog.availability || 'Unavailable'" /></article></div>
-      <h3>Storage roots</h3><ul><li v-for="(root, name) in data.storageRoots" :key="name"><strong>{{ name }}</strong>: {{ root.path }} — {{ root.availability }}</li></ul>
-    </ShellCard>
+    <template v-else-if="kind === 'backend' && data">
+      <section class="priority-summary" aria-labelledby="backend-summary"><div><p class="section-kicker">Runtime selection</p><h3 id="backend-summary">{{ data.selectedBackend || 'Backend unavailable' }}</h3><p>Profile <strong>{{ data.selection?.profile || 'Unavailable' }}</strong></p></div><ShellBadge :tone="backendAttention(data).length ? 'danger' : 'positive'" :label="backendAttention(data).length ? 'Attention required' : 'Available'" /></section>
+      <ShellBanner v-for="finding in backendAttention(data)" :key="finding.name" tone="danger" :title="finding.name">{{ finding.message }}</ShellBanner>
+      <ShellDisclosure title="Selection diagnostics" summary="Show the property that selected this backend">
+        <dl class="facts"><dt>Selecting property</dt><dd>{{ data.selection?.property?.name || 'Unavailable' }} = {{ data.selection?.property?.value || 'Unavailable' }}</dd></dl>
+      </ShellDisclosure>
+      <ShellDisclosure title="Catalog evidence" summary="Show catalog availability, counts, and source paths">
+        <div class="card-grid compact"><article v-for="(catalog, name) in data.catalogs" :key="name"><strong>{{ catalogLabels[String(name)] || name }}</strong><dl class="facts"><dt>Catalog count</dt><dd>{{ catalog.itemCount ?? 'Unavailable' }}</dd><dt>Source path</dt><dd>{{ catalog.sourceDirectory || 'Unavailable — not returned by the Admin API' }}</dd></dl><ShellBadge :tone="catalog.availability === 'available' ? 'positive' : 'warning'" :label="catalog.availability || 'Unavailable'" /></article></div>
+      </ShellDisclosure>
+      <ShellDisclosure title="Storage-root evidence" summary="Show configured paths and availability">
+        <ul><li v-for="(root, name) in data.storageRoots" :key="name"><strong>{{ name }}</strong>: {{ root.path }} — {{ root.availability }}</li></ul>
+      </ShellDisclosure>
+    </template>
 
     <template v-else-if="kind === 'policies' && data">
       <ShellBanner tone="info" title="Read-only configuration-as-code">Changes require YAML configuration followed by catalog reload or redeployment. No create, edit, save, or delete actions are available.</ShellBanner>
@@ -158,8 +210,10 @@ watch(() => route.fullPath, load)
 
     <ShellCard v-else-if="kind === 'policy-validation'" title="Non-persistent validation" eyebrow="Validation only">
       <ShellBanner tone="warning" title="Validation only — non-persistent">This proposal is never written to the storage-policy catalog.</ShellBanner>
-      <form class="form-grid" @submit.prevent="validatePolicy"><label>Storage class ID<input v-model="proposal.storageClassId" required></label><label>Data blocks<input v-model.number="proposal.dataBlocks" type="number" min="1" required></label><label>Parity blocks<input v-model.number="proposal.parityBlocks" type="number" min="0" required></label><label>Replication factor<input v-model.number="proposal.replicationFactor" type="number" min="1" required></label><button class="shell-button" type="submit">Validate proposal</button></form>
-      <section v-if="data" aria-live="polite"><h3>Validation report: {{ data.valid ? 'Valid' : 'Invalid' }}</h3><p>This report is non-persistent.</p><ul><li v-for="finding in data.errors" :key="finding.field">{{ finding.field }}: {{ finding.message }}</li></ul><div v-if="policyCatalogEvidence" class="catalog-evidence"><h4>Storage-policy catalog refreshed after validation</h4><p>{{ policyCatalogEvidence.unchanged ? 'Catalog unchanged — the proposal was not persisted.' : 'Catalog changed outside this validation request; review the refreshed catalog.' }}</p><p>Before: {{ policyCatalogEvidence.before.join(', ') || 'No policies' }}</p><p>After refresh: {{ policyCatalogEvidence.after.join(', ') || 'No policies' }}</p></div></section>
+      <form class="form-grid" @submit.prevent="validatePolicy"><label>Storage class ID<input v-model="proposal.storageClassId" required></label><label>Data blocks<input v-model.number="proposal.dataBlocks" type="number" min="1" required></label><label>Parity blocks<input v-model.number="proposal.parityBlocks" type="number" min="0" required></label><label>Replication factor<input v-model.number="proposal.replicationFactor" type="number" min="1" required></label><button class="shell-button" type="submit" :disabled="operationLoading">{{ operationLoading ? 'Validating proposal…' : 'Validate proposal without saving' }}</button></form>
+      <p v-if="operationLoading" class="operation-progress" role="status">Validation in progress. The proposal will not be persisted.</p>
+      <ShellBanner v-else-if="operationError" tone="danger" title="Policy validation could not be completed" aria-live="assertive">{{ operationError instanceof Error ? operationError.message : 'Check the proposal or connection and try again.' }} Your proposal is preserved. Correct it or retry; the catalog was not changed.</ShellBanner>
+      <section v-else-if="data" aria-live="polite"><ShellBanner :tone="data.valid ? 'positive' : 'warning'" :title="`Validation ${data.valid ? 'succeeded' : 'found corrections'}`">Proposal {{ proposal.storageClassId }} was not persisted. The storage-policy catalog was not changed by this validation.</ShellBanner><h3>Validation report: {{ data.valid ? 'Valid' : 'Invalid' }}</h3><ul><li v-for="finding in data.errors" :key="finding.field">{{ finding.field }}: {{ finding.message }}</li></ul><div v-if="policyCatalogEvidence" class="catalog-evidence"><h4>Storage-policy catalog refreshed after validation</h4><p>{{ policyCatalogEvidence.unchanged ? 'Catalog unchanged — the proposal was not persisted.' : 'Catalog changed outside this validation request; review the refreshed catalog.' }}</p><p>Before: {{ policyCatalogEvidence.before.join(', ') || 'No policies' }}</p><p>After refresh: {{ policyCatalogEvidence.after.join(', ') || 'No policies' }}</p></div></section>
     </ShellCard>
 
     <template v-else-if="kind === 'devices' && data"><ShellBanner tone="info" title="Read-only configuration-as-code">Device catalog mutation is unavailable.</ShellBanner><ShellPageState v-if="!data.storageDevices.length" state="empty" heading="No devices configured" /><div v-else class="list-grid"><RouterLink v-for="device in data.storageDevices" :key="device.id" class="resource-link" :to="`/admin/storage-devices/${encodeURIComponent(device.id)}`"><strong>{{ device.id }}</strong><span>{{ device.health }} · {{ bytes(device.availableCapacityBytes) }} available</span></RouterLink></div></template>
@@ -171,7 +225,7 @@ watch(() => route.fullPath, load)
     <ShellCard v-else-if="kind === 'capacity'" title="Find bucket capacity" eyebrow="Accounting only"><p>This lookup does not list buckets, objects, or object keys.</p><form class="inline-form" @submit.prevent="lookupCapacity"><label>Bucket name<input v-model="bucket" required></label><button class="shell-button" type="submit">Look up capacity</button></form></ShellCard>
     <ShellCard v-else-if="kind === 'capacity-detail' && data" :title="data.bucket" eyebrow="Capacity and quota status"><dl class="facts"><dt>Used</dt><dd>{{ bytes(data.usedBytes) }}</dd><dt>Reserved</dt><dd>{{ bytes(data.reservedBytes) }}</dd><dt>Quota</dt><dd>{{ bytes(data.quotaBytes) }}</dd><dt>Rejected reservations</dt><dd>{{ data.rejectedReservations }}</dd><dt>Last rejected</dt><dd>{{ bytes(data.lastRejectedBytes) }}</dd></dl><form class="inline-form" @submit.prevent="updateQuota"><label>New quota in bytes<input v-model.number="quotaBytes" type="number" min="0" required></label><button class="shell-button" type="submit">Update quota</button></form><p>No bucket or object browsing is available.</p></ShellCard>
 
-    <div v-else-if="kind === 'data-hygiene' || kind === 'observability'" class="card-grid"><ShellCard v-for="(report, name) in reports" :key="name" :title="String(name)" eyebrow="Provider evidence"><ShellPageState v-if="report.state !== 'ready'" :state="report.state === 'unavailable' ? 'unavailable' : 'error'" :heading="report.state === 'unavailable' ? 'Provider not configured' : 'Report unavailable'" :message="report.message" @recover="load" /><pre v-else>{{ JSON.stringify(report.value, null, 2) }}</pre></ShellCard></div>
+    <div v-else-if="kind === 'data-hygiene' || kind === 'observability'" class="card-grid"><ShellCard v-for="(report, name) in reports" :key="name" :title="String(name)" eyebrow="Provider evidence"><template v-if="report.state !== 'ready'"><ShellBadge tone="warning" label="Not configured" /><h2 class="report-state-heading">Provider not configured</h2><h3>{{ String(name) }} evidence unavailable</h3><p>{{ report.message }}</p><p><strong>Operational impact:</strong> {{ reportImpact(String(name)) }}</p><div class="context-actions"><button class="shell-button shell-button--secondary" type="button" @click="load">Retry evidence</button><RouterLink class="text-link" to="/admin/docs">Open configuration documentation</RouterLink></div><p class="unsupported-note">The {{ String(name) }} operation is not available from this page.</p></template><pre v-else>{{ JSON.stringify(report.value, null, 2) }}</pre></ShellCard></div>
 
     <ShellCard v-else-if="kind === 'diagnostics'" title="Signed HeadObject" eyebrow="S3 Data Plane"><ShellBanner tone="info" title="Separate S3 client">This diagnostic never calls Admin or private storage-engine object endpoints and grants only the selected credential profile's privileges. Credentials and signed headers are never displayed.</ShellBanner><form class="form-grid" @submit.prevent="runDiagnostic"><label>Credential profile<input v-model="diagnostic.credentialProfile" required autocomplete="off"></label><label>Bucket<input v-model="diagnostic.bucket" required></label><label>Object key<input v-model="diagnostic.key" required></label><button class="shell-button" type="submit">Run HeadObject</button></form><dl v-if="data" class="facts" aria-live="polite"><dt>Request method</dt><dd>{{ data.request?.method || 'HEAD' }}</dd><dt>Safe S3 target</dt><dd>{{ data.request?.target || 'Not returned by client' }}</dd><dt>Outcome</dt><dd>{{ data.ok ? 'S3 accepted the request' : 'S3 rejected the request' }}</dd><dt>Status</dt><dd>{{ data.status }} {{ data.statusText }}</dd><dt>S3 request ID</dt><dd>{{ data.requestId || 'Not returned' }}</dd><dt>ETag</dt><dd>{{ data.eTag || 'Not returned' }}</dd><dt>Content length</dt><dd>{{ data.contentLength ?? 'Not returned' }}</dd><dt>S3 error code</dt><dd>{{ data.errorCode || 'Not returned' }}</dd></dl></ShellCard>
   </section>
@@ -180,7 +234,14 @@ watch(() => route.fullPath, load)
 <style scoped>
 .object-storage-page { display: grid; gap: var(--shell-space-5); }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
-.card-grid, .list-grid, .pipeline { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: var(--shell-space-4); }
+.card-grid, .list-grid, .pipeline, .task-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: var(--shell-space-4); }
+.priority-summary { display: flex; align-items: center; justify-content: space-between; gap: var(--shell-space-4); padding: clamp(var(--shell-space-4), 4vw, var(--shell-space-6)); background: var(--shell-surface-raised); border: 1px solid var(--shell-border); border-left: 0.35rem solid var(--shell-positive); border-radius: var(--shell-radius-md); }
+.priority-summary--attention { border-left-color: var(--shell-danger); }
+.priority-summary h3, #quick-tasks { margin: 0; font-size: clamp(1.25rem, 3vw, 1.75rem); }.priority-summary p { margin-bottom: 0; }
+.section-kicker { margin: 0 0 var(--shell-space-1); color: var(--shell-text-muted); font-size: var(--shell-text-xs); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.attention-list { display: grid; gap: var(--shell-space-3); padding: 0; list-style: none; }.attention-list li { display: grid; gap: var(--shell-space-1); padding-left: var(--shell-space-3); border-left: 3px solid var(--shell-danger); }
+.task-link { display: grid; gap: var(--shell-space-2); min-height: 7rem; padding: var(--shell-space-4); color: var(--shell-text); background: var(--shell-surface-raised); border: 1px solid var(--shell-border); border-radius: var(--shell-radius-md); text-decoration: none; }.task-link:hover, .task-link:focus-visible { border-color: var(--shell-brand); box-shadow: var(--shell-shadow-sm); }.task-link span { color: var(--shell-text-muted); }
+.context-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--shell-space-3); margin-top: var(--shell-space-4); }.text-link { color: var(--shell-link, var(--shell-brand)); font-weight: 700; text-underline-offset: .2em; }.unsupported-note { color: var(--shell-text-muted); font-size: var(--shell-text-sm); }.operation-progress { padding: var(--shell-space-3); border-left: 3px solid var(--shell-info); }
 .card-grid.compact article { padding: var(--shell-space-4); background: var(--shell-surface-canvas); border-radius: var(--shell-radius-sm); overflow-wrap: anywhere; }
 .resource-link { display: grid; gap: var(--shell-space-2); min-height: 5rem; padding: var(--shell-space-4); color: var(--shell-text); background: var(--shell-surface-raised); border: 1px solid var(--shell-border); border-radius: var(--shell-radius-md); text-decoration: none; }
 .resource-link:hover, .resource-link:focus-visible { border-color: var(--shell-brand); }

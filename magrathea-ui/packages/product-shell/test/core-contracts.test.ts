@@ -2,13 +2,17 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   createApplicationStateStore,
   createLocalizationCatalog,
+  createNavigationSections,
   defaultBrandTokens,
   defaultLocaleRegistrations,
+  persistAppearancePreference,
   persistLocale,
+  resolveAppearance,
   resolveBrandTokens,
   resolveInitialLocale,
   resolveProductIdentity,
   selectInitialLocale,
+  loadAppearancePreference,
   shellEnglishBundle,
   standardPagePresentations,
 } from '../src'
@@ -111,6 +115,56 @@ describe('product-neutral shell core contracts', () => {
     expect(unsupportedSavedLocale).toHaveBeenCalledWith({
       savedLocale: 'private.locale.key', selectedLocale: 'de',
     })
+  })
+
+  it('creates ordered task navigation sections and retains legacy flat entries', () => {
+    const sections = createNavigationSections(
+      [
+        { id: 'legacy', labelKey: 'example.legacy', route: '/legacy', order: -1 },
+        {
+          id: 'review',
+          labelKey: 'example.review',
+          descriptionKey: 'example.reviewDescription',
+          route: '/review',
+          groupId: 'assess',
+          icon: 'activity',
+          status: { labelKey: 'example.attention', tone: 'warning' },
+        },
+      ],
+      [{ id: 'assess', labelKey: 'example.assess', descriptionKey: 'example.assessDescription', icon: 'overview' }],
+    )
+
+    expect(sections).toEqual([
+      {
+        group: {
+          id: 'assess', labelKey: 'example.assess', descriptionKey: 'example.assessDescription', icon: 'overview',
+        },
+        entries: [{
+          id: 'review',
+          labelKey: 'example.review',
+          descriptionKey: 'example.reviewDescription',
+          route: '/review',
+          groupId: 'assess',
+          icon: 'activity',
+          status: { labelKey: 'example.attention', tone: 'warning' },
+        }],
+      },
+      { entries: [{ id: 'legacy', labelKey: 'example.legacy', route: '/legacy', order: -1 }] },
+    ])
+    expect(Object.isFrozen(sections)).toBe(true)
+    expect(Object.isFrozen(sections[0]?.entries)).toBe(true)
+  })
+
+  it('resolves optional appearance preferences without owning platform persistence', async () => {
+    const save = vi.fn()
+    const preference = { load: vi.fn(() => 'dark' as const), save }
+
+    await expect(loadAppearancePreference(preference)).resolves.toBe('dark')
+    expect(resolveAppearance('dark', 'light')).toBe('dark')
+    expect(resolveAppearance('system', 'dark')).toBe('dark')
+    await expect(persistAppearancePreference('light', preference)).resolves.toBe('light')
+    expect(preference.load).toHaveBeenCalledWith()
+    expect(save).toHaveBeenCalledWith('light')
   })
 
   it('keeps application state immutable and observable without API dependencies', () => {

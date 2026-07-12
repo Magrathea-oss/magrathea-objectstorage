@@ -58,10 +58,10 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |EP-8 / EP-10 (`@absent`, high priority after ADR acceptance)
 
 |9
-|**Product-shell boundary regression** — ADR 0026 separation is implemented and validated, but future extensions could reintroduce Object Storage routes, endpoint knowledge, or models into the reusable shell.
+|**Product-shell boundary regression** — ADR 0026 separation and REQ-ADMIN-032 task-group composition are implemented and validated, but future extensions could reintroduce Object Storage routes, endpoint knowledge, or models into the reusable shell.
 |Other Magrathea products would inherit Object Storage coupling or need to fork the shell.
 |Keep static boundary, example-product composition, and deterministic extension-removal tests mandatory; Product Shell source must remain product-neutral.
-|EP-7 (`REQ-ADMIN-001..031` mitigation validated; ongoing regression risk)
+|EP-7 (`REQ-ADMIN-001..037` mitigation validated; ongoing regression risk)
 
 |10
 |**Admin Panel becomes an alternate object API** — future product pressure could add bucket/object semantics to the Admin Control Plane or call the storage engine directly.
@@ -70,9 +70,9 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |EP-7 / INV-3 (boundary implemented and validated; ongoing regression risk)
 
 |11
-|**EP-7 unavailable providers may be mistaken for delivered operations** — the UI and Admin routes correctly expose `not-configured`, but no real recovery, garbage-collection, scrub, audit, metrics, or traces provider is present; credential/tenant administration is also absent.
-|Operators or release notes could infer operational records or administration capabilities that the system cannot provide.
-|Keep HTTP 503 `report-provider-not-configured` explicit, prohibit fabricated records, and retain EP-7 `@partial` until real providers and credential/tenant administration are implemented and semantically validated or formally descoped.
+|**EP-7 unavailable providers may be mistaken for delivered operations** — REQ-ADMIN-037 now validates named unavailable evidence, operational impact, valid next steps, and disabled missing operations, while the Admin routes correctly expose `not-configured`; nevertheless no real recovery, garbage-collection, scrub, audit, metrics, or traces provider is present, and credential/tenant administration is also absent.
+|Operators or release notes could still infer operational records or administration capabilities that the system cannot provide, especially by overgeneralizing fixture-backed configured-storage-engine UX or the bounded live bare-single-node browser run.
+|Keep HTTP 503 `report-provider-not-configured` explicit, prohibit fabricated records and enabled missing operations, distinguish fixture evidence from live evidence, and retain EP-7 `@partial` until real providers and credential/tenant administration are implemented and semantically validated or formally descoped.
 |EP-7 (`@partial`; human scope review required before closure)
 
 |12

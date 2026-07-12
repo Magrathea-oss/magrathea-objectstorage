@@ -11,9 +11,9 @@ The package provides:
 - API-independent application and asynchronous resource-state contracts;
 - English shell messages and loading, empty, error, offline, unavailable, unauthorized, and not-found presentation metadata;
 - ports for locale persistence and missing-message reporting;
-- a responsive application frame, skip link, identity, navigation, breadcrumbs, and page header;
-- reusable cards, badges, banners, data tables, loading skeletons, page states, fields, and modal dialogs;
-- semantic theme tokens with visible focus, forced-colors, reduced-motion, and compact-layout support.
+- a responsive application frame, skip link, identity, task-grouped navigation, breadcrumbs, and page header;
+- reusable cards, badges, banners, data tables, loading skeletons, page states, fields, disclosures, opt-in tooltips, and modal dialogs;
+- controlled light, dark, and system themes with visible focus, forced-colors, reduced-motion, and compact-layout support.
 
 Applications own platform adapters and register independently maintained product extensions. Extensions own their screens, domain models, routes, integrations, and localization namespaces. The shell core does not access browser storage, networks, native runtimes, or product APIs directly.
 
@@ -46,6 +46,8 @@ Import the default semantic theme once at the application entry point:
 import '@magrathea/product-shell/theme.css'
 ```
 
-Use `ProductShell` as the page frame and compose the exported `Shell*` primitives inside it. Pass `extensionLoadStates` from the composition contract and handle `retry-extension` by invoking the composer; the rendered alert names only the extension and never exposes the technical failure. Pass registered `locales` and `selectedLocale`, then handle `locale-change` in the application adapter to update localization, document language, and persistence. The native selector retains platform keyboard behavior and does not replace or nest the shell's navigation landmarks.
+Use `ProductShell` as the page frame and compose the exported `Shell*` primitives inside it. Pass `navigationGroups` to group entries by administrator task; legacy flat `navigation` arrays retain their original order. Navigation icons use the semantic `ProductNavigationIconId` contract, while status labels always remain visible text. The mobile drawer provides a backdrop, Escape handling, focus entry, focus containment, and focus restoration without requiring application wiring.
+
+Pass `extensionLoadStates` from the composition contract and handle `retry-extension` by invoking the composer; the rendered alert names only the extension and never exposes the technical failure. Pass registered `locales` and `selectedLocale`, then handle `locale-change` in the application adapter to update localization, document language, and persistence. Set `appearance` to `light`, `dark`, or `system`; optionally enable `showAppearanceControl` and handle `appearance-change` through an application-owned `AppearancePreferencePort`. The shell never reads or writes browser storage. Native selectors retain platform keyboard behavior and do not replace or nest the shell's navigation landmarks.
 
 Product branding may override only `--shell-brand-strong`, `--shell-brand`, `--shell-brand-accent`, and `--shell-brand-soft`; `brandTokenSlots`, `defaultBrandTokens`, and `resolveBrandTokens` are the executable contract. Overrides can be passed through the `brandTokens` prop or set on an application container. All other semantic tokens remain shell-owned. Missing identity or token overrides render the product-neutral Magrathea name, `M` mark, accessible home-link name, and default palette. A logo that cannot load falls back to the same text mark; logos are decorative because the adjacent product name and link accessible name provide the identity. Extensions should consume semantic tokens rather than defining shell-level visual constants. The primitives contain no product routes, product data, API integration, persistence, or document mutation.

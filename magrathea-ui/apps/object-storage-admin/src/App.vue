@@ -8,9 +8,12 @@ import { adminDocumentTitleForRoute } from './browser-adapters'
 
 const props = defineProps({
   initialLocale: { type: String, default: 'en' },
+  initialAppearance: { type: String, default: 'system' },
   localePreference: { type: Object, default: undefined },
+  appearancePreference: { type: Object, default: undefined },
   extensionComposer: { type: Object, default: undefined },
   onLocaleApplied: { type: Function, default: undefined },
+  onAppearanceApplied: { type: Function, default: undefined },
   onPageTitleChange: { type: Function, default: undefined },
   onEnglishFallback: { type: Function, default: undefined },
 })
@@ -19,11 +22,14 @@ const extension = createObjectStorageExtension()
 const composer = props.extensionComposer || createExtensionComposer([extension])
 const composition = ref(composer.snapshot())
 const selectedLocale = ref(supportedLocales.some(({ locale }) => locale === props.initialLocale) ? props.initialLocale : 'en')
+const selectedAppearance = ref(['system', 'light', 'dark'].includes(props.initialAppearance) ? props.initialAppearance : 'system')
+const extensionReady = computed(() => composition.value.extensionLoadStates.length === 0)
+const navigationGroups = computed(() => extensionReady.value ? (extension.navigationGroups || []) : (composition.value.navigationGroups || []))
 const navigation = computed(() => [
-  ...(composition.value.extensionLoadStates.length === 0 ? (extension.navigation || []) : composition.value.navigation),
-  { id: 'documentation', route: '/admin/docs', labelKey: 'objectStorage.nav.documentation', order: 100 },
+  ...(extensionReady.value ? (extension.navigation || []) : composition.value.navigation),
+  { id: 'documentation', route: '/admin/docs', labelKey: 'objectStorage.nav.documentation',
+    descriptionKey: 'objectStorage.nav.descriptions.documentation', groupId: 'configuration', icon: 'documentation', order: 100 },
 ])
-const labels = objectStorageEnglishMessages.nav
 const descriptions = {
   dashboard: 'Liveness, readiness, and component status from the Admin Control Plane.',
   backend: 'Selected backend, catalog sources, and storage-root availability.',
@@ -58,12 +64,21 @@ const breadcrumbs = computed(() => {
   crumbs.push({ label: pageTitle.value })
   return crumbs
 })
-function navigationLabel(key) { return labels[key.split('.').at(-1)] || key }
+function messageAt(key) {
+  return key.split('.').slice(1).reduce((value, segment) => value?.[segment], objectStorageEnglishMessages) || key
+}
+function navigationLabel(key) { return messageAt(key) }
 async function selectLocale(locale) {
   if (!supportedLocales.some((registration) => registration.locale === locale)) return
   selectedLocale.value = locale
   await props.localePreference?.save(locale)
   props.onLocaleApplied?.(supportedLocales.find((registration) => registration.locale === locale))
+}
+async function selectAppearance(appearance) {
+  if (!['system', 'light', 'dark'].includes(appearance)) return
+  selectedAppearance.value = appearance
+  props.onAppearanceApplied?.(appearance)
+  await props.appearancePreference?.save(appearance)
 }
 async function retryExtension(extensionId) { composition.value = await composer.retry(extensionId) }
 
@@ -84,12 +99,16 @@ onMounted(async () => { composition.value = await composer.start() })
 <template>
   <ProductShell
     :identity="{ ...defaultProductIdentity, name: 'Magrathea Object Storage', accessibleName: 'Magrathea Object Storage administration', mark: 'OS' }"
-    :navigation="navigation" :active-route="activeRoute" :breadcrumbs="breadcrumbs"
+    :navigation="navigation" :navigation-groups="navigationGroups" :active-route="activeRoute" :breadcrumbs="breadcrumbs"
     :page-title="pageTitle" :page-description="pageDescription" :locales="supportedLocales"
     :selected-locale="selectedLocale" :labels="shellLabels(selectedLocale)"
+    :appearance="selectedAppearance" :show-appearance-control="true"
     :extension-load-states="composition.extensionLoadStates"
-    @locale-change="selectLocale" @retry-extension="retryExtension">
+    @locale-change="selectLocale" @appearance-change="selectAppearance" @retry-extension="retryExtension">
+    <template #navigation-group-label="{ group }">{{ navigationLabel(group.labelKey) }}</template>
+    <template #navigation-group-description="{ group }">{{ navigationLabel(group.descriptionKey) }}</template>
     <template #navigation-label="{ entry }">{{ navigationLabel(entry.labelKey) }}</template>
+    <template #navigation-description="{ entry }">{{ navigationLabel(entry.descriptionKey) }}</template>
     <router-view />
   </ProductShell>
 </template>

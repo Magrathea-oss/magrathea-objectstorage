@@ -376,19 +376,19 @@ KA dependencies: KA-2 (Ceph s3-tests requires SigV4), KA-3 (presigned URLs), and
 
 ### EP-7 — Complete Admin Panel (HIGH)
 
-> **Late implementation status (2026-07-12):** the declared `REQ-ADMIN-001..031` slice is implemented and validated. EP-7 overall remains `@partial` because this authoritative plan also requires credential/tenant administration and real operational report providers, which are absent.
+> **Late implementation status (2026-07-12):** the declared `REQ-ADMIN-001..037` slice is implemented and validated. EP-7 overall remains `@partial` because this authoritative plan also requires credential/tenant administration and real operational report providers, which are absent.
 
 | Field | Plan / Result |
 |---|---|
 | Focus | Reusable **Magrathea Product Shell**, Object Storage **Product Extension**, Admin Control Plane contracts, and S3 diagnostics through the **S3 Data Plane**. The broader phase also calls for credential/tenant administration and real recovery/GC/scrub/audit/metrics/traces reporting. |
 | Architectural boundary | Implemented: the Product Shell owns only product-neutral frame/navigation/layout, Design Tokens, Shell Primitives, localization, extension composition, documentation integration, and common states. Product-specific routes, labels, models, permissions, clients, mappings, and screens belong to Product Extensions. |
-| Implemented UI/contracts | Dashboard health/readiness/backend/catalog evidence; read-only policy/device/disk-set views; non-persistent policy validation; capacity/quota presentation; truthful unavailable report states; optional S3 HeadObject diagnostic through a separately configured S3 client; direct navigation, responsive keyboard operation, localization, accessibility, extension isolation/removal, and reusable product composition. |
+| Implemented UI/contracts | Task-oriented grouped navigation; dashboard-first readiness, selected-backend, attention, and degraded-device evidence; legitimate quick tasks without Admin object controls; read-only policy/device/disk-set views; progressive backend disclosure that leaves critical conditions visible; non-persistent policy validation with pending, duplicate-prevention, success, and actionable failure feedback; capacity/quota presentation; persistent system/light/dark appearance; truthful unavailable report impact and valid next steps; optional S3 HeadObject diagnostic through a separately configured S3 client; direct navigation, responsive keyboard operation, localization, accessibility, extension isolation/removal, and reusable product composition. |
 | Plane boundary | Validated: Admin route inventory contains no object/bucket data plane. Object and bucket semantics remain on S3 endpoints; the HeadObject diagnostic has no Admin/storage-engine bypass. |
-| Requirement feature files | `requirements/phase-ep7-admin-panel.feature` and `specs/phase-ep7-product-shell.feature`; all `REQ-ADMIN-001..031` are `@implemented-and-validated`. |
-| Validation evidence | 72/72 Vitest tests; 39/39 Playwright/axe tests (13 at each 360/768/1440 viewport); deterministic extension removal; reproducible dual-product packaging; canonical Docker `frontend-packaging-validation` passed; Admin API Cucumber passed 18 executed scenarios/132 steps for REQ-ADMIN-023..031; focused Maven passed. |
+| Requirement feature files | `requirements/phase-ep7-admin-panel.feature` and `specs/phase-ep7-product-shell.feature`; all `REQ-ADMIN-001..037` are `@implemented-and-validated`. |
+| Validation evidence | ESLint 0 warnings/errors; typecheck passed for 6 workspaces; Vitest 86/86 across 14 files; template validation, deterministic extension removal, and 5-package/app product build passed; Playwright Chromium 57/57 (19 at each 360/768/1440 viewport), including axe 3/3 with zero violations and visual regression 12/12. Live browser evidence without JSON fixtures observed `200 /admin/health`, `200 /admin/live`, `200 /admin/backend-status`, `503 /admin/ready`, `503 /admin/storage-devices`, `503 /admin/reports/recovery`, `503 /admin/reports/garbage-collection`, and `503 /admin/reports/scrub` against the bare single-node Admin API; this proved truthful `in-memory`/unavailable states, not configured storage-engine dashboard behavior. Earlier canonical Docker `frontend-packaging-validation` passed but was not rerun in the resumed slice. Admin API Cucumber remains 18 executed scenarios/132 steps for REQ-ADMIN-023..031. |
 | Honest provider boundary | Recovery, garbage-collection, scrub, audit, metrics, and traces routes intentionally return HTTP 503 `report-provider-not-configured` with `availability: not-configured` when no provider exists. This validates truthful unavailability, not real providers or operational data. |
 | Remaining authoritative scope | Credential administration, tenant administration, and real recovery/GC/scrub/audit/metrics/traces provider integrations remain absent. |
-| Status | `@partial` overall. The `REQ-ADMIN-001..031` bounded implementation/contract scope is complete and validated, but **EP-7 Complete Admin Panel is not complete under this plan** until the remaining scope is delivered or formally descoped. |
+| Status | `@partial` overall. The `REQ-ADMIN-001..037` bounded implementation/contract and UX scope is complete and validated, but **EP-7 Complete Admin Panel is not complete under this plan** until credential/tenant administration and real operational report providers are delivered or formally descoped. |
 
 ### EP-8 — Cluster Architecture ADR & Supply Chain (MEDIUM)
 
@@ -482,7 +482,7 @@ Owner rule (2026-07-02): any gRPC used by the SMB/VFS gateway follows the same r
 | 4 | EP-4 Space management & data hygiene | High | `@implemented-and-validated` for declared single-node scope |
 | 5 | EP-5 Operability & delivery | High | `@implemented-and-validated` for the `0.1.0` single-node JVM preview |
 | 6 | EP-6 Performance & capacity | High | `@implemented-and-validated` for declared single-node envelope |
-| 7 | EP-7 Complete admin panel | High | `@partial` overall; `REQ-ADMIN-001..031` bounded scope implemented and validated, credential/tenant administration and real report providers absent |
+| 7 | EP-7 Complete admin panel | High | `@partial` overall; `REQ-ADMIN-001..037` bounded scope implemented and validated, credential/tenant administration and real report providers absent |
 | 8 | EP-8 HA decision & supply chain | Medium | `@absent` |
 | 9 | EP-10 S3 cluster (multi-node; after the EP-8 ADR is accepted) | High | `@absent` |
 | 10 | EP-11 SMB gateway (optional; after EP-1 and EP-3; independent of EP-10) | Future | `@absent` |
@@ -676,7 +676,7 @@ Backend selection, mutually exclusive beans, fail-fast on missing config, and S3
 | Field | Open items |
 |---|---|
 | Owner agents | `java-infra-coder` (backend), frontend workflow agents (UI) |
-| Delivered | EP-7 `REQ-ADMIN-001..031`: reusable Product Shell and extension contracts; Object Storage Admin Application; backend status, health/readiness, read-only catalogs, non-persistent validation, capacity/quota and route inventory; truthful unavailable-provider contracts; optional S3 HeadObject diagnostic; deterministic dual-product Docker packaging. |
+| Delivered | EP-7 `REQ-ADMIN-001..037`: reusable Product Shell and extension contracts; Object Storage Admin Application; task-grouped navigation; priority dashboard; progressive disclosure; operation feedback; appearance support; backend status, health/readiness, read-only catalogs, non-persistent validation, capacity/quota and route inventory; truthful unavailable-provider contracts; optional S3 HeadObject diagnostic; deterministic dual-product Docker packaging. |
 | Remaining | Credential/tenant administration and real recovery/GC/scrub/audit/metrics/traces providers. HTTP 503 `report-provider-not-configured` is the implemented fallback contract, not provider completion. |
 
 ### CC-9 — Cucumber Parity — remaining open items
@@ -700,7 +700,7 @@ Phase CC-10 quality gates were completed 2026-06-12 (HEAD `351d088`): `mvn valid
 - [x] Storage-engine backend can be selected at runtime without duplicate repositories. **Qualifier:** full-process restart validation now covers bucket registry, multipart state, legal hold, object lock, retention, object encryption, object restore state, object tags, object ACLs, bucket configuration families, and the combined EP-2 bucket/object-tag/object-ACL/multipart scenario.
 - [x] S3 write/read path works end to end with the selected storage-engine backend for object bytes, manifests, object references, bucket registry, multipart upload state, per-object configuration metadata, object tags, and object ACL metadata. EP-2 is closed for the declared storage-engine durability scope; remaining metadata work moves to later roadmap phases rather than EP-2 closure.
 - [x] Backend Admin API exposes read-only policy/device/disk-set catalogs and non-persistent validation as configuration-as-code.
-- [x] EP-7 `REQ-ADMIN-001..031` UI/contracts implemented and validated; `docs/admin-ui-plan.md` records delivered scope and remaining authoritative backlog (2026-07-12).
+- [x] EP-7 `REQ-ADMIN-001..037` bounded UI/contracts/UX scope implemented and validated; `docs/admin-ui-plan.md` records the earlier delivered scope and the authoritative credential/tenant/provider backlog (2026-07-12).
 - [ ] AWS CLI Cucumber parity for all canonical scenarios (increments delivered; remainder tracked in CC-9).
 - [x] Documentation reports planned vs completed work accurately.
 

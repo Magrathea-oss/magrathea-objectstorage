@@ -10,8 +10,10 @@ import {
   ShellCard,
   ShellDataTable,
   ShellDialog,
+  ShellDisclosure,
   ShellField,
   ShellPageState,
+  ShellTooltip,
 } from '../src'
 
 const navigation = Array.from({ length: 12 }, (_, index) => ({
@@ -113,7 +115,7 @@ describe('product-neutral shell components', () => {
     expect(links.filter((link) => link.attributes('aria-current') === 'page')).toHaveLength(1)
   })
 
-  it('exposes mobile navigation state and returns focus after Escape', async () => {
+  it('exposes mobile navigation state, moves focus into the drawer, and restores it after Escape or backdrop dismissal', async () => {
     const wrapper = mountShowcase()
     const trigger = wrapper.get('button[aria-controls="primary-navigation"]')
     expect(trigger.attributes('aria-expanded')).toBe('false')
@@ -121,11 +123,69 @@ describe('product-neutral shell components', () => {
     await trigger.trigger('click')
     expect(trigger.attributes('aria-expanded')).toBe('true')
     expect(trigger.attributes('aria-label')).toBe('Close navigation')
+    expect(wrapper.find('.product-shell__backdrop').exists()).toBe(true)
+    expect(document.activeElement).toBe(wrapper.get('#primary-navigation a').element)
 
     await wrapper.get('#primary-navigation').trigger('keydown', { key: 'Escape' })
     await nextTick()
     expect(trigger.attributes('aria-expanded')).toBe('false')
     expect(document.activeElement).toBe(trigger.element)
+
+    await trigger.trigger('click')
+    await wrapper.get('.product-shell__backdrop').trigger('click')
+    await nextTick()
+    expect(trigger.attributes('aria-expanded')).toBe('false')
+    expect(document.activeElement).toBe(trigger.element)
+  })
+
+  it('renders task-grouped navigation with semantic SVG icons and named status text while retaining legacy entries', () => {
+    const wrapper = mount(ProductShell, {
+      props: {
+        pageTitle: 'Operations', activeRoute: '/health',
+        navigationGroups: [{ id: 'assess', labelKey: 'Assess service health', icon: 'gauge', order: 1 }],
+        navigation: [
+          { id: 'legacy', labelKey: 'Legacy destination', route: '/legacy', order: 3 },
+          { id: 'health', labelKey: 'Service health', route: '/health', groupId: 'assess', icon: 'activity', status: { labelKey: 'Needs attention', tone: 'warning' }, order: 1 },
+        ],
+      },
+      attachTo: document.body,
+    })
+
+    expect(wrapper.get('.product-shell__nav-section-heading h2').text()).toBe('Assess service health')
+    expect(wrapper.findAll('#primary-navigation a').map((link) => link.text())).toEqual(['Service healthNeeds attention', 'Legacy destination'])
+    expect(wrapper.get('a[aria-current="page"] .product-shell__nav-status').text()).toBe('Needs attention')
+    expect(wrapper.findAll('#primary-navigation svg').length).toBeGreaterThanOrEqual(3)
+  })
+
+  it('offers controlled light, dark, and system appearance without owning persistence', async () => {
+    const wrapper = mount(ProductShell, {
+      props: { pageTitle: 'Overview', appearance: 'dark', showAppearanceControl: true },
+      attachTo: document.body,
+    })
+    expect(wrapper.get('.product-shell').attributes('data-appearance')).toBe('dark')
+    const selector = wrapper.get('select[aria-label="Appearance"]')
+    expect(selector.findAll('option').map((option) => option.attributes('value'))).toEqual(['system', 'light', 'dark'])
+    await selector.setValue('light')
+    expect(wrapper.emitted('appearanceChange')).toEqual([['light']])
+    expect(wrapper.get('.product-shell').attributes('data-appearance')).toBe('dark')
+  })
+
+  it('provides keyboard-native disclosures and opt-in accessible tooltip descriptions', async () => {
+    const wrapper = mount({
+      components: { ShellDisclosure, ShellTooltip },
+      template: `<ShellDisclosure title="Diagnostic detail" summary="Supporting evidence"><p>Technical context</p></ShellDisclosure>
+        <ShellTooltip text="Explains the adjacent value"><span aria-label="More information">Info</span></ShellTooltip>`,
+    }, { attachTo: document.body })
+    const disclosure = wrapper.get('details')
+    expect(disclosure.attributes('open')).toBeUndefined()
+    await disclosure.get('summary').trigger('click')
+    expect((disclosure.element as HTMLDetailsElement).open).toBe(true)
+    const tooltip = wrapper.get('[role="tooltip"]')
+    expect(wrapper.get('.shell-tooltip__trigger').attributes('aria-describedby')).toBe(tooltip.attributes('id'))
+    expect(tooltip.text()).toBe('Explains the adjacent value')
+
+    const result = await axe.run(wrapper.element, { rules: { 'color-contrast': { enabled: false } } })
+    expect(result.violations).toEqual([])
   })
 
   it('preserves the focused locale control and complete focus order while localized names change', async () => {

@@ -319,7 +319,7 @@ Business Need: EP-7 Object Storage administration through the Magrathea Product 
 
   Rule: The administration experience is task-oriented, polished, and truthful
 
-    @REQ-ADMIN-032 @functional-requirement @admin-ui @dashboard @navigation @usability @frontend-e2e-required @partial
+    @REQ-ADMIN-032 @functional-requirement @admin-ui @dashboard @navigation @usability @frontend-e2e-required @implemented-and-validated
     Scenario: Dashboard leads administrators from operational priorities to relevant tasks
       Given readiness is degraded by storage device "node-1-disk-0"
       And backend "storage-engine" is selected
@@ -330,7 +330,7 @@ Business Need: EP-7 Object Storage administration through the Magrathea Product 
       And the degraded device provides a direct path to its detail page
       And no dashboard card or navigation item offers bucket or object operations outside the S3 Data Plane
 
-    @REQ-ADMIN-033 @functional-requirement @non-functional-requirement @admin-ui @affordance @configuration-as-code @usability @frontend-e2e-required @partial
+    @REQ-ADMIN-033 @functional-requirement @non-functional-requirement @admin-ui @affordance @configuration-as-code @usability @frontend-e2e-required @implemented-and-validated
     Scenario: Affordances communicate what can be done before an administrator acts
       Given storage policy and topology catalogs are read-only configuration-as-code
       And policy validation is non-persistent
@@ -341,7 +341,7 @@ Business Need: EP-7 Object Storage administration through the Magrathea Product 
       And quota administration is presented as an Admin Control Plane action
       And unsupported catalog mutation and object-management controls are not presented as available actions
 
-    @REQ-ADMIN-034 @functional-requirement @non-functional-requirement @admin-ui @progressive-disclosure @information-hierarchy @usability @frontend-e2e-required @partial
+    @REQ-ADMIN-034 @functional-requirement @non-functional-requirement @admin-ui @progressive-disclosure @information-hierarchy @usability @frontend-e2e-required @implemented-and-validated
     Scenario: Operational pages reveal detail without obscuring the decision summary
       Given backend status contains a selected backend, readiness conditions, catalog sources, storage roots, and diagnostic details
       When the administrator opens route "/admin/backend-status"
@@ -350,7 +350,7 @@ Business Need: EP-7 Object Storage administration through the Magrathea Product 
       And critical or unavailable conditions are never hidden only because supporting detail is collapsed
       And revealing or hiding detail preserves the page route, heading context, and keyboard focus
 
-    @REQ-ADMIN-035 @non-functional-requirement @admin-ui @responsive @information-hierarchy @visual-design @accessibility @frontend-e2e-required @visual-regression-required @partial
+    @REQ-ADMIN-035 @non-functional-requirement @admin-ui @responsive @information-hierarchy @visual-design @accessibility @frontend-e2e-required @visual-regression-required @implemented-and-validated
     Scenario Outline: Responsive pages retain a professional and scannable information hierarchy
       Given the Object Storage application viewport is <width> pixels wide
       And the dashboard contains health, attention, task, and supporting-detail content
@@ -366,7 +366,7 @@ Business Need: EP-7 Object Storage administration through the Magrathea Product 
         | 768   |
         | 1440  |
 
-    @REQ-ADMIN-036 @functional-requirement @non-functional-requirement @admin-ui @operation-feedback @accessibility @frontend-e2e-required @partial
+    @REQ-ADMIN-036 @functional-requirement @non-functional-requirement @admin-ui @operation-feedback @accessibility @frontend-e2e-required @implemented-and-validated
     Scenario: Policy validation gives timely and unambiguous operation feedback
       Given the administrator has entered a proposed policy "ARCHIVE_EC"
       When the administrator submits it for non-persistent validation
@@ -375,7 +375,7 @@ Business Need: EP-7 Object Storage administration through the Magrathea Product 
       And successful feedback reiterates that "ARCHIVE_EC" was not persisted
       And failure feedback preserves the proposal, explains what can be corrected or retried, and does not imply that the catalog changed
 
-    @REQ-ADMIN-037 @functional-requirement @non-functional-requirement @admin-ui @unavailable-state @truthful-ui @usability @frontend-e2e-required @admin-api-contract-required @partial
+    @REQ-ADMIN-037 @functional-requirement @non-functional-requirement @admin-ui @unavailable-state @truthful-ui @usability @frontend-e2e-required @admin-api-contract-required @implemented-and-validated
     Scenario: Unavailable capabilities explain impact and valid next steps without false promise
       Given recovery, scrub, and metrics report providers return availability "not-configured"
       When the administrator views the affected operational pages

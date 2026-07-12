@@ -5,6 +5,23 @@ export type ExtensionId = string
 export type CapabilityId = string
 export type FeatureFlagId = string
 export type MessageKey = string
+export type AppearancePreference = 'system' | 'light' | 'dark'
+export type ResolvedAppearance = Exclude<AppearancePreference, 'system'>
+
+/** Semantic identifiers; renderers remain free to choose an icon library or text fallback. */
+export type ProductNavigationIconId =
+  | 'overview'
+  | 'activity'
+  | 'layers'
+  | 'checklist'
+  | 'gauge'
+  | 'operations'
+  | 'settings'
+  | 'documentation'
+  | 'information'
+  | 'warning'
+
+export type ProductNavigationStatusTone = 'neutral' | 'info' | 'positive' | 'warning' | 'critical' | 'unavailable'
 
 export interface ProductIdentity {
   readonly name: string
@@ -39,12 +56,30 @@ export interface ContributionAvailability {
   readonly requiredFeatureFlags?: readonly FeatureFlagId[]
 }
 
+export interface ProductNavigationStatus {
+  readonly labelKey: MessageKey
+  readonly tone?: ProductNavigationStatusTone
+}
+
+export interface ProductNavigationGroup extends ContributionAvailability {
+  readonly id: string
+  readonly labelKey: MessageKey
+  readonly descriptionKey?: MessageKey
+  readonly icon?: ProductNavigationIconId
+  readonly order?: number
+}
+
 export interface ProductNavigationEntry extends ContributionAvailability {
   readonly id: string
   readonly labelKey: MessageKey
   readonly route: string
   readonly permission?: string
   readonly order?: number
+  /** Optional extension-owned task group. Omit to retain legacy flat navigation. */
+  readonly groupId?: string
+  readonly descriptionKey?: MessageKey
+  readonly icon?: ProductNavigationIconId
+  readonly status?: ProductNavigationStatus
 }
 
 export interface ProductRouteRegistration extends ContributionAvailability {
@@ -65,6 +100,7 @@ export interface ProductExtension {
   readonly id: ExtensionId
   readonly order?: number
   readonly navigation?: readonly ProductNavigationEntry[]
+  readonly navigationGroups?: readonly ProductNavigationGroup[]
   readonly routes?: readonly ProductRouteRegistration[]
   readonly permissions?: readonly string[]
   readonly capabilities?: readonly CapabilityDeclaration[]
@@ -80,8 +116,20 @@ export interface ProductShellConfiguration {
   /** @deprecated Use identity. */
   readonly brand?: ProductBrand
   readonly defaultLocale?: string
+  readonly defaultAppearance?: AppearancePreference
   readonly featureFlags?: readonly FeatureFlag[]
   readonly capabilities?: readonly CapabilityId[]
+}
+
+export interface AppearancePreferencePort {
+  /** Loads a public preference value; persistence details remain private to the platform adapter. */
+  load(): AppearancePreference | undefined | Promise<AppearancePreference | undefined>
+  save(preference: AppearancePreference): void | Promise<void>
+}
+
+export interface SystemAppearancePort {
+  current(): ResolvedAppearance
+  subscribe?(listener: (appearance: ResolvedAppearance) => void): () => void
 }
 
 export interface LocalePreferencePort {

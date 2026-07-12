@@ -36,6 +36,23 @@ describe('default shell visual contract', () => {
     expect(productShell).toContain('@media (prefers-reduced-motion: reduce)')
   })
 
+  it('supports controlled light, dark, and system appearance without fonts or network assets', () => {
+    expect(theme).toContain("[data-appearance='dark']")
+    expect(theme).toContain("[data-appearance='system']")
+    expect(theme).toContain('@media (prefers-color-scheme: dark)')
+    expect(theme).not.toMatch(/@import|url\(/)
+    expect(productShell).toContain(':data-appearance="appearance"')
+  })
+
+  it('uses restrained midnight depth and semantic accents rather than low-contrast glass', () => {
+    expect(theme).toContain('--shell-inverse-surface: #111827')
+    expect(theme).toContain('--shell-accent-violet')
+    expect(theme).toContain('--shell-accent-teal')
+    expect(theme).toContain('--shell-accent-orange')
+    expect(productShell).toContain('background: #101725')
+    expect(productShell).not.toContain('backdrop-filter')
+  })
+
   it('defines compact, 768px, and wide navigation layouts without horizontal page overflow', () => {
     expect(productShell).toContain('overflow-x: clip')
     expect(productShell).toContain('width: min(20rem, 88vw)')

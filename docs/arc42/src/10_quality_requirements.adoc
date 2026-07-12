@@ -42,7 +42,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 |Maintainability / Accessibility
 |Reusable and accessible product shell
 |Product-neutral shell remains free of Object Storage knowledge; product extension composes deterministically and remains keyboard/responsive accessible
-|Static boundary and extension-removal tests; 72/72 Vitest and 39/39 Playwright/axe at 360/768/1440 pixels
+|Static boundary and extension-removal tests; 86/86 Vitest across 14 files; 57/57 Playwright Chromium (19 per 360/768/1440), including axe 3/3 with zero violations and visual regression 12/12
 |===
 
 === Quality Scenarios
@@ -96,14 +96,30 @@ ifndef::imagesdir[:imagesdir: ../images]
 - **Context:** An operator uses the Object Storage Admin Application or a maintainer removes/adds a Product Extension
 - **Stimulus:** Navigate by keyboard and direct URL at supported widths, or remove an extension from the product manifest
 - **Response:** Navigation and content remain accessible; removal eliminates extension routes, navigation, permissions, localization, and screens without modifying Product Shell source
-- **Metric:** 72/72 Vitest tests and 39/39 Playwright/axe tests across 360/768/1440-pixel Chromium viewports; deterministic extension-removal validation passes
+- **Metric (2026-07-12):** 86/86 Vitest tests across 14 files; 57/57 Playwright Chromium tests (19 at each 360/768/1440-pixel viewport), including axe 3/3 with zero violations and 12/12 Linux Chromium visual baselines; template and deterministic extension-removal validation, six-workspace typecheck, ESLint, and the five-package/application build pass
 
 ==== Scenario 8 — Truthful Operational Unavailability
 
 - **Context:** No real recovery, garbage-collection, scrub, audit, metrics, or traces report provider is configured
 - **Stimulus:** The Admin UI requests an operational report
-- **Response:** The Admin API returns HTTP 503 `report-provider-not-configured` with `availability: not-configured`; the UI presents an unavailable state and fabricates no records
-- **Metric:** EP-7 Admin API Cucumber executes the six provider-unavailable examples within its 18 passed scenarios / 132 steps
+- **Response:** The Admin API returns HTTP 503 `report-provider-not-configured` with `availability: not-configured`; the UI names the unavailable evidence, explains operational impact, offers only valid documentation/configuration/retry/navigation next steps, and enables no missing operation or fabricated record
+- **Metric:** EP-7 Admin API Cucumber executes the six provider-unavailable examples within its 18 passed scenarios / 132 steps; Playwright validates REQ-ADMIN-037 across all three viewports
+
+==== Scenario 9 — Task-oriented Administration UX (`REQ-ADMIN-032..036`)
+
+- **Status:** `implementation-informed`, `@implemented-and-validated`
+- **Context:** An operator assesses a degraded service, inspects backend evidence, validates a non-persistent policy proposal, or changes appearance
+- **Stimulus:** Use grouped navigation and the priority dashboard, reveal supporting backend detail, submit validation, or select `system`, `light`, or `dark`
+- **Response:** Readiness, selected backend, and attention conditions precede supporting detail; a degraded device links to its detail; navigation and quick tasks expose only valid Admin Control Plane work; collapsed detail never hides critical conditions; validation prevents duplicates and preserves truthful pending/success/failure semantics; appearance persists and system mode follows operating-system changes
+- **Metric (2026-07-12):** REQ-ADMIN-032..036 pass in the 57-test Playwright matrix and supporting Vitest suite; 12 visual baselines cover dashboard, collapsed backend attention, unavailable reports, and validation success at 360/768/1440 pixels
+
+==== Scenario 10 — Live Admin API Browser Boundary
+
+- **Status:** `implementation-informed`, bounded evidence
+- **Context:** The built browser UI is connected through transport-only routing, without JSON fixtures, to a bare single-node `bootstrap-application` Admin API on port 8081
+- **Stimulus:** Load dashboard/data-hygiene evidence
+- **Response:** The browser observes `200 /admin/health`, `200 /admin/live`, `200 /admin/backend-status`, `503 /admin/ready`, `503 /admin/storage-devices`, `503 /admin/reports/recovery`, `503 /admin/reports/garbage-collection`, and `503 /admin/reports/scrub`; the UI renders selected `in-memory`, unavailable dashboard state, and three provider-not-configured report states
+- **Limitation:** This runtime had no YAML catalogs. Configured `storage-engine` dashboard priority and degraded-device linking are deterministic browser-fixture evidence, not live evidence from this run. This scenario does not establish any missing operational provider.
 
 // The generated Gherkin requirements report is included as a top-level ARC42 appendix
 // from arc42-template.adoc (see AGENTS.md §B.7), not as a subsection of this chapter.

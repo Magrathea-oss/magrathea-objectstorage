@@ -1,4 +1,11 @@
-import type { LocalePreferencePort, LocaleRegistration } from '@magrathea/product-shell'
+import type {
+  AppearancePreference,
+  AppearancePreferencePort,
+  LocalePreferencePort,
+  LocaleRegistration,
+  ResolvedAppearance,
+  SystemAppearancePort,
+} from '@magrathea/product-shell'
 import type { Router } from 'vue-router'
 
 export interface BrowserRuntimeConfiguration {
@@ -12,6 +19,31 @@ export interface BrowserConnectivity {
 }
 
 const LOCALE_PATTERN = /^[a-z]{2,3}(?:-[A-Z][a-z]{3})?(?:-[A-Z]{2}|-\d{3})?$/
+const APPEARANCES = new Set<AppearancePreference>(['system', 'light', 'dark'])
+const DARK_SCHEME_QUERY = '(prefers-color-scheme: dark)'
+
+type StorageAccess = Pick<Storage, 'getItem' | 'setItem'>
+
+interface MatchMediaResult {
+  readonly matches: boolean
+  addEventListener?(type: 'change', listener: (event: { readonly matches: boolean }) => void): void
+  removeEventListener?(type: 'change', listener: (event: { readonly matches: boolean }) => void): void
+  addListener?(listener: (event: { readonly matches: boolean }) => void): void
+  removeListener?(listener: (event: { readonly matches: boolean }) => void): void
+}
+
+interface MatchMediaRuntime {
+  matchMedia?(query: string): MatchMediaResult
+}
+
+/** Accesses localStorage without failing startup in restricted browser contexts. */
+export function getBrowserLocalStorage(runtime: { readonly localStorage?: Storage }): Storage | undefined {
+  try {
+    return runtime.localStorage
+  } catch {
+    return undefined
+  }
+}
 
 /** Reads public endpoint configuration from the served document. Never reads credentials. */
 export function readBrowserRuntimeConfiguration(
@@ -52,13 +84,13 @@ export function createBrowserConnectivity(
 }
 
 export function createLocalStorageLocalePreference(
-  storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>,
+  storage: StorageAccess | undefined,
   key = 'magrathea.locale',
 ): LocalePreferencePort {
   return Object.freeze({
     load() {
       try {
-        const locale = storage.getItem(key)
+        const locale = storage?.getItem(key)
         return locale && LOCALE_PATTERN.test(locale) ? locale : undefined
       } catch {
         return undefined
@@ -67,11 +99,108 @@ export function createLocalStorageLocalePreference(
     save(locale: string) {
       if (!LOCALE_PATTERN.test(locale)) throw new TypeError('Locale must be a valid language tag')
       try {
-        storage.setItem(key, locale)
+        storage?.setItem(key, locale)
       } catch {
         // Persistence can be unavailable in private or policy-restricted browser contexts.
       }
     },
+  })
+}
+
+/** Persists only the public appearance enum and degrades to in-memory behavior. */
+export function createLocalStorageAppearancePreference(
+  storage: StorageAccess | undefined,
+  key = 'magrathea.appearance',
+): AppearancePreferencePort {
+  return Object.freeze({
+    load() {
+      try {
+        const preference = storage?.getItem(key)
+        return isAppearancePreference(preference) ? preference : undefined
+      } catch {
+        return undefined
+      }
+    },
+    save(preference: AppearancePreference) {
+      if (!isAppearancePreference(preference)) throw new TypeError('Appearance must be system, light, or dark')
+      try {
+        storage?.setItem(key, preference)
+      } catch {
+        // The visible selection still works when persistence is blocked or unavailable.
+      }
+    },
+  })
+}
+
+/** Adapts prefers-color-scheme without assuming matchMedia is present or usable. */
+export function createMatchMediaSystemAppearance(runtime?: MatchMediaRuntime): SystemAppearancePort {
+  let query: MatchMediaResult | undefined
+  try {
+    query = runtime?.matchMedia?.(DARK_SCHEME_QUERY)
+  } catch {
+    query = undefined
+  }
+
+  const current = (): ResolvedAppearance => {
+    try {
+      return query?.matches ? 'dark' : 'light'
+    } catch {
+      return 'light'
+    }
+  }
+
+  return Object.freeze({
+    current,
+    subscribe(listener: (appearance: ResolvedAppearance) => void) {
+      if (!query) return () => undefined
+      const notify = (event: { readonly matches: boolean }) => listener(event.matches ? 'dark' : 'light')
+      try {
+        if (query.addEventListener && query.removeEventListener) {
+          query.addEventListener('change', notify)
+          return () => query?.removeEventListener?.('change', notify)
+        }
+        if (query.addListener && query.removeListener) {
+          query.addListener(notify)
+          return () => query?.removeListener?.(notify)
+        }
+      } catch {
+        // Media-query observation is optional; retain the last safe appearance.
+      }
+      return () => undefined
+    },
+  })
+}
+
+export interface DocumentAppearanceSynchronizer {
+  apply(preference: AppearancePreference): void
+  dispose(): void
+}
+
+/** Keeps browser chrome/native controls aligned with the shell's effective appearance. */
+export function synchronizeDocumentAppearance(
+  document: Document,
+  systemAppearance: SystemAppearancePort,
+  initialPreference: AppearancePreference,
+): DocumentAppearanceSynchronizer {
+  let preference = isAppearancePreference(initialPreference) ? initialPreference : 'system'
+  const synchronize = () => {
+    const resolved = preference === 'system' ? systemAppearance.current() : preference
+    document.documentElement.dataset.appearance = preference
+    document.documentElement.dataset.resolvedAppearance = resolved
+    document.documentElement.style.colorScheme = resolved
+  }
+  const unsubscribe = systemAppearance.subscribe?.(() => {
+    if (preference === 'system') synchronize()
+  }) ?? (() => undefined)
+
+  synchronize()
+  return Object.freeze({
+    apply(next: AppearancePreference) {
+      if (!isAppearancePreference(next)) return
+      preference = next
+      synchronize()
+    },
+    dispose: unsubscribe,
   })
 }
 
@@ -121,6 +250,10 @@ export function installBrowserNavigationEffects(options: {
     }
   })
   return removeHook
+}
+
+function isAppearancePreference(value: unknown): value is AppearancePreference {
+  return typeof value === 'string' && APPEARANCES.has(value as AppearancePreference)
 }
 
 function readEndpointMeta(

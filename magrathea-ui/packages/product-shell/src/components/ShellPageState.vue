@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, useId } from 'vue'
+import ShellIcon from './ShellIcon.vue'
 import ShellSkeleton from './ShellSkeleton.vue'
 import type { RecoveryAction, StandardPageState } from '../application-state'
 
@@ -35,7 +36,7 @@ const headingId = `shell-page-state-${useId()}`
       <ShellSkeleton :label="heading || detail.heading" :lines="4" />
     </template>
     <template v-else>
-      <span class="shell-page-state__symbol" aria-hidden="true">{{ state === 'empty' ? '◇' : state === 'not-found' ? '?' : '!' }}</span>
+      <span class="shell-page-state__symbol" aria-hidden="true"><ShellIcon :name="state === 'empty' || state === 'not-found' ? 'empty' : 'error'" /></span>
       <h2 :id="headingId">{{ heading || detail.heading }}</h2>
       <p>{{ message || detail.message }}</p>
       <button v-if="detail.action !== 'none'" class="shell-button" type="button" @click="emit('recover', detail.action)">
@@ -46,9 +47,9 @@ const headingId = `shell-page-state-${useId()}`
 </template>
 
 <style>
-.shell-page-state { width: 100%; min-height: 15rem; display: grid; place-items: center; align-content: center; gap: var(--shell-space-3); padding: clamp(1.5rem, 6vw, 4rem); text-align: center; color: var(--shell-text); background: var(--shell-surface); border: 1px dashed var(--shell-border); border-radius: var(--shell-radius-lg); }
+.shell-page-state { width: 100%; min-height: 15rem; display: grid; place-items: center; align-content: center; gap: var(--shell-space-3); padding: clamp(1.5rem, 6vw, 4rem); text-align: center; color: var(--shell-text); background: var(--shell-surface); border: 1px solid var(--shell-border); border-radius: var(--shell-radius-lg); box-shadow: var(--shell-shadow); }
 .shell-page-state h2, .shell-page-state p { margin: 0; }
 .shell-page-state p { max-width: 48ch; color: var(--shell-text-muted); line-height: 1.55; }
-.shell-page-state__symbol { width: 3rem; height: 3rem; display: grid; place-items: center; color: var(--shell-brand); background: var(--shell-brand-soft); border-radius: 50%; font-size: var(--shell-text-lg); font-weight: 900; }
+.shell-page-state__symbol { width: 3rem; height: 3rem; display: grid; place-items: center; color: var(--shell-brand); background: var(--shell-brand-soft); border: 1px solid color-mix(in srgb, var(--shell-brand) 30%, var(--shell-border)); border-radius: 50%; }
 .shell-page-state--error .shell-page-state__symbol, .shell-page-state--offline .shell-page-state__symbol, .shell-page-state--unavailable .shell-page-state__symbol { color: var(--shell-danger); background: var(--shell-danger-soft); }
 </style>

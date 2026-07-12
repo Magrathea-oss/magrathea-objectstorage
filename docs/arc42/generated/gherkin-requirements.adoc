@@ -29,10 +29,10 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |Tag |Scenario count
 |`@absent` |3
 |`@config-only` |69
-|`@implemented-and-validated` |195
+|`@implemented-and-validated` |201
 |`@implemented-not-e2e-validated` |21
 |`@not-implemented` |6
-|`@partial` |10
+|`@partial` |4
 |`@placeholder` |9
 |`unknown/not-tagged` |178
 |===
@@ -4265,9 +4265,9 @@ request path, response, and audit evidence for a diagnostic request.
 |Classification |`@functional-requirement`
 |Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-ui`, `@dashboard`, `@navigation`, `@usability`
 |Validation mode tags |`@frontend-e2e-required`
-|Declared/validated status |`@partial`
+|Declared/validated status |`@implemented-and-validated`
 |Protocol smoke |`no`
-|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-032`, `@functional-requirement`, `@admin-ui`, `@dashboard`, `@navigation`, `@usability`, `@frontend-e2e-required`, `@partial`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-032`, `@functional-requirement`, `@admin-ui`, `@dashboard`, `@navigation`, `@usability`, `@frontend-e2e-required`, `@implemented-and-validated`
 |===
 
 .Gherkin steps
@@ -4296,9 +4296,9 @@ request path, response, and audit evidence for a diagnostic request.
 |Classification |`@functional-requirement`, `@non-functional-requirement`
 |Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-ui`, `@affordance`, `@configuration-as-code`, `@usability`
 |Validation mode tags |`@frontend-e2e-required`
-|Declared/validated status |`@partial`
+|Declared/validated status |`@implemented-and-validated`
 |Protocol smoke |`no`
-|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-033`, `@functional-requirement`, `@non-functional-requirement`, `@admin-ui`, `@affordance`, `@configuration-as-code`, `@usability`, `@frontend-e2e-required`, `@partial`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-033`, `@functional-requirement`, `@non-functional-requirement`, `@admin-ui`, `@affordance`, `@configuration-as-code`, `@usability`, `@frontend-e2e-required`, `@implemented-and-validated`
 |===
 
 .Gherkin steps
@@ -4327,9 +4327,9 @@ request path, response, and audit evidence for a diagnostic request.
 |Classification |`@functional-requirement`, `@non-functional-requirement`
 |Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-ui`, `@progressive-disclosure`, `@information-hierarchy`, `@usability`
 |Validation mode tags |`@frontend-e2e-required`
-|Declared/validated status |`@partial`
+|Declared/validated status |`@implemented-and-validated`
 |Protocol smoke |`no`
-|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-034`, `@functional-requirement`, `@non-functional-requirement`, `@admin-ui`, `@progressive-disclosure`, `@information-hierarchy`, `@usability`, `@frontend-e2e-required`, `@partial`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-034`, `@functional-requirement`, `@non-functional-requirement`, `@admin-ui`, `@progressive-disclosure`, `@information-hierarchy`, `@usability`, `@frontend-e2e-required`, `@implemented-and-validated`
 |===
 
 .Gherkin steps
@@ -4356,9 +4356,9 @@ request path, response, and audit evidence for a diagnostic request.
 |Classification |`@non-functional-requirement`
 |Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-ui`, `@responsive`, `@information-hierarchy`, `@visual-design`, `@accessibility`
 |Validation mode tags |`@frontend-e2e-required`, `@visual-regression-required`
-|Declared/validated status |`@partial`
+|Declared/validated status |`@implemented-and-validated`
 |Protocol smoke |`no`
-|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-035`, `@non-functional-requirement`, `@admin-ui`, `@responsive`, `@information-hierarchy`, `@visual-design`, `@accessibility`, `@frontend-e2e-required`, `@visual-regression-required`, `@partial`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-035`, `@non-functional-requirement`, `@admin-ui`, `@responsive`, `@information-hierarchy`, `@visual-design`, `@accessibility`, `@frontend-e2e-required`, `@visual-regression-required`, `@implemented-and-validated`
 |===
 
 .Gherkin steps
@@ -4395,9 +4395,9 @@ request path, response, and audit evidence for a diagnostic request.
 |Classification |`@functional-requirement`, `@non-functional-requirement`
 |Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-ui`, `@operation-feedback`, `@accessibility`
 |Validation mode tags |`@frontend-e2e-required`
-|Declared/validated status |`@partial`
+|Declared/validated status |`@implemented-and-validated`
 |Protocol smoke |`no`
-|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-036`, `@functional-requirement`, `@non-functional-requirement`, `@admin-ui`, `@operation-feedback`, `@accessibility`, `@frontend-e2e-required`, `@partial`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-036`, `@functional-requirement`, `@non-functional-requirement`, `@admin-ui`, `@operation-feedback`, `@accessibility`, `@frontend-e2e-required`, `@implemented-and-validated`
 |===
 
 .Gherkin steps
@@ -4424,9 +4424,9 @@ request path, response, and audit evidence for a diagnostic request.
 |Classification |`@functional-requirement`, `@non-functional-requirement`
 |Capability area tags |`@phase-ep7`, `@admin-control-plane`, `@business-need`, `@admin-ui`, `@unavailable-state`, `@truthful-ui`, `@usability`
 |Validation mode tags |`@frontend-e2e-required`, `@admin-api-contract-required`
-|Declared/validated status |`@partial`
+|Declared/validated status |`@implemented-and-validated`
 |Protocol smoke |`no`
-|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-037`, `@functional-requirement`, `@non-functional-requirement`, `@admin-ui`, `@unavailable-state`, `@truthful-ui`, `@usability`, `@frontend-e2e-required`, `@admin-api-contract-required`, `@partial`
+|All tags |`@requirement`, `@phase-ep7`, `@admin-control-plane`, `@business-need`, `@REQ-ADMIN-037`, `@functional-requirement`, `@non-functional-requirement`, `@admin-ui`, `@unavailable-state`, `@truthful-ui`, `@usability`, `@frontend-e2e-required`, `@admin-api-contract-required`, `@implemented-and-validated`
 |===
 
 .Gherkin steps

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
+import ShellIcon from './ShellIcon.vue'
 
 const props = withDefaults(defineProps<{
   open: boolean
@@ -52,7 +53,7 @@ function onKeydown(event: KeyboardEvent): void {
             <h2 :id="`${id}-title`">{{ title }}</h2>
             <p v-if="description" :id="`${id}-description`">{{ description }}</p>
           </div>
-          <button class="shell-dialog__close" type="button" :aria-label="closeLabel" @click="close">×</button>
+          <button class="shell-dialog__close" type="button" :aria-label="closeLabel" @click="close"><ShellIcon name="close" /></button>
         </header>
         <div class="shell-dialog__body"><slot /></div>
         <footer v-if="$slots.actions" class="shell-dialog__actions"><slot name="actions" :close="close" /></footer>
@@ -67,7 +68,7 @@ function onKeydown(event: KeyboardEvent): void {
 .shell-dialog__header { display: flex; align-items: start; justify-content: space-between; gap: var(--shell-space-4); padding: var(--shell-space-5); border-bottom: 1px solid var(--shell-border); }
 .shell-dialog__header h2 { margin: 0; font-size: var(--shell-text-lg); }
 .shell-dialog__header p { margin: var(--shell-space-2) 0 0; color: var(--shell-text-muted); line-height: 1.5; }
-.shell-dialog__close { width: 2.75rem; height: 2.75rem; flex: none; color: var(--shell-text); background: transparent; border: 1px solid transparent; border-radius: 50%; cursor: pointer; font-size: 1.7rem; line-height: 1; }
+.shell-dialog__close { width: 2.75rem; height: 2.75rem; display: grid; place-items: center; flex: none; color: var(--shell-text); background: transparent; border: 1px solid transparent; border-radius: 50%; cursor: pointer; }
 .shell-dialog__close:hover { background: var(--shell-surface-canvas); }
 .shell-dialog__body { padding: var(--shell-space-5); }
 .shell-dialog__actions { display: flex; flex-wrap: wrap; justify-content: end; gap: var(--shell-space-3); padding: var(--shell-space-4) var(--shell-space-5); background: var(--shell-surface-canvas); border-top: 1px solid var(--shell-border); }

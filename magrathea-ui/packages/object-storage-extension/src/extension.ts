@@ -2,16 +2,16 @@ import type { ProductExtension } from '@magrathea/product-shell'
 import AdminPage from './AdminPage.vue'
 
 const pages = [
-  ['dashboard', '/admin', 'objectStorage.nav.dashboard', 'dashboard'],
-  ['backend', '/admin/backend-status', 'objectStorage.nav.backend', 'backend'],
-  ['policies', '/admin/storage-policies', 'objectStorage.nav.policies', 'policies'],
-  ['policy-validation', '/admin/storage-policies/validate', 'objectStorage.nav.validatePolicy', 'policy-validation'],
-  ['devices', '/admin/storage-devices', 'objectStorage.nav.devices', 'devices'],
-  ['disk-sets', '/admin/disk-sets', 'objectStorage.nav.diskSets', 'disk-sets'],
-  ['capacity', '/admin/capacity', 'objectStorage.nav.capacity', 'capacity'],
-  ['data-hygiene', '/admin/data-hygiene', 'objectStorage.nav.dataHygiene', 'data-hygiene'],
-  ['observability', '/admin/observability', 'objectStorage.nav.observability', 'observability'],
-  ['diagnostics', '/admin/s3-diagnostics', 'objectStorage.nav.diagnostics', 'diagnostics'],
+  ['dashboard', '/admin', 'objectStorage.nav.dashboard', 'dashboard', 'health', 'overview'],
+  ['backend', '/admin/backend-status', 'objectStorage.nav.backend', 'backend', 'health', 'gauge'],
+  ['data-hygiene', '/admin/data-hygiene', 'objectStorage.nav.dataHygiene', 'data-hygiene', 'health', 'operations'],
+  ['observability', '/admin/observability', 'objectStorage.nav.observability', 'observability', 'health', 'activity'],
+  ['policies', '/admin/storage-policies', 'objectStorage.nav.policies', 'policies', 'storage', 'layers'],
+  ['devices', '/admin/storage-devices', 'objectStorage.nav.devices', 'devices', 'storage', 'gauge'],
+  ['disk-sets', '/admin/disk-sets', 'objectStorage.nav.diskSets', 'disk-sets', 'storage', 'layers'],
+  ['policy-validation', '/admin/storage-policies/validate', 'objectStorage.nav.validatePolicy', 'policy-validation', 'configuration', 'checklist'],
+  ['capacity', '/admin/capacity', 'objectStorage.nav.capacity', 'capacity', 'configuration', 'settings'],
+  ['diagnostics', '/admin/s3-diagnostics', 'objectStorage.nav.diagnostics', 'diagnostics', 'configuration', 'operations'],
 ] as const
 
 const messages = {
@@ -20,6 +20,22 @@ const messages = {
     validatePolicy: 'Validate policy', devices: 'Storage devices', diskSets: 'Disk-set topology',
     capacity: 'Bucket capacity', dataHygiene: 'Data hygiene', observability: 'Observability',
     diagnostics: 'S3 diagnostics', documentation: 'Documentation',
+    groups: { health: 'Assess service health', storage: 'Inspect storage', configuration: 'Administer configuration' },
+    groupDescriptions: {
+      health: 'Prioritize readiness and provider-backed operational evidence.',
+      storage: 'Review read-only catalogs, devices, and failure domains.',
+      configuration: 'Validate policy, manage quota, and run bounded diagnostics.',
+    },
+    descriptions: {
+      dashboard: 'Readiness, selected backend, and tasks requiring attention.', backend: 'Runtime selection and supporting technical evidence.',
+      policies: 'Read-only configuration-as-code catalog.', validatePolicy: 'Check a proposal without persisting it.',
+      devices: 'Device health, capacity, and eligibility.', diskSets: 'Read-only failure-domain membership.',
+      'disk-sets': 'Read-only failure-domain membership.',
+      capacity: 'Admin Control Plane quota accounting.', dataHygiene: 'Recovery, garbage-collection, and scrub evidence.',
+      'data-hygiene': 'Recovery, garbage-collection, and scrub evidence.',
+      observability: 'Audit, metrics, and trace provider evidence.', diagnostics: 'A bounded S3 HeadObject diagnostic.',
+      documentation: 'Product, operations, and API guidance.',
+    },
   },
 }
 
@@ -30,7 +46,16 @@ export function createObjectStorageExtension(): ProductExtension {
     id: 'object-storage',
     order: 10,
     capabilities: [{ id: 'object-storage-admin', description: 'Object Storage Admin Control Plane' }],
-    navigation: pages.map(([id, route, labelKey], order) => ({ id, route, labelKey, order })),
+    navigationGroups: [
+      { id: 'health', labelKey: 'objectStorage.nav.groups.health', descriptionKey: 'objectStorage.nav.groupDescriptions.health', icon: 'activity', order: 10 },
+      { id: 'storage', labelKey: 'objectStorage.nav.groups.storage', descriptionKey: 'objectStorage.nav.groupDescriptions.storage', icon: 'layers', order: 20 },
+      { id: 'configuration', labelKey: 'objectStorage.nav.groups.configuration', descriptionKey: 'objectStorage.nav.groupDescriptions.configuration', icon: 'settings', order: 30 },
+    ],
+    navigation: pages.map(([id, route, labelKey, , groupId, icon], order) => ({
+      id, route, labelKey, groupId, icon,
+      descriptionKey: `objectStorage.nav.descriptions.${id === 'policy-validation' ? 'validatePolicy' : id}`,
+      order,
+    })),
     routes: [
       ...pages.map(([id, path, , kind], order) => ({
         id,

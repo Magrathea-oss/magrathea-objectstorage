@@ -71,12 +71,30 @@ describe('deployable Object Storage Admin application', () => {
     expect(wrapper.get('main h1').text()).toBe(resource)
     expect(wrapper.text()).toContain(fixture)
     expect(wrapper.get('a[href="#main-content"]').text()).toContain('Skip')
-    expect(wrapper.get('nav[aria-label="Primary navigation"] a[aria-current="page"]').text()).toBe(current)
+    expect(wrapper.get('nav[aria-label="Primary navigation"] a[aria-current="page"] .product-shell__nav-label').text()).toBe(current)
 
     const breadcrumb = wrapper.get('nav[aria-label="Breadcrumb"]')
     expect(breadcrumb.get('a[href="/admin"]').text()).toBe('Dashboard')
     expect(breadcrumb.get(`a[href="${collectionPath}"]`).text()).toBe(collection)
     expect(breadcrumb.get('[aria-current="page"]').text()).toBe(resource)
+  })
+
+  it('binds task-grouped extension navigation and delegates appearance preference persistence', async () => {
+    const saveAppearance = vi.fn()
+    const { wrapper } = await mountApplication('/admin/storage-policies/minio-standard', {
+      initialAppearance: 'system', appearancePreference: { save: saveAppearance },
+    })
+
+    const groupHeadings = wrapper.findAll('.product-shell__nav-section-heading h2').map((heading) => heading.text())
+    expect(groupHeadings).toEqual(['Assess service health', 'Inspect storage', 'Administer configuration'])
+    expect(wrapper.text()).toContain('Prioritize readiness and provider-backed operational evidence.')
+    expect(wrapper.text()).toContain('Check a proposal without persisting it.')
+    expect(wrapper.get('a[href="/admin/docs"] .product-shell__nav-label').text()).toBe('Documentation')
+
+    await wrapper.get('select[aria-label="Appearance"]').setValue('dark')
+    await flushPromises()
+    expect(saveAppearance).toHaveBeenCalledWith('dark')
+    expect(wrapper.get('.product-shell').attributes('data-appearance')).toBe('dark')
   })
 
   it('persists a locale change without losing the copied deep link and reports English page-title fallback', async () => {
@@ -97,8 +115,8 @@ describe('deployable Object Storage Admin application', () => {
     expect(onEnglishFallback).toHaveBeenCalledWith(expect.objectContaining({
       locale: 'de', fallbackLocale: 'en', key: 'pages.policy-detail.title', outcome: 'fallback',
     }))
-    expect(wrapper.get('select').attributes('aria-label')).toBe('Sprache')
-    expect(wrapper.get('select').element.value).toBe('de')
+    expect(wrapper.get('select[aria-label="Sprache"]').attributes('aria-label')).toBe('Sprache')
+    expect(wrapper.get('select[aria-label="Sprache"]').element.value).toBe('de')
     expect(wrapper.get('main h1').text()).toBe('minio-standard')
     expect(adminClient.getPolicy).toHaveBeenCalledWith('minio-standard')
     expect(router.currentRoute.value.fullPath).toBe('/admin/storage-policies/minio-standard')
@@ -112,7 +130,7 @@ describe('deployable Object Storage Admin application', () => {
     await router.push('/admin/storage-devices/node-1-disk-0')
     await flushPromises()
     expect(document.title).toBe('Storage device: node-1-disk-0 — Magrathea Object Storage')
-    expect(wrapper.get('nav[aria-label="Primary navigation"] a[aria-current="page"]').text()).toBe('Storage devices')
+    expect(wrapper.get('nav[aria-label="Primary navigation"] a[aria-current="page"] .product-shell__nav-label').text()).toBe('Storage devices')
     const deviceBreadcrumb = wrapper.get('nav[aria-label="Breadcrumb"]')
     expect(deviceBreadcrumb.get('a[href="/admin/storage-devices"]').text()).toBe('Storage devices')
     expect(deviceBreadcrumb.get('[aria-current="page"]').text()).toBe('node-1-disk-0')
@@ -120,7 +138,7 @@ describe('deployable Object Storage Admin application', () => {
     await router.push('/admin/disk-sets/rack-a')
     await flushPromises()
     expect(document.title).toBe('Disk set: rack-a — Magrathea Object Storage')
-    expect(wrapper.get('nav[aria-label="Primary navigation"] a[aria-current="page"]').text()).toBe('Disk-set topology')
+    expect(wrapper.get('nav[aria-label="Primary navigation"] a[aria-current="page"] .product-shell__nav-label').text()).toBe('Disk-set topology')
 
     router.back()
     await new Promise((resolve) => setTimeout(resolve, 0))
@@ -167,7 +185,7 @@ describe('deployable Object Storage Admin application', () => {
     expect(wrapper.get('main h1').text()).toBe('minio-standard')
     expect(wrapper.text()).toContain('MINIO_STANDARD')
     expect(wrapper.get('a[href="#main-content"]').text()).toContain('Skip')
-    expect(wrapper.get('nav[aria-label="Primary navigation"] a[aria-current="page"]').text()).toBe('Storage policies')
+    expect(wrapper.get('nav[aria-label="Primary navigation"] a[aria-current="page"] .product-shell__nav-label').text()).toBe('Storage policies')
 
     const breadcrumb = wrapper.get('nav[aria-label="Breadcrumb"]')
     expect(breadcrumb.get('a[href="/admin"]').text()).toBe('Dashboard')

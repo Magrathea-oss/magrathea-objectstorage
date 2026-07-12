@@ -14,11 +14,15 @@ import {
   applyDocumentLocale,
   applyDocumentTitle,
   createBrowserConnectivity,
+  createLocalStorageAppearancePreference,
   createLocalStorageLocalePreference,
+  createMatchMediaSystemAppearance,
+  getBrowserLocalStorage,
   installBrowserNavigationEffects,
   readBrowserRuntimeConfiguration,
+  synchronizeDocumentAppearance,
 } from './browser-adapters'
-import { resolveInitialLocale } from '@magrathea/product-shell'
+import { loadAppearancePreference, resolveInitialLocale } from '@magrathea/product-shell'
 import '@magrathea/product-shell/theme.css'
 import '@magrathea/object-storage-extension/style.css'
 import './style.css'
@@ -26,7 +30,10 @@ import './style.css'
 async function start() {
   const runtime = readBrowserRuntimeConfiguration(document, window.location)
   const connectivity = createBrowserConnectivity(window, navigator)
-  const localePreference = createLocalStorageLocalePreference(window.localStorage)
+  const storage = getBrowserLocalStorage(window)
+  const localePreference = createLocalStorageLocalePreference(storage)
+  const appearancePreference = createLocalStorageAppearancePreference(storage)
+  const systemAppearance = createMatchMediaSystemAppearance(window)
   const localeSelection = await resolveInitialLocale({
     registrations: supportedLocales,
     defaultLocale: normalizeBrowserLocale(navigator.language),
@@ -38,6 +45,8 @@ async function start() {
       ),
     },
   })
+  const initialAppearance = await loadAppearancePreference(appearancePreference)
+  const documentAppearance = synchronizeDocumentAppearance(document, systemAppearance, initialAppearance)
   i18n.global.locale.value = localeSelection.locale
   applyDocumentLocale(document, localeSelection)
 
@@ -51,8 +60,11 @@ async function start() {
   )
   const app = createApp(App, {
     initialLocale: localeSelection.locale,
+    initialAppearance,
     localePreference,
+    appearancePreference,
     onLocaleApplied: applyLocale,
+    onAppearanceApplied: documentAppearance.apply,
     onPageTitleChange: (pageTitle) => applyDocumentTitle(document, pageTitle, 'Magrathea Object Storage'),
     onEnglishFallback: reportEnglishFallback,
   })

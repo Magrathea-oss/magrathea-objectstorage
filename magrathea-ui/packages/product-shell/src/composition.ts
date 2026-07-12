@@ -5,6 +5,7 @@ import type {
   LocalizationBundle,
   ProductExtension,
   ProductNavigationEntry,
+  ProductNavigationGroup,
   ProductRouteRegistration,
 } from './contracts'
 import { shellEnglishBundle } from './localization'
@@ -31,6 +32,7 @@ export interface ComposedExtension {
   readonly id: string
   readonly order: number
   readonly navigation: readonly ProductNavigationEntry[]
+  readonly navigationGroups: readonly ProductNavigationGroup[]
   readonly routes: readonly ProductRouteRegistration[]
   readonly permissions: readonly string[]
   readonly capabilities: readonly CapabilityDeclaration[]
@@ -40,6 +42,7 @@ export interface ComposedExtension {
 export interface ProductComposition {
   readonly extensions: readonly ComposedExtension[]
   readonly navigation: readonly ProductNavigationEntry[]
+  readonly navigationGroups: readonly ProductNavigationGroup[]
   readonly routes: readonly ProductRouteRegistration[]
   readonly permissions: readonly string[]
   readonly capabilities: readonly CapabilityDeclaration[]
@@ -116,6 +119,9 @@ function readExtension(
   const navigation = [...(extension.navigation ?? [])]
     .filter((entry) => isAvailable(entry, enabledFlags, availableCapabilities))
     .sort(compareContributions)
+  const navigationGroups = [...(extension.navigationGroups ?? [])]
+    .filter((group) => isAvailable(group, enabledFlags, availableCapabilities))
+    .sort(compareContributions)
   const routes = [...(extension.routes ?? [])]
     .filter((entry) => isAvailable(entry, enabledFlags, availableCapabilities))
     .sort(compareContributions)
@@ -126,12 +132,18 @@ function readExtension(
   )
 
   assertUnique(navigation.map((entry) => entry.id), 'navigation id')
+  assertUnique(navigationGroups.map((group) => group.id), 'navigation group id')
   assertUnique(routes.map((entry) => entry.id), 'route id')
   assertUnique(declaredCapabilities.map((entry) => entry.id), 'capability id')
   assertUnique(localization.map((entry) => `${entry.locale}:${entry.namespace}`), 'localization bundle')
+  const navigationGroupIds = new Set(navigationGroups.map((group) => group.id))
+  for (const group of navigationGroups) assertIdentifier(group.id, 'navigation group id')
   for (const entry of navigation) {
     assertIdentifier(entry.id, 'navigation id')
     if (!entry.route.startsWith('/')) throw new Error(`Navigation route must be absolute: ${entry.route}`)
+    if (entry.groupId && !navigationGroupIds.has(entry.groupId)) {
+      throw new Error(`Unknown navigation group ${entry.groupId} for navigation entry: ${entry.id}`)
+    }
   }
   for (const entry of routes) {
     assertIdentifier(entry.id, 'route id')
@@ -147,6 +159,7 @@ function readExtension(
     id: extension.id,
     order: extension.order ?? 0,
     navigation: Object.freeze(navigation),
+    navigationGroups: Object.freeze(navigationGroups),
     routes: Object.freeze(routes),
     permissions: Object.freeze(permissions),
     capabilities: Object.freeze(declaredCapabilities),
@@ -156,6 +169,7 @@ function readExtension(
 
 function assertNoConflicts(candidate: ComposedExtension, healthy: readonly ComposedExtension[]): void {
   const navigationIds = new Set(healthy.flatMap((item) => item.navigation.map((entry) => entry.id)))
+  const navigationGroupIds = new Set(healthy.flatMap((item) => item.navigationGroups.map((group) => group.id)))
   const routeIds = new Set(healthy.flatMap((item) => item.routes.map((entry) => entry.id)))
   const routePaths = new Set(healthy.flatMap((item) => item.routes.map((entry) => entry.route.path)))
   const routeNames = new Set(healthy.flatMap((item) => item.routes.map((entry) => entry.route.name)).filter(Boolean))
@@ -164,6 +178,9 @@ function assertNoConflicts(candidate: ComposedExtension, healthy: readonly Compo
   )
   for (const entry of candidate.navigation) {
     if (navigationIds.has(entry.id)) throw new Error(`Duplicate navigation id: ${entry.id}`)
+  }
+  for (const group of candidate.navigationGroups) {
+    if (navigationGroupIds.has(group.id)) throw new Error(`Duplicate navigation group id: ${group.id}`)
   }
   for (const entry of candidate.routes) {
     if (routeIds.has(entry.id)) throw new Error(`Duplicate route id: ${entry.id}`)
@@ -195,6 +212,9 @@ function createSnapshot(
   return Object.freeze({
     extensions: Object.freeze(extensions),
     navigation: Object.freeze(extensions.flatMap((extension) => extension.navigation).sort(compareContributions)),
+    navigationGroups: Object.freeze(
+      extensions.flatMap((extension) => extension.navigationGroups).sort(compareContributions),
+    ),
     routes: Object.freeze(extensions.flatMap((extension) => extension.routes).sort(compareContributions)),
     permissions: Object.freeze([...new Set(extensions.flatMap((extension) => extension.permissions))].sort()),
     capabilities: Object.freeze(extensions.flatMap((extension) => extension.capabilities)),

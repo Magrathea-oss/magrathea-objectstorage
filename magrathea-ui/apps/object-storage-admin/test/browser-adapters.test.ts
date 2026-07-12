@@ -5,9 +5,13 @@ import {
   applyDocumentLocale,
   applyDocumentTitle,
   createBrowserConnectivity,
+  createLocalStorageAppearancePreference,
   createLocalStorageLocalePreference,
+  createMatchMediaSystemAppearance,
+  getBrowserLocalStorage,
   installBrowserNavigationEffects,
   readBrowserRuntimeConfiguration,
+  synchronizeDocumentAppearance,
 } from '../src/browser-adapters'
 
 describe('Object Storage Admin browser adapters', () => {
@@ -46,6 +50,72 @@ describe('Object Storage Admin browser adapters', () => {
     })
     expect(unavailable.load()).toBeUndefined()
     expect(() => unavailable.save('en')).not.toThrow()
+  })
+
+  it('persists only a validated appearance enum and safely handles blocked storage access', () => {
+    const values = new Map<string, string>()
+    const preference = createLocalStorageAppearancePreference({
+      getItem: (key) => values.get(key) ?? null,
+      setItem: (key, value) => { values.set(key, value) },
+    })
+
+    preference.save('dark')
+    expect(preference.load()).toBe('dark')
+    expect(values).toEqual(new Map([['magrathea.appearance', 'dark']]))
+    expect(() => preference.save('secret-token' as never)).toThrow(/system, light, or dark/)
+
+    const restrictedRuntime = Object.defineProperty({}, 'localStorage', {
+      get: () => { throw new DOMException('blocked') },
+    })
+    expect(getBrowserLocalStorage(restrictedRuntime)).toBeUndefined()
+    const unavailable = createLocalStorageAppearancePreference(undefined)
+    expect(unavailable.load()).toBeUndefined()
+    expect(() => unavailable.save('light')).not.toThrow()
+  })
+
+  it('synchronizes document appearance and follows system changes only in system mode', () => {
+    let dark = true
+    let listener: ((event: { matches: boolean }) => void) | undefined
+    const systemAppearance = createMatchMediaSystemAppearance({
+      matchMedia: (query) => {
+        expect(query).toBe('(prefers-color-scheme: dark)')
+        return {
+          get matches() { return dark },
+          addEventListener: (_type, next) => { listener = next },
+          removeEventListener: (_type, next) => { if (listener === next) listener = undefined },
+        }
+      },
+    })
+    const synchronization = synchronizeDocumentAppearance(document, systemAppearance, 'system')
+
+    expect(document.documentElement.dataset.appearance).toBe('system')
+    expect(document.documentElement.dataset.resolvedAppearance).toBe('dark')
+    expect(document.documentElement.style.colorScheme).toBe('dark')
+
+    dark = false
+    listener?.({ matches: false })
+    expect(document.documentElement.dataset.resolvedAppearance).toBe('light')
+
+    synchronization.apply('dark')
+    listener?.({ matches: false })
+    expect(document.documentElement.dataset.appearance).toBe('dark')
+    expect(document.documentElement.dataset.resolvedAppearance).toBe('dark')
+
+    synchronization.dispose()
+    expect(listener).toBeUndefined()
+  })
+
+  it('falls back to light when media queries are missing or throw', () => {
+    const missing = createMatchMediaSystemAppearance()
+    expect(missing.current()).toBe('light')
+    const unsubscribe = missing.subscribe?.(vi.fn())
+    expect(() => unsubscribe?.()).not.toThrow()
+
+    const blocked = createMatchMediaSystemAppearance({
+      matchMedia: () => { throw new DOMException('blocked') },
+    })
+    expect(blocked.current()).toBe('light')
+    expect(() => synchronizeDocumentAppearance(document, blocked, 'system')).not.toThrow()
   })
 
   it('applies registered document language metadata and a safe product title', () => {
