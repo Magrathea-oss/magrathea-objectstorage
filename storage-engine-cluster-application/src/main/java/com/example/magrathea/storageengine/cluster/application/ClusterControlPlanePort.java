@@ -18,4 +18,45 @@ public interface ClusterControlPlanePort {
     Mono<ObjectReferenceGeneration> compareAndPublish(PublicationProposal proposal);
 
     Mono<ObjectReferenceGeneration> objectReference(String bucket, String objectKey);
+
+    /** Ensures one canonical job after consensus validates the exact current reference and target. */
+    default Mono<RepairCommandResult> ensureRepair(RepairCommands.Ensure command) {
+        return Mono.error(new UnsupportedOperationException("repair control is not implemented"));
+    }
+
+    default Mono<RepairJob> repairJob(RepairJobId jobId) {
+        return Mono.error(new UnsupportedOperationException("repair control is not implemented"));
+    }
+
+    default Flux<RepairJob> repairJobs(RepairJobQuery query) {
+        return Flux.error(new UnsupportedOperationException("repair control is not implemented"));
+    }
+
+    default Mono<RepairCommandResult> claimRepair(RepairCommands.Claim command) {
+        return Mono.error(new UnsupportedOperationException("repair control is not implemented"));
+    }
+
+    default Mono<RepairCommandResult> renewRepair(RepairCommands.Renew command) {
+        return Mono.error(new UnsupportedOperationException("repair control is not implemented"));
+    }
+
+    default Mono<RepairCommandResult> retryRepair(RepairCommands.Retry command) {
+        return Mono.error(new UnsupportedOperationException("repair control is not implemented"));
+    }
+
+    default Mono<RepairCommandResult> blockRepair(RepairCommands.Block command) {
+        return Mono.error(new UnsupportedOperationException("repair control is not implemented"));
+    }
+
+    default Mono<RepairCommandResult> succeedRepair(RepairCommands.Succeed command) {
+        return Mono.error(new UnsupportedOperationException("repair control is not implemented"));
+    }
+
+    default Mono<RepairCommandResult> obsoleteRepair(RepairCommands.Obsolete command) {
+        return Mono.error(new UnsupportedOperationException("repair control is not implemented"));
+    }
+
+    default Mono<RepairCommandResult> reevaluateRepair(RepairCommands.Reevaluate command) {
+        return Mono.error(new UnsupportedOperationException("repair control is not implemented"));
+    }
 }

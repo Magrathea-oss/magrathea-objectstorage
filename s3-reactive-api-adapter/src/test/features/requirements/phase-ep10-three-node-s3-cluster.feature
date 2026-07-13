@@ -9,7 +9,10 @@ Business Need: Preserve S3 bucket and whole-object behavior across one node loss
   through glue, profiles, tags, and validation adapters. Internal root, Ratis, and replica inspection is
   supplementary evidence and cannot replace S3 CreateBucket, PutObject, and GetObject outcomes. The
   implemented-and-validated status applies only to this fixed first slice; it does not claim completion of
-  broader EP-10 transfer, lifecycle, or compatibility capabilities.
+  broader EP-10 transfer, lifecycle, or compatibility capabilities. REQ-CLUSTER-019 and REQ-CLUSTER-020
+  cover bounded current-generation whole-object repair and are implemented and validated through both
+  real-process WebTestClient and AWS CLI modes. They do not authorize orphan cleanup, rebalance, periodic
+  anti-entropy, dynamic membership, or erasure coding.
 
   The first-slice object fixture is the repository file
   "s3-reactive-api-adapter/src/test/resources/fixtures/upload/large-object.bin": it is 134 bytes,
@@ -153,6 +156,76 @@ Business Need: Preserve S3 bucket and whole-object behavior across one node loss
       Examples: Multi-node AWS CLI restart validation
         | validation_mode              |
         | multi-node-aws-cli-restart   |
+
+  Rule: A missing promised local replica is repaired before its bytes become the response
+
+    @REQ-CLUSTER-019 @functional-requirement @non-functional-requirement @repair @durability @integrity @availability @consistency @single-pass-get @webclient-required @awscli-required @implemented-and-validated
+    Scenario Outline: GET through B durably restores its missing current-generation replica before source C stops
+      Given validation mode "<validation_mode>" is selected for requirement "REQ-CLUSTER-019"
+      And clean fixed cluster nodes A, B, and C run with the declared UUIDs, ports, roots, and three-voter bootstrap manifest
+      And fixture "s3-reactive-api-adapter/src/test/resources/fixtures/upload/large-object.bin" has length 134, SHA-256 "46918899a9ddbe1d1c2f1613416501b3e8d7cdbc2a63a78298d0cc3ee388e800", and MD5/ETag "1ae14a405348c337d00821e272868e71"
+      And current consensus-committed reference generation 7 for bucket "ep10-repair-archive" and key "evidence/2026/current-generation-repair.bin" names immutable whole-object artifact "whole-7f351d76-50d8-4f48-9b86-6f94e777a101" on B and C with those exact facts
+      And "target/ep10/three-node/node-c/objects/whole-7f351d76-50d8-4f48-9b86-6f94e777a101.artifact" contains the checksum-valid fixture
+      But promised path "target/ep10/three-node/node-b/objects/whole-7f351d76-50d8-4f48-9b86-6f94e777a101.artifact" is missing before response streaming starts
+      When the S3 client sends GetObject for that bucket and key to node B
+      Then B consensus-commits one deduplicated repair job bound to generation 7, that artifact, and target UUID "22222222-2222-4222-8222-222222222222"
+      And a current fenced claim owns the direct fetch from the different named source C
+      And B completely verifies length 134 and SHA-256 "46918899a9ddbe1d1c2f1613416501b3e8d7cdbc2a63a78298d0cc3ee388e800" before atomically publishing the target with file and parent-directory fsync
+      And unverified or partially transferred bytes are never published or returned
+      And after durable publication B opens the repaired local artifact once for the response while calculating length and checksum incrementally
+      And B does not completely preflight-read a local payload and then open it a second time for the response
+      And the response body is byte-for-byte equal to the fixture with length 134, SHA-256 "46918899a9ddbe1d1c2f1613416501b3e8d7cdbc2a63a78298d0cc3ee388e800", and ETag "1ae14a405348c337d00821e272868e71"
+      And current-token completion is consensus committed as "SUCCEEDED" without changing reference generation 7 or its replica set
+      When source node C stops and nodes A and B retain control quorum
+      And the S3 client sends a later GetObject for the same bucket and key to node B
+      Then the later response again returns the exact fixture facts and ETag from B's durable repaired path
+      And no remote replica read or unavailable source C is needed for the later response
+
+      @webclient
+      Examples: Multi-node WebTestClient repair validation
+        | validation_mode          |
+        | multi-node-webtestclient |
+
+      @awscli
+      Examples: Multi-node AWS CLI repair validation
+        | validation_mode     |
+        | multi-node-aws-cli  |
+
+  Rule: Corruption discovered during the one response pass fails now and repairs only a later GET
+
+    @REQ-CLUSTER-020 @functional-requirement @non-functional-requirement @repair @durability @integrity @consistency @single-pass-get @failure-handling @webclient-required @awscli-required @implemented-and-validated
+    Scenario Outline: GET through B reports streamed corruption and succeeds only after durable repair
+      Given validation mode "<validation_mode>" is selected for requirement "REQ-CLUSTER-020"
+      And clean fixed cluster nodes A, B, and C run with the declared UUIDs, ports, roots, and three-voter bootstrap manifest
+      And fixture "s3-reactive-api-adapter/src/test/resources/fixtures/upload/large-object.bin" has length 134, SHA-256 "46918899a9ddbe1d1c2f1613416501b3e8d7cdbc2a63a78298d0cc3ee388e800", and MD5/ETag "1ae14a405348c337d00821e272868e71"
+      And current consensus-committed reference generation 8 for bucket "ep10-repair-archive" and key "evidence/2026/corrupt-current-generation.bin" names immutable whole-object artifact "whole-a26f054a-b8c4-48ba-8107-e2140e964202" on B and C with those exact facts
+      And "target/ep10/three-node/node-c/objects/whole-a26f054a-b8c4-48ba-8107-e2140e964202.artifact" contains the checksum-valid fixture
+      But the last byte at "target/ep10/three-node/node-b/objects/whole-a26f054a-b8c4-48ba-8107-e2140e964202.artifact" is changed from 0x0a to 0xf5, preserving length 134 but producing SHA-256 "92fdf1bf738ce40121046269e4db13013e3085208e16de8fce93385cde231180"
+      And the repair worker is paused before it can claim newly ensured work
+      When the S3 client sends GetObject for that bucket and key to node B
+      Then B opens the present local payload once and calculates length and SHA-256 incrementally during that response pass
+      And B does not completely preflight-read the payload and then open it a second time
+      And the checksum mismatch terminates the current GET as an integrity failure even if response bytes or the expected ETag were already emitted
+      And neither validation mode reports a successful 134-byte object or retains corrupt output as a successful download
+      And B does not transparently retry source C for the already-started response
+      And one repair job for generation 8, that artifact, and target B is durably consensus committed before repair is reported as scheduled
+      And no GET is reported as successful merely because that repair job is "READY"
+      When the repair worker claims that job and durably replaces B's corrupt path from a completely verified named replica on C
+      And current-token completion is consensus committed as "SUCCEEDED"
+      And the S3 client sends a later GetObject for the same bucket and key to node B
+      Then the later response, and not the corrupt request, is the first successful GET after detection
+      And its body is byte-for-byte equal to the fixture with length 134, SHA-256 "46918899a9ddbe1d1c2f1613416501b3e8d7cdbc2a63a78298d0cc3ee388e800", and ETag "1ae14a405348c337d00821e272868e71"
+      And reference generation 8 and its named replica set remain unchanged
+
+      @webclient
+      Examples: Multi-node WebTestClient corruption-repair validation
+        | validation_mode          |
+        | multi-node-webtestclient |
+
+      @awscli
+      Examples: Multi-node AWS CLI corruption-repair validation
+        | validation_mode     |
+        | multi-node-aws-cli  |
 
   Rule: Broader S3 transfer semantics remain explicit backlog
 

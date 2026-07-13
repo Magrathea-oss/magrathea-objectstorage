@@ -6,8 +6,33 @@ import java.nio.ByteBuffer;
 /** Local immutable-artifact boundary used by data-plane infrastructure, independent of gRPC. */
 public interface LocalArtifactPort {
     Source openPublished(String artifactId) throws IOException;
+    boolean publishedExists(String artifactId);
+    ArtifactProbe probePublished(String artifactId, long expectedLength, String expectedSha256)
+            throws IOException;
     Sink beginUnpublished(TransferRequest request) throws IOException;
+    RepairSink beginRepair(TransferRequest request, RepairToken token) throws IOException;
     IncomingSink beginIncoming(String operationId, String artifactId) throws IOException;
+
+    record RepairToken(RepairJobId jobId, long claimGeneration) {
+        public RepairToken {
+            if (jobId == null) throw new IllegalArgumentException("repair job ID is required");
+            if (claimGeneration < 1) {
+                throw new IllegalArgumentException("claim generation must be positive");
+            }
+        }
+    }
+
+    record ArtifactProbe(Status status, long actualLength, String actualSha256) {
+        public enum Status { MISSING, EXACT, INVALID }
+
+        public ArtifactProbe {
+            if (status == null) throw new IllegalArgumentException("probe status is required");
+            if (actualLength < -1) throw new IllegalArgumentException("actual length is invalid");
+            actualSha256 = actualSha256 == null ? "" : actualSha256;
+        }
+
+        public boolean exact() { return status == Status.EXACT; }
+    }
 
     interface Source extends AutoCloseable {
         int read(ByteBuffer target) throws IOException;
@@ -34,6 +59,15 @@ public interface LocalArtifactPort {
     interface Sink extends AutoCloseable {
         void accept(long offset, ByteBuffer bytes) throws IOException;
         TransferResult publish() throws IOException;
+        void abort();
+        @Override void close() throws IOException;
+    }
+
+    /** Token-specific repair staging; verification and durable replacement are separate fences. */
+    interface RepairSink extends AutoCloseable {
+        void accept(long offset, ByteBuffer bytes) throws IOException;
+        TransferResult verify() throws IOException;
+        TransferResult publishVerified() throws IOException;
         void abort();
         @Override void close() throws IOException;
     }

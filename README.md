@@ -6,7 +6,7 @@
 
 **Magrathea ObjectStore** is an AWS S3-compatible object store built with Spring Boot 4 WebFlux and Java 21. The public object API is the S3 REST API exposed by the pluggable `s3-reactive-api-adapter` module. In addition, `admin-api-adapter` exposes `/admin/**` endpoints for storage policy, device, and configuration management — these are internal/administrative APIs, separate from the S3 object API.
 
-> **Current cluster status:** EP-10 is **partial**. Its implemented-and-validated scope is the fixed A/B/C whole-object `N=3/W=2` slice with consensus publication, failover, and complete restart (`REQ-CLUSTER-001..005`, `008..013`). Multipart/conditional/versioned/EC transfer, dynamic membership, healing/rebalance, and broader partitions remain absent; no production-readiness or general distributed-support claim is made.
+> **Current cluster status:** EP-10 is **partial**. Fixed A/B/C consensus publication/failover and bounded current-generation whole-object repair are implemented and validated for `REQ-CLUSTER-001..005`, `008..013`, `019/020/021/022/023/025/026`. `REQ-CLUSTER-014`, broad healing `017`, and crash matrix `024` remain partial; the full seven-point real-filesystem/gRPC repair crash matrix, broad periodic anti-entropy, rebalance, orphan cleanup, multipart/conditional/versioned/EC transfer, dynamic membership, and broader partitions remain absent or unvalidated. No production-readiness or general distributed-support claim is made.
 
 **Architecture:** [ARC42 entry point](docs/arc42/arc42-template.adoc) · [C4 model](docs/c4/README.md) · [Executable requirements appendix](docs/arc42/generated/gherkin-requirements.adoc) · [Focused evidence](docs/test-report.md)
 
@@ -31,7 +31,7 @@
 - **Jackson 3 XML** — `tools.jackson.dataformat:jackson-dataformat-xml` with custom WebFlux encoder
 - **Pure domain** — no Spring, no JPA, no reactive types in `object-store-domain`
 - **In-memory infrastructure** — reactive in-memory bucket, object, and multipart repositories
-- **Testing** — JUnit, Cucumber, targeted AWS CLI compatibility; the fixed EP-10 slice reuses shared real-process scenarios in WebTestClient and AWS CLI modes, but full S3 and cluster capability parity is not complete; **JaCoCo is the current coverage baseline** (Clover/OpenClover is optional/legacy)
+- **Testing** — JUnit, Cucumber, targeted AWS CLI compatibility; the Java 21 EP-10 real-process gate passes 14 scenarios / 188 steps for `001..005/019/020` (repair-only `019/020`: 4 / 80), repair control passes 22 / 210 for `021..026`, and data-plane regression passes, but full S3 and cluster capability parity is not complete; **JaCoCo is the current coverage baseline** (Clover/OpenClover is optional/legacy)
 
 ---
 
@@ -46,10 +46,10 @@
 | `object-store-reactive-application` | Reactive application services and DTOs | Native Mono/Flux service APIs |
 | `object-store-reactive-infrastructure` | Reactive in-memory repository implementations | No HTTP API, no S3 router |
 | `object-store-reactive-repository-storage-engine-infrastructure` | Anti-Corruption Layer + adapter: Object Store → Storage Engine | Implements repository interfaces using single-node Storage Engine or bounded cluster repositories |
-| `storage-engine-cluster-application` | Transport-neutral cluster application layer | Fixed-slice control/data ports and `N=3/W=2` whole-object coordination; no Ratis/gRPC dependencies |
+| `storage-engine-cluster-application` | Transport-neutral cluster application layer | Fixed-slice control/data ports, `N=3/W=2` whole-object coordination, and bounded repair coordinator/scheduler/worker; no Ratis/gRPC dependencies |
 | `cluster-protocol` | Internal versioned protobuf contracts | No S3 API or domain policy |
-| `cluster-control-ratis-infrastructure` | Fixed-cluster control infrastructure | Ratis voter/state machine, persisted state, fixed bootstrap, control mTLS |
-| `cluster-data-grpc-infrastructure` | Direct replica transport infrastructure | grpc-java bounded transfer, checksums, deadlines/cancellation, replica mTLS |
+| `cluster-control-ratis-infrastructure` | Fixed-cluster control infrastructure | Ratis voter/state machine, persisted version-2 repair lifecycle and snapshot migration, fixed bootstrap, control mTLS |
+| `cluster-data-grpc-infrastructure` | Direct replica transport infrastructure | grpc-java bounded write/read/repair transfer, checksums, deadlines/cancellation, replica mTLS |
 | `storage-engine-domain` | Storage Engine domain model (pure) | Policy, workflow, device, trace, manifest — zero framework dependencies |
 | `storage-engine-reactive-application` | Storage Engine reactive orchestration | Ports, Chunker, ReactiveStorageOrchestrator |
 | `storage-engine-reactive-infrastructure` | Storage Engine filesystem cluster backend | YAML catalogs, FileSystemStorageCluster, content address index, manifest repository, chaos decorator |
@@ -219,7 +219,7 @@ aws --endpoint-url http://localhost:8080 s3api get-object --bucket test-bucket -
 
 Consolidated Markdown report: [`docs/test-report.md`](docs/test-report.md)
 
-The EP-10 semantic claim comes from its focused shared real-process WebTestClient/AWS CLI gates and focused Ratis/gRPC/cross-module runners documented there. An ordinary root `mvn test` pass is supporting integration evidence only and must not be substituted for the focused 10-scenario / 108-step result or used to upgrade later EP-10 scope. The current dirty-working-tree root pass is likewise not acceptance supply-chain evidence: `REQ-SUPPLY-001` remains implemented-not-e2e-validated until a clean-revision application SBOM/license/image packet covers all four cluster modules.
+The EP-10 semantic claim comes from its focused shared real-process WebTestClient/AWS CLI gates and focused Ratis/gRPC/cross-module runners documented there. An ordinary root `mvn test` pass is supporting integration evidence only and must not be substituted for the 14-scenario / 188-step shared result, 4-scenario / 80-step repair-only result, or 22-scenario / 210-step repair-control result, nor used to upgrade later EP-10 scope. The current dirty-working-tree root pass is likewise not acceptance supply-chain evidence: `REQ-SUPPLY-001` remains implemented-not-e2e-validated until a clean-revision application SBOM/license/image packet covers all four cluster modules.
 
 ### Requirements appendix generation
 

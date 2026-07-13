@@ -47,7 +47,25 @@ public final class RatisControlPlaneAdapter implements ClusterControlPlanePort {
     @Override public Mono<ObjectReferenceGeneration> objectReference(String bucket, String objectKey) {
         return query(ControlPlaneCodec.queryReference(bucket, objectKey)).map(this::referenceResult);
     }
+    @Override public Mono<RepairCommandResult> ensureRepair(RepairCommands.Ensure command) { return repair(command); }
+    @Override public Mono<RepairCommandResult> claimRepair(RepairCommands.Claim command) { return repair(command); }
+    @Override public Mono<RepairCommandResult> renewRepair(RepairCommands.Renew command) { return repair(command); }
+    @Override public Mono<RepairCommandResult> retryRepair(RepairCommands.Retry command) { return repair(command); }
+    @Override public Mono<RepairCommandResult> blockRepair(RepairCommands.Block command) { return repair(command); }
+    @Override public Mono<RepairCommandResult> succeedRepair(RepairCommands.Succeed command) { return repair(command); }
+    @Override public Mono<RepairCommandResult> obsoleteRepair(RepairCommands.Obsolete command) { return repair(command); }
+    @Override public Mono<RepairCommandResult> reevaluateRepair(RepairCommands.Reevaluate command) { return repair(command); }
+    @Override public Mono<RepairJob> repairJob(RepairJobId jobId) {
+        return query(ControlPlaneCodec.queryRepair(jobId)).map(result -> ControlPlaneCodec.decodeRepairJob(success(result, "W")));
+    }
+    @Override public Flux<RepairJob> repairJobs(RepairJobQuery filter) {
+        return query(ControlPlaneCodec.queryRepairs(filter)).flatMapMany(result ->
+                Flux.fromIterable(ControlPlaneCodec.decodeRepairJobs(success(result, "X"))));
+    }
 
+    private Mono<RepairCommandResult> repair(RepairCommands.Command command) {
+        return write(ControlPlaneCodec.repair(command)).map(result -> ControlPlaneCodec.decodeRepairResult(success(result, "J")));
+    }
     private Mono<String> write(byte[] command) { return invoke(command, false); }
     private Mono<String> query(byte[] command) { return invoke(command, true); }
 

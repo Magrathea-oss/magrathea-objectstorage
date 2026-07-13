@@ -705,16 +705,46 @@ public class Phase3ReactivePipelineSteps {
 
     @Then("the HTTP adapter validates manifest and artifact metadata without reading complete payload bytes before response commitment")
     public void httpAdapterValidatesMetadataWithoutPayloadPreflight() throws IOException {
-        Path repositoryRoot = Files.exists(PROJECT_ROOT.resolve("s3-reactive-api-adapter/pom.xml"))
-                ? PROJECT_ROOT : PROJECT_ROOT.getParent();
-        String handler = Files.readString(repositoryRoot.resolve(
+        Path root = repositoryRoot();
+        String handler = Files.readString(root.resolve(
                 "s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/adapter/web/S3ObjectOperationsHandler.java"));
-        String service = Files.readString(repositoryRoot.resolve(
+        String service = Files.readString(root.resolve(
                 "object-store-reactive-application/src/main/java/com/example/magrathea/reactive/application/service/ReactiveObjectService.java"));
-        String orchestratorSource = Files.readString(repositoryRoot.resolve(
+        String queryRepositoryPort = Files.readString(root.resolve(
+                "object-store-reactive-repository-application/src/main/java/com/example/magrathea/objectstorage/reactive/repository/application/S3ObjectQueryRepository.java"));
+        String storageEngineRepository = Files.readString(root.resolve(
+                "object-store-reactive-repository-storage-engine-infrastructure/src/main/java/com/example/magrathea/objectstorage/repository/storageengine/adapter/StorageEngineReactiveS3ObjectRepository.java"));
+        String clusterRepository = Files.readString(root.resolve(
+                "object-store-reactive-repository-storage-engine-infrastructure/src/main/java/com/example/magrathea/objectstorage/repository/storageengine/adapter/ClusterReactiveS3ObjectRepository.java"));
+        String orchestratorSource = Files.readString(root.resolve(
                 "storage-engine-reactive-application/src/main/java/com/example/magrathea/storageengine/application/service/ReactiveStorageOrchestrator.java"));
+
         assertTrue(handler.contains("getIntegrityVerifiedObjectWithContent(objectKey)"));
-        assertTrue(service.contains("validateContentIntegrity(objectWithContent.object().key())"));
+        String integrityUseCase = service.substring(
+                service.indexOf("public Mono<ObjectWithContent> getIntegrityVerifiedObjectWithContent"),
+                service.indexOf("public Mono<Flux<DataBuffer>> getObjectTorrent"));
+        int policyDecision = integrityUseCase.indexOf(
+                "if (!queryRepository.requiresPreResponseIntegrityValidation())");
+        int directStreamingBranch = integrityUseCase.indexOf("return objectWithContent;");
+        int ordinaryValidationBranch = integrityUseCase.indexOf(
+                ".validateContentIntegrity(result.object().key())");
+        assertTrue(policyDecision >= 0);
+        assertTrue(policyDecision < directStreamingBranch);
+        assertTrue(directStreamingBranch < ordinaryValidationBranch);
+        assertTrue(integrityUseCase.contains(".thenReturn(result)"));
+
+        String defaultValidationPolicy = queryRepositoryPort.substring(
+                queryRepositoryPort.indexOf("default boolean requiresPreResponseIntegrityValidation()"),
+                queryRepositoryPort.indexOf("// ── Phase F object config queries"));
+        assertTrue(defaultValidationPolicy.contains("return true;"),
+                "ordinary repositories must retain pre-response integrity validation");
+        String storageEngineValidation = storageEngineRepository.substring(
+                storageEngineRepository.indexOf("public Mono<Void> validateContentIntegrity("),
+                storageEngineRepository.indexOf("private Mono<ManifestId> resolveManifestId("));
+        assertTrue(storageEngineValidation.contains("resolveManifestId(key)"));
+        assertTrue(storageEngineValidation.contains(
+                "orchestrator.validateReadable(manifestId, key.bucket(), key.key())"));
+
         String preflight = orchestratorSource.substring(
                 orchestratorSource.indexOf("public Mono<Void> validateReadable"),
                 orchestratorSource.indexOf("List<StorageStage> writePipelineStages"));
@@ -723,6 +753,37 @@ public class Phase3ReactivePipelineSteps {
         assertFalse(preflight.contains("chunkStorePort.read("));
         assertFalse(preflight.contains("collectList("));
         assertFalse(preflight.contains("byte[]"));
+
+        String clusterValidationPolicy = clusterRepository.substring(
+                clusterRepository.indexOf("public boolean requiresPreResponseIntegrityValidation()"),
+                clusterRepository.indexOf("public Mono<LegalHold> findLegalHold"));
+        assertTrue(clusterValidationPolicy.contains("return false;"));
+        assertFalse(clusterValidationPolicy.contains("return true;"));
+        String clusterRead = clusterRepository.substring(
+                clusterRepository.indexOf("public Flux<DataBuffer> getContent(ObjectKey key)"),
+                clusterRepository.indexOf("public Mono<Void> validateContentIntegrity(ObjectKey key)"));
+        int missingRepair = clusterRead.indexOf("repairMissingBeforeResponse(reference)");
+        int responseStream = clusterRead.indexOf("verifiedLocalStream(reference)");
+        int corruptRepair = clusterRead.indexOf("scheduleAfterIntegrityFailure(reference)");
+        assertTrue(missingRepair >= 0 && missingRepair < responseStream);
+        assertTrue(responseStream < corruptRepair);
+        assertEquals(responseStream, clusterRead.lastIndexOf("verifiedLocalStream(reference)"),
+                "the cluster response path must open one integrity-verifying stream");
+        assertTrue(clusterRead.contains(".thenMany(Flux.error(failure))"),
+                "a corrupt response pass must fail while scheduling durable repair for a later read");
+        assertFalse(clusterRead.contains("validateContentIntegrity("));
+        assertFalse(clusterRead.contains("collectList("));
+        assertFalse(clusterRead.contains("DataBufferUtils.join"));
+        assertFalse(clusterRead.contains(".cache("));
+        assertFalse(clusterRead.contains(".repeat("));
+        String verifiedClusterStream = clusterRepository.substring(
+                clusterRepository.indexOf("private Flux<DataBuffer> verifiedLocalStream("),
+                clusterRepository.indexOf("private static S3Object restore("));
+        assertTrue(verifiedClusterStream.contains("localArtifacts.openPublished(reference.artifactId())"));
+        assertTrue(verifiedClusterStream.contains("Flux.<DataBuffer>generate(sink -> reader.read(sink))"));
+        assertFalse(verifiedClusterStream.contains("collectList("));
+        assertFalse(verifiedClusterStream.contains("DataBufferUtils.join"));
+        assertFalse(verifiedClusterStream.contains("readAllBytes("));
     }
 
     @Then("each persisted payload artifact is opened once for the response stream")

@@ -52,10 +52,10 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |EP-6 (`@implemented-and-validated` safety envelope; KA-6 remains pending)
 
 |8
-|**Distributed evidence is limited to one fixed slice** — real A/B/C consensus, whole-object `N=3/W=2` replication, failover, and complete restart are validated, while multipart/conditional/versioned/EC transfer, dynamic membership, healing/rebalance, and broader partition behavior are absent.
-|Consumers may overgeneralize one-coordinator-stop evidence into HA, broad S3 clustering, or distributed production readiness.
-|Keep EP-10 `@partial`; name the exact `REQ-CLUSTER-001..005` and `008..013` boundary and prohibit broader claims until each later capability has semantic and fault evidence.
-|EP-10 (`@partial`, fixed first slice validated; broader distributed readiness not claimed)
+|**Distributed evidence is limited to fixed A/B/C and bounded repair** — real consensus, whole-object `N=3/W=2` replication, failover/restart, and current-generation repair are validated only for `001..005/008..013/019..023/025/026`; `014/017/024` are partial, while multipart/conditional/versioned/EC transfer, dynamic membership, broad anti-entropy/rebalance/cleanup, and broader partitions remain absent or unvalidated.
+|Consumers may overgeneralize one-coordinator-stop or bounded repair evidence into HA, broad S3 clustering, broad healing, or distributed production readiness.
+|Keep EP-10 `@partial`; name the exact validated and partial requirement boundaries and prohibit broader claims until each later capability has semantic and fault evidence.
+|EP-10 (`@partial`, bounded fixed-cluster repair validated; broader distributed readiness not claimed)
 
 |9
 |**Product-shell boundary regression** — ADR 0026 separation and REQ-ADMIN-032 task-group composition are implemented and validated, but future extensions could reintroduce Object Storage routes, endpoint knowledge, or models into the reusable shell.
@@ -102,7 +102,7 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |16
 |**Supply-chain and focused cluster evidence can be overread** — the clean-revision SBOM/hardening packet predates four newly composed cluster modules, while the fixed A/B/C semantic gates are separate evidence. No artifact was published, OWASP remains unknown/error, and EP-10 capabilities outside the first slice are absent.
 |Consumers could mistake historical inventory generation for current complete-reactor coverage or compliance, a local image for a release, a dirty root pass for supply-chain acceptance, single-node hardening for clustered deployment hardening, or bounded failover for production distributed readiness.
-|Keep historical hashes explicitly scoped, `REQ-SUPPLY-001` at `@implemented-not-e2e-validated` until a new clean packet covers all production modules, `NOASSERTION`/manual-review entries, `published=false`, unavailable userns status, and OWASP error visible. Report focused EP-10 gates separately from ordinary root Maven and prohibit broader membership, repair, partition, or readiness claims.
+|Keep historical hashes explicitly scoped, `REQ-SUPPLY-001` at `@implemented-not-e2e-validated` until a new clean packet covers all production modules, `NOASSERTION`/manual-review entries, `published=false`, unavailable userns status, and OWASP error visible. Report focused EP-10 gates separately from ordinary root Maven and prohibit broader membership, broad healing/cleanup, partition, or readiness claims.
 |EP-8 architecture/other evidence guards (declared statuses retained); `REQ-SUPPLY-001` (`@implemented-not-e2e-validated`); EP-10 (`@partial`); compliance/publication/production readiness (`not claimed`)
 
 |17
@@ -128,4 +128,28 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |Passing TLS and failover gates can conceal absent operational enrollment, key custody, trust distribution, rotation, revocation, expiry monitoring, and disaster recovery.
 |Keep production mTLS mandatory and test-only certificate infrastructure visibly separate. Require an operational certificate lifecycle and stable-node-identity evidence before any production security claim.
 |EP-10 first slice (`implementation-informed`); production PKI (`blocked`, owner/review point: security and operations)
+
+|21
+|**Bounded repair can be overread as broad healing** — accepted ADR 0029 and the implementation restore one missing/corrupt target named by the current reference, but broad `REQ-CLUSTER-017` remains partial and does not include periodic anti-entropy, rebalance, or orphan cleanup.
+|Operators could treat a planner result or process-local scheduler as durable ownership, infer fleet-wide discovery/cleanup behavior, or mistake bounded repair for production readiness.
+|Keep consensus as job/lifecycle authority and scheduler signals message-free; report `019/020/021/022/023/025/026` separately from partial `017/024`; retain prepared-artifact intents, orphan cleanup, rebalance, broad anti-entropy, dynamic membership, EC, multipart, and partitions as explicit exclusions.
+|EP-10 repair (`implementation-informed`, bounded); broad healing/cleanup (`partial/absent`; owners: cluster implementation and operations)
+
+|22
+|**Single-pass corrupt GET has a late-failure client contract** — corruption may be detected after response headers or bytes are emitted, so the server cannot safely replace the stream with a remote replica or necessarily send a fresh S3 XML error body.
+|Clients can receive a transport/body-integrity failure rather than a conventional pre-body S3 error; a transparent retry could concatenate or disguise corrupt bytes.
+|Preserve no-preflight/no-second-read and prohibit transparent corrupt-read retry. Keep checksum/body assertions in both real-process modes, document that scheduling does not make the current request successful, and require any future client-contract change to preserve emitted-byte safety.
+|EP-10 `REQ-CLUSTER-020` (`implementation-informed`, high-impact ongoing contract risk; owners: S3/API and requirements)
+
+|23
+|**Repair lifecycle growth is not production-bounded and crash-side-effect evidence is incomplete** — version-2 migration and lifecycle restoration are validated, but jobs, attempts, dedup history, retry metadata, and terminal states enlarge snapshots, and the full seven-point real-filesystem/gRPC crash matrix was not executed.
+|Unbounded history could increase snapshot/recovery time; a side-effect crash outside covered combinations could delay or duplicate exact publication even though fencing protects lifecycle state.
+|Keep unknown-version fail-closed behavior and monotonic claim generation; complete the seven-point side-effect matrix before upgrading `REQ-CLUSTER-024`; measure snapshot growth before defining terminal-history retention/compaction and never silently discard dedup/fencing evidence.
+|EP-10 `REQ-CLUSTER-024` (`partial`, `needs-review`; owners: Ratis adapter, data plane, and operations)
+
+|24
+|**Current-generation races and unavailable sources can leave repair blocked or unreachable exact bytes** — the reference can change during transfer, or every named source can be missing/corrupt/unavailable.
+|An old artifact might be durably published but non-authoritative, while endless retry or copying an unverified source would threaten integrity and capacity.
+|Retain implemented currentness checks before source selection, publication, and success; keep changed work terminal `OBSOLETE`, finite retries, visible `BLOCKED`, and integrity alerts. Never return/copy unverified bytes. Leave resulting unreachable artifacts in place until separately fenced orphan cleanup is decided.
+|EP-10 bounded repair (`implementation-informed`; owner: cluster application/operations); orphan cleanup (`absent/deferred`, separate ADR required)
 |===

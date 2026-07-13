@@ -133,6 +133,42 @@ ifndef::imagesdir[:imagesdir: ../images]
 |Object-reference generation
 |Consensus-committed record naming verified immutable replicas for one object generation. In the fixed slice it is proposed only after `W=2` checksum-valid durable acknowledgements and is the authoritative basis for reads
 
+|Replica observation
+|ADR 0029 repair term: point-in-time evidence that a replica named by the current reference is missing, unavailable, corrupt, or checksum-valid. An observation is not durable work ownership or completion
+
+|Repair finding / plan
+|Deterministic PA-6 policy output derived from observations. `AntiEntropyFinding`, `HealingPlan`, and `HealingTask` remain planning values; application and consensus responsibilities are separate
+
+|Repair job
+|Implemented consensus-owned immutable specification for restoring one target already promised by the current committed whole-object generation. Its semantic key is `(REPAIR, bucket, objectKey, referenceGeneration, artifactId, targetNodeId)`; candidate source is not identity
+
+|Repair job state
+|One of the implemented consensus lifecycle values `READY`, `CLAIMED`, `RETRY_WAIT`, `SUCCEEDED`, `BLOCKED`, or terminal `OBSOLETE`
+
+|Repair claim
+|Time-bounded committed assignment of one repair attempt to a stable node UUID and one process-session ID. Deadline supports liveness; it is not the safety fence
+
+|Claim generation
+|Monotonic per-job number incremented by every accepted claim or reclaim. Together with `jobId` it forms the repair attempt's fencing token and survives snapshot/restart
+
+|Process session
+|Identifier generated once per process start. A restarted worker receives a new session and cannot renew or complete its predecessor's claim
+
+|Repair fencing token
+|Exact token `(jobId, claimGeneration)`. Result commands for stale tokens or wrong process sessions have no state effect; Ratis term alone is not a repair token
+
+|Verified repair source
+|A different replica named by the same current committed reference whose complete length and SHA-256 match the committed artifact facts during transfer. Missing, corrupt, unavailable, or mismatching replicas are never sources
+
+|Successful repair
+|Condition in which the exact artifact is durably valid at the promised target after file fsync, atomic publication/replacement, and directory fsync, and completion for the current fencing token is consensus committed
+
+|Blocked repair
+|Visible state indicating no safe automatic progress, such as no verified source, an integrity conflict, or exhausted bounded retries. It requires an alert and never authorizes unverified bytes
+
+|Obsolete repair
+|Terminal state for a job whose bound reference generation is no longer current or no longer names the exact target obligation. It is not rewritten or resurrected for a newer generation
+
 |Fencing
 |Rejection of stale node incarnations, coordinators, operations, or topology/policy epochs so they cannot publish conflicting or resurrected state
 
@@ -143,7 +179,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 |Minimum number of selected targets that must durably acknowledge checksum-valid immutable data before reference publication; the implemented fixed whole-object slice uses `W=2` of `N=3`
 
 |Valid-data read quorum
-|Number of checksum/length-valid sources required after consensus resolves the committed generation. The fixed failover slice validates exact bytes from a referenced whole-object replica; alternate-source repair behavior remains future work
+|Number of checksum/length-valid sources required after consensus resolves the committed generation. Fixed failover and bounded ADR 0029 repair validate exact bytes from a referenced whole-object replica; EC reconstruction and broader read policies remain future work
 
 |Degraded write
 |A write acknowledged below its declared placement/durability threshold. The fixed EP-10 slice rejects publication below `W=2` or without control quorum

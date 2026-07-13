@@ -26,6 +26,11 @@ public interface S3ObjectQueryRepository {
         return getContent(key).doOnNext(DataBufferUtils::release).then();
     }
 
+    /** Whether this repository must complete a separate integrity pass before response streaming. */
+    default boolean requiresPreResponseIntegrityValidation() {
+        return true;
+    }
+
     // ── Phase F object config queries ──
 
     /** Find legal hold for an object by bucket name and key. */

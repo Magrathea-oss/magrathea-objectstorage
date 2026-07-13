@@ -39,6 +39,11 @@
             <artifactId>reactor-core</artifactId>
         </dependency>
         <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>cluster-data-grpc-infrastructure</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>io.cucumber</groupId>
             <artifactId>cucumber-java</artifactId>
             <scope>test</scope>

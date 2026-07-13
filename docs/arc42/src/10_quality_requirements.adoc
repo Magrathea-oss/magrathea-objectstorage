@@ -24,6 +24,11 @@ ifndef::imagesdir[:imagesdir: ../images]
 |For fixed A/B/C, publish unconditional whole-object writes only after `W=2` checksum-valid durable acknowledgements and control commit; preserve exact reads after coordinator loss and complete restart
 |Shared real-process WebTestClient and AWS CLI `REQ-CLUSTER-001..005`, plus focused mechanism `REQ-CLUSTER-008..013`; this metric does not cover later EP-10 capabilities
 
+|Reliability / Consistency / Integrity
+|Bounded current-generation repair
+|Restore only a missing or corrupt whole-object target named by the current committed reference, with consensus-owned lifecycle and single-pass GET semantics
+|`REQ-CLUSTER-019/020/021/022/023/025/026` implemented and validated; `024` partial for incomplete seven-point real-filesystem/gRPC crash proof; broad `017` partial
+
 |Performance
 |Reactive non-blocking I/O
 |Upload/download without thread blocking
@@ -132,7 +137,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 - **Context:** Fixed nodes A, B, and C run one voter and one replica server per JVM with policy `N=3/W=2`.
 - **Stimulus:** An unconditional whole-object write succeeds, has only one checksum-valid durable acknowledgement, or has two staged replicas but no control quorum.
 - **Response:** S3 success occurs only after at least `W=2` checksum-valid durable acknowledgements and consensus commit of the object-reference generation. Otherwise publication fails, staged bytes remain unreachable, and no degraded result is returned.
-- **Metric (2026-07-13):** The shared real-process WebTestClient and AWS CLI gate for `REQ-CLUSTER-001..005` passes 10 scenarios / 108 steps in total. Focused cross-module `REQ-CLUSTER-009/010` mechanisms also pass. Ordinary root Maven success is supporting evidence only.
+- **Metric (2026-07-13):** The Java 21 shared real-process WebTestClient/AWS CLI gate passes 14 scenarios / 188 steps for `REQ-CLUSTER-001..005/019/020`; the first five publication scenarios retain their passing results. Focused cross-module `REQ-CLUSTER-009/010` mechanisms and the post-repair data-plane regression also pass. Ordinary root Maven success is supporting evidence only.
 
 ==== Scenario 12 — Fixed-Slice Failover and Complete-Restart Integrity
 
@@ -157,6 +162,40 @@ ifndef::imagesdir[:imagesdir: ../images]
 - **Stimulus:** Execute application/image SBOM generation, license normalization, fail-closed OWASP monitoring, hardened-container replacement, and the two EP-8 Cucumber runners against one clean full revision. A dirty checkout must fail acceptance-evidence identity generation rather than reuse the historical packet.
 - **Response:** For the historical revision, CycloneDX 1.6 application JSON/XML reconcile at 102 components and 103 dependencies; Syft 1.31.0 inspects exact image ID `sha256:e5b5862948853a613f8b92adc8135fa81b84bdd9f36c9ae8d69b9a6bd6dd7966`; license unknown/ambiguous entries stay visible without a compliance conclusion; the runtime uses UID/GID 10001, read-only root, explicit writable mounts, `no-new-privileges`, dropped capabilities, isolated host namespaces, and no engine socket while preserving Admin readiness and exact object bytes across replacement. None of those historical values claims coverage of the four later cluster modules.
 - **Metric:** Architecture Cucumber passed 13/13 expanded scenarios and 114 steps; the historical supply-chain Cucumber run passed 9/9 and 103 steps. Historical-only hashes are: application JSON `4025d7206af01683da5cffa84862f20f68c7568dd9338ee9920d55947df545d1`, application XML `b934de56a243cf6b5464566f45635e1f6ac0fc244d2ceb7c1f7418308012952f`, license inventory `0df3a3eac37e554dce6d67f227ffead9b28675f47fca9dab741d6850ac47b214`, and 7,105-component image SBOM `8d13ae409ef7230d52b4d850d0700db69132297910e55cffdbe27c08e28a90ba`. OWASP remains `unknown/error` after NVD HTTP 429 at 190,000/364,891 records (`clean=null`, 8 errors), so no vulnerability or remediation conclusion follows. The dirty-working-tree ordinary root pass is supporting integration evidence only.
+
+==== Scenario 15 — Missing-local Repair Before GET Response (`REQ-CLUSTER-019`)
+
+- **Status:** `implementation-informed`, `@implemented-and-validated`.
+- **Context:** Fixed A/B/C has a current committed whole-object generation naming target B, but B's exact artifact is absent and another named replica is checksum-valid.
+- **Stimulus:** An S3 client sends GET through B.
+- **Response:** Before emitting response payload, B durably ensures/deduplicates the target-specific job, uses a current fenced claim, transfers and completely verifies a different named replica directly, durably publishes it, and opens the repaired local artifact once for the response. No complete local-payload preflight or second filesystem read occurs.
+- **Metric (2026-07-13):** `REQ-CLUSTER-019` passes in both Java 21 real-process WebTestClient and AWS CLI modes; together with `020`, the focused repair-only gate passes 4 scenarios / 80 steps.
+
+==== Scenario 16 — Corruption Failure and Later-read Recovery (`REQ-CLUSTER-020`)
+
+- **Status:** `implementation-informed`, `@implemented-and-validated`.
+- **Context:** The current reference names B and B has a present artifact whose corruption becomes visible only while the one-pass GET stream is consumed.
+- **Stimulus:** A client reads through B, then a later client reads after repair completion.
+- **Response:** The first GET fails with an integrity outcome, durably schedules/deduplicates repair, and never transparently retries another replica because bytes may already have been emitted. A fenced worker later verifies and durably replaces the artifact; only the later GET may succeed. Scheduling never converts the failed request into success.
+- **Metric (2026-07-13):** `REQ-CLUSTER-020` passes in both real-process validation modes with client/body integrity assertions and no transparent corrupt-stream retry. The combined `001..005/019/020` gate passes 14 scenarios / 188 steps.
+
+==== Scenario 17 — Durable-job Authority, Fencing, and Idempotent Recovery (`REQ-CLUSTER-021..025`)
+
+- **Status:** `implementation-informed`; `021/022/023/025` are `@implemented-and-validated`, while `024` is `@partial`.
+- **Context:** One repair job is deduplicated, transitions through consensus, or is interrupted around claim, transfer, durable publication, completion, snapshot, restart, or leader change.
+- **Stimulus:** A process-local scheduler queries committed work; a new process session claims/reclaims while a stale worker may resume.
+- **Response:** Ratis, not scheduler memory, owns one semantic job and monotonic attempt/claim history. `ClusterNodeRuntime` owns scheduler start/stop; wake signals contain no job state. Reclaim increments `claimGeneration`; already-valid target bytes are idempotent success; stale result commands have no effect; a changed reference makes the job `OBSOLETE`.
+- **Metric (2026-07-13):** Repair-control `REQ-CLUSTER-021..026` passes 22 scenarios / 210 steps and the data-plane regression passes. `REQ-CLUSTER-024` remains partial because control persistence, fencing, and some scheduler reconciliation do not constitute the full seven-point real-filesystem/gRPC crash-side-effect matrix.
+
+==== Scenario 18 — Snapshot Migration and Fail-closed Compatibility (`REQ-CLUSTER-026`)
+
+- **Status:** `implementation-informed`, `@implemented-and-validated`.
+- **Context:** A node starts from the reference-only version-1 snapshot, version-2 active/terminal repair state, or an unknown future schema.
+- **Stimulus:** Load snapshot, replay committed commands, and take the next snapshot.
+- **Response:** Version 1 deterministically initializes an empty job map and next writes version 2; version 2 preserves job specification, lifecycle, attempts/dedup history, claim/session/retry fields, terminal reasons, and last-applied metadata; unknown future versions fail closed without discarding work. Payload bytes never enter snapshots.
+- **Metric (2026-07-13):** `REQ-CLUSTER-026` passes in the focused 22-scenario / 210-step repair-control gate, including stale-token rejection after restore.
+
+These scenarios deliberately exclude prepared-artifact intents, orphan cleanup, rebalance, broad periodic anti-entropy, dynamic membership, erasure coding, multipart, and broader partitions. Broad `REQ-CLUSTER-017` remains partial, and no production-readiness claim follows.
 
 // The generated Gherkin requirements report is included as a top-level ARC42 appendix
 // from arc42-template.adoc (see AGENTS.md §B.7), not as a subsection of this chapter.

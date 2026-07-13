@@ -210,7 +210,60 @@ image::../../c4/images/ClusterCompleteRestartRuntime.png[Cluster Complete Restar
 3. Each node recovers its stable UUID; seed order does not rewrite persisted three-voter state or committed generations.
 4. A `GetObject` through B returns the original exact bytes, length, SHA-256, and ETag.
 
-The shared real-process `REQ-CLUSTER-001..005` gates pass in both WebTestClient and AWS CLI modes (10 scenarios, 108 steps). Focused Ratis/gRPC/cross-module scenarios separately pass for `REQ-CLUSTER-008..013`. Root Maven success is only supporting integration evidence. These results do not cover clustered multipart, conditional/versioned writes, erasure coding, dynamic membership, healing/rebalance, rolling upgrades, or the broader partition suite.
+The shared Java 21 real-process gate now passes `REQ-CLUSTER-001..005`, `019`, and `020` in both WebTestClient and AWS CLI modes (14 scenarios, 188 steps); its repair-only `019/020` run passes 4 scenarios / 80 steps. Focused Ratis/gRPC/cross-module scenarios pass for `REQ-CLUSTER-008..013`, and repair-control `021..026` passes 22 scenarios / 210 steps. Root Maven success is only supporting integration evidence. These results do not cover clustered multipart, conditional/versioned writes, erasure coding, dynamic membership, broad periodic anti-entropy, rebalance, orphan cleanup, rolling upgrades, or the broader partition suite.
+
+=== Scenario 6h — Missing-local Repair Before GET Response (accepted ADR 0029)
+
+[NOTE]
+====
+Status: *implementation-informed / implemented-and-validated for `REQ-CLUSTER-019`*. This is bounded current-generation repair, not broad anti-entropy or production readiness.
+====
+
+.Runtime — durable repair of known local absence
+image::../../c4/images/MissingReplicaRepairRuntime.png[Missing Replica Repair Runtime, width=600]
+
+1. The read use case resolves the current consensus-committed whole-object reference and exact artifact length/SHA-256.
+2. Before any response payload starts, the target establishes that its promised local artifact is missing. It performs no complete payload preflight.
+3. Application code durably ensures or deduplicates the canonical repair key and may obtain an inline claim. Consensus binds the claim to a stable node/process session and increments `claimGeneration`.
+4. The worker revalidates the same current generation and fetches from a different named replica over the direct data path. It incrementally verifies the complete length/checksum, fsyncs, atomically publishes, and fsyncs the parent directory.
+5. Success is proposed only for the exact current fencing token. An uncertain completion result remains idempotently queryable/retryable.
+6. The GET opens the repaired local artifact once and streams it while calculating integrity metadata. This is the only filesystem read for the response; no local preflight/read-again cycle exists.
+7. If no named source verifies, the job becomes `BLOCKED`, an integrity/repair alert is emitted, and GET fails rather than returning unverified bytes.
+
+=== Scenario 6i — Single-pass Corruption Failure and Repair Later (accepted ADR 0029)
+
+[NOTE]
+====
+Status: *implementation-informed / implemented-and-validated for `REQ-CLUSTER-020`*. The corrupt request is never reported as transparently recovered; only a later GET may succeed.
+====
+
+.Runtime — corruption fails now, repair benefits a later GET
+image::../../c4/images/CorruptReplicaRepairRuntime.png[Corrupt Replica Repair Runtime, width=600]
+
+1. The current reference names the local artifact, so GET opens it once and streams while incrementally validating length/SHA-256.
+2. Corruption discovered during that pass fails the current request. Because response bytes may already have been emitted, the server does not open a remote replica and transparently retry the same request.
+3. Application code durably ensures/deduplicates repair for the still-current promised target. Scheduling repair does not convert the failed GET into success; if ensure cannot commit, an unscheduled-repair alert is required.
+4. A later claimed worker rechecks currentness, transfers a different named verified replica directly, stages under its fencing token, and crash-safely replaces the corrupt target.
+5. Consensus commits `SUCCEEDED` only after durable exact publication for the current token. If no verified source remains, work is `BLOCKED` and the target stays unavailable.
+6. A subsequent GET may read the repaired local payload once and succeed.
+
+=== Scenario 6j — Bounded Retry Across Restart or Leader Change (accepted ADR 0029)
+
+[NOTE]
+====
+Status: *implementation-informed*. Control persistence, fencing, snapshot migration, lifecycle, and some scheduler reconciliation are validated by `REQ-CLUSTER-021/022/023/025/026`. `REQ-CLUSTER-024` remains partial because the full seven-point real-filesystem/gRPC crash matrix was not executed. No general partition or rolling-upgrade behavior is implied.
+====
+
+.Runtime — snapshot recovery, reclaim, and stale-token rejection
+image::../../c4/images/RepairRestartRetryRuntime.png[Repair Restart Retry Runtime, width=600]
+
+1. Ratis commits one deterministic job and claim generation `g1`; the worker may crash before transfer, during transfer, or after durable publication but before completion commits.
+2. Versioned snapshot plus log replay retains identity, specification, state, attempt/dedup history, owner session, claim generation, retry timing, and last-applied metadata. Object bytes and staging files are not snapshot content.
+3. Restart or leader-ready notification only wakes a scheduler. A replacement process has a new session; reclaim is a committed transition that increments the token to `g2`.
+4. The `g2` worker rechecks that the bound generation remains current. If the target is already exact and durable, it treats that as idempotent success; otherwise it retries bounded verified transfer.
+5. Completion for `g2` may commit. A late `g1` renew/fail/succeed command is rejected with no state effect. If the reference changed, the old job becomes terminal `OBSOLETE` and is never rewritten to the newer generation.
+
+Prepared-artifact intents, orphan cleanup, rebalance, broad periodic anti-entropy, dynamic membership, erasure coding, multipart, and broader partition handling are outside all three implemented bounded flows. Broad `REQ-CLUSTER-017` therefore remains partial.
 
 === Scenario 7 — Reactive Chain Pattern
 

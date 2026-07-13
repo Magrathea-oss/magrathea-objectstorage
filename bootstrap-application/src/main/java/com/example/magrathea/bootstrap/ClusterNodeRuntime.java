@@ -10,11 +10,16 @@ import com.example.magrathea.cluster.data.grpc.ReplicaTransferFaultPlan;
 import com.example.magrathea.cluster.data.grpc.ReplicaTransferMetrics;
 import com.example.magrathea.storageengine.cluster.application.ClusterControlPlanePort;
 import com.example.magrathea.storageengine.cluster.application.ClusterMember;
+import com.example.magrathea.storageengine.cluster.application.ClusterRepairCoordinator;
+import com.example.magrathea.storageengine.cluster.application.ClusterRepairMetrics;
+import com.example.magrathea.storageengine.cluster.application.ClusterRepairScheduler;
+import com.example.magrathea.storageengine.cluster.application.ClusterRepairWorker;
 import com.example.magrathea.storageengine.cluster.application.ClusterWriteCoordinator;
 import com.example.magrathea.storageengine.cluster.application.LocalArtifactPort;
 import com.example.magrathea.storageengine.cluster.application.MembershipSnapshot;
 import com.example.magrathea.storageengine.cluster.application.NodeIdentity;
 import com.example.magrathea.storageengine.cluster.application.ReferencePublicationBarrier;
+import com.example.magrathea.storageengine.cluster.application.RepairExecutionGate;
 import com.example.magrathea.storageengine.cluster.application.ReplicaReadPort;
 import com.example.magrathea.storageengine.cluster.application.ReplicaTransferPort;
 import com.example.magrathea.storageengine.cluster.application.TransferRequest;
@@ -25,11 +30,14 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletionStage;
 
 /** Spring lifecycle composition for one production JVM, one voter, and one data server. */
@@ -47,17 +55,30 @@ public final class ClusterNodeRuntime implements SmartLifecycle, AutoCloseable {
     private final ReplicaTransferPort transfers;
     private final ReplicaReadPort reads;
     private final ClusterWriteCoordinator coordinator;
+    private final String processSession;
+    private final ClusterRepairMetrics repairMetrics;
+    private final ClusterRepairScheduler repairScheduler;
+    private final ClusterRepairCoordinator repairCoordinator;
     private volatile GrpcReplicaServer dataServer;
     private volatile boolean running;
 
     public ClusterNodeRuntime(ClusterProfileProperties properties) throws IOException {
-        this(properties, ReplicaTransferFaultPlan.none(), ReferencePublicationBarrier.none());
+        this(properties, ReplicaTransferFaultPlan.none(), ReferencePublicationBarrier.none(),
+                RepairExecutionGate.open());
     }
 
     public ClusterNodeRuntime(
             ClusterProfileProperties properties,
             ReplicaTransferFaultPlan transferFaultPlan,
             ReferencePublicationBarrier publicationBarrier) throws IOException {
+        this(properties, transferFaultPlan, publicationBarrier, RepairExecutionGate.open());
+    }
+
+    public ClusterNodeRuntime(
+            ClusterProfileProperties properties,
+            ReplicaTransferFaultPlan transferFaultPlan,
+            ReferencePublicationBarrier publicationBarrier,
+            RepairExecutionGate repairExecutionGate) throws IOException {
         this.properties = Objects.requireNonNull(properties, "properties");
         this.transferFaultPlan = Objects.requireNonNull(transferFaultPlan, "transferFaultPlan");
         this.membership = membership(properties);
@@ -117,7 +138,17 @@ public final class ClusterNodeRuntime implements SmartLifecycle, AutoCloseable {
                 localIdentity, controlPlane, artifacts, transfers,
                 positive(properties.getDeadlines().getTransfer(), "transfer deadline"),
                 Objects.requireNonNull(publicationBarrier, "publicationBarrier"));
-        positive(properties.getDeadlines().getRead(), "read deadline");
+        Duration readDeadline = positive(properties.getDeadlines().getRead(), "read deadline");
+        this.processSession = UUID.randomUUID().toString();
+        this.repairMetrics = new ClusterRepairMetrics();
+        ClusterRepairWorker repairWorker = new ClusterRepairWorker(localIdentity, processSession,
+                controlPlane, artifacts, reads, readDeadline,
+                Objects.requireNonNull(repairExecutionGate, "repairExecutionGate"),
+                repairMetrics, Clock.systemUTC());
+        this.repairScheduler = new ClusterRepairScheduler(localIdentity, controlPlane, repairWorker,
+                Clock.systemUTC(), Duration.ofMillis(250));
+        this.repairCoordinator = new ClusterRepairCoordinator(localIdentity, controlPlane, artifacts,
+                repairScheduler, repairMetrics, Clock.systemUTC());
     }
 
     public NodeIdentity localIdentity() { return localIdentity; }
@@ -125,6 +156,11 @@ public final class ClusterNodeRuntime implements SmartLifecycle, AutoCloseable {
     public ClusterControlPlanePort controlPlane() { return controlPlane; }
     public ReplicaReadPort reads() { return reads; }
     public ClusterWriteCoordinator coordinator() { return coordinator; }
+    public ClusterRepairCoordinator repairCoordinator() { return repairCoordinator; }
+    public ClusterRepairMetrics repairMetrics() { return repairMetrics; }
+    public ClusterRepairScheduler.Status repairSchedulerStatus() { return repairScheduler.status(); }
+    public String processSession() { return processSession; }
+    public long publishedOpenCount(String artifactId) { return artifacts.publishedOpenCount(artifactId); }
 
     @Override
     public synchronized void start() {
@@ -135,8 +171,10 @@ public final class ClusterNodeRuntime implements SmartLifecycle, AutoCloseable {
                     localMember.dataAddress(), dataTls, artifacts,
                     new ReplicaTransferMetrics(),
                     properties.getDeadlines().getSlowReplicaAcceptance(), transferFaultPlan).start();
+            repairScheduler.start();
             running = true;
         } catch (IOException | RuntimeException failure) {
+            repairScheduler.close();
             if (dataServer != null) dataServer.close();
             dataServer = null;
             voter.close();
@@ -167,6 +205,7 @@ public final class ClusterNodeRuntime implements SmartLifecycle, AutoCloseable {
     public synchronized void stop() {
         if (!running && dataServer == null) return;
         running = false;
+        repairScheduler.close();
         if (dataServer != null) dataServer.close();
         dataServer = null;
         clients.values().forEach(GrpcReplicaClient::close);

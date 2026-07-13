@@ -64,7 +64,7 @@ public final class GrpcReplicaClient implements ReplicaTransferPort, AutoCloseab
     }
 
     /** Receives a server stream with one-message demand issued only after local sink acceptance. */
-    public CompletionStage<TransferResult> read(TransferRequest request, LocalArtifactPort.Sink sink) {
+    public CompletionStage<TransferResult> read(TransferRequest request, LocalArtifactPort.RepairSink sink) {
         if(request.deadline().compareTo(limits.maximumRpcDeadline())>0) throw new IllegalArgumentException("RPC deadline exceeds configured finite maximum");
         CompletableFuture<TransferResult> result=new CompletableFuture<>();
         var stub=ReplicaTransferServiceGrpc.newStub(channel).withDeadlineAfter(request.deadline().toNanos(),TimeUnit.NANOSECONDS);
@@ -73,7 +73,7 @@ public final class GrpcReplicaClient implements ReplicaTransferPort, AutoCloseab
             public void beforeStart(ClientCallStreamObserver<ReadReplicaRequest> stream){call=stream;stream.disableAutoRequestWithInitial(1);result.whenComplete((v,e)->{if(result.isCancelled())stream.cancel("application cancellation",null);});}
             public void onNext(ReplicaPayloadFrame frame){try{if(frame.getPayload().size()>limits.maxFrameBytes())throw new IOException("oversize frame");sink.accept(frame.getOffset(),ByteBuffer.wrap(frame.getPayload().toByteArray()));call.request(1);}catch(Throwable e){sink.abort();call.cancel("disk acceptance failed",e);result.completeExceptionally(e);}}
             public void onError(Throwable failure){sink.abort();result.completeExceptionally(failure);}
-            public void onCompleted(){try{result.complete(sink.publish());}catch(Throwable failure){sink.abort();result.completeExceptionally(failure);}}
+            public void onCompleted(){try{result.complete(sink.verify());}catch(Throwable failure){sink.abort();result.completeExceptionally(failure);}}
         };
         stub.read(ReadReplicaRequest.newBuilder().setArtifactId(request.artifactId()).setExpectedLength(request.expectedLength()).setExpectedSha256(ByteString.copyFrom(request.expectedSha256())).build(),observer);
         return result;

@@ -304,10 +304,13 @@ public class ReactiveObjectService {
      * stream exposed by the use case remains the repository's bounded response stream.
      */
     public Mono<ObjectWithContent> getIntegrityVerifiedObjectWithContent(ObjectKey objectKey) {
-        return getObjectWithContent(objectKey)
-            .flatMap(objectWithContent -> queryRepository
-                .validateContentIntegrity(objectWithContent.object().key())
-                .thenReturn(objectWithContent));
+        Mono<ObjectWithContent> objectWithContent = getObjectWithContent(objectKey);
+        if (!queryRepository.requiresPreResponseIntegrityValidation()) {
+            return objectWithContent;
+        }
+        return objectWithContent.flatMap(result -> queryRepository
+                .validateContentIntegrity(result.object().key())
+                .thenReturn(result));
     }
 
     /**

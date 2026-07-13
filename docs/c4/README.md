@@ -14,9 +14,9 @@ The model does not represent Product Shell or a product extension as separately 
 
 ## EP-10 bounded first-cluster implementation baseline
 
-ADRs 0027 and 0028 define the architecture and the **implemented-and-validated bounded first slice**. This status applies only to the fixed A/B/C baseline; it is not an EP-10 completion or distributed production-readiness claim.
+ADRs 0027 and 0028 define the original **implemented-and-validated bounded first slice**. Accepted ADR 0029 records the current **implementation-informed bounded repair** of current-generation replicas, with the conservative requirement statuses below. This remains fixed-A/B/C evidence, not EP-10 completion or a distributed production-readiness claim.
 
-C2 models one Cluster Node Runtime instantiated as fixed co-located voter/storage nodes A, B, and C. Each node JVM owns one Ratis voter and one independent replica data server. The implemented C3 view contains `storage-engine-cluster-application`, `cluster-protocol`, `cluster-control-ratis-infrastructure`, and `cluster-data-grpc-infrastructure`. The model preserves these implementation-informed constraints:
+C2 models one Cluster Node Runtime instantiated as fixed co-located voter/storage nodes A, B, and C. Each node JVM owns one Ratis voter, one independent replica data server, one request-facing repair coordinator, one process-local bounded scheduler, and one fenced worker. `ClusterNodeRuntime` in `bootstrap-application` is the SmartLifecycle composition authority for those process-local parts; Ratis, not the lifecycle or wake signal, is the durable repair authority. The model preserves these implementation-informed constraints:
 
 - The existing object-store-to-storage-engine adapter remains the only S3 integration boundary; no cluster module exposes a second object API.
 - The cluster slice is limited to unconditional `CreateBucket`, single-part whole-object `PUT`, and whole-object `GET`.
@@ -29,19 +29,39 @@ C2 models one Cluster Node Runtime instantiated as fixed co-located voter/storag
 - The failover runtime stops coordinator A after a successful write, then requires exact-byte `GET` through B while B and C retain quorum.
 - The restart runtime stops all A/B/C JVMs, restarts them from non-empty roots, recovers identities and committed generations, and verifies the exact object through B.
 
-The implemented first-slice diagrams are:
+The implemented baseline diagrams are:
 
-- `ClusterNodeComponents` — implemented module and boundary decomposition;
+- `ClusterNodeComponents` — complete bounded runtime decomposition, including lifecycle composition and repair components;
 - `ClusterCreateBucketRuntime` — consensus bucket-generation publication;
 - `ClusterWriteRuntime` — direct whole-object replication followed by consensus reference publication;
 - `ClusterFailoverReadRuntime` — exact-byte read after coordinator A stops;
 - `ClusterCompleteRestartRuntime` — stable-identity and persisted-state recovery;
-- `FixedThreeNodeRuntimeDeployment` — one voter and one data server per node JVM with separate roots; and
+- `FixedThreeNodeRuntimeDeployment` — co-located voter, data server, repair coordinator, scheduler, and worker in each JVM with separate roots; and
 - `FixedThreeNodeAcceptanceDeployment` — validated real-child-process topology with test-local mTLS fixtures.
 
-A separate `FutureClusterCapabilities` diagram keeps later scope visibly distinct and labeled **PLANNED / NOT IMPLEMENTED** (or **NOT VALIDATED** for broader partition behavior): clustered multipart, conditional/versioned and chunked writes, erasure-coded transfer/reconstruction, dynamic membership and certificate lifecycle, durable healing/rebalance/orphan cleanup, and broader partition handling. Existing single-node features and PA-6 planning models are not evidence for those cluster capabilities.
+## EP-10 bounded current-generation repair slice
 
-None of these diagrams claims production PKI, dynamic membership, rolling upgrades, repair execution, general partition tolerance, two-node-loss tolerance, broader S3 cluster support, or distributed production readiness.
+The implemented repair slice applies only to a missing or corrupt `WHOLE_OBJECT` replica already named by the current consensus-committed reference on fixed A/B/C. Ratis snapshot version 2 persists canonical repair jobs, lifecycle, attempts, process-session claims, monotonic claim generations, retry state, histories, and command-deduplication results; loading version 1 initializes no invented jobs. Payload bytes and temporary files remain outside Ratis.
+
+The implementation-informed repair diagrams are:
+
+- `RepairComponents` — the Storage Engine ACL, `ClusterRepairCoordinator`, `ClusterRepairScheduler`, `ClusterRepairWorker`, Ratis control infrastructure, direct replica infrastructure, and `ClusterNodeRuntime` lifecycle authority;
+- `MissingReplicaRepairRuntime` — known local absence permits durable ensure/deduplication and an inline fenced claim, followed by a completely verified direct transfer, durable publication, and one local filesystem open for the response;
+- `CorruptReplicaRepairRuntime` — a present local artifact is opened once and checked incrementally during the response pass. The reader retains only the pending final frame, not a complete preflight copy. Corruption fails that request without a second full read or transparent alternate-replica retry; a committed repair job may make only a later GET succeed;
+- `RepairRestartRetryRuntime` — versioned snapshot/log recovery, periodic committed-state rediscovery through leader changes, expired-claim reclaim with a newer generation, already-valid-target idempotence, and stale-token rejection; and
+- `FixedThreeNodeRuntimeDeployment` — the implemented scheduler and worker remain co-located in each existing JVM while Ratis carries job metadata and direct mTLS gRPC carries whole-object bytes.
+
+`ClusterNodeRuntime` starts the scheduler only after its voter and replica server and closes the scheduler before transport shutdown. The scheduler's immediate wake contains no job data, and its 250 ms scan queries only committed locally targeted `READY`, due `RETRY_WAIT`, and expired `CLAIMED` work, at most 16 jobs sequentially. It is repair-job reconciliation, not broad periodic anti-entropy discovery.
+
+Status remains intentionally bounded:
+
+- `REQ-CLUSTER-019`, `REQ-CLUSTER-020`, `REQ-CLUSTER-021`, `REQ-CLUSTER-022`, `REQ-CLUSTER-023`, `REQ-CLUSTER-025`, and `REQ-CLUSTER-026` are modeled as implemented and semantically validated within their declared scopes.
+- `REQ-CLUSTER-024` remains **partial** because the complete seven interruption-point matrix did not execute real filesystem and gRPC repair side effects at every crash point.
+- Broad `REQ-CLUSTER-017` remains **partial** because broad or periodic anti-entropy discovery, rebalance execution, and automated orphan cleanup remain absent.
+
+A separate `FutureClusterCapabilities` diagram keeps excluded scope visibly distinct: prepared-artifact intents, automated orphan cleanup, rebalance, broad or periodic anti-entropy, clustered multipart, conditional/versioned and chunked writes, erasure-coded transfer/reconstruction, dynamic membership and certificate lifecycle, and broader partition handling. Existing single-node features, PA-6 planning models, and the bounded repair scheduler are not evidence for those capabilities.
+
+None of these diagrams claims production PKI, dynamic membership, rolling upgrades, the full crash matrix, general partition tolerance, two-node-loss tolerance, broader S3 cluster support, or distributed production readiness.
 
 This project uses **Structurizr local** through the official `docker.io/structurizr/structurizr` container image, following the current Structurizr local workflow. The helper scripts are compatible with both **Podman** and **Docker**; Podman is preferred when both are available.
 

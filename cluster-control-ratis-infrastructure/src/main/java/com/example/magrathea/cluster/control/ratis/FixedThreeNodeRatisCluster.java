@@ -88,6 +88,15 @@ public final class FixedThreeNodeRatisCluster implements AutoCloseable {
     }
     public MembershipSnapshot configuredMembership() { return membership; }
     public Set<NodeIdentity> runningVoters() { return Set.copyOf(voters.keySet()); }
+    public synchronized Optional<NodeIdentity> leaderIdentity() {
+        return voters.entrySet().stream().filter(entry -> entry.getValue().leader()).map(Map.Entry::getKey).findFirst();
+    }
+    public synchronized long currentTerm(NodeIdentity id) {
+        SingleNodeRatisVoter voter = voters.get(id); return voter == null ? -1 : voter.currentTerm();
+    }
+    public synchronized long lastAppliedIndex(NodeIdentity id) {
+        SingleNodeRatisVoter voter = voters.get(id); return voter == null ? -1 : voter.lastAppliedIndex();
+    }
 
     public Mono<Void> stop(NodeIdentity id) {
         return Mono.fromRunnable(() -> stopBlocking(id)).subscribeOn(Schedulers.boundedElastic()).then();

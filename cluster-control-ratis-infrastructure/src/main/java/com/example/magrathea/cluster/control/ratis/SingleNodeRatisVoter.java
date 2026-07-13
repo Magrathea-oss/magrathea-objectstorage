@@ -115,6 +115,24 @@ public final class SingleNodeRatisVoter implements AutoCloseable {
         return server != null;
     }
 
+    public synchronized boolean leader() {
+        if (server == null) return false;
+        try { return server.getDivision(GROUP_ID).getInfo().isLeaderReady(); }
+        catch (IOException unavailable) { return false; }
+    }
+
+    public synchronized long currentTerm() {
+        if (server == null) return -1;
+        try { return server.getDivision(GROUP_ID).getInfo().getCurrentTerm(); }
+        catch (IOException unavailable) { return -1; }
+    }
+
+    public synchronized long lastAppliedIndex() {
+        if (server == null) return -1;
+        try { return server.getDivision(GROUP_ID).getInfo().getLastAppliedIndex(); }
+        catch (IOException unavailable) { return -1; }
+    }
+
     public synchronized long snapshot() {
         if (stateMachine == null) {
             throw new ControlPlaneException(ControlPlaneException.Code.INTERNAL_FAILURE,

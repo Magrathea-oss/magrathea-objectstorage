@@ -4,9 +4,9 @@ Date: 2026-07-13
 
 ## Status
 
-Accepted — architectural decision only, approved by the product owner for EP-8 EARLY.
+Accepted — architectural authority for the cluster control/data-plane split, approved by the product owner for EP-8 EARLY and implementation-informed by the bounded EP-10 slices.
 
-The cluster implementation and EP-8 supply-chain outputs remain planned/absent. Acceptance authorizes EP-10 implementation work; it is not evidence of networked membership, Raft correctness, multi-node persistence, quorum data transfer, healing, rebalance, SBOM or license-report generation, CI integration, or production readiness. Embedded Apache Ratis is a planned implementation choice with an explicit spike and validation risk; no production proof exists.
+The repository now implements the fixed A/B/C Ratis and direct whole-object baseline from ADR 0028 plus the bounded current-generation repair refinement in ADR 0029. This does not complete ADR 0027's wider target: dynamic membership, broader namespace/topology lifecycle, clustered multipart/conditional/versioned/chunked or erasure-coded data paths, broad periodic anti-entropy, rebalance, orphan cleanup, rolling upgrades, broader partitions, and production deployment proof remain absent or unvalidated. EP-8 supply-chain status is tracked separately. No production-readiness or general distributed-support claim follows.
 
 ## Context
 
@@ -48,7 +48,7 @@ Membership is authoritative only when committed through consensus. Liveness susp
 
 Start with three metadata voters, each co-located with one of the initial storage-node deployments while remaining a logically separate control-plane role. The topology should place those voters across the best available independent failure domains. A three-voter deployment tolerates one unavailable voter; it does not tolerate loss of two voters and must not be described otherwise.
 
-Use an embedded Apache Ratis integration as the planned Raft implementation. Before production implementation is accepted, a time-boxed spike must validate Reactor integration, persistent log/snapshot behavior, membership changes, leader transfer and restart, mTLS transport integration, upgrade compatibility, bounded resource use, and partition/fault behavior. Failure of that spike can reopen the implementation-library choice without changing the decision to use an authoritative consensus control plane. No current repository evidence proves Ratis or Raft production behavior.
+Use embedded Apache Ratis as the Raft implementation. The bounded fixed A/B/C integration now validates persisted control state, consensus bucket/reference publication, repair-job lifecycle/snapshot migration, mTLS, restart, and selected leader-change behavior. Before any production claim, the remaining spike obligations still require membership changes, rolling/mixed-version upgrade and leader-transfer coverage, bounded resource evidence, and a broader partition/fault matrix. Failure of those wider gates can reopen the implementation-library choice without changing the decision to use an authoritative consensus control plane. Current evidence is bounded and does not prove production Ratis or Raft behavior.
 
 The consensus-controlled log owns the authoritative ordering and generations for:
 
@@ -91,9 +91,9 @@ Retries use stable operation and artifact identifiers. A coordinator or leader c
 
 A read first resolves the consensus-committed object-reference/manifest generation. It never chooses a generation by comparing divergent replicas and does not serve an uncommitted or locally newer manifest.
 
-The reader then fetches immutable bytes from the referenced replicas or reconstructs them from the referenced EC shards. It validates checksum and length while streaming through bounded buffers. The configurable replica read quorum defaults to one checksum-valid replica. On missing, unavailable, or corrupt data, the reader retries other referenced replicas or the policy-valid EC reconstruction set. Successful fallback records durable repair work; it does not rewrite metadata outside consensus. If the configured valid-data quorum or reconstruction threshold cannot be met, the read fails with an integrity/availability outcome rather than returning unverified bytes.
+The reader then fetches immutable bytes from the referenced replicas or reconstructs them from the referenced EC shards. It validates checksum and length while streaming through bounded buffers. The configurable replica read quorum defaults to one checksum-valid replica. ADR 0029 refines fallback for the implemented single-pass whole-object path: known local absence before response streaming may be repaired from a different named verified replica, but corruption discovered while the response stream is consumed fails that request and never transparently retries after bytes may have been emitted. Durable repair may benefit only a later GET. Future EC reconstruction requires separate evidence. If the configured valid-data quorum or reconstruction threshold cannot be met, the read fails with an integrity/availability outcome rather than returning unverified bytes.
 
-This is strongly ordered, consensus-selected metadata with checksum-validated data reads. It is not Dynamo-style eventual metadata, read-repair generation selection, or last-write-wins reconciliation.
+This is strongly ordered, consensus-selected metadata with checksum-validated data reads. It is not Dynamo-style eventual metadata, read-repair generation selection, or last-write-wins reconciliation. ADR 0029 is the accepted bounded authority for current-generation whole-object repair and single-pass corruption semantics.
 
 ### Failure, partition, and cancellation semantics
 
@@ -115,7 +115,7 @@ EP-8 will produce and validate the following artifacts and gates:
 
 For this user-approved EARLY decision, dependency remediation is explicitly outside scope. Existing OWASP findings and scan-operability evidence are to be reported truthfully, without suppressing, upgrading, or changing dependencies merely to claim EP-8 completion. This does not waive vulnerabilities or make a failing gate acceptable for a later release; it separates evidence collection from remediation work.
 
-CycloneDX generation, SPDX normalization, CI wiring, and the expanded runtime-hardening validation are planned/absent until executable output demonstrates them. Existing Dependency-Check configuration and single-node non-root checks are contextual repository evidence only, not completion evidence for the EP-8 supply-chain strategy.
+At acceptance time, CycloneDX generation, SPDX normalization, CI wiring, and expanded runtime-hardening validation were planned/absent. Subsequent EP-8 evidence is tracked in `docs/test-report.md`: the historical clean packet remains revision-bound, current complete-reactor `REQ-SUPPLY-001` is implemented-not-e2e-validated, OWASP status is unknown/error, and no publication or compliance claim follows. This supply-chain status does not alter the cluster authority decided here.
 
 ## Consequences
 
@@ -129,7 +129,7 @@ CycloneDX generation, SPDX normalization, CI wiring, and the expanded runtime-ha
 - Topology catalogs become richer and require migration/validation of existing YAML. PA-6 policy semantics remain reusable instead of being replaced by transport or consensus code.
 - Ratis reduces the need to implement Raft directly but introduces library fit, lifecycle, storage, upgrade, and reactive-integration risks that must pass the spike and fault-injection gates.
 - Direct data transfer avoids routing large payloads through the leader, while requiring idempotent staging, orphan cleanup, checksummed acknowledgements, and careful coordinator failover.
-- Accepted architecture does not upgrade EP-8 or EP-10 implementation status. Networked cluster behavior, supply-chain outputs, and production-readiness claims remain absent until semantic multi-node, fault-injection, and artifact-validation evidence exists.
+- The bounded ADR 0028/0029 implementation evidence upgrades only their exact fixed-cluster requirements. EP-10 remains partial, current complete-reactor supply-chain evidence remains separately qualified, and production readiness remains unclaimed pending the wider membership, fault, upgrade, operation, and artifact-validation evidence.
 
 ## Alternatives Considered
 
@@ -169,20 +169,20 @@ Rejected by default because availability would be purchased with an acknowledged
 
 Architecture inputs observed before this decision include:
 
-- `PLAN.md` classifies PA-6 as modeled and unit-validated but not distributed-production-ready, and EP-8/EP-10 implementation as absent.
+- At decision time, `PLAN.md` classified PA-6 as modeled and unit-validated but not distributed-production-ready and EP-8/EP-10 implementation as absent; that is historical context superseded for bounded slices by ADRs 0028/0029 and current evidence documents.
 - `storage-engine-domain/src/main/java/com/example/magrathea/storageengine/domain/distributed/` contains pure placement, quorum, anti-entropy, rebalance, and readiness models. `DistributedReadinessReporter` explicitly retains missing networked-membership, real-replication-execution, and multi-node-e2e capabilities.
 - `storage-engine-domain/src/main/java/com/example/magrathea/storageengine/domain/valueobject/FailureDomain.java` currently models only rack, host, and disk levels; the YAML device/disk-set catalogs do not yet express the complete concrete parent-linked cluster topology.
 - `pom.xml` and `scripts/run-dependency-check.sh` contain the existing opt-in OWASP Dependency-Check monitoring/fail-closed configuration and machine-readable analysis path.
 - `Dockerfile` runs the JVM image as the `magrathea` user, and `scripts/validate-jvm-container-replacement.sh` checks non-root execution for the existing single-node replacement scenario.
 - Domain research observation: `/home/paperboy/.llm-wiki/wiki/sources/obs-2026-07-12-ep-8-authoritative-cluster-and-supply-chain-research-complet.md`.
 
-These are decision inputs and bounded existing evidence. They do not prove the planned cluster, Ratis integration, expanded topology, SBOM/license outputs, or EP-8 hardening gates.
+These were the original decision inputs. Subsequent ADR 0028 evidence implements the fixed A/B/C Ratis/direct whole-object baseline, and ADR 0029 evidence implements bounded current-generation repair. They still do not prove the expanded topology, dynamic membership, wider data semantics, broad anti-entropy/rebalance/cleanup, production cluster operation, or a current complete-reactor SBOM/license/hardening packet.
 
 ## Related Requirements
 
 - PA-6 `REQ-DIST-001..006`: modeled distributed placement, quorum, healing, rebalance, and readiness policy.
 - Planned EP-8 `REQ-HA-*` and `REQ-SUPPLY-*`: architecture and supply-chain evidence.
-- Planned EP-10 `REQ-CLUSTER-*`: networked membership, replication/EC transfer, authoritative metadata, quorum behavior, healing, rebalance, and multi-node failure semantics.
+- EP-10 `REQ-CLUSTER-*`: bounded `001..005`, `008..013`, `019..023`, `025`, and `026` are implemented and validated; `014`, `017`, and `024` are partial; the remaining wider transfer, lifecycle, healing, rebalance, cleanup, and failure semantics retain their explicit absent/not-implemented status.
 - ADR 0014: Storage Engine bounded context.
 - ADR 0019: MIT license and dependency-license compatibility obligation.
 - ADR 0025: conditional chunking and immutable storage-artifact taxonomy.

@@ -2,10 +2,12 @@ package com.example.magrathea.bootstrap;
 
 import com.example.magrathea.cluster.data.grpc.ReplicaTransferFaultPlan;
 import com.example.magrathea.storageengine.cluster.application.ClusterControlPlanePort;
+import com.example.magrathea.storageengine.cluster.application.ClusterRepairCoordinator;
 import com.example.magrathea.storageengine.cluster.application.ClusterWriteCoordinator;
 import com.example.magrathea.storageengine.cluster.application.LocalArtifactPort;
 import com.example.magrathea.storageengine.cluster.application.NodeIdentity;
 import com.example.magrathea.storageengine.cluster.application.ReferencePublicationBarrier;
+import com.example.magrathea.storageengine.cluster.application.RepairExecutionGate;
 import com.example.magrathea.storageengine.cluster.application.ReplicaReadPort;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -25,11 +27,13 @@ public class ClusterProfileConfiguration {
     ClusterNodeRuntime clusterNodeRuntime(
             ClusterProfileProperties properties,
             ObjectProvider<ReplicaTransferFaultPlan> transferFaultPlan,
-            ObjectProvider<ReferencePublicationBarrier> publicationBarrier) throws IOException {
+            ObjectProvider<ReferencePublicationBarrier> publicationBarrier,
+            ObjectProvider<RepairExecutionGate> repairExecutionGate) throws IOException {
         return new ClusterNodeRuntime(
                 properties,
                 transferFaultPlan.getIfAvailable(ReplicaTransferFaultPlan::none),
-                publicationBarrier.getIfAvailable(ReferencePublicationBarrier::none));
+                publicationBarrier.getIfAvailable(ReferencePublicationBarrier::none),
+                repairExecutionGate.getIfAvailable(RepairExecutionGate::open));
     }
 
     @Bean
@@ -55,6 +59,11 @@ public class ClusterProfileConfiguration {
     @Bean
     ClusterWriteCoordinator clusterWriteCoordinator(ClusterNodeRuntime runtime) {
         return runtime.coordinator();
+    }
+
+    @Bean
+    ClusterRepairCoordinator clusterRepairCoordinator(ClusterNodeRuntime runtime) {
+        return runtime.repairCoordinator();
     }
 
     @Bean

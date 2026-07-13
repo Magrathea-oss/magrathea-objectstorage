@@ -71,7 +71,13 @@ public class PhaseEp8ArchitectureContractSteps {
 
     @Then("its status is {string}")
     public void statusIs(String status) {
-        assertThat(adr).contains("## Status", status);
+        assertThat(status).isEqualTo("Accepted — architectural decision only");
+        assertThat(adr).contains(
+                "## Status",
+                "Accepted — architectural authority for the cluster control/data-plane split, approved by the product owner for EP-8 EARLY and implementation-informed by the bounded EP-10 slices.",
+                "fixed A/B/C Ratis and direct whole-object baseline from ADR 0028 plus the bounded current-generation repair refinement in ADR 0029",
+                "This does not complete ADR 0027's wider target",
+                "No production-readiness or general distributed-support claim follows");
     }
 
     @Then("it selects internal protobuf gRPC over HTTP\\/{int} with mutual TLS and bounded Reactor bridges")
@@ -117,7 +123,11 @@ public class PhaseEp8ArchitectureContractSteps {
 
     @Then("it identifies EP-10 as the owner of networked execution and multi-node fault validation")
     public void ep10OwnsExecution() {
-        assertThat(adr).contains("EP-10 must execute", "EP-10", "semantic multi-node, fault-injection");
+        assertThat(adr).contains(
+                "EP-10 must execute", "multi-node validation", "fault-injection gates",
+                "fixed A/B/C Ratis and direct whole-object baseline from ADR 0028 plus the bounded current-generation repair refinement in ADR 0029",
+                "The bounded ADR 0028/0029 implementation evidence upgrades only their exact fixed-cluster requirements",
+                "EP-10 remains partial");
         assertThat(implementationAdr).contains(
                 "Accepted — implementation-informed baseline for the bounded first fixed three-node EP-10 slice",
                 "Acceptance is limited to the evidenced A/B/C topology",
@@ -128,13 +138,21 @@ public class PhaseEp8ArchitectureContractSteps {
                 "No evidence above supports a production-readiness or general distributed-storage claim");
         assertThat(arc42).contains(
                 "EP-10 (S3 Cluster, multi-node): `@partial`",
-                "fixed A/B/C first slice is implementation-informed and validated for `REQ-CLUSTER-001..005` and `008..013`",
+                "Fixed A/B/C is implementation-informed and validated for `REQ-CLUSTER-001..005`, `008..013`, `019..023`, `025`, and `026`",
+                "`014`, `017`, and `024` remain partial",
+                "`006/007`, `015/016`, and `018` remain not implemented",
+                "Consensus-owned Durable Current-generation Repair (accepted ADR 0029)",
+                "`REQ-CLUSTER-019/020/021/022/023/025/026` are `@implemented-and-validated`",
+                "`REQ-CLUSTER-024` and broad `REQ-CLUSTER-017` are `@partial`",
                 "No production distributed-cluster claim follows from the bounded first slice");
         assertThat(testReport).contains(
-                "These opt-in/focused results are the semantic basis for the slice and are not folded into the ordinary root Maven totals above.",
+                "The opt-in EP-10 14-scenario / 188-step shared gate, 4-scenario / 80-step repair-only run, and focused mechanism/repair-control gates remain separate and are not folded into these totals",
                 "These hashes remain historical evidence only: the production reactor now composes `cluster-protocol`, `storage-engine-cluster-application`, `cluster-control-ratis-infrastructure`, and `cluster-data-grpc-infrastructure`, and no new clean-revision application SBOM/license/image packet was generated after that expansion.",
                 "Therefore current complete-reactor `REQ-SUPPLY-001` is `@implemented-not-e2e-validated`; the other EP-8 requirement statuses and their explicit limitations remain unchanged.",
-                "EP-10 remains `@partial`: `006/007` and `015..018` are not implemented, `014` is partial, and clustered multipart, conditional/versioned/chunked writes, EC, dynamic membership, healing/rebalance, and the broader partition suite remain absent.");
+                "EP-10 bounded fixed-cluster and current-generation repair evidence",
+                "Exact status: `019/020/021/022/023/025/026` are `@implemented-and-validated`; `024` is `@partial`",
+                "broad `017` is `@partial` because periodic anti-entropy, rebalance, and automated orphan cleanup remain absent",
+                "No production-readiness or broader distributed-support claim is made.");
     }
 
     @Given("ADR 0027 defines the planned gRPC surface for membership, control coordination, artifact transfer, verification, health evidence, and durable recovery-job execution")
@@ -147,7 +165,11 @@ public class PhaseEp8ArchitectureContractSteps {
     @When("the architecture boundary is compared with the S3 Data Plane and Admin Control Plane")
     public void compareBoundaries() {
         assertThat(arc42).contains("S3 Data Plane", "Admin Control Plane", "MUST NOT expose object/bucket CRUD");
-        assertThat(c4).contains("S3 Data Plane", "Admin Control Plane", "Internal only; not an object API");
+        assertThat(c4).contains(
+                "S3 Data Plane", "Admin Control Plane", "Cluster Node Runtime",
+                "It exposes no separate object API",
+                "Versioned internal protobuf contracts",
+                "It contains no S3 facade");
     }
 
     @Then("external create, list, read, write, delete, tagging, versioning, ACL, metadata, multipart, bucket, and object operations remain available only through S3-compatible endpoints")
@@ -183,7 +205,9 @@ public class PhaseEp8ArchitectureContractSteps {
     public void listenerIsInternal() {
         assertThat(adr).contains("internal-only protobuf gRPC", "mutual TLS", "not a third public facade");
         assertThat(c4).contains(
-                "Internal only; not an object API and not a production-readiness claim",
+                "It exposes no separate object API",
+                "Versioned internal protobuf contracts and generated messages/stubs",
+                "It contains no S3 facade",
                 "Ratis gRPC/HTTP2 with mTLS",
                 "Application gRPC/HTTP2 streaming with mTLS",
                 "peers require stable-UUID-bound mTLS");
@@ -208,7 +232,7 @@ public class PhaseEp8ArchitectureContractSteps {
     }
 
     @Then("the required stages have exactly this order:")
-    public void exactPublicationOrder(DataTable table) {
+    public void exactPublicationOrder(DataTable table) throws IOException {
         List<List<String>> rows = table.cells();
         assertThat(rows.get(0)).containsExactly("order", "required stage");
         assertThat(rows.subList(1, rows.size())).hasSize(PUBLICATION_STAGES.size());
@@ -221,24 +245,36 @@ public class PhaseEp8ArchitectureContractSteps {
             assertThat(current).as("ordered ADR marker %s", marker).isGreaterThan(previous);
             previous = current;
         }
+        assertThat(adr).contains(
+                "PA-6 `DistributedPlacementPlanner`",
+                "remain deterministic, side-effect-free policy components",
+                "2. Invoke the pure placement policy");
+        String writeCoordinator = Ep8EvidenceSupport.read(
+                "storage-engine-cluster-application/src/main/java/com/example/magrathea/storageengine/cluster/application/ClusterWriteCoordinator.java");
+        assertThat(writeCoordinator).contains(
+                "private final DistributedPlacementPlanner placementPlanner;",
+                "PlacementDecision placement = placementPlanner.plan(",
+                "PA-6 could not select three independent fixed replica targets",
+                "return prepare(bucket, objectKey, artifact).flatMap(this::publish);",
+                "return publicationService.publish(prepared.proposal());");
         assertInOrder(c4, List.of(
                 "Runtime: Bounded Fixed-Cluster Whole-Object Write",
-                "7. Use pure PA-6 placement to select A/B/C at N=3/W=2",
+                "7. Use pure storage placement to select A/B/C at N=3/W=2",
                 "8. Stage and directly transfer the immutable whole-object artifact",
                 "9. Return identity-bound checksum-valid durable acknowledgements from selected nodes",
                 "10. Only after W=2, submit the verified object-reference generation",
                 "11. Commit the reference through A/B/C quorum before S3 success"));
         assertThat(c4).contains(
-                "IMPLEMENTED AND VALIDATED FOR THE FIRST SLICE",
+                "Pure storage placement selects fixed nodes A/B/C for N=3",
                 "direct replica transfer must obtain W=2 checksum-valid durable acknowledgements",
                 "There is no degraded write: fewer than two data acknowledgements or loss of control quorum fails publication",
-                "Future Cluster Capabilities — Planned / Not Implemented",
-                "DISTINCT FUTURE SCOPE, NOT PART OF THE VALIDATED FIRST SLICE",
-                "Future clustered object semantics\" \"PLANNED / NOT IMPLEMENTED",
-                "Future erasure-coded transfer\" \"PLANNED / NOT IMPLEMENTED",
-                "Future dynamic membership lifecycle\" \"PLANNED / NOT IMPLEMENTED",
-                "Future healing and rebalance execution\" \"PLANNED / NOT IMPLEMENTED",
-                "Future broader partition handling\" \"PLANNED / NOT VALIDATED");
+                "C3 Component: Excluded Cluster Capabilities",
+                "The fixed A/B/C cluster scope excludes clustered multipart and conditional/versioned writes",
+                "Excluded clustered object semantics",
+                "Excluded erasure-coded transfer",
+                "Excluded dynamic membership lifecycle",
+                "Excluded repair-adjacent operations",
+                "Excluded broader partition handling");
     }
 
     @Then("stable operation and artifact identifiers make a retried stage idempotent")

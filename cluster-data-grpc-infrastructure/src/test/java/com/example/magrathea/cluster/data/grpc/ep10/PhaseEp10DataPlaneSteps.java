@@ -58,7 +58,10 @@ public final class PhaseEp10DataPlaneSteps {
             receiverStore=h.store;metrics=h.metrics;
             FileLocalArtifactStore readStore=new FileLocalArtifactStore(root.resolve("readback/objects"),root.resolve("readback/temporary"),A);
             TransferRequest readRequest=new TransferRequest("read-op","grpc-three-frames",A,bytes.length,hash,"topology-1","policy-1",Duration.ofSeconds(10));
-            TransferResult read=h.client.read(readRequest,readStore.beginUnpublished(readRequest)).toCompletableFuture().get(15,TimeUnit.SECONDS);
+            LocalArtifactPort.RepairSink readSink=readStore.beginRepair(readRequest,
+                    new LocalArtifactPort.RepairToken(new RepairJobId("repair-readback"),1));
+            TransferResult read=h.client.read(readRequest,readSink).toCompletableFuture().get(15,TimeUnit.SECONDS);
+            readSink.publishVerified();readSink.close();
             assertEquals(bytes.length,read.durableLength());assertArrayEquals(bytes,Files.readAllBytes(readStore.publishedPath("grpc-three-frames")));
             assertTrue(metrics.readyGatedFrames()>=4);
             System.out.printf("EP10_DEMAND maxInboundOutstanding=%d maxPayloadFrameBytes=%d readyGatedReadFrames=%d%n",metrics.maximumInboundOutstanding(),metrics.maximumPayloadFrameBytes(),metrics.readyGatedFrames());

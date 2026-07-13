@@ -143,13 +143,13 @@ The **Cluster Node Runtime** is one logical C2 container instantiated as fixed n
 |Module |Responsibility
 
 |`storage-engine-cluster-application`
-|Transport-neutral cluster use cases and ports for consensus-authoritative bucket/object-reference generations, local artifacts, fixed `N=3/W=2` whole-object write coordination, and committed-reference reads. It has no Ratis, protobuf, generated-stub, or gRPC dependencies.
+|Transport-neutral cluster use cases and ports for consensus-authoritative bucket/object-reference generations, local artifacts, fixed `N=3/W=2` whole-object write coordination, committed-reference reads, and bounded repair coordination/scheduling/worker execution. It has no Ratis, protobuf, generated-stub, or gRPC dependencies.
 
 |`cluster-protocol`
 |Versioned application-owned protobuf contracts and generated messages/stubs for internal cluster communication. It contains no S3 API or policy decisions.
 
 |`cluster-control-ratis-infrastructure`
-|Apache Ratis 3.2.2 with `ratis-grpc`, the deterministic control state machine, fixed A/B/C bootstrap, persisted log/snapshot state, control-plane mTLS, and infrastructure mapping. Dynamic membership remains future scope.
+|Apache Ratis 3.2.2 with `ratis-grpc`, the deterministic control state machine, fixed A/B/C bootstrap, persisted version-2 log/snapshot repair state and version-1 migration, control-plane mTLS, and infrastructure mapping. Dynamic membership remains future scope.
 
 |`cluster-data-grpc-infrastructure`
 |Independent grpc-java 1.82.2 `grpc-netty-shaded` replica servers/clients using protobuf 3.25.8, checksum/length validation, durable acknowledgements, deadlines/cancellation, replica mTLS, and a bounded manual 64 KiB flow-control bridge.
@@ -161,10 +161,41 @@ The implemented behavior is restricted to unconditional `CreateBucket`, single-p
 
 The PA-6 `DistributedPlacementPlanner`, `QuorumPolicy`, `AntiEntropyPlanner`, `RebalancePlanner`, and `DistributedReadinessReporter` remain pure components inside `storage-engine-domain`; they do not acquire Ratis, gRPC, protobuf, Spring, filesystem, certificate, retry, or lifecycle dependencies. This larger module-boundary requirement is still partial (`REQ-CLUSTER-014`) even though the first-slice Ratis/gRPC/cross-module mechanisms in `REQ-CLUSTER-008..013` pass.
 
-.Future cluster capabilities — deliberately not part of the implemented slice
-image::../../c4/images/FutureClusterCapabilities.png[Future Cluster Capabilities, width=600]
+==== Implemented Bounded Repair Extension (accepted ADR 0029)
 
-Clustered multipart, conditional/versioned and chunked writes, erasure coding, consensus-controlled dynamic membership and certificate lifecycle, healing/rebalance/orphan-cleanup execution, rolling upgrades, and the broader partition suite remain not implemented or unvalidated. Fixed A/B/C bootstrap and test-local mTLS fixtures must not be presented as those future capabilities or as production PKI.
+[NOTE]
+====
+Status: *implementation-informed / bounded*. `REQ-CLUSTER-019/020/021/022/023/025/026` are implemented and validated. `REQ-CLUSTER-024` and broad `REQ-CLUSTER-017` remain partial; no production-readiness claim follows.
+====
+
+.Consensus-owned bounded repair components
+image::../../c4/images/RepairComponents.png[Repair Components, width=600]
+
+The implementation adds no C2 container. It composes these responsibilities inside each fixed **Cluster Node Runtime**:
+
+[cols="3,5",options="header"]
+|===
+|Component |Implemented responsibility
+
+|**Durable Repair Coordinator and Scheduler**
+|The coordinator ensures bounded missing/corrupt current-generation work. The scheduler stores no authoritative job data: startup and committed-work signals only trigger bounded consensus queries, and serial dispatch is limited to committed work for the local target. `ClusterNodeRuntime` owns scheduler start/stop with process lifecycle.
+
+|**Fenced Repair Worker**
+|Executes only an exact committed `(jobId, claimGeneration)` assignment owned by its stable node and process session. It rechecks currentness, transfers from another named replica, verifies complete length/SHA-256, durably publishes the target, and proposes an idempotent result.
+
+|**Ratis Control Infrastructure**
+|Persists repair identity, immutable specification, lifecycle, attempt/deduplication history, claim generations, owner sessions, retry eligibility, and terminal reasons in version-2 snapshots/log state. Its deterministic state machine owns lifecycle but performs no RPC or filesystem side effect.
+
+|**Replica Data Infrastructure**
+|Keeps verified whole-object bytes on the existing direct mTLS path. Token-specific staging, fsync, atomic publication/replacement, and directory fsync make repeated exact-content effects safe; bytes never enter the Ratis log or snapshot.
+|===
+
+PA-6 `AntiEntropyPlanner` remains pure planning policy; its `HealingTask` is neither durable ownership nor proof of copied data. `RebalancePlanner` is not used. The repair target must already be named by the current committed reference, so this building-block change does not add placement or alter C2 boundaries.
+
+.Deferred cluster capabilities — deliberately outside bounded repair
+image::../../c4/images/FutureClusterCapabilities.png[Deferred Cluster Capabilities, width=600]
+
+`REQ-CLUSTER-024` remains partial because the full seven-point real-filesystem/gRPC crash matrix was not executed. `REQ-CLUSTER-017` remains partial because prepared-artifact intents, orphan cleanup, rebalance, and broad periodic anti-entropy are absent. Clustered multipart, conditional/versioned and chunked writes, erasure coding, consensus-controlled dynamic membership and certificate lifecycle, rolling upgrades, and the broader partition suite remain not implemented or unvalidated.
 
 === Level 2 — Component Diagram (s3-reactive-api-adapter)
 

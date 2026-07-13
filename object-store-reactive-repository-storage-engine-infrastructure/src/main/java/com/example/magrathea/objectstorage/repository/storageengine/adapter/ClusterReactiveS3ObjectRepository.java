@@ -17,17 +17,13 @@ import com.example.magrathea.objectstore.reactive.repository.application.S3Objec
 import com.example.magrathea.objectstore.reactive.repository.application.S3ObjectQueryRepository;
 import com.example.magrathea.objectstore.reactive.repository.application.StorageObjectIntegrityException;
 import com.example.magrathea.storageengine.cluster.application.ClusterControlPlanePort;
-import com.example.magrathea.storageengine.cluster.application.ClusterMember;
+import com.example.magrathea.storageengine.cluster.application.ClusterRepairCoordinator;
 import com.example.magrathea.storageengine.cluster.application.ClusterObjectMetadata;
 import com.example.magrathea.storageengine.cluster.application.ClusterWriteCoordinator;
 import com.example.magrathea.storageengine.cluster.application.ControlPlaneException;
 import com.example.magrathea.storageengine.cluster.application.LocalArtifactPort;
-import com.example.magrathea.storageengine.cluster.application.NodeIdentity;
 import com.example.magrathea.storageengine.cluster.application.ObjectReferenceGeneration;
 import com.example.magrathea.storageengine.cluster.application.PreparedArtifact;
-import com.example.magrathea.storageengine.cluster.application.ReplicaReadPort;
-import com.example.magrathea.storageengine.cluster.application.TransferRequest;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
@@ -41,7 +37,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.Duration;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.Base64;
@@ -60,27 +55,21 @@ public final class ClusterReactiveS3ObjectRepository
     private static final int FRAME_BYTES = 65_536;
     private static final DefaultDataBufferFactory BUFFERS = new DefaultDataBufferFactory();
 
-    private final NodeIdentity localNode;
     private final ClusterControlPlanePort controlPlane;
     private final LocalArtifactPort localArtifacts;
     private final ClusterWriteCoordinator writeCoordinator;
-    private final ReplicaReadPort replicaReads;
-    private final Duration readDeadline;
+    private final ClusterRepairCoordinator repairCoordinator;
     private final AtomicLong versions = new AtomicLong(1);
 
     public ClusterReactiveS3ObjectRepository(
-            NodeIdentity localNode,
             ClusterControlPlanePort controlPlane,
             LocalArtifactPort localArtifacts,
             ClusterWriteCoordinator writeCoordinator,
-            ReplicaReadPort replicaReads,
-            @Qualifier("clusterReadDeadline") Duration clusterReadDeadline) {
-        this.localNode = localNode;
+            ClusterRepairCoordinator repairCoordinator) {
         this.controlPlane = controlPlane;
         this.localArtifacts = localArtifacts;
         this.writeCoordinator = writeCoordinator;
-        this.replicaReads = replicaReads;
-        this.readDeadline = clusterReadDeadline;
+        this.repairCoordinator = repairCoordinator;
     }
 
     @Override
@@ -156,13 +145,24 @@ public final class ClusterReactiveS3ObjectRepository
     @Override
     public Flux<DataBuffer> getContent(ObjectKey key) {
         return controlPlane.objectReference(key.bucket(), key.key())
-                .flatMap(reference -> ensureLocal(reference).thenReturn(reference))
-                .flatMapMany(this::verifiedLocalStream);
+                .flatMap(reference -> repairCoordinator.localArtifactExists(reference)
+                        .flatMap(exists -> exists ? Mono.just(reference)
+                                : repairCoordinator.repairMissingBeforeResponse(reference)
+                                        .thenReturn(reference)))
+                .flatMapMany(reference -> verifiedLocalStream(reference)
+                        .onErrorResume(StorageObjectIntegrityException.class, failure ->
+                                repairCoordinator.scheduleAfterIntegrityFailure(reference)
+                                        .thenMany(Flux.error(failure))));
     }
 
     @Override
     public Mono<Void> validateContentIntegrity(ObjectKey key) {
         return getContent(key).doOnNext(DataBufferUtils::release).then();
+    }
+
+    @Override
+    public boolean requiresPreResponseIntegrityValidation() {
+        return false;
     }
 
     @Override
@@ -286,48 +286,6 @@ public final class ClusterReactiveS3ObjectRepository
                 .then();
     }
 
-    private Mono<Void> ensureLocal(ObjectReferenceGeneration reference) {
-        return Mono.fromCallable(() -> {
-                    try (LocalArtifactPort.Source ignored =
-                                 localArtifacts.openPublished(reference.artifactId())) {
-                        return true;
-                    }
-                })
-                .subscribeOn(Schedulers.boundedElastic())
-                .then()
-                .onErrorResume(IOException.class, ignored -> fetchOneReplica(reference));
-    }
-
-    private Mono<Void> fetchOneReplica(ObjectReferenceGeneration reference) {
-        return controlPlane.membership().flatMap(snapshot -> Flux.fromIterable(reference.replicas())
-                .filter(replica -> !replica.equals(localNode))
-                .concatMap(replica -> fetchReplica(snapshot.member(replica), reference)
-                        .onErrorResume(ignored -> Mono.empty()), 1)
-                .next()
-                .switchIfEmpty(Mono.error(new IOException(
-                        "no committed replica could provide artifact " + reference.artifactId())))
-                .then());
-    }
-
-    private Mono<?> fetchReplica(ClusterMember source, ObjectReferenceGeneration reference) {
-        TransferRequest request = new TransferRequest(
-                "read-" + UUID.randomUUID(),
-                reference.artifactId(),
-                localNode,
-                reference.length(),
-                HexFormat.of().parseHex(reference.sha256()),
-                reference.topologyEpoch(),
-                reference.policyEpoch(),
-                readDeadline);
-        return Mono.usingWhen(
-                Mono.fromCallable(() -> localArtifacts.beginUnpublished(request))
-                        .subscribeOn(Schedulers.boundedElastic()),
-                sink -> Mono.fromCompletionStage(replicaReads.fetch(source, request, sink)),
-                sink -> closeSink(sink, false),
-                (sink, error) -> closeSink(sink, true),
-                sink -> closeSink(sink, true));
-    }
-
     private Flux<DataBuffer> verifiedLocalStream(ObjectReferenceGeneration reference) {
         return Flux.using(
                         () -> new VerifiedReader(
@@ -358,19 +316,6 @@ public final class ClusterReactiveS3ObjectRepository
 
     private static Mono<Void> closeIncoming(
             LocalArtifactPort.IncomingSink sink, boolean abort) {
-        return Mono.fromRunnable(() -> {
-                    if (abort) sink.abort();
-                    try {
-                        sink.close();
-                    } catch (IOException ignored) {
-                        // The primary terminal signal owns the outcome.
-                    }
-                })
-                .subscribeOn(Schedulers.boundedElastic())
-                .then();
-    }
-
-    private static Mono<Void> closeSink(LocalArtifactPort.Sink sink, boolean abort) {
         return Mono.fromRunnable(() -> {
                     if (abort) sink.abort();
                     try {
@@ -420,6 +365,7 @@ public final class ClusterReactiveS3ObjectRepository
         private final ObjectReferenceGeneration reference;
         private final MessageDigest digest = sha256();
         private long length;
+        private byte[] pending;
         private boolean terminal;
 
         private VerifiedReader(
@@ -434,29 +380,44 @@ public final class ClusterReactiveS3ObjectRepository
                 return;
             }
             try {
-                ByteBuffer target = ByteBuffer.allocate(FRAME_BYTES);
-                int count = source.read(target);
-                if (count < 0) {
-                    terminal = true;
-                    byte[] expected = HexFormat.of().parseHex(reference.sha256());
-                    if (length != reference.length()
-                            || !MessageDigest.isEqual(digest.digest(), expected)) {
-                        sink.error(new StorageObjectIntegrityException(
-                                "cluster artifact length or SHA-256 differs from committed reference"));
-                    } else {
-                        sink.complete();
+                while (true) {
+                    ByteBuffer target = ByteBuffer.allocate(FRAME_BYTES);
+                    int count = source.read(target);
+                    if (count < 0) {
+                        terminal = true;
+                        byte[] expected = HexFormat.of().parseHex(reference.sha256());
+                        if (length != reference.length()
+                                || !MessageDigest.isEqual(digest.digest(), expected)) {
+                            pending = null;
+                            sink.error(new StorageObjectIntegrityException(
+                                    "cluster artifact length or SHA-256 differs from committed reference"));
+                        } else if (pending == null) {
+                            sink.complete();
+                        } else {
+                            byte[] verifiedFinalFrame = pending;
+                            pending = null;
+                            sink.next(BUFFERS.wrap(verifiedFinalFrame));
+                        }
+                        return;
                     }
+                    if (count == 0) continue;
+                    target.flip();
+                    byte[] bytes = new byte[count];
+                    target.get(bytes);
+                    digest.update(bytes);
+                    length += count;
+                    if (pending == null) {
+                        pending = bytes;
+                        continue;
+                    }
+                    byte[] verifiedPriorFrame = pending;
+                    pending = bytes;
+                    sink.next(BUFFERS.wrap(verifiedPriorFrame));
                     return;
                 }
-                if (count == 0) return;
-                target.flip();
-                byte[] bytes = new byte[count];
-                target.get(bytes);
-                digest.update(bytes);
-                length += count;
-                sink.next(BUFFERS.wrap(bytes));
             } catch (IOException failure) {
                 terminal = true;
+                pending = null;
                 sink.error(new StorageObjectIntegrityException(
                         "cannot stream committed cluster artifact", failure));
             }

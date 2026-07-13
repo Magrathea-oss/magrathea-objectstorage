@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -47,6 +48,7 @@ public class PhaseEp10CreateBucketRealProcessSteps {
     private static final int[] S3_PORTS = {19001, 19002, 19003};
     private static final int[] ADMIN_PORTS = {19101, 19102, 19103};
     private static final String FIXTURE_SHA = "46918899a9ddbe1d1c2f1613416501b3e8d7cdbc2a63a78298d0cc3ee388e800";
+    private static final String CORRUPT_FIXTURE_SHA = "92fdf1bf738ce40121046269e4db13013e3085208e16de8fce93385cde231180";
     private static final String FIXTURE_ETAG = "1ae14a405348c337d00821e272868e71";
     private static final Pattern MD5_HEX = Pattern.compile("[a-f0-9]{32}");
 
@@ -73,6 +75,11 @@ public class PhaseEp10CreateBucketRealProcessSteps {
     private long putCompletedAtMillis;
     private CompletableFuture<PutResult> pendingPut;
     private Map<String, Long> durableReplicaCounts = Map.of();
+    private int repairGeneration;
+    private String repairArtifact;
+    private boolean semanticGetFailure;
+    private int successfulRepairGets;
+    private boolean pausedCorruptPathRemained;
 
     @Before
     public void reset() throws Exception {
@@ -99,6 +106,11 @@ public class PhaseEp10CreateBucketRealProcessSteps {
         putCompletedAtMillis = 0;
         pendingPut = null;
         durableReplicaCounts = Map.of();
+        repairGeneration = 0;
+        repairArtifact = null;
+        semanticGetFailure = false;
+        successfulRepairGets = 0;
+        pausedCorruptPathRemained = false;
         originalIdentities.clear();
     }
 
@@ -111,7 +123,8 @@ public class PhaseEp10CreateBucketRealProcessSteps {
     @Given("validation mode {string} is selected for requirement {string}")
     public void validationMode(String mode, String selectedRequirement) {
         require(Set.of("REQ-CLUSTER-001", "REQ-CLUSTER-002", "REQ-CLUSTER-003",
-                        "REQ-CLUSTER-004", "REQ-CLUSTER-005").contains(selectedRequirement),
+                        "REQ-CLUSTER-004", "REQ-CLUSTER-005", "REQ-CLUSTER-019",
+                        "REQ-CLUSTER-020").contains(selectedRequirement),
                 "unexpected requirement selector");
         require(Set.of("multi-node-webtestclient", "multi-node-aws-cli",
                         "multi-node-webtestclient-restart", "multi-node-aws-cli-restart").contains(mode),
@@ -255,7 +268,18 @@ public class PhaseEp10CreateBucketRealProcessSteps {
 
     @When("the S3 client sends GetObject for bucket {string} and key {string} to node B")
     public void getFromB(String bucket, String key) throws Exception {
-        applyGet(getObjectThroughSelectedClient("B", bucket, key));
+        try {
+            applyGet(getObjectThroughSelectedClient("B", bucket, key));
+            if (getStatus == 200) successfulRepairGets++;
+            if ("REQ-CLUSTER-020".equals(requirement) && getStatus != 200) {
+                semanticGetFailure = true;
+            }
+        } catch (Exception failure) {
+            if (!"REQ-CLUSTER-020".equals(requirement)) throw failure;
+            semanticGetFailure = true;
+            getStatus = 0;
+            downloaded = null;
+        }
     }
 
     @Then("the response body is byte-for-byte equal to the uploaded fixture")
@@ -521,6 +545,255 @@ public class PhaseEp10CreateBucketRealProcessSteps {
                 + " sha256=" + sha256(downloaded) + " etag=" + unquote(getEtag));
     }
 
+    @Given("fixture {string} has length {int}, SHA-{int} {string}, and MD5\\/ETag {string}")
+    public void exactRepairFixture(String path, int length, int algorithmBits, String sha, String md5)
+            throws Exception {
+        exactFixture(path, length, algorithmBits, sha);
+        require(md5(fixture).equals(md5), "fixture MD5 differs");
+    }
+
+    @Given("current consensus-committed reference generation {int} for bucket {string} and key {string} names immutable whole-object artifact {string} on B and C with those exact facts")
+    public void setupExactRepairReference(
+            int generation, String bucket, String key, String artifact) throws Exception {
+        repairGeneration = generation;
+        repairArtifact = artifact;
+        currentBucket = bucket;
+        currentKey = key;
+        String setup = acceptancePost("C", "/__acceptance/repair/setup/" + generation + "/valid");
+        require(setup.contains("processSession"), "acceptance reference setup did not complete");
+    }
+
+    @Given("{string} contains the checksum-valid fixture")
+    public void namedSourceContainsFixture(String declaredPath) throws Exception {
+        Path actual = nodeRoot("C").resolve("objects").resolve(repairArtifact + ".artifact");
+        require(actual.toString().endsWith(Path.of(declaredPath).toString()),
+                "declared C artifact path differs");
+        byte[] bytes = Files.readAllBytes(actual);
+        require(Arrays.equals(bytes, fixture) && sha256(bytes).equals(FIXTURE_SHA),
+                "named source C does not contain the exact fixture");
+    }
+
+    @Given("promised path {string} is missing before response streaming starts")
+    public void promisedTargetIsMissing(String declaredPath) throws Exception {
+        acceptancePost("B", "/__acceptance/repair/setup/" + repairGeneration + "/missing");
+        Path actual = nodeRoot("B").resolve("objects").resolve(repairArtifact + ".artifact");
+        require(actual.toString().endsWith(Path.of(declaredPath).toString()) && !Files.exists(actual),
+                "promised B artifact is not missing");
+    }
+
+    @Given("the last byte at {string} is changed from 0x0a to 0xf5, preserving length {int} but producing SHA-{int} {string}")
+    public void corruptTarget(String declaredPath, int length, int algorithmBits, String corruptSha)
+            throws Exception {
+        require(algorithmBits == 256, "unexpected corrupt checksum algorithm");
+        acceptancePost("B", "/__acceptance/repair/setup/" + repairGeneration + "/corrupt");
+        Path actual = nodeRoot("B").resolve("objects").resolve(repairArtifact + ".artifact");
+        byte[] corrupt = Files.readAllBytes(actual);
+        require(actual.toString().endsWith(Path.of(declaredPath).toString())
+                        && corrupt.length == length && sha256(corrupt).equals(corruptSha),
+                "corrupt B fixture facts differ");
+    }
+
+    @Given("the repair worker is paused before it can claim newly ensured work")
+    public void pauseRepairWorker() throws Exception {
+        String status = acceptancePost("B", "/__acceptance/repair/pause");
+        require(status.contains("repairPaused>true"), "repair worker was not paused");
+    }
+
+    @When("the S3 client sends GetObject for that bucket and key to node B")
+    public void getCurrentRepairObjectFromB() throws Exception {
+        getFromB(currentBucket, currentKey);
+    }
+
+    @Then("B consensus-commits one deduplicated repair job bound to generation {int}, that artifact, and target UUID {string}")
+    public void oneRepairJob(int generation, String target) throws Exception {
+        String jobs = repairJobs("B");
+        require(occurrences(jobs, "generation=" + generation) == 1
+                        && jobs.contains(repairArtifact) && jobs.contains(target),
+                "exact deduplicated repair job is absent: " + jobs);
+    }
+
+    @Then("a current fenced claim owns the direct fetch from the different named source C")
+    public void currentClaimFetchedFromC() throws Exception {
+        String jobs = repairJobs("B");
+        require(jobs.contains(IDS[2]) && jobs.contains("SUCCEEDED"),
+                "repair history does not name source C and durable success");
+    }
+
+    @Then("B completely verifies length {int} and SHA-{int} {string} before atomically publishing the target with file and parent-directory fsync")
+    public void repairPublishedExact(int length, int algorithmBits, String sha) throws Exception {
+        Path repaired = nodeRoot("B").resolve("objects").resolve(repairArtifact + ".artifact");
+        byte[] bytes = Files.readAllBytes(repaired);
+        require(algorithmBits == 256 && bytes.length == length && sha256(bytes).equals(sha),
+                "durable repaired artifact facts differ");
+        require(temporaryFileCount() == 0, "verified repair left temporary bytes");
+    }
+
+    @Then("unverified or partially transferred bytes are never published or returned")
+    public void noPartialRepairPublication() throws Exception {
+        repairPublishedExact(134, 256, FIXTURE_SHA);
+        require(downloaded != null && Arrays.equals(downloaded, fixture),
+                "partial or unverified bytes were returned");
+    }
+
+    @Then("after durable publication B opens the repaired local artifact once for the response while calculating length and checksum incrementally")
+    public void repairedArtifactOpenedOnce() throws Exception {
+        require(openCount("B") == 1, "missing-repair response did not open B exactly once");
+    }
+
+    @Then("B does not completely preflight-read a local payload and then open it a second time for the response")
+    public void noMissingPreflight() throws Exception {
+        require(openCount("B") == 1, "missing-repair GET performed a second local open");
+    }
+
+    @Then("the response body is byte-for-byte equal to the fixture with length {int}, SHA-{int} {string}, and ETag {string}")
+    public void exactRepairResponse(int length, int algorithmBits, String sha, String etag) {
+        require(getStatus == 200 && algorithmBits == 256 && downloaded != null
+                        && downloaded.length == length && Arrays.equals(downloaded, fixture)
+                        && sha256(downloaded).equals(sha) && unquote(getEtag).equals(etag),
+                "repair GET response differs from committed facts");
+    }
+
+    @Then("current-token completion is consensus committed as {string} without changing reference generation {int} or its replica set")
+    public void repairSucceededWithoutReferenceChange(String state, int generation) throws Exception {
+        require(state.equals("SUCCEEDED") && repairGeneration == generation
+                        && repairJobs("B").contains("state=SUCCEEDED"),
+                "repair completion is not durably SUCCEEDED");
+    }
+
+    @When("source node C stops and nodes A and B retain control quorum")
+    public void stopSourceC() throws Exception {
+        Process process = processes.remove("C");
+        require(process != null, "source C process was not running");
+        process.destroy();
+        if (!process.waitFor(10, TimeUnit.SECONDS)) process.destroyForcibly();
+        clients.remove("C");
+        waitFor(() -> listBuckets("A") == 200 && listBuckets("B") == 200,
+                Duration.ofSeconds(20), "A/B did not retain control quorum after C stopped");
+    }
+
+    @When("the S3 client sends a later GetObject for the same bucket and key to node B")
+    public void laterGetFromB() throws Exception {
+        getFromB(currentBucket, currentKey);
+    }
+
+    @Then("the later response again returns the exact fixture facts and ETag from B's durable repaired path")
+    public void laterMissingRepairResponse() {
+        exactRepairResponse(134, 256, FIXTURE_SHA, FIXTURE_ETAG);
+    }
+
+    @Then("no remote replica read or unavailable source C is needed for the later response")
+    public void noLaterRemoteRead() throws Exception {
+        require(!processes.containsKey("C") && openCount("B") == 2,
+                "later GET did not use only B's durable repaired path");
+        String status = acceptanceStatus("B");
+        require(numberField(status, "fetches") == 1,
+                "later GET performed another replica fetch: " + status);
+    }
+
+    @Then("B opens the present local payload once and calculates length and SHA-{int} incrementally during that response pass")
+    public void corruptPayloadOpenedOnce(int algorithmBits) throws Exception {
+        require(algorithmBits == 256 && openCount("B") == 1,
+                "corrupt response did not use exactly one local pass");
+    }
+
+    @Then("B does not completely preflight-read the payload and then open it a second time")
+    public void noCorruptPreflight() throws Exception {
+        require(openCount("B") == 1, "corrupt GET performed a preflight and second open");
+    }
+
+    @Then("the checksum mismatch terminates the current GET as an integrity failure even if response bytes or the expected ETag were already emitted")
+    public void currentCorruptGetFails() {
+        require(semanticGetFailure, "corrupt current GET was reported as successful");
+    }
+
+    @Then("neither validation mode reports a successful {int}-byte object or retains corrupt output as a successful download")
+    public void noSuccessfulCorruptOutput(int length) throws Exception {
+        require(semanticGetFailure && !(getStatus == 200 && downloaded != null
+                        && downloaded.length == length),
+                "validation mode retained corrupt output as a success");
+        Path corruptPath = nodeRoot("B").resolve("objects")
+                .resolve(repairArtifact + ".artifact");
+        require(Files.isRegularFile(corruptPath)
+                        && sha256(Files.readAllBytes(corruptPath)).equals(CORRUPT_FIXTURE_SHA),
+                "paused repair removed or changed the non-authoritative corrupt path");
+        pausedCorruptPathRemained = true;
+    }
+
+    @Then("B does not transparently retry source C for the already-started response")
+    public void noTransparentRetry() throws Exception {
+        require(numberField(acceptanceStatus("B"), "fetches") == 0,
+                "corrupt response transparently fetched source C");
+    }
+
+    @Then("one repair job for generation {int}, that artifact, and target B is durably consensus committed before repair is reported as scheduled")
+    public void corruptionJobReady(int generation) throws Exception {
+        String jobs = repairJobs("B");
+        require(occurrences(jobs, "generation=" + generation) == 1
+                        && jobs.contains("state=READY"),
+                "paused corrupt repair job is not durably READY: " + jobs);
+    }
+
+    @Then("no GET is reported as successful merely because that repair job is {string}")
+    public void readyIsNotGetSuccess(String state) {
+        require(state.equals("READY") && semanticGetFailure && successfulRepairGets == 0,
+                "READY repair was incorrectly reported as a successful GET");
+    }
+
+    @When("the repair worker claims that job and durably replaces B's corrupt path from a completely verified named replica on C")
+    public void releaseAndRepairCorruption() throws Exception {
+        Path corruptPath = nodeRoot("B").resolve("objects")
+                .resolve(repairArtifact + ".artifact");
+        require(pausedCorruptPathRemained && Files.isRegularFile(corruptPath),
+                "corrupt path was absent before repair release");
+        AtomicBoolean watching = new AtomicBoolean(true);
+        AtomicBoolean publicationGap = new AtomicBoolean();
+        CompletableFuture<Void> watcher = CompletableFuture.runAsync(() -> {
+            while (watching.get()) {
+                if (!Files.isRegularFile(corruptPath)) publicationGap.set(true);
+                Thread.onSpinWait();
+            }
+        });
+        try {
+            acceptancePost("B", "/__acceptance/repair/release");
+            waitFor(() -> repairJobs("B").contains("state=SUCCEEDED"),
+                    Duration.ofSeconds(20), "released repair worker did not reach SUCCEEDED");
+        } finally {
+            watching.set(false);
+            watcher.get(5, TimeUnit.SECONDS);
+        }
+        require(!publicationGap.get(),
+                "repair exposed a filesystem gap instead of atomic replacement");
+        repairPublishedExact(134, 256, FIXTURE_SHA);
+    }
+
+    @When("current-token completion is consensus committed as {string}")
+    public void currentTokenCompletion(String state) throws Exception {
+        require(state.equals("SUCCEEDED")
+                        && repairJobs("B").contains("state=SUCCEEDED"),
+                "current-token completion was not committed");
+    }
+
+    @Then("the later response, and not the corrupt request, is the first successful GET after detection")
+    public void laterGetIsFirstSuccess() {
+        require(semanticGetFailure && successfulRepairGets == 1 && getStatus == 200,
+                "corrupt GET was treated as successful or later GET failed");
+    }
+
+    @Then("its body is byte-for-byte equal to the fixture with length {int}, SHA-{int} {string}, and ETag {string}")
+    public void laterCorruptRepairResponse(int length, int algorithmBits, String sha, String etag) {
+        exactRepairResponse(length, algorithmBits, sha, etag);
+    }
+
+    @Then("reference generation {int} and its named replica set remain unchanged")
+    public void corruptReferenceUnchanged(int generation) throws Exception {
+        require(repairGeneration == generation && repairJobs("B").contains(repairArtifact)
+                        && repairJobs("B").contains(IDS[2]),
+                "repair changed the bound reference facts");
+        System.out.println("EP10_REQ_CLUSTER_020 mode=" + validationMode
+                + " firstGet=integrity-failure laterGet=success generation=" + generation
+                + " opensB=" + openCount("B") + " metrics=" + acceptanceStatus("B"));
+    }
+
     private void ensureCleanCluster(List<String> startOrder) throws Exception {
         if (!processes.isEmpty()) return;
         TestPki pki = new TestPki(PKI);
@@ -531,6 +804,16 @@ public class PhaseEp10CreateBucketRealProcessSteps {
         }
         waitFor(() -> processes.values().stream().allMatch(Process::isAlive), Duration.ofSeconds(10),
                 "one cluster JVM exited during startup");
+        waitFor(() -> {
+            try {
+                for (String node : NAMES) {
+                    if (!acceptanceStatus(node).contains("dataServerRunning>true")) return false;
+                }
+                return true;
+            } catch (Exception notReady) {
+                return false;
+            }
+        }, Duration.ofSeconds(30), "one cluster JVM did not expose its test-only readiness status");
     }
 
     private Process startNode(int index, String seedOrder) throws IOException {
@@ -726,9 +1009,23 @@ public class PhaseEp10CreateBucketRealProcessSteps {
     }
 
     private String acceptanceStatus(String node) throws Exception {
-        EntityExchangeResult<byte[]> response = client(node).get().uri("/__acceptance/status")
+        return acceptanceGet(node, "/__acceptance/status");
+    }
+
+    private String repairJobs(String node) throws Exception {
+        return acceptanceGet(node, "/__acceptance/repair/jobs");
+    }
+
+    private long openCount(String node) throws Exception {
+        return numberField(acceptanceGet(node,
+                "/__acceptance/repair/open-count/" + repairArtifact), "opens");
+    }
+
+    private String acceptanceGet(String node, String path) throws Exception {
+        EntityExchangeResult<byte[]> response = client(node).get().uri(path)
                 .exchange().expectBody().returnResult();
-        require(response.getStatus().value() == 200, "acceptance status failed on " + node);
+        require(response.getStatus().value() == 200,
+                "acceptance GET failed on " + node + path);
         return new String(response.getResponseBody(), StandardCharsets.UTF_8);
     }
 
@@ -777,7 +1074,7 @@ public class PhaseEp10CreateBucketRealProcessSteps {
         for (String node : NAMES) {
             Path temporary = nodeRoot(node).resolve("temporary");
             if (!Files.isDirectory(temporary)) continue;
-            try (Stream<Path> files = Files.list(temporary)) {
+            try (Stream<Path> files = Files.walk(temporary)) {
                 total += files.filter(Files::isRegularFile).count();
             }
         }
@@ -800,6 +1097,29 @@ public class PhaseEp10CreateBucketRealProcessSteps {
         } catch (Exception impossible) {
             throw new AssertionError(impossible);
         }
+    }
+
+    private static String md5(byte[] bytes) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("MD5").digest(bytes));
+        } catch (Exception impossible) {
+            throw new AssertionError(impossible);
+        }
+    }
+
+    private static int occurrences(String text, String sought) {
+        int count = 0;
+        for (int offset = 0; (offset = text.indexOf(sought, offset)) >= 0; offset += sought.length()) {
+            count++;
+        }
+        return count;
+    }
+
+    private static long numberField(String json, String field) {
+        Matcher matcher = Pattern.compile("(?:\\\"" + Pattern.quote(field)
+                + "\\\"\\s*:\\s*|<" + Pattern.quote(field) + ">)(\\d+)").matcher(json);
+        require(matcher.find(), "numeric field " + field + " is absent from " + json);
+        return Long.parseLong(matcher.group(1));
     }
 
     private static String extractEtag(String output) {

@@ -37,7 +37,87 @@ Publication is ordered in two stages: direct data transfer first, authoritative 
 
 Ratis control and replica data use different internal servers, ports, executors, bounds, metrics, and lifecycle ownership. Both use mTLS bound to the expected stable node identity. The grpc-java bridge limits payload frames to 64 KiB and explicitly bounds demand, queues, in-flight frames, deadlines, idle timeout, retries, and terminal cleanup. Test-local certificates establish exercised peer authentication only; production enrollment, custody, rotation, revocation, expiry handling, and recovery remain absent.
 
-This concept does not extend single-node multipart/versioning/EC support into cluster mode. Dynamic membership, clustered multipart, conditional/versioned and chunked writes, erasure coding, healing, rebalance, orphan cleanup, rolling upgrades, and broader partition behavior remain future work.
+This concept does not extend single-node multipart/versioning/EC support into cluster mode. Dynamic membership, clustered multipart, conditional/versioned and chunked writes, erasure coding, broad periodic anti-entropy, rebalance, orphan cleanup, rolling upgrades, and broader partition behavior remain future work. Bounded current-generation repair is documented separately below.
+
+=== Consensus-owned Durable Current-generation Repair (accepted ADR 0029)
+
+[NOTE]
+====
+Status: *implementation-informed / bounded*. The concept applies only to a missing or corrupt target already named by the current consensus-committed `WHOLE_OBJECT` generation on fixed A/B/C. `REQ-CLUSTER-019/020/021/022/023/025/026` are implemented and validated; `REQ-CLUSTER-024` and broad `REQ-CLUSTER-017` remain partial.
+====
+
+==== Planning, ownership, and execution
+
+PA-6 `AntiEntropyPlanner` remains deterministic policy. A replica observation, finding, plan, source hint, or `HealingTask` says what ought to happen; it does not own work and cannot establish completion. Cluster application code re-resolves the current committed reference, maps a still-applicable finding into an ensure proposal, and dispatches only committed claims. `RebalancePlanner` is not used because repair restores an existing obligation and does not select or move placement.
+
+Ratis owns durable lifecycle metadata. Workers own direct network/filesystem effects through application ports. The replicated state machine performs deterministic transitions only: no wall-clock reads, RPC, filesystem access, sleeping, or retry loops occur in `applyTransaction`. `ClusterNodeRuntime` owns the process-local scheduler lifecycle; startup and committed-work notifications carry no job data and merely wake bounded queries of committed due work. Scheduler memory is operational state, never work authority.
+
+==== Deterministic identity and immutable specification
+
+One logical job is keyed by:
+
+`(REPAIR, bucket, objectKey, referenceGeneration, artifactId, targetNodeId)`
+
+Ensure/upsert returns the existing job for that key. Candidate source is not part of identity because another named replica may be selected on a later attempt. The immutable specification records the exact committed artifact length/SHA-256, topology/policy epochs, target stable UUID, and reference facts. A newer generation has a different key; an old job is never rewritten to point at it.
+
+==== Consensus lifecycle
+
+[cols="2,5",options="header"]
+|===
+|State |Meaning
+
+|`READY`
+|Applicable committed work is unclaimed and eligible now.
+
+|`CLAIMED`
+|One stable node/process session owns the current time-bounded claim and fencing token.
+
+|`RETRY_WAIT`
+|A retryable attempt failed; a command-supplied deterministic next-eligible time has not arrived.
+
+|`SUCCEEDED`
+|The exact artifact is durably valid at the promised target and success for the current token is committed.
+
+|`BLOCKED`
+|Safe automatic progress is unavailable: no verified source remains, an integrity conflict exists, or bounded retries are exhausted. The system emits a repair/integrity alert rather than copying unverified bytes or retrying forever.
+
+|`OBSOLETE`
+|The bound generation is no longer current or no longer names the exact artifact/target obligation. This state is terminal.
+|===
+
+The normal path is absent → `READY` → `CLAIMED` → `SUCCEEDED`. Retryable failure uses `CLAIMED` → `RETRY_WAIT` → `CLAIMED`; unsafe or exhausted work uses `CLAIMED` → `BLOCKED`; and a reference mismatch moves non-obsolete work to `OBSOLETE`. A fresh observation may re-evaluate a `BLOCKED` or previously `SUCCEEDED` job only while the same reference remains current, without resetting attempt history or claim generation.
+
+==== Claim fencing, retry, and idempotence
+
+Every accepted claim/reclaim increments attempt number and `claimGeneration`. The safety token is exactly `(jobId, claimGeneration)`. A claim also records the stable node UUID and a process-session ID generated once per process start. A restarted process receives a new session and cannot act as its predecessor. Ratis term and claim deadline are liveness information, not fencing tokens.
+
+Renew, fail, block, succeed, and obsolete commands compare the exact current token/session. Duplicate accepted commands return their committed result; stale or non-`CLAIMED` tokens have no state effect. Transport/deadline/transient source or target failures use bounded deterministic backoff. Wrong-checksum sources are excluded; another named source may be tried. No verified source, unsafe target conflict, or exhausted attempts produces `BLOCKED`. A changed reference produces `OBSOLETE`, not a retry.
+
+A worker queries committed state after an uncertain command result. Crash after durable publication but before completion is safe: retry probes the exact target and treats already-valid durable bytes as idempotent success. Token-specific staging and immutable expected content make repeated side effects safe, while only the current token may change job state.
+
+==== Current-generation and direct-transfer invariants
+
+The consensus-selected reference—not local manifests or pairwise comparison—is authority. Ensure validates the current generation and exact target obligation. The worker rechecks currentness before source choice, immediately before target publication, and before success. A source must be a different named replica of the same reference and must verify the complete committed length/SHA-256 during transfer. Missing, corrupt, unavailable, or mismatching replicas are never sources.
+
+Whole-object bytes remain outside Ratis and travel over the existing bounded mTLS replica path. Publication occurs only after complete verification, file fsync, atomic publication/replacement, and parent-directory fsync. Existing exact bytes are success. A corrupt target is replaced only by the verified exact artifact; no unverified payload is returned or copied.
+
+==== GET integrity boundary
+
+Known absence and discovered corruption have intentionally different request behavior:
+
+- **Missing before response:** durably ensure/deduplicate repair, optionally claim inline, fetch and fully verify a different named current-reference replica, publish it durably, and then open the repaired local artifact once for the response. There is no complete local-payload preflight and no second filesystem read.
+- **Corruption during the single response pass:** fail that GET, durably ensure repair, and do not transparently retry another replica because bytes may already have reached the client. Scheduling does not make the request successful. A later GET may succeed after repair.
+- **Ensure cannot commit:** the corrupt request still fails and an explicit unscheduled-repair alert is required. The system must not claim durable scheduling.
+
+==== Snapshot migration and recovery
+
+The implemented Ratis snapshot schema version 2 explicitly migrates reference-only version 1. Version 2 preserves existing membership/bucket/reference state plus every repair specification, lifecycle state, attempt/dedup history required for audit, owner/session/deadline, attempt number, claim generation, retry policy/eligibility, terminal reason, command timestamps, and last-applied term/index. Version 1 loads with an empty repair map and is written as version 2 at the next snapshot; unknown future versions fail closed. Object payloads and staging files are excluded.
+
+Snapshot/log replay and leader change preserve one logical job and its fences. Scheduler wake-up may reclaim only through a committed newer claim generation. `REQ-CLUSTER-026` validates migration/restoration, while `REQ-CLUSTER-024` remains partial: its seven interruption examples validate control persistence, fencing, and some scheduler reconciliation, but not the full real-filesystem and gRPC repair side effect at every crash point.
+
+==== Explicit deferrals
+
+Prepared-artifact intents, retirement tombstones, orphan cleanup, rebalance, broad periodic anti-entropy, adding an unacknowledged third placement, dynamic membership/node replacement, erasure coding, chunk repair, multipart, conditional/versioned operations, and broader/asymmetric partitions require separate requirements and decisions.
 
 === Reactive Non-blocking I/O
 
@@ -385,12 +465,12 @@ AWS CLI v2 does NOT send `Content-Type` by default unless `--content-type` is ex
 
 [NOTE]
 ====
-Status: *planned / not implemented beyond the bounded ADR 0028 baseline*. The implemented identity, transport, and publication subset is documented above; this section records only the remaining target.
+Status: *planned / not implemented beyond the bounded ADR 0028 and ADR 0029 slices*. The implemented identity, transport, publication, and current-generation repair subsets are documented above; this section records only the remaining target.
 ====
 
-**Membership and authority.** Consensus-controlled admission, catch-up, promotion, demotion, replacement, removal, topology/policy epochs, fencing, tombstones, wider namespace/configuration generations, and durable recovery jobs remain future work. Health suspicion must not become membership mutation.
+**Membership and authority.** Consensus-controlled admission, catch-up, promotion, demotion, replacement, removal, topology/policy epochs, fencing, tombstones, wider namespace/configuration generations, and durable jobs beyond bounded repair remain future work. Health suspicion must not become membership mutation.
 
-**Transfer and reads.** Chunked, multipart, conditional/versioned, and EC transfer/reconstruction are not implemented in cluster mode. Alternate-source fallback with authoritative durable repair, healing, rebalance, and automated orphan cleanup remain planned rather than inferred from whole-object `N=3/W=2` replication.
+**Transfer and reads.** Chunked, multipart, conditional/versioned, and EC transfer/reconstruction are not implemented in cluster mode. Bounded current-generation whole-object repair is implemented under ADR 0029; broad periodic anti-entropy, rebalance, and automated orphan cleanup remain absent rather than inferred from that repair or from `N=3/W=2` replication.
 
 **Operations and security.** Production certificate enrollment/rotation/revocation/recovery, rolling and mixed-version upgrades, broader partition handling, online multi-node backup/DR, and deployment hardening require separate evidence. Test-local mTLS and one-coordinator-stop validation do not satisfy these obligations.
 
