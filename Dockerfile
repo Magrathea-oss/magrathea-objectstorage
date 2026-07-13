@@ -1,12 +1,14 @@
 # Stage 1: Build with Maven + Node.js
 FROM public.ecr.aws/docker/library/maven:3.9-eclipse-temurin-21 AS build-base
 
+ARG SOURCE_DATE_EPOCH
 ARG NODE_VERSION=26.1.0
 ARG NODE_DIST=node-v${NODE_VERSION}-linux-x64
 ARG NODE_URL=https://nodejs.org/dist/v${NODE_VERSION}/${NODE_DIST}.tar.xz
 
 ENV NODE_HOME=/opt/node
 ENV PATH="${NODE_HOME}/bin:${PATH}"
+ENV SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH}"
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl xz-utils ca-certificates libatomic1 python3 \
@@ -38,6 +40,7 @@ COPY object-store-reactive-repository-storage-engine-infrastructure/pom.xml ./ob
 COPY s3-reactive-api-adapter/pom.xml ./s3-reactive-api-adapter/
 COPY admin-api-adapter/pom.xml ./admin-api-adapter/
 COPY bootstrap-application/pom.xml ./bootstrap-application/
+COPY coverage-report/pom.xml ./coverage-report/
 
 # Frontend workspace and documentation script manifests for dependency caching
 COPY magrathea-ui/package.json magrathea-ui/package-lock.json ./magrathea-ui/
@@ -140,15 +143,19 @@ RUN set -eux; \
 # Build final JAR packaging with Maven. Do not use Maven fail-never here:
 # a Docker image is valid only when the bootstrap package actually succeeds.
 ENV NODE_PATH=/build/magrathea-ui/node_modules
-RUN mvn -B --no-transfer-progress clean package -DskipTests && \
+RUN test -n "${SOURCE_DATE_EPOCH}" && case "${SOURCE_DATE_EPOCH}" in *[!0-9]*) exit 2;; esac && \
+    mvn -B --no-transfer-progress clean package -DskipTests -Dproject.build.outputTimestamp="${SOURCE_DATE_EPOCH}" && \
     cp bootstrap-application/target/*.jar /app.jar
 
 # Stage 2: Runtime
 FROM public.ecr.aws/docker/library/eclipse-temurin:21-jre
 
-ARG OCI_VERSION=unknown
-ARG OCI_REVISION=unknown
-ARG OCI_SOURCE=unknown
+ARG OCI_VERSION
+ARG OCI_REVISION
+ARG OCI_SOURCE
+ARG RUNTIME_UID=10001
+ARG RUNTIME_GID=10001
+RUN test -n "${OCI_VERSION}" && test -n "${OCI_REVISION}" && test -n "${OCI_SOURCE}"
 LABEL org.opencontainers.image.version="${OCI_VERSION}" \
       org.opencontainers.image.revision="${OCI_REVISION}" \
       org.opencontainers.image.source="${OCI_SOURCE}"
@@ -156,8 +163,8 @@ LABEL org.opencontainers.image.version="${OCI_VERSION}" \
 RUN apt-get update \
     && apt-get install -y --no-install-recommends wget \
     && rm -rf /var/lib/apt/lists/* \
-    && addgroup --system magrathea \
-    && adduser --system --ingroup magrathea --home /app --no-create-home magrathea \
+    && addgroup --system --gid "${RUNTIME_GID}" magrathea \
+    && adduser --system --uid "${RUNTIME_UID}" --gid "${RUNTIME_GID}" --home /app --no-create-home magrathea \
     && mkdir -p /app/data/storage-engine /app/config \
     && chown -R magrathea:magrathea /app
 
@@ -168,7 +175,7 @@ COPY --from=builder --chown=magrathea:magrathea /build/storage-engine-reactive-i
 COPY --from=builder --chown=magrathea:magrathea /build/storage-engine-reactive-infrastructure/src/main/resources/storage-devices /app/config/storage-devices
 COPY --from=builder --chown=magrathea:magrathea /build/storage-engine-reactive-infrastructure/src/main/resources/disk-sets /app/config/disk-sets
 
-USER magrathea
+USER 10001:10001
 
 ENV SPRING_PROFILES_ACTIVE=storage-engine \
     MAGRATHEA_OBJECT_STORE_BACKEND=storage-engine \

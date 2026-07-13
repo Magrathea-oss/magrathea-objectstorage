@@ -80,4 +80,28 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |Vulnerable dependencies may remain unidentified. Zero finding counters from the absent report could be misread as a clean scan.
 |Do not make vulnerability-finding or clean-scan claims. Inject `NVD_API_KEY` securely through CI/environment and rerun `scripts/run-dependency-check.sh`; retain the CVSS 7.0 gate and require a complete report plus executable semantic validation before closing `REQ-QUAL-003/004`.
 |Quality/security evidence (`@partial`, `needs-review`)
+
+|13
+|**Embedded Apache Ratis fit is unproven** — ADR 0027 selects Ratis as the planned Raft implementation, but persistence/snapshots, Reactor and mTLS integration, membership change, upgrades, leader transfer, partition behavior, and resource bounds have no repository proof.
+|A poor integration could block event loops, lose control state, complicate upgrades, or violate quorum/fencing assumptions.
+|Run the time-boxed spike and fault matrix before production implementation acceptance; preserve the consensus boundary so an external service/alternative adapter remains possible.
+|EP-8 / EP-10 (`planned`, `needs-review`)
+
+|14
+|**Initial voter/data co-location couples failures and resources** — each of three initial storage-node deployments also hosts a metadata voter.
+|Host/resource failure can remove both data capacity and a voter; two such losses remove control quorum.
+|Place voters across the best available independent topology domains, enforce bounded transport/Ratis resources, validate one-loss/two-loss behavior, and retain a future dedicated-voter deployment option.
+|EP-10 (`planned`)
+
+|15
+|**Topology/catalog migration is undefined** — current YAML lacks concrete parent-linked `zone/rack/host/disk-set/device` identities and persisted UUID ownership.
+|Invalid or stale topology can violate failure-domain placement or fence legitimate writers.
+|Define schema migration, duplicate/broken-parent/device-ownership validation, consensus epochs, rollback, and disaster-recovery behavior before implementation.
+|EP-10 (`planned`, `needs-review`)
+
+|16
+|**Supply-chain artifacts and expanded hardening are absent** — CycloneDX JSON/XML, SPDX-normalized inventory, CI reconciliation, and read-only-root/capability/no-new-privileges runtime proof are decisions only. Current OWASP evidence is fail-closed but incomplete, and remediation is intentionally out of scope for this slice.
+|Release consumers lack complete component/license evidence and may overread current non-root checks as full hardening.
+|Generate and schema-validate artifacts, report unresolved licenses/findings truthfully, retain OWASP failure semantics, and execute S3/Admin/persistence validation under hardened runtime settings. Revisit remediation separately.
+|EP-8 (`planned`, `needs-review`)
 |===

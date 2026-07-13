@@ -366,6 +366,25 @@ AWS CLI v2 does NOT send `Content-Type` by default unless `--content-type` is ex
 |[green]#Low#
 |===
 
+=== Planned Cluster Consistency, Transport, and Identity (ADR 0027)
+
+[NOTE]
+====
+Status: *planned / absent*. The following is accepted architecture, not implementation evidence.
+====
+
+**Authority and identity.** A stable persisted node UUID identifies storage identity across address, certificate, and process changes. Static seeds only bootstrap contact. Membership changes, topology/policy epochs, fencing, tombstones, namespace and manifest generations, and durable recovery jobs are ordered by the consensus control log. Suspicion can suppress placement or prompt repair but cannot remove a member.
+
+**Transport.** Node-to-node calls use internal protobuf gRPC/HTTP2 with mandatory mTLS. Reactor adapters must bridge demand and cancellation without blocking event loops; buffers, message sizes, retries, and in-flight work are bounded, and every operation has a deadline. This API carries control coordination and immutable data transfer only and cannot bypass the S3 Data Plane.
+
+**Publication and reads.** Immutable data is checksummed and durably acknowledged directly by selected nodes before a reference is committed. Initial replication uses `N=3, W=2`, with no degraded writes by default. Reads first resolve the committed generation, then require a configurable checksum-valid data quorum (default one) with alternate retry and durable repair. Metadata is not eventually reconciled between replicas.
+
+**Policy separation.** Cluster application/infrastructure adapters execute authoritative snapshots and decisions from PA-6. Ratis/protobuf/Reactor/persistence concerns do not enter `DistributedPlacementPlanner`, `QuorumPolicy`, `AntiEntropyPlanner`, `RebalancePlanner`, or `DistributedReadinessReporter`.
+
+=== Planned Supply-chain Evidence (ADR 0027)
+
+Status: *planned / absent* for CycloneDX generation, SPDX normalization, CI integration, and expanded runtime-hardening validation. The strategy requires CycloneDX JSON/XML SBOMs, an SPDX-normalized license inventory with unresolved/manual-review results, retained fail-closed OWASP Dependency-Check evidence, and runtime container validation under least privilege and read-only-root constraints. The current user decision separates evidence collection from remediation: no dependency upgrades or suppressions are authorized by this EARLY slice, and scan failures or findings remain visible.
+
 === Testing Strategy
 
 Four levels of testing:

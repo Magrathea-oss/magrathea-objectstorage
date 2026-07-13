@@ -37,6 +37,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>21</maven.compiler.release>
         <graalvm.buildtools.version>0.10.6</graalvm.buildtools.version>
+        <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
     </properties>
 
     <build>
@@ -209,6 +210,50 @@
     </dependencyManagement>
 
     <profiles>
+        <!-- Opt-in EP-8 application supply-chain inventory. The wrapper script supplies
+             project.build.outputTimestamp from SOURCE_DATE_EPOCH and validates/reconciles
+             the JSON and XML before evidence is accepted. -->
+        <profile>
+            <id>supply-chain</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.cyclonedx</groupId>
+                        <artifactId>cyclonedx-maven-plugin</artifactId>
+                        <version>${cyclonedx-maven-plugin.version}</version>
+                        <inherited>false</inherited>
+                        <configuration>
+                            <schemaVersion>1.6</schemaVersion>
+                            <projectType>application</projectType>
+                            <includeBomSerialNumber>false</includeBomSerialNumber>
+                            <includeCompileScope>true</includeCompileScope>
+                            <includeProvidedScope>true</includeProvidedScope>
+                            <includeRuntimeScope>true</includeRuntimeScope>
+                            <includeSystemScope>true</includeSystemScope>
+                            <includeTestScope>false</includeTestScope>
+                            <includeLicenseText>false</includeLicenseText>
+                            <excludeArtifactId>coverage-report</excludeArtifactId>
+                            <outputReactorProjects>false</outputReactorProjects>
+                            <outputFormat>all</outputFormat>
+                            <outputName>application.cdx</outputName>
+                            <outputDirectory>${maven.multiModuleProjectDirectory}/target/supply-chain</outputDirectory>
+                            <outputTimestamp>${project.build.outputTimestamp}</outputTimestamp>
+                            <skipAttach>true</skipAttach>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>aggregate-application-sbom</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>makeAggregateBom</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
         <!-- Opt-in dependency security gate. Use scripts/run-dependency-check.sh so failures
              also produce explicit, machine-readable scan-error evidence. -->
         <profile>

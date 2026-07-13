@@ -145,6 +145,42 @@ As of the EP-2 metadata durability work, every family below is a value object on
 
 **Unavailable-provider flow:** UI → typed Admin client → operational report route → optional provider port. If no provider is configured, the route returns HTTP 503 `report-provider-not-configured` with `availability: not-configured`, and the UI renders an unavailable state without fabricated records.
 
+=== Planned Scenario 6d — Consensus-Published Quorum Write (ADR 0027)
+
+[NOTE]
+====
+Status: *planned / not implemented*. Architecture ordering only; not runtime evidence.
+====
+
+.Planned runtime — consensus-published quorum write
+image::../../c4/images/PlannedClusterWriteRuntime.png[Planned Cluster Write Runtime, width=600]
+
+1. Resolve committed membership, namespace generation, fencing, and topology/policy epochs.
+2. Use the pure PA-6 policy core to select exact replica or EC targets.
+3. Stream unpublished immutable artifacts directly to selected nodes over bounded, deadline-aware, cancellable gRPC/mTLS.
+4. Each target durably publishes its local artifact only after checksum/length validation and returns an idempotent acknowledgement.
+5. Require the configured threshold (initial replication `N=3, W=2`); timeout, cancellation, stale epoch, corruption, or insufficient acknowledgements aborts publication.
+6. Revalidate fencing and consensus-commit the object-reference generation before acknowledging S3. Unreferenced artifacts remain unreachable and are handled only by fenced durable cleanup.
+
+Loss of metadata quorum, inability to satisfy placement, or fewer than `W` valid acknowledgements fails the write; there is no default degraded-write path.
+
+=== Planned Scenario 6e — Consensus-Selected Checksum-Valid Read (ADR 0027)
+
+[NOTE]
+====
+Status: *planned / not implemented*. Architecture ordering only; not runtime evidence.
+====
+
+.Planned runtime — consensus-selected checksum-valid read
+image::../../c4/images/PlannedClusterReadRuntime.png[Planned Cluster Read Runtime, width=600]
+
+1. Resolve exactly the consensus-committed object-reference/manifest generation; never compare divergent replicas to choose metadata.
+2. Stream a referenced replica or reconstruct from the referenced EC set through bounded buffers while checking length and checksum.
+3. Require the configured valid-data quorum (default one valid replica). On failure, retry alternate referenced sources.
+4. A successful fallback records durable, fenced repair work. If the quorum/reconstruction threshold cannot be met, fail rather than serve unverified bytes.
+
+Health suspicion can affect new placement and trigger investigation, but never auto-evicts membership or resurrects a tombstoned generation.
+
 === Scenario 7 — Reactive Chain Pattern
 
 **Description:** The reactive chain pattern used throughout the application layer. No blocking `.join()`, no `Mono.fromCallable`, no `.subscribeOn(Schedulers.boundedElastic())`.

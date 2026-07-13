@@ -126,6 +126,22 @@ The current static distribution is generated and handed to `bootstrap-applicatio
 - **Required Interface:** Storage Engine domain model and filesystem/configuration resources
 - **Technology:** Java 21, Reactor, YAML configuration, filesystem adapters
 
+=== Planned Cluster Runtime Roles (ADR 0027)
+
+[NOTE]
+====
+Status: *planned / not implemented*. These are logical C2 runtime roles, initially intended to be co-located in each of three storage-node deployments. They are not new public APIs and do not imply separate artifacts or production readiness.
+====
+
+.Planned Cluster roles in the C2 Container Diagram
+image::../../c4/images/Container.png[Container Diagram with planned cluster roles, width=600]
+
+- **Planned Cluster Control Plane** — three initial embedded-Ratis metadata voters; owns consensus-authoritative membership, epochs, fencing, namespace/object-reference generations, tombstones, and durable job state. Ratis remains spike-gated.
+- **Planned Cluster Data Plane** — bounded, deadline-aware direct transfer and read of immutable replicas/chunks/EC shards with mTLS, checksum/length validation, durable acknowledgement, retry, repair, and cleanup execution.
+- **Pure PA-6 policy core** — `DistributedPlacementPlanner`, `QuorumPolicy`, `AntiEntropyPlanner`, `RebalancePlanner`, and `DistributedReadinessReporter` remain components inside `storage-engine-domain`; they are not deployable C2 containers.
+
+Both planned roles remain behind the existing Object Store-to-Storage Engine ACL. The S3 adapter remains the only external object API, and the Admin adapter remains a non-object operational surface.
+
 === Level 2 — Component Diagram (s3-reactive-api-adapter)
 
 .C3 Component — s3-reactive-api-adapter

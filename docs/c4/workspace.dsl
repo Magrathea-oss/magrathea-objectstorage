@@ -78,6 +78,14 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
         storageEngineReactiveInfrastructure = component "storage-engine-reactive-infrastructure" "Filesystem and YAML adapters/configuration: FileSystemStorageCluster, FileSystemStorageNode, FileSystemVirtualDeviceMapper, FileSystemContentAddressIndex, FileSystemManifestRepository, FileSystemStoredObjectRepository, YAML policy/device/disk-set catalogs, compression/encryption/EC/replication adapters, direct SHA-256 calculation in filesystem/pipeline components, and FaultInjectingStorageCluster chaos decorator. MINIO_STANDARD YAML enables EC (4 data / 2 parity) and disables dedup; current C4 docs do not claim verified physical EC shard placement." "Java 21, Reactor, YAML"
         storageEngineRepositoryAdapter = component "object-store-reactive-repository-storage-engine-infrastructure" "Anti-Corruption Layer + adapter: implements Object Store repository interfaces using the Storage Engine backend. Contains ObjectStoreToStorageEngineTranslator, StorageEngineReactiveS3ObjectRepository, StorageEngineReactiveBucketRepository, StorageEngineReactiveMultipartUploadRepository." "Spring @Repository, Reactor"
       }
+
+      plannedClusterControlPlane = container "Planned Cluster Control Plane" "PLANNED / NOT IMPLEMENTED (EP-8 EARLY): authoritative membership, epochs, fencing, metadata generations, tombstones, and durable jobs. Initially three embedded Ratis voters, one per storage-node deployment; Ratis remains spike-gated." "Planned Java 21, embedded Apache Ratis, protobuf gRPC/HTTP2, mTLS" {
+        tags "Planned"
+      }
+
+      plannedClusterDataPlane = container "Planned Cluster Data Plane" "PLANNED / NOT IMPLEMENTED (EP-8 EARLY): bounded direct immutable-artifact transfer, durable checksum-valid acknowledgements and reads, plus fenced recovery execution. Internal only; not an object API." "Planned Java 21, Reactor-to-gRPC bridge, protobuf gRPC/HTTP2, mTLS" {
+        tags "Planned"
+      }
     }
 
     administrator -> magrathea "Uses admin UI, generated documentation, and management API" "HTTP/JSON"
@@ -169,6 +177,28 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
     magrathea.storageEngine.storageEngineReactiveApplication -> magrathea.storageEngine.storageEngineDomain "Uses domain services (PersistencePlanner, EffectivePolicyResolver, VirtualDeviceResolver, CompleteUploadService)" "Java calls"
     magrathea.storageEngine.storageEngineReactiveApplication -> magrathea.storageEngine.storageEngineReactiveRepositoryApplication "Uses ports and catalogs (ChunkStorePort, ContentAddressIndex, ObjectManifestRepository, StoredObjectRepository, StoragePolicyCatalog, StorageDeviceCatalog, DiskSetCatalog)" "Repository interfaces"
     magrathea.storageEngine.storageEngineReactiveRepositoryApplication -> magrathea.storageEngine.storageEngineReactiveInfrastructure "Implemented by filesystem and YAML adapters" "Implements"
+
+    magrathea.storageEngine.storageEngineReactiveApplication -> magrathea.plannedClusterControlPlane "PLANNED / NOT IMPLEMENTED: resolves committed membership, topology/policy epochs, fencing, namespace generations, and submits reference publication" "Internal protobuf gRPC/HTTP2 with mTLS" {
+      tags "Planned"
+    }
+    magrathea.storageEngine.storageEngineReactiveApplication -> magrathea.plannedClusterDataPlane "PLANNED / NOT IMPLEMENTED: coordinates bounded immutable artifact writes and checksum-valid reads against the consensus-selected generation" "Internal protobuf gRPC/HTTP2 streaming with mTLS" {
+      tags "Planned"
+    }
+    magrathea.plannedClusterControlPlane -> magrathea.storageEngine.storageEngineDomain "PLANNED / NOT IMPLEMENTED: invokes PA-6 deterministic placement, quorum, healing, rebalance, and readiness policy using authoritative snapshots" "In-process Java calls" {
+      tags "Planned"
+    }
+    magrathea.plannedClusterControlPlane -> magrathea.plannedClusterControlPlane "PLANNED / NOT IMPLEMENTED: commits authoritative membership, epochs, fencing, object references, tombstones, and durable job ownership across the three metadata voters" "Internal protobuf gRPC/HTTP2 and Raft with mTLS" {
+      tags "Planned"
+    }
+    magrathea.plannedClusterControlPlane -> magrathea.plannedClusterDataPlane "PLANNED / NOT IMPLEMENTED: supplies committed generations/epochs and dispatches fenced durable recovery work" "Internal protobuf gRPC/HTTP2 with mTLS" {
+      tags "Planned"
+    }
+    magrathea.plannedClusterDataPlane -> magrathea.plannedClusterDataPlane "PLANNED / NOT IMPLEMENTED: streams immutable replicas/chunks/EC shards directly between selected nodes with bounded backpressure, deadlines, cancellation, checksum and durable acknowledgements" "Internal protobuf gRPC/HTTP2 streaming with mTLS" {
+      tags "Planned"
+    }
+    magrathea.plannedClusterDataPlane -> magrathea.plannedClusterControlPlane "PLANNED / NOT IMPLEMENTED: submits verified artifact acknowledgements, reference publication requests, and durable repair/cleanup job evidence" "Internal protobuf gRPC/HTTP2 with mTLS" {
+      tags "Planned"
+    }
   }
 
   views {
@@ -183,7 +213,7 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
 
     container magrathea "Container" {
       title "C2 Container: Magrathea ObjectStore"
-      description "bootstrap-application is the executable Spring Boot assembly and owns the static asset handoff. Object Storage Admin Browser Application is the independently built browser runtime that composes Product Shell, the Object Storage Product Extension, and application-owned adapters; it does not imply that operational report providers exist. admin-api-adapter contributes the JSON Admin Control Plane. s3-reactive-api-adapter exposes the S3 API; reactive application containers implement object and bucket capabilities; reactive-repository-application supplies CQS interfaces; reactive-infrastructure supplies in-memory persistence; and storage-engine supplies the Storage Engine bounded context."
+      description "Implemented boundaries remain unchanged: bootstrap-application assembles the S3 and Admin runtimes, the browser uses only those established interfaces, and storage-engine remains behind the Object Store ACL. ADR 0027 adds two explicitly PLANNED / NOT IMPLEMENTED internal roles: an authoritative consensus Cluster Control Plane and a direct immutable-object Cluster Data Plane. Initially, three control-plane voter instances are planned one-per-storage-node deployment and co-located with data-plane instances across the best available independent failure domains; one unavailable voter is tolerated, not two. They are not public facades, and the PA-6 policy core remains inside storage-engine-domain rather than becoming a runtime container."
       include user
       include administrator
       include magrathea.bootstrapApplication
@@ -195,6 +225,8 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
       include magrathea.reactiveRepositoryApplication
       include magrathea.reactiveInfrastructure
       include magrathea.storageEngine
+      include magrathea.plannedClusterControlPlane
+      include magrathea.plannedClusterDataPlane
       autolayout lr
     }
 
@@ -304,6 +336,40 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
       magrathea.browserFrontend.productApplication -> magrathea.browserFrontend.objectStorageExtension "5. Render the registered product route" "ProductExtension contract"
       magrathea.browserFrontend.objectStorageExtension -> magrathea.browserFrontend.adminApiClient "6. Request Admin Control Plane data" "Typed client interface"
       magrathea.browserFrontend.adminApiClient -> magrathea.adminApiAdapter.adminRouter "7. GET/POST/PUT /admin/**" "HTTP/JSON"
+      autolayout lr
+    }
+
+    dynamic magrathea.s3ReactiveApiAdapter "PlannedClusterWriteRuntime" {
+      title "Runtime: Planned Consensus-Published Quorum Write"
+      description "PLANNED / NOT IMPLEMENTED (EP-8 EARLY). Resolve committed state, select targets through the pure PA-6 policy, transfer bytes directly, require the configured durable checksum-valid threshold (initial replication N=3/W=2), then consensus-commit the reference before acknowledging S3. Timeout, cancellation, stale epoch, checksum failure, insufficient acknowledgements, or loss of control quorum fails publication and leaves only unreachable artifacts for fenced cleanup."
+      user -> magrathea.s3ReactiveApiAdapter.objectOperationsHandler "1. Submit S3 PutObject" "HTTP"
+      magrathea.s3ReactiveApiAdapter.objectOperationsHandler -> magrathea.reactiveObjectStore.reactiveObjectService "2. Invoke object write use case" "Java service calls"
+      magrathea.reactiveObjectStore.reactiveObjectService -> magrathea.reactiveObjectStore.s3ObjectRepositoryPort "3. Persist through the existing repository boundary" "Repository interfaces"
+      magrathea.reactiveObjectStore.s3ObjectRepositoryPort -> magrathea.reactiveRepositoryApplication.s3ObjectCommandRepository "4. Select the configured repository implementation" "Implemented by"
+      magrathea.reactiveRepositoryApplication.s3ObjectCommandRepository -> magrathea.storageEngine.storageEngineRepositoryAdapter "5. Enter the Storage Engine ACL" "Implements"
+      magrathea.storageEngine.storageEngineRepositoryAdapter -> magrathea.storageEngine.storageEngineReactiveApplication "6. Coordinate the planned clustered write" "Java calls"
+      magrathea.storageEngine.storageEngineReactiveApplication -> magrathea.plannedClusterControlPlane "7. PLANNED: resolve committed membership, generations, fencing, topology and policy epochs" "Internal protobuf gRPC/HTTP2 with mTLS"
+      magrathea.plannedClusterControlPlane -> magrathea.storageEngine.storageEngineDomain "8. PLANNED: select exact targets using the pure PA-6 policy" "In-process Java calls"
+      magrathea.storageEngine.storageEngineReactiveApplication -> magrathea.plannedClusterDataPlane "9. PLANNED: stream the unpublished immutable artifacts to selected targets" "Internal protobuf gRPC/HTTP2 streaming with mTLS"
+      magrathea.plannedClusterDataPlane -> magrathea.plannedClusterDataPlane "10. PLANNED: transfer directly and return checksum-valid durable acknowledgements" "Internal protobuf gRPC/HTTP2 streaming with mTLS"
+      magrathea.plannedClusterDataPlane -> magrathea.plannedClusterControlPlane "11. PLANNED: submit verified artifact references only after the required threshold" "Internal protobuf gRPC/HTTP2 with mTLS"
+      magrathea.plannedClusterControlPlane -> magrathea.plannedClusterControlPlane "12. PLANNED: revalidate fencing and consensus-commit the object-reference generation" "Internal protobuf gRPC/HTTP2 and Raft with mTLS"
+      autolayout lr
+    }
+
+    dynamic magrathea.s3ReactiveApiAdapter "PlannedClusterReadRuntime" {
+      title "Runtime: Planned Consensus-Selected Checksum-Valid Read"
+      description "PLANNED / NOT IMPLEMENTED (EP-8 EARLY). Resolve only the consensus-committed manifest generation, then stream a referenced immutable artifact or reconstruct from referenced EC shards while validating checksum and length. The default replica read quorum is one valid replica; failed fallback records durable repair work and never selects or resurrects another generation."
+      user -> magrathea.s3ReactiveApiAdapter.objectOperationsHandler "1. Submit S3 GetObject" "HTTP"
+      magrathea.s3ReactiveApiAdapter.objectOperationsHandler -> magrathea.reactiveObjectStore.reactiveObjectService "2. Invoke object read use case" "Java service calls"
+      magrathea.reactiveObjectStore.reactiveObjectService -> magrathea.reactiveObjectStore.s3ObjectRepositoryPort "3. Read through the existing repository boundary" "Repository interfaces"
+      magrathea.reactiveObjectStore.s3ObjectRepositoryPort -> magrathea.reactiveRepositoryApplication.s3ObjectQueryRepository "4. Select the configured repository implementation" "Implemented by"
+      magrathea.reactiveRepositoryApplication.s3ObjectQueryRepository -> magrathea.storageEngine.storageEngineRepositoryAdapter "5. Enter the Storage Engine ACL" "Implements"
+      magrathea.storageEngine.storageEngineRepositoryAdapter -> magrathea.storageEngine.storageEngineReactiveApplication "6. Coordinate the planned clustered read" "Java calls"
+      magrathea.storageEngine.storageEngineReactiveApplication -> magrathea.plannedClusterControlPlane "7. PLANNED: resolve the consensus-committed object-reference generation" "Internal protobuf gRPC/HTTP2 with mTLS"
+      magrathea.storageEngine.storageEngineReactiveApplication -> magrathea.plannedClusterDataPlane "8. PLANNED: fetch only referenced replicas or the referenced EC reconstruction set" "Internal protobuf gRPC/HTTP2 streaming with mTLS"
+      magrathea.plannedClusterDataPlane -> magrathea.plannedClusterDataPlane "9. PLANNED: retry referenced sources and validate checksum and length through bounded buffers" "Internal protobuf gRPC/HTTP2 streaming with mTLS"
+      magrathea.plannedClusterDataPlane -> magrathea.plannedClusterControlPlane "10. PLANNED: record durable fenced repair work after successful fallback" "Internal protobuf gRPC/HTTP2 with mTLS"
       autolayout lr
     }
 
@@ -425,6 +491,15 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
       element "Component" {
         background #85bbf0
         color #000000
+      }
+      element "Planned" {
+        background #6b7280
+        color #ffffff
+        stroke #374151
+      }
+      relationship "Planned" {
+        color #6b7280
+        dashed true
       }
     }
 

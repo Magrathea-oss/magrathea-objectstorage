@@ -12,6 +12,19 @@ The C2 model includes the independently built **Object Storage Admin Browser App
 
 The model does not represent Product Shell or a product extension as separately running C4 containers: they are build-time package boundaries that execute as components in the browser application. It also does not invent operational report providers. The current Admin Control Plane returns explicit provider-not-configured responses when no real recovery, garbage-collection, scrub, audit, metrics, or trace provider is present.
 
+## EP-8 EARLY cluster planning boundary
+
+ADR 0027 adds explicitly **PLANNED / NOT IMPLEMENTED** C2 roles for the internal Cluster Control Plane and direct Cluster Data Plane. The C2 plan records one metadata voter and one data-plane role co-located on each of three initial storage-node deployments; physical/virtual deployment-node details remain intentionally unspecified. Planned relationships are tagged and rendered separately from implemented relationships. The model preserves these constraints:
+
+- S3 remains the only external object/bucket API, and the Admin API remains operational only.
+- Internal cluster traffic is protobuf gRPC over HTTP/2 with mandatory mTLS; it is not another public facade.
+- Consensus owns authoritative membership, epochs, fencing, metadata generations, tombstones, and durable job state.
+- Immutable object data moves directly between selected storage nodes and does not transit the Raft log.
+- PA-6 deterministic policy remains a pure `storage-engine-domain` component, not a separately running C2 container.
+- The three-voter initial plan tolerates one unavailable metadata voter, not two; no networked cluster implementation or validation is claimed.
+
+The planned write/read dynamic views show publication ordering, direct checksum/quorum transfer, consensus-selected reads, fallback, and durable repair recording without upgrading EP-8 or EP-10 implementation status.
+
 This project uses **Structurizr local** through the official `docker.io/structurizr/structurizr` container image, following the current Structurizr local workflow. The helper scripts are compatible with both **Podman** and **Docker**; Podman is preferred when both are available.
 
 <https://docs.structurizr.com/local/quickstart>

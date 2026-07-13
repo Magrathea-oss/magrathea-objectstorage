@@ -121,5 +121,37 @@ ifndef::imagesdir[:imagesdir: ../images]
 - **Response:** The browser observes `200 /admin/health`, `200 /admin/live`, `200 /admin/backend-status`, `503 /admin/ready`, `503 /admin/storage-devices`, `503 /admin/reports/recovery`, `503 /admin/reports/garbage-collection`, and `503 /admin/reports/scrub`; the UI renders selected `in-memory`, unavailable dashboard state, and three provider-not-configured report states
 - **Limitation:** This runtime had no YAML catalogs. Configured `storage-engine` dashboard priority and degraded-device linking are deterministic browser-fixture evidence, not live evidence from this run. This scenario does not establish any missing operational provider.
 
+==== Scenario 11 — Planned Quorum Write Safety
+
+- **Status:** `planned / absent`
+- **Context:** Three metadata voters and at least three policy-valid storage targets are configured.
+- **Stimulus:** A replicated object write encounters cancellation, checksum failure, stale epochs, one or more unavailable data targets, or loss of control quorum.
+- **Response:** S3 success occurs only after at least `W=2` checksum-valid durable acknowledgements and consensus commit of the reference. Otherwise publication fails; no degraded write or uncommitted generation becomes visible.
+- **Metric:** Multi-node semantic and fault-injection evidence must cover each failure before EP-10 can claim implementation.
+
+==== Scenario 12 — Planned Authoritative Read Integrity
+
+- **Status:** `planned / absent`
+- **Context:** A committed generation references multiple immutable replicas or an EC set.
+- **Stimulus:** The first selected source is unavailable or corrupt.
+- **Response:** The reader keeps the consensus-selected generation, retries only its referenced sources, validates checksum/length, satisfies the configured valid-data quorum (default one), and records durable repair after fallback; it never selects eventual metadata or serves unverified bytes.
+- **Metric:** Multi-node tests must prove retry, repair recording, tombstone/fencing safety, and failure below quorum/reconstruction threshold.
+
+==== Scenario 13 — Planned Cluster Control Availability and Safety
+
+- **Status:** `planned / absent`
+- **Context:** The initial three-voter metadata group is operating across the best available failure domains.
+- **Stimulus:** One voter fails, two voters fail, a node is merely suspected, or leadership changes during an operation.
+- **Response:** One-voter loss preserves quorum; two-voter loss blocks authoritative changes and new publication. Suspicion never changes membership. Idempotent operations may resume after leadership change without conflicting generation publication.
+- **Metric:** Ratis spike plus fault-injection tests must validate restart, snapshots, membership changes, leader transfer, partitions, fencing, and bounded resource use.
+
+==== Scenario 14 — Planned Supply-chain and Runtime Hardening Evidence
+
+- **Status:** `planned / absent`
+- **Context:** A release candidate and runtime image are assembled.
+- **Stimulus:** Execute supply-chain generation and hardened-container validation.
+- **Response:** Publish parseable CycloneDX JSON/XML and SPDX-normalized license inventory; retain truthful fail-closed OWASP evidence; run required S3/Admin/persistence behavior as non-root with unnecessary capabilities dropped, privilege escalation disabled, and root filesystem read-only except explicit mounts.
+- **Metric:** Artifact schema validation, inventory reconciliation/manual-review reporting, preserved OWASP status, and executable hardened-runtime checks all pass. Dependency remediation remains a separate decision.
+
 // The generated Gherkin requirements report is included as a top-level ARC42 appendix
 // from arc42-template.adoc (see AGENTS.md §B.7), not as a subsection of this chapter.

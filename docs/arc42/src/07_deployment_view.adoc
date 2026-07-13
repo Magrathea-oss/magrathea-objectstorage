@@ -99,6 +99,19 @@ When the `storage-engine` profile is active, durable state is organized under th
 
 Every document under `metadata/**` is committed with the same crash-safe discipline: write to a temp file in the target directory, then atomically rename over the final path. Concurrent writers to the same key are serialized through striped per-key locks.
 
+=== Planned Initial Cluster Deployment (ADR 0027)
+
+[NOTE]
+====
+Status: *planned / absent*. No multi-node deployment or Ratis validation exists.
+====
+
+The initial topology has three storage-node deployments. Each co-locates one logical Cluster Control Plane voter and one Cluster Data Plane role while keeping control and data responsibilities distinct. Voters should span the best available independent `zone → rack → host` failure domains; a three-voter group tolerates one unavailable voter, not two. Each node persists its UUID and cluster state separately from replaceable process/container identity.
+
+Only internal mTLS-authenticated protobuf gRPC/HTTP2 is permitted between nodes. Static seed addresses provide bootstrap contact and do not define membership. Writable mounts must be explicit for storage data, Ratis log/snapshots, and runtime state; planned hardening validation requires non-root execution, dropped unnecessary capabilities, no privilege escalation, and a read-only root filesystem outside those mounts.
+
+The embedded Apache Ratis deployment remains conditional on a spike covering persistence/snapshots, membership change, leader transfer/restart, mTLS integration, upgrade compatibility, bounded resources, Reactor bridging, and partition/fault behavior. Dedicated control-plane nodes or an external consensus service remain future reconsideration points if co-location or Ratis validation is unacceptable.
+
 === Production Deployment (Future)
 
 The current single-process deployment is intentionally monolithic for single-node operation. Enterprise Production Readiness phases (`PLAN.md`, EP-0..EP-11) sequence the path to production, including:

@@ -25,9 +25,11 @@ bootstrap-application/src/main/resources/static/product-manifest.json
 *.class
 META-INF/maven/
 
-# Local tool caches
+# Local tool caches and generated supply-chain evidence
 .cache/
 .pi/
+target/supply-chain/
+target/site/supply-chain/
 
 # Git metadata
 .git/

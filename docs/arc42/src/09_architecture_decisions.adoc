@@ -112,4 +112,8 @@ All architectural decisions are documented as Architecture Decision Records (ADR
 |link:../../adr/0026-magrathea-product-shell-and-product-extension-contracts.md[0026]
 |Magrathea Product Shell and Product Extension contracts
 |✅ Accepted — implemented and validated for REQ-ADMIN-001..031
+
+|link:../../adr/0027-authoritative-cluster-control-plane-and-direct-quorum-data-path.md[0027]
+|Authoritative cluster control plane and direct quorum data path
+|✅ Accepted architecture — implementation absent/planned
 |===

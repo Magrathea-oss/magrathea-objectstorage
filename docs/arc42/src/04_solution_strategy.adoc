@@ -78,6 +78,19 @@ The **Object Storage Admin Application** is the Product Extension owned by this 
 
 Operational report availability is fail-closed: without a configured recovery, garbage-collection, scrub, audit, metrics, or traces provider, the route returns HTTP 503 `report-provider-not-configured` and the UI renders `not-configured`. This is a truthful contract, not provider implementation.
 
+=== Planned Authoritative Cluster Strategy (ADR 0027)
+
+[NOTE]
+====
+Status: *planned / absent*. The architecture is accepted; no networked cluster, embedded Ratis integration, multi-node durability, SBOM/license output, or expanded hardening proof exists yet.
+====
+
+The planned cluster separates a small authoritative **Cluster Control Plane** from the high-volume **Cluster Data Plane**. Three initially co-located metadata voters use embedded Apache Ratis (subject to a mandatory spike) to order membership, bucket/configuration namespace, object-reference generations, topology/policy epochs, fencing/tombstones, and durable jobs. Static seeds only establish first contact; stable persisted node UUIDs and committed membership remain authoritative.
+
+Immutable replica or EC artifacts stream directly between selected nodes through internal protobuf gRPC/HTTP2 with mandatory mTLS, Reactor backpressure/cancellation bridging, deadlines, and bounded buffers. Initial replication is `N=3, W=2`; no reference is committed until the data threshold has durably acknowledged checksum-valid bytes, and degraded writes are disabled by default. Reads first resolve the consensus-committed generation and then require a configurable checksum-valid data quorum (default one), retrying alternate referenced replicas and recording durable repair work rather than reconciling eventual metadata.
+
+The topology catalog grows additively to `zone → rack → host → disk-set → device`. Existing PA-6 placement, quorum, anti-entropy, rebalance, and readiness classes remain deterministic policy core. See link:../../adr/0027-authoritative-cluster-control-plane-and-direct-quorum-data-path.md[ADR 0027] for ordering, failure semantics, alternatives, and the planned CycloneDX/SPDX/OWASP/container-hardening evidence strategy.
+
 === Quality Strategy
 
 - **Testability**: domain tested with pure JUnit (no Spring), integration tested with Cucumber BDD, targeted S3 compatibility verified with AWS CLI; the first AWS CLI object CRUD increment passes, but full S3 scenario parity remains open

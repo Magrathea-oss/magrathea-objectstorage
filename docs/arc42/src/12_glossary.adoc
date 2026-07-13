@@ -106,6 +106,45 @@ ifndef::imagesdir[:imagesdir: ../images]
 |S3ObjectContent
 |Domain interface: object read contract without reactive types
 
+|Cluster Control Plane
+|Planned internal consensus-authoritative role for membership, namespace and manifest generations, topology/policy epochs, fencing/tombstones, and durable cluster jobs; initially three embedded-Ratis voters (ADR 0027)
+
+|Cluster Data Plane
+|Planned internal role that transfers immutable replicas/chunks/EC shards directly between selected nodes and validates durable acknowledgements and reads; it is not an external object API
+
+|Node UUID
+|Stable persisted identifier of a storage node. It survives address, process, and certificate changes and must not be cloned into concurrent live nodes
+
+|Static seed
+|Operator-configured bootstrap address used to contact a cluster; it is neither authoritative membership nor an availability oracle
+
+|Metadata voter
+|Consensus participant storing and voting on the authoritative control log. The initial plan co-locates one voter with each of three storage-node deployments
+
+|Control log
+|Consensus-ordered history owning membership, bucket/config namespace, object-reference generations, topology/policy epochs, fencing/tombstones, and durable job state; large object bytes are excluded
+
+|Fencing
+|Rejection of stale node incarnations, coordinators, operations, or topology/policy epochs so they cannot publish conflicting or resurrected state
+
+|Topology epoch
+|Consensus-controlled version of the parent-linked `zone → rack → host → disk-set → device` placement snapshot
+
+|Write quorum (`W`)
+|Minimum number of selected targets that must durably acknowledge checksum-valid immutable data before reference publication; initial replicated default is `W=2` of `N=3`
+
+|Valid-data read quorum
+|Configurable number of checksum/length-valid sources required after consensus resolves the committed generation; default is one replica with alternate retry and durable repair
+
+|Degraded write
+|A write acknowledged below its declared placement/durability threshold. ADR 0027 disables this behavior by default
+
+|CycloneDX SBOM
+|Planned release inventory of application components emitted and schema-validated in both JSON and XML
+
+|SPDX-normalized license inventory
+|Planned dependency-license report preserving package/version identity, detected and concluded licenses, source, and unresolved/manual-review results
+
 |Enterprise Production Readiness Plan (EP-0..EP-11)
 |`PLAN.md` roadmap sequencing governance, security, durability, streaming, space management, operability, performance, admin panel, cluster architecture, and optional gateways before broader production claims
 
