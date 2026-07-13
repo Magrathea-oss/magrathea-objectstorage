@@ -145,41 +145,72 @@ As of the EP-2 metadata durability work, every family below is a value object on
 
 **Unavailable-provider flow:** UI → typed Admin client → operational report route → optional provider port. If no provider is configured, the route returns HTTP 503 `report-provider-not-configured` with `availability: not-configured`, and the UI renders an unavailable state without fabricated records.
 
-=== Planned Scenario 6d — Consensus-Published Quorum Write (ADR 0027)
+=== Scenario 6d — Fixed-Cluster CreateBucket (ADR 0028)
 
 [NOTE]
 ====
-Status: *planned / not implemented*. Architecture ordering only; not runtime evidence.
+Status: *implementation-informed / implemented-and-validated for `REQ-CLUSTER-001`*. The status is limited to the fixed A/B/C profile.
 ====
 
-.Planned runtime — consensus-published quorum write
-image::../../c4/images/PlannedClusterWriteRuntime.png[Planned Cluster Write Runtime, width=600]
+.Runtime — consensus-committed bucket generation
+image::../../c4/images/ClusterCreateBucketRuntime.png[Cluster CreateBucket Runtime, width=600]
 
-1. Resolve committed membership, namespace generation, fencing, and topology/policy epochs.
-2. Use the pure PA-6 policy core to select exact replica or EC targets.
-3. Stream unpublished immutable artifacts directly to selected nodes over bounded, deadline-aware, cancellable gRPC/mTLS.
-4. Each target durably publishes its local artifact only after checksum/length validation and returns an idempotent acknowledgement.
-5. Require the configured threshold (initial replication `N=3, W=2`); timeout, cancellation, stale epoch, corruption, or insufficient acknowledgements aborts publication.
-6. Revalidate fencing and consensus-commit the object-reference generation before acknowledging S3. Unreferenced artifacts remain unreachable and are handled only by fenced durable cleanup.
+1. A client sends unconditional `CreateBucket` through the existing S3 endpoint and Object Store-to-Storage Engine adapter on node A.
+2. `storage-engine-cluster-application` proposes a new bucket generation to the fixed A/B/C Ratis voter group.
+3. The control group commits the generation after its two-voter majority; bucket bytes or an alternate internal object API are not involved.
+4. S3 success follows the commit, and `HeadBucket` through node B resolves the committed generation.
 
-Loss of metadata quorum, inability to satisfy placement, or fewer than `W` valid acknowledgements fails the write; there is no default degraded-write path.
+Bucket configuration families, conditional creation, dynamic membership, and wider namespace behavior are outside this first slice.
 
-=== Planned Scenario 6e — Consensus-Selected Checksum-Valid Read (ADR 0027)
+=== Scenario 6e — Whole-Object Quorum PUT (ADR 0028)
 
 [NOTE]
 ====
-Status: *planned / not implemented*. Architecture ordering only; not runtime evidence.
+Status: *implementation-informed / implemented-and-validated for the fixed write path and its two no-publication failures (`REQ-CLUSTER-002..004`)*.
 ====
 
-.Planned runtime — consensus-selected checksum-valid read
-image::../../c4/images/PlannedClusterReadRuntime.png[Planned Cluster Read Runtime, width=600]
+.Runtime — fixed `N=3/W=2` whole-object write
+image::../../c4/images/ClusterWriteRuntime.png[Cluster Write Runtime, width=600]
 
-1. Resolve exactly the consensus-committed object-reference/manifest generation; never compare divergent replicas to choose metadata.
-2. Stream a referenced replica or reconstruct from the referenced EC set through bounded buffers while checking length and checksum.
-3. Require the configured valid-data quorum (default one valid replica). On failure, retry alternate referenced sources.
-4. A successful fallback records durable, fenced repair work. If the quorum/reconstruction threshold cannot be met, fail rather than serve unverified bytes.
+1. A client sends an unconditional, single-part whole-object `PUT` through node A's existing S3 boundary.
+2. The cluster application resolves the committed bucket generation and selects fixed replica targets A, B, and C.
+3. The coordinator transfers unpublished whole-object bytes directly through independent grpc-java data services. The bounded bridge uses 64 KiB-or-smaller payload frames, finite queues/in-flight demand, readiness checks, deadlines, and cancellation; object bytes do not transit the Ratis log.
+4. A target acknowledges only after durable publication and checksum/length validation.
+5. Fewer than `W=2` valid durable acknowledgements fails the operation. There is no degraded-write fallback, and staged bytes remain unreachable.
+6. After `W=2`, the control group commits an object-reference generation naming verified immutable replicas. Loss of control quorum still fails publication. S3 success follows the reference commit, not merely replica receipt.
 
-Health suspicion can affect new placement and trigger investigation, but never auto-evicts membership or resurrects a tombstoned generation.
+=== Scenario 6f — Coordinator-Loss Exact-Byte GET (ADR 0028)
+
+[NOTE]
+====
+Status: *implementation-informed / implemented-and-validated for `REQ-CLUSTER-002`*. It proves one stopped coordinator while B and C remain reachable, not general partition tolerance or production readiness.
+====
+
+.Runtime — stop A, then exact-byte GET through B
+image::../../c4/images/ClusterFailoverReadRuntime.png[Cluster Failover Read Runtime, width=600]
+
+1. After a successful write, the real-process acceptance environment stops coordinator node A without changing fixed membership.
+2. A client sends `GET /{bucket}/{key}` through node B's S3 endpoint.
+3. B and C retain the two-voter control quorum and resolve exactly the committed bucket/object-reference generation; no replica comparison chooses metadata.
+4. B reads a referenced checksum-valid whole-object replica and returns it through S3.
+5. WebTestClient and AWS CLI validation compare the response byte-for-byte with the uploaded fixture and verify its length, SHA-256, and ETag.
+
+=== Scenario 6g — Complete Fixed-Cluster Restart (ADR 0028)
+
+[NOTE]
+====
+Status: *implementation-informed / implemented-and-validated for `REQ-CLUSTER-005`*. Recovery is from the same non-empty roots and fixed membership; node replacement and membership change are not covered.
+====
+
+.Runtime — complete A/B/C restart
+image::../../c4/images/ClusterCompleteRestartRuntime.png[Cluster Complete Restart Runtime, width=600]
+
+1. Stop A, B, and C and discard process memory after the bucket and object-reference generations are committed.
+2. Restart all three JVMs against their original non-empty identity, Ratis, object, temporary, and runtime roots, with seed order changed to `C,A,B`.
+3. Each node recovers its stable UUID; seed order does not rewrite persisted three-voter state or committed generations.
+4. A `GetObject` through B returns the original exact bytes, length, SHA-256, and ETag.
+
+The shared real-process `REQ-CLUSTER-001..005` gates pass in both WebTestClient and AWS CLI modes (10 scenarios, 108 steps). Focused Ratis/gRPC/cross-module scenarios separately pass for `REQ-CLUSTER-008..013`. Root Maven success is only supporting integration evidence. These results do not cover clustered multipart, conditional/versioned writes, erasure coding, dynamic membership, healing/rebalance, rolling upgrades, or the broader partition suite.
 
 === Scenario 7 — Reactive Chain Pattern
 

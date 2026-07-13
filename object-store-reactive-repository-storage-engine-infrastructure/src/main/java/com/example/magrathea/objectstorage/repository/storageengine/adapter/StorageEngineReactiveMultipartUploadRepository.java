@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * </p>
  */
 @Repository
-@Profile("storage-engine")
+@Profile("storage-engine & !cluster")
 public class StorageEngineReactiveMultipartUploadRepository
         implements MultipartUploadCommandRepository, MultipartUploadQueryRepository {
 

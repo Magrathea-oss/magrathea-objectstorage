@@ -247,6 +247,125 @@ jobs:
           mvn -B --no-transfer-progress -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false -Dtest=PhaseEp1SecurityIdentityRequirementsCucumberTest,PhaseEp1SecurityIdentityAwsCliCucumberTest,Ep1SecurityServicesSpecsCucumberTest,PhaseEp2MetadataDurabilityCucumberTest,PhaseEp2MetadataDurabilityFullRestartCucumberTest,Phase3ReactivePipelineStaticArchitectureSpecsCucumberTest,Phase3RuntimeBackpressureSpecsCucumberTest,PhaseEp4SpaceManagementSpecsCucumberTest,PhaseEp4CapacityWebCucumberTest,PhaseEp4CapacityAwsCliCucumberTest,PhaseEp5OperabilityRequirementsCucumberTest,PhaseEp5StorageMigrationSpecsCucumberTest,PhaseEp5DeliverySpecsCucumberTest,PhaseEp7AdminApiRequirementsCucumberTest,S3ApiSemanticCoverageReportSpecsCucumberTest,Phase5S3SemanticCompatibilityRequirementsCucumberTest,Phase5S3SemanticCompatibilityAwsCliCucumberTest,Phase5MultipartFullRestartCucumberTest test | tee target/focused-cucumber.log
           ! grep -q 'Using generated security password' target/focused-cucumber.log
 
+  ep10-bounded-cluster-evidence:
+    name: EP-10 bounded cluster process and mechanism evidence (non-publishing)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Install and verify the EP-10 toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          packages=()
+          command -v mvn >/dev/null 2>&1 || packages+=(maven)
+          command -v openssl >/dev/null 2>&1 || packages+=(openssl)
+          command -v aws >/dev/null 2>&1 || packages+=(awscli)
+          if (( ${#packages[@]} > 0 )); then
+            sudo apt-get update
+            sudo apt-get install --yes --no-install-recommends "${packages[@]}"
+          fi
+          java_version="$(java -version 2>&1 | awk -F '"' '/version/ { split($2, parts, "."); print parts[1]; exit }')"
+          test "$java_version" = "21"
+          java -version
+          mvn --version
+          openssl version
+          aws --version
+
+      - name: Run bounded EP-10 shared and focused Cucumber evidence
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p target/ci-ep10
+
+          cleanup_ep10_jvms() {
+            mapfile -t pids < <(pgrep -f 'com[.]example[.]magrathea[.]bootstrap[.]ep10[.]Ep10AcceptanceApplication' || true)
+            if (( ${#pids[@]} == 0 )); then
+              return
+            fi
+            kill -TERM "${pids[@]}" 2>/dev/null || true
+            for _ in $(seq 1 10); do
+              mapfile -t pids < <(pgrep -f 'com[.]example[.]magrathea[.]bootstrap[.]ep10[.]Ep10AcceptanceApplication' || true)
+              (( ${#pids[@]} == 0 )) && return
+              sleep 1
+            done
+            kill -KILL "${pids[@]}" 2>/dev/null || true
+          }
+          trap cleanup_ep10_jvms EXIT INT TERM
+
+          overall_status=0
+          set +e
+          timeout --signal=TERM --kill-after=30s 35m \
+            mvn -B --no-transfer-progress -Pep10-cluster-tests \
+              -pl bootstrap-application -am \
+              -Dsurefire.failIfNoSpecifiedTests=false \
+              -Dtest=PhaseEp10CreateBucketRealProcessCucumberTest test \
+            2>&1 | tee target/ci-ep10/req-cluster-001-005-real-process.log
+          real_process_status=${PIPESTATUS[0]}
+          set -e
+          cleanup_ep10_jvms
+          if (( real_process_status != 0 )); then
+            overall_status=$real_process_status
+          fi
+
+          set +e
+          timeout --signal=TERM --kill-after=30s 15m \
+            mvn -B --no-transfer-progress -Pep10-cluster-tests \
+              -pl cluster-control-ratis-infrastructure,cluster-data-grpc-infrastructure,s3-reactive-api-adapter -am \
+              -Dsurefire.failIfNoSpecifiedTests=false \
+              -Dtest=PhaseEp10ControlPlaneCucumberTest,PhaseEp10ControlPlaneTlsCucumberTest,PhaseEp10DataPlaneCucumberTest,PhaseEp10ClusterCoordinationCucumberTest test \
+            2>&1 | tee target/ci-ep10/req-cluster-008-013-focused-mechanisms.log
+          focused_status=${PIPESTATUS[0]}
+          set -e
+          cleanup_ep10_jvms
+          if (( focused_status != 0 && overall_status == 0 )); then
+            overall_status=$focused_status
+          fi
+          exit "$overall_status"
+
+      - name: Ensure EP-10 child JVM cleanup
+        if: always()
+        shell: bash
+        run: |
+          mapfile -t pids < <(pgrep -f 'com[.]example[.]magrathea[.]bootstrap[.]ep10[.]Ep10AcceptanceApplication' || true)
+          if (( ${#pids[@]} > 0 )); then
+            kill -TERM "${pids[@]}" 2>/dev/null || true
+            sleep 5
+            mapfile -t pids < <(pgrep -f 'com[.]example[.]magrathea[.]bootstrap[.]ep10[.]Ep10AcceptanceApplication' || true)
+            (( ${#pids[@]} == 0 )) || kill -KILL "${pids[@]}" 2>/dev/null || true
+          fi
+
+      - name: Upload bounded EP-10 Cucumber, Surefire, and process evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ep10-bounded-cluster-evidence-${{ github.run_id }}
+          path: |
+            target/ci-ep10/*.log
+            bootstrap-application/target/cucumber-json/ep10-*.json
+            bootstrap-application/target/surefire-reports/*PhaseEp10CreateBucketRealProcessCucumberTest*
+            bootstrap-application/target/ep10/evidence/
+            bootstrap-application/target/ep10/three-node/*.log
+            cluster-control-ratis-infrastructure/target/cucumber-json/ep10-*.json
+            cluster-control-ratis-infrastructure/target/surefire-reports/*PhaseEp10*
+            cluster-data-grpc-infrastructure/target/cucumber-json/ep10-*.json
+            cluster-data-grpc-infrastructure/target/surefire-reports/*PhaseEp10*
+            s3-reactive-api-adapter/target/cucumber-json/ep10-*.json
+            s3-reactive-api-adapter/target/surefire-reports/*PhaseEp10ClusterCoordinationCucumberTest*
+          if-no-files-found: warn
+          retention-days: 30
+
   ep6-ci-load:
     name: EP-6 deterministic 45-second load validation
     runs-on: ubuntu-latest

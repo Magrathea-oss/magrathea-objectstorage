@@ -19,6 +19,11 @@ ifndef::imagesdir[:imagesdir: ../images]
 |Bucket registry, multipart upload state, and per-object/bucket configuration survive a full process restart in storage-engine mode (EP-2)
 |Restart-simulation unit tests (`MetadataDurabilityRestartTest`) plus real Spring-context restart test (`StorageEngineRestartSafetyTest`)
 
+|Reliability / Consistency / Integrity
+|Bounded fixed-cluster durability and failover
+|For fixed A/B/C, publish unconditional whole-object writes only after `W=2` checksum-valid durable acknowledgements and control commit; preserve exact reads after coordinator loss and complete restart
+|Shared real-process WebTestClient and AWS CLI `REQ-CLUSTER-001..005`, plus focused mechanism `REQ-CLUSTER-008..013`; this metric does not cover later EP-10 capabilities
+
 |Performance
 |Reactive non-blocking I/O
 |Upload/download without thread blocking
@@ -82,7 +87,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 - **Context:** OWASP Dependency-Check scans resolved production-reactor dependencies under the CVSS 7.0 policy
 - **Stimulus:** Run `NVD_API_KEY="$(< /secure/path/nvd-api-key)" scripts/run-dependency-check.sh`, using an access-restricted, non-repository key file or equivalent CI secret injection
 - **Response:** A complete scan publishes `target/dependency-check-report.json` and `.html`; normalized status is written to `target/site/dependency-check-analysis.json`. An incomplete scan fails and emits `target/dependency-check-scan-error.json` plus `target/dependency-check-scan.log` without fabricating clean evidence.
-- **Observed metric (2026-07-13, current evidence revision `209b3170b64d3311ba9b773fdb7bd5581519e682`):** Dependency-Check 12.2.2 downloaded 190,000/364,891 NVD records before HTTP 429; `scanStatus=error`, `clean=null`, 8 scan errors. The outcome is monitoring-only `unknown/error`: there is no vulnerability-findings, clean-scan, or zero-vulnerability claim and no EP-8 remediation was performed.
+- **Observed metric (2026-07-13, historical EP-8 clean revision `209b3170b64d3311ba9b773fdb7bd5581519e682`):** Dependency-Check 12.2.2 downloaded 190,000/364,891 NVD records before HTTP 429; `scanStatus=error`, `clean=null`, 8 scan errors. The outcome is monitoring-only `unknown/error`: there is no vulnerability-findings, clean-scan, or zero-vulnerability claim and no EP-8 remediation was performed. The later dirty-working-tree root test did not refresh this assessment.
 
 ==== Scenario 6 — Restart Safety (Storage Engine backend)
 
@@ -121,37 +126,37 @@ ifndef::imagesdir[:imagesdir: ../images]
 - **Response:** The browser observes `200 /admin/health`, `200 /admin/live`, `200 /admin/backend-status`, `503 /admin/ready`, `503 /admin/storage-devices`, `503 /admin/reports/recovery`, `503 /admin/reports/garbage-collection`, and `503 /admin/reports/scrub`; the UI renders selected `in-memory`, unavailable dashboard state, and three provider-not-configured report states
 - **Limitation:** This runtime had no YAML catalogs. Configured `storage-engine` dashboard priority and degraded-device linking are deterministic browser-fixture evidence, not live evidence from this run. This scenario does not establish any missing operational provider.
 
-==== Scenario 11 — Planned Quorum Write Safety
+==== Scenario 11 — Fixed-Slice Quorum Write Safety
 
-- **Status:** `planned / absent`
-- **Context:** Three metadata voters and at least three policy-valid storage targets are configured.
-- **Stimulus:** A replicated object write encounters cancellation, checksum failure, stale epochs, one or more unavailable data targets, or loss of control quorum.
-- **Response:** S3 success occurs only after at least `W=2` checksum-valid durable acknowledgements and consensus commit of the reference. Otherwise publication fails; no degraded write or uncommitted generation becomes visible.
-- **Metric:** Multi-node semantic and fault-injection evidence must cover each failure before EP-10 can claim implementation.
+- **Status:** `implementation-informed`, `@implemented-and-validated` for `REQ-CLUSTER-002..004`; EP-10 remains partial.
+- **Context:** Fixed nodes A, B, and C run one voter and one replica server per JVM with policy `N=3/W=2`.
+- **Stimulus:** An unconditional whole-object write succeeds, has only one checksum-valid durable acknowledgement, or has two staged replicas but no control quorum.
+- **Response:** S3 success occurs only after at least `W=2` checksum-valid durable acknowledgements and consensus commit of the object-reference generation. Otherwise publication fails, staged bytes remain unreachable, and no degraded result is returned.
+- **Metric (2026-07-13):** The shared real-process WebTestClient and AWS CLI gate for `REQ-CLUSTER-001..005` passes 10 scenarios / 108 steps in total. Focused cross-module `REQ-CLUSTER-009/010` mechanisms also pass. Ordinary root Maven success is supporting evidence only.
 
-==== Scenario 12 — Planned Authoritative Read Integrity
+==== Scenario 12 — Fixed-Slice Failover and Complete-Restart Integrity
 
-- **Status:** `planned / absent`
-- **Context:** A committed generation references multiple immutable replicas or an EC set.
-- **Stimulus:** The first selected source is unavailable or corrupt.
-- **Response:** The reader keeps the consensus-selected generation, retries only its referenced sources, validates checksum/length, satisfies the configured valid-data quorum (default one), and records durable repair after fallback; it never selects eventual metadata or serves unverified bytes.
-- **Metric:** Multi-node tests must prove retry, repair recording, tombstone/fencing safety, and failure below quorum/reconstruction threshold.
+- **Status:** `implementation-informed`, `@implemented-and-validated` for `REQ-CLUSTER-001`, `002`, and `005`.
+- **Context:** Bucket and whole-object reference generations are committed in fixed A/B/C; stable UUIDs and each node's identity, Ratis, object, temporary, and runtime roots are distinct.
+- **Stimulus:** Stop coordinator A while B and C remain mutually reachable, then retrieve through B; separately stop all A/B/C JVMs and restart them from their original non-empty roots with seed order `C,A,B`.
+- **Response:** B resolves the consensus-committed generation and returns the exact uploaded bytes, length, SHA-256, and ETag. Complete restart recovers original identities and committed state without seed order rewriting membership.
+- **Metric (2026-07-13):** Both flows pass in the shared WebTestClient and AWS CLI real-process scenarios. The result proves one-node stop and complete fixed-cluster restart, not dynamic replacement, general partitions, healing, or production readiness.
 
-==== Scenario 13 — Planned Cluster Control Availability and Safety
+==== Scenario 13 — Bounded Cluster Mechanism and Security Safety
 
-- **Status:** `planned / absent`
-- **Context:** The initial three-voter metadata group is operating across the best available failure domains.
-- **Stimulus:** One voter fails, two voters fail, a node is merely suspected, or leadership changes during an operation.
-- **Response:** One-voter loss preserves quorum; two-voter loss blocks authoritative changes and new publication. Suspicion never changes membership. Idempotent operations may resume after leadership change without conflicting generation publication.
-- **Metric:** Ratis spike plus fault-injection tests must validate restart, snapshots, membership changes, leader transfer, partitions, fencing, and bounded resource use.
+- **Status:** `implementation-informed`, `@implemented-and-validated` for `REQ-CLUSTER-008..013`; `REQ-CLUSTER-014` remains `@partial`.
+- **Context:** The fixed profile uses Ratis control, separate grpc-java replica transfer, stable UUIDs, 64 KiB maximum payload frames, and test-local mTLS fixtures.
+- **Stimulus:** Start/restart fixed voters, transfer a multi-frame object under slow demand, cancel or expire transfer, attempt an invalid peer, or evaluate publication ordering across modules.
+- **Response:** Persisted fixed state recovers; flow control remains finite; cancellation/deadline releases resources without durable acknowledgement; both internal transports reject unauthenticated or identity-mismatched peers; S3 remains the only external object API.
+- **Metric (2026-07-13):** Focused real Ratis, gRPC, TLS, and cross-module Cucumber reports for `REQ-CLUSTER-008..013` pass. Clustered multipart, conditional/versioned or chunked writes, erasure coding, dynamic membership/PKI lifecycle, healing/rebalance/orphan cleanup, rolling upgrades, and broader partitions remain not implemented or unvalidated (`006/007`, `015..018`).
 
 ==== Scenario 14 — Supply-chain and Runtime Hardening Evidence (`REQ-SUPPLY-001..006`)
 
-- **Status:** `implementation-informed`, `@implemented-and-validated` for bounded architecture/evidence wiring; no publication or cluster-runtime claim
-- **Context:** Clean revision `209b3170b64d3311ba9b773fdb7bd5581519e682` and one exact local JVM image are assembled as non-published development evidence.
-- **Stimulus:** Execute application/image SBOM generation, license normalization, fail-closed OWASP monitoring, hardened-container replacement, and the two EP-8 Cucumber runners.
-- **Response:** CycloneDX 1.6 application JSON/XML reconcile at 102 components and 103 dependencies; Syft 1.31.0 inspects exact image ID `sha256:e5b5862948853a613f8b92adc8135fa81b84bdd9f36c9ae8d69b9a6bd6dd7966`; license unknown/ambiguous entries stay visible without a compliance conclusion; the runtime uses UID/GID 10001, read-only root, explicit writable mounts, `no-new-privileges`, dropped capabilities, isolated host namespaces, and no engine socket while preserving Admin readiness and exact object bytes across replacement.
-- **Metric:** Architecture Cucumber passed 13/13 expanded scenarios and 114 steps; supply-chain Cucumber passed 9/9 and 103 steps. Application JSON SHA-256 is `4025d7206af01683da5cffa84862f20f68c7568dd9338ee9920d55947df545d1`, XML SHA-256 is `b934de56a243cf6b5464566f45635e1f6ac0fc244d2ceb7c1f7418308012952f`, license inventory SHA-256 is `0df3a3eac37e554dce6d67f227ffead9b28675f47fca9dab741d6850ac47b214`, and the 7,105-component image SBOM SHA-256 is `8d13ae409ef7230d52b4d850d0700db69132297910e55cffdbe27c08e28a90ba`. OWASP remains `unknown/error` after NVD HTTP 429 at 190,000/364,891 records (`clean=null`, 8 errors), so no vulnerability or remediation conclusion follows.
+- **Status:** `implementation-informed`; current complete-reactor `REQ-SUPPLY-001` is `@implemented-not-e2e-validated`. Other EP-8 scenarios retain their declared statuses and limitations; there is no publication or cluster-runtime claim.
+- **Context:** The historical clean packet assembled revision `209b3170b64d3311ba9b773fdb7bd5581519e682` and one exact local JVM image as non-published development evidence. The production reactor later gained four cluster modules without a new acceptance-eligible clean-revision application SBOM/license/image packet.
+- **Stimulus:** Execute application/image SBOM generation, license normalization, fail-closed OWASP monitoring, hardened-container replacement, and the two EP-8 Cucumber runners against one clean full revision. A dirty checkout must fail acceptance-evidence identity generation rather than reuse the historical packet.
+- **Response:** For the historical revision, CycloneDX 1.6 application JSON/XML reconcile at 102 components and 103 dependencies; Syft 1.31.0 inspects exact image ID `sha256:e5b5862948853a613f8b92adc8135fa81b84bdd9f36c9ae8d69b9a6bd6dd7966`; license unknown/ambiguous entries stay visible without a compliance conclusion; the runtime uses UID/GID 10001, read-only root, explicit writable mounts, `no-new-privileges`, dropped capabilities, isolated host namespaces, and no engine socket while preserving Admin readiness and exact object bytes across replacement. None of those historical values claims coverage of the four later cluster modules.
+- **Metric:** Architecture Cucumber passed 13/13 expanded scenarios and 114 steps; the historical supply-chain Cucumber run passed 9/9 and 103 steps. Historical-only hashes are: application JSON `4025d7206af01683da5cffa84862f20f68c7568dd9338ee9920d55947df545d1`, application XML `b934de56a243cf6b5464566f45635e1f6ac0fc244d2ceb7c1f7418308012952f`, license inventory `0df3a3eac37e554dce6d67f227ffead9b28675f47fca9dab741d6850ac47b214`, and 7,105-component image SBOM `8d13ae409ef7230d52b4d850d0700db69132297910e55cffdbe27c08e28a90ba`. OWASP remains `unknown/error` after NVD HTTP 429 at 190,000/364,891 records (`clean=null`, 8 errors), so no vulnerability or remediation conclusion follows. The dirty-working-tree ordinary root pass is supporting integration evidence only.
 
 // The generated Gherkin requirements report is included as a top-level ARC42 appendix
 // from arc42-template.adoc (see AGENTS.md §B.7), not as a subsection of this chapter.

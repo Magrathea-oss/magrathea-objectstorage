@@ -6,6 +6,10 @@
 
 **Magrathea ObjectStore** is an AWS S3-compatible object store built with Spring Boot 4 WebFlux and Java 21. The public object API is the S3 REST API exposed by the pluggable `s3-reactive-api-adapter` module. In addition, `admin-api-adapter` exposes `/admin/**` endpoints for storage policy, device, and configuration management — these are internal/administrative APIs, separate from the S3 object API.
 
+> **Current cluster status:** EP-10 is **partial**. Its implemented-and-validated scope is the fixed A/B/C whole-object `N=3/W=2` slice with consensus publication, failover, and complete restart (`REQ-CLUSTER-001..005`, `008..013`). Multipart/conditional/versioned/EC transfer, dynamic membership, healing/rebalance, and broader partitions remain absent; no production-readiness or general distributed-support claim is made.
+
+**Architecture:** [ARC42 entry point](docs/arc42/arc42-template.adoc) · [C4 model](docs/c4/README.md) · [Executable requirements appendix](docs/arc42/generated/gherkin-requirements.adoc) · [Focused evidence](docs/test-report.md)
+
 ---
 
 ## System Context
@@ -27,7 +31,7 @@
 - **Jackson 3 XML** — `tools.jackson.dataformat:jackson-dataformat-xml` with custom WebFlux encoder
 - **Pure domain** — no Spring, no JPA, no reactive types in `object-store-domain`
 - **In-memory infrastructure** — reactive in-memory bucket, object, and multipart repositories
-- **Testing** — JUnit, Cucumber, targeted AWS CLI compatibility; the first AWS CLI object CRUD increment passes, but full S3 scenario parity is not complete; **JaCoCo is the current coverage baseline** (Clover/OpenClover is optional/legacy)
+- **Testing** — JUnit, Cucumber, targeted AWS CLI compatibility; the fixed EP-10 slice reuses shared real-process scenarios in WebTestClient and AWS CLI modes, but full S3 and cluster capability parity is not complete; **JaCoCo is the current coverage baseline** (Clover/OpenClover is optional/legacy)
 
 ---
 
@@ -41,7 +45,11 @@
 | `object-store-reactive-repository-application` | Reactive CQS repository interfaces | Bucket, object, and multipart command/query ports |
 | `object-store-reactive-application` | Reactive application services and DTOs | Native Mono/Flux service APIs |
 | `object-store-reactive-infrastructure` | Reactive in-memory repository implementations | No HTTP API, no S3 router |
-| `object-store-reactive-repository-storage-engine-infrastructure` | Anti-Corruption Layer + adapter: Object Store → Storage Engine | Implements repository interfaces using Storage Engine backend |
+| `object-store-reactive-repository-storage-engine-infrastructure` | Anti-Corruption Layer + adapter: Object Store → Storage Engine | Implements repository interfaces using single-node Storage Engine or bounded cluster repositories |
+| `storage-engine-cluster-application` | Transport-neutral cluster application layer | Fixed-slice control/data ports and `N=3/W=2` whole-object coordination; no Ratis/gRPC dependencies |
+| `cluster-protocol` | Internal versioned protobuf contracts | No S3 API or domain policy |
+| `cluster-control-ratis-infrastructure` | Fixed-cluster control infrastructure | Ratis voter/state machine, persisted state, fixed bootstrap, control mTLS |
+| `cluster-data-grpc-infrastructure` | Direct replica transport infrastructure | grpc-java bounded transfer, checksums, deadlines/cancellation, replica mTLS |
 | `storage-engine-domain` | Storage Engine domain model (pure) | Policy, workflow, device, trace, manifest — zero framework dependencies |
 | `storage-engine-reactive-application` | Storage Engine reactive orchestration | Ports, Chunker, ReactiveStorageOrchestrator |
 | `storage-engine-reactive-infrastructure` | Storage Engine filesystem cluster backend | YAML catalogs, FileSystemStorageCluster, content address index, manifest repository, chaos decorator |
@@ -49,14 +57,15 @@
 
 ### Backend selection
 
-Two implementations of the Object Store repository interfaces coexist:
+The Object Store repository implementations are selected by profile:
 
 | Profile | Backend | Module |
 |---|---|---|
 | `single-node` (default for unpackaged/dev runs) | In-memory repositories | `object-store-reactive-infrastructure` |
-| `storage-engine` | Storage Engine filesystem cluster | `object-store-reactive-repository-storage-engine-infrastructure` |
+| `storage-engine` | Single-node Storage Engine filesystem backend | `object-store-reactive-repository-storage-engine-infrastructure` |
+| `storage-engine,cluster` | Bounded fixed A/B/C consensus and whole-object backend | Storage Engine adapter plus the four cluster modules above |
 
-The packaged JVM and native container images activate `storage-engine` by default even for single-node deployments, and package the YAML storage-policy/device/disk-set catalogs under `/app/config`. The bare Spring Boot default remains `single-node` for development/test compatibility unless a deployment explicitly selects `storage-engine`.
+The packaged JVM and native container images activate `storage-engine` by default even for single-node deployments, and package the YAML storage-policy/device/disk-set catalogs under `/app/config`. They do not activate the cluster profile by default. The bare Spring Boot default remains `single-node` for development/test compatibility. The `cluster` profile is limited to the fixed first slice and requires explicit node/root/address/mTLS configuration; unsupported cluster operations fail rather than falling back to single-node semantics.
 The ACL translation layer lives in `object-store-reactive-repository-storage-engine-infrastructure`,
 which translates Object Store concepts into Storage Engine commands and delegates persistence
 to the Storage Engine bounded context.
@@ -210,9 +219,11 @@ aws --endpoint-url http://localhost:8080 s3api get-object --bucket test-bucket -
 
 Consolidated Markdown report: [`docs/test-report.md`](docs/test-report.md)
 
+The EP-10 semantic claim comes from its focused shared real-process WebTestClient/AWS CLI gates and focused Ratis/gRPC/cross-module runners documented there. An ordinary root `mvn test` pass is supporting integration evidence only and must not be substituted for the focused 10-scenario / 108-step result or used to upgrade later EP-10 scope. The current dirty-working-tree root pass is likewise not acceptance supply-chain evidence: `REQ-SUPPLY-001` remains implemented-not-e2e-validated until a clean-revision application SBOM/license/image packet covers all four cluster modules.
+
 ### Requirements appendix generation
 
-The ARC42 Gherkin requirements appendix is generated deterministically from the shared requirement feature files under `s3-reactive-api-adapter/src/test/features/requirements`.
+The ARC42 Gherkin requirements appendix is generated deterministically from all shared `.feature` files under `s3-reactive-api-adapter/src/test/features/requirements` and `s3-reactive-api-adapter/src/test/features/specs`.
 
 ```bash
 python3 scripts/generate-gherkin-requirements-appendix.py

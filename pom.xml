@@ -14,6 +14,13 @@
 
         <module>object-store-domain</module>
         <module>storage-engine-domain</module>
+
+        <!-- EP-10 cluster baseline: protocol and application boundaries precede infrastructure. -->
+        <module>cluster-protocol</module>
+        <module>storage-engine-cluster-application</module>
+        <module>cluster-control-ratis-infrastructure</module>
+        <module>cluster-data-grpc-infrastructure</module>
+
         <module>storage-engine-reactive-repository-application</module>
         <module>storage-engine-reactive-application</module>
         <module>storage-engine-reactive-infrastructure</module>
@@ -38,6 +45,15 @@
         <maven.compiler.release>21</maven.compiler.release>
         <graalvm.buildtools.version>0.10.6</graalvm.buildtools.version>
         <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
+        <ratis.version>3.2.2</ratis.version>
+        <grpc.version>1.82.2</grpc.version>
+        <protobuf.version>3.25.8</protobuf.version>
+        <testcontainers.version>2.0.2</testcontainers.version>
+        <protobuf-maven-plugin.version>0.6.1</protobuf-maven-plugin.version>
+        <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
+        <maven-enforcer-plugin.version>3.6.2</maven-enforcer-plugin.version>
+        <!-- grpc-java 1.82.2 requires this newer annotation artifact than Boot 4.0.0. -->
+        <error-prone-annotations.version>2.48.0</error-prone-annotations.version>
     </properties>
 
     <build>
@@ -116,6 +132,39 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <dependency>
+                <groupId>io.grpc</groupId>
+                <artifactId>grpc-bom</artifactId>
+                <version>${grpc.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- EP-10 dependency baseline. Explicit entries take precedence over imported BOMs. -->
+            <dependency>
+                <groupId>com.google.protobuf</groupId>
+                <artifactId>protobuf-java</artifactId>
+                <version>${protobuf.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.errorprone</groupId>
+                <artifactId>error_prone_annotations</artifactId>
+                <version>${error-prone-annotations.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.ratis</groupId>
+                <artifactId>ratis-server</artifactId>
+                <version>${ratis.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.ratis</groupId>
+                <artifactId>ratis-grpc</artifactId>
+                <version>${ratis.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers</artifactId>
+                <version>${testcontainers.version}</version>
+            </dependency>
             <!-- Internal module dependencies -->
             <dependency>
                 <groupId>com.example</groupId>
@@ -135,6 +184,26 @@
             <dependency>
                 <groupId>com.example</groupId>
                 <artifactId>storage-engine-domain</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.example</groupId>
+                <artifactId>cluster-protocol</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.example</groupId>
+                <artifactId>storage-engine-cluster-application</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.example</groupId>
+                <artifactId>cluster-control-ratis-infrastructure</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.example</groupId>
+                <artifactId>cluster-data-grpc-infrastructure</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -210,6 +279,28 @@
     </dependencyManagement>
 
     <profiles>
+        <!-- Activates the opt-in EP-10 cluster acceptance and focused mechanism suites. -->
+        <profile>
+            <id>ep10-cluster-tests</id>
+            <properties>
+                <ep10.cluster.tests.enabled>true</ep10.cluster.tests.enabled>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <version>3.5.4</version>
+                        <configuration>
+                            <systemPropertyVariables>
+                                <ep10.cluster.tests.enabled>${ep10.cluster.tests.enabled}</ep10.cluster.tests.enabled>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
         <!-- Opt-in EP-8 application supply-chain inventory. The wrapper script supplies
              project.build.outputTimestamp from SOURCE_DATE_EPOCH and validates/reconciles
              the JSON and XML before evidence is accepted. -->

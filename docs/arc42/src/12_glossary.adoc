@@ -68,7 +68,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 |Cross-Origin Resource Sharing: allowed origins, methods, headers
 
 |Multipart Upload
-|Upload of large objects in parts; session state (upload id, recorded parts) is durable in storage-engine mode via `MultipartUploadStateStore`, but part-body persistence and final assembly through the storage engine remain open (EP-3)
+|Upload of large objects in parts. Single-node multipart behavior does not imply clustered multipart support; clustered multipart is not implemented in the fixed EP-10 first slice (`REQ-CLUSTER-006`)
 
 |Storage Engine backend
 |Durable persistence backend selected via the `storage-engine` Spring profile; commits bucket registry, multipart upload state, per-object configuration, and object manifest references as crash-safe filesystem documents under a configurable root
@@ -106,23 +106,32 @@ ifndef::imagesdir[:imagesdir: ../images]
 |S3ObjectContent
 |Domain interface: object read contract without reactive types
 
+|Cluster Node Runtime
+|Implementation-informed fixed-slice runtime instantiated as nodes A, B, and C. Each JVM co-locates one Ratis metadata voter and one independent whole-object replica server with separate stable-identity, Ratis, object, temporary, and runtime roots (ADR 0028)
+
 |Cluster Control Plane
-|Planned internal consensus-authoritative role for membership, namespace and manifest generations, topology/policy epochs, fencing/tombstones, and durable cluster jobs; initially three embedded-Ratis voters (ADR 0027)
+|Internal Apache Ratis role that orders bucket and object-reference generations in the implemented fixed slice. ADR 0027's wider membership, topology/policy epoch, fencing/tombstone, and durable-job authority remains future scope
 
 |Cluster Data Plane
-|Planned internal role that transfers immutable replicas/chunks/EC shards directly between selected nodes and validates durable acknowledgements and reads; it is not an external object API
+|Internal grpc-java role that directly transfers checksum-valid immutable whole-object replicas between A/B/C for fixed `N=3/W=2`; it is not an external object API. Chunked, multipart, and EC transfer remain unimplemented cluster capabilities
 
 |Node UUID
-|Stable persisted identifier of a storage node. It survives address, process, and certificate changes and must not be cloned into concurrent live nodes
+|Stable persisted identifier recovered from a node's identity root. The validated fixed slice preserves it across complete JVM restart and seed reordering; it must not be cloned into concurrent live nodes
+
+|Fixed bootstrap manifest
+|Identical A/B/C UUID and control/data address declaration used to initialize the first three-voter slice. It cannot add, replace, promote, demote, or remove members and must not rewrite recovered non-empty consensus state
 
 |Static seed
-|Operator-configured bootstrap address used to contact a cluster; it is neither authoritative membership nor an availability oracle
+|Operator-configured bootstrap address used to contact the fixed group; seed order is restart-tested but is neither a membership transition nor an availability oracle
 
 |Metadata voter
-|Consensus participant storing and voting on the authoritative control log. The initial plan co-locates one voter with each of three storage-node deployments
+|Apache Ratis consensus participant storing and voting on the authoritative control log. The fixed slice co-locates exactly one voter with one replica server in each A/B/C JVM
 
 |Control log
-|Consensus-ordered history owning membership, bucket/config namespace, object-reference generations, topology/policy epochs, fencing/tombstones, and durable job state; large object bytes are excluded
+|Consensus-ordered history that contains bucket and object-reference generations in the fixed slice; whole-object payload bytes are excluded. The broader ADR 0027 authority remains a target, not an implemented-scope claim
+
+|Object-reference generation
+|Consensus-committed record naming verified immutable replicas for one object generation. In the fixed slice it is proposed only after `W=2` checksum-valid durable acknowledgements and is the authoritative basis for reads
 
 |Fencing
 |Rejection of stale node incarnations, coordinators, operations, or topology/policy epochs so they cannot publish conflicting or resurrected state
@@ -131,13 +140,13 @@ ifndef::imagesdir[:imagesdir: ../images]
 |Consensus-controlled version of the parent-linked `zone → rack → host → disk-set → device` placement snapshot
 
 |Write quorum (`W`)
-|Minimum number of selected targets that must durably acknowledge checksum-valid immutable data before reference publication; initial replicated default is `W=2` of `N=3`
+|Minimum number of selected targets that must durably acknowledge checksum-valid immutable data before reference publication; the implemented fixed whole-object slice uses `W=2` of `N=3`
 
 |Valid-data read quorum
-|Configurable number of checksum/length-valid sources required after consensus resolves the committed generation; default is one replica with alternate retry and durable repair
+|Number of checksum/length-valid sources required after consensus resolves the committed generation. The fixed failover slice validates exact bytes from a referenced whole-object replica; alternate-source repair behavior remains future work
 
 |Degraded write
-|A write acknowledged below its declared placement/durability threshold. ADR 0027 disables this behavior by default
+|A write acknowledged below its declared placement/durability threshold. The fixed EP-10 slice rejects publication below `W=2` or without control quorum
 
 |CycloneDX SBOM
 |Planned release inventory of application components emitted and schema-validated in both JSON and XML

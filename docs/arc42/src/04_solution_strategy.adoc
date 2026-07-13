@@ -78,18 +78,20 @@ The **Object Storage Admin Application** is the Product Extension owned by this 
 
 Operational report availability is fail-closed: without a configured recovery, garbage-collection, scrub, audit, metrics, or traces provider, the route returns HTTP 503 `report-provider-not-configured` and the UI renders `not-configured`. This is a truthful contract, not provider implementation.
 
-=== Planned Authoritative Cluster Strategy (ADR 0027)
+=== Bounded Authoritative Cluster Strategy (ADRs 0027 and 0028)
 
 [NOTE]
 ====
-Status: *confirmed architecture / implementation-informed evidence wiring*. ADR 0027 is accepted for architecture only, and EP-8 supply-chain/hardening evidence wiring is validated. No networked cluster, embedded Ratis integration, multi-node durability, quorum-transfer execution, healing, rebalance, or cluster fault behavior exists; those remain EP-10 `@absent`.
+Status: *implementation-informed / partial*. The fixed A/B/C first slice is implemented and validated; EP-10 as a whole is not complete and no distributed production-readiness claim follows.
 ====
 
-The planned cluster separates a small authoritative **Cluster Control Plane** from the high-volume **Cluster Data Plane**. Three initially co-located metadata voters use embedded Apache Ratis (subject to a mandatory spike) to order membership, bucket/configuration namespace, object-reference generations, topology/policy epochs, fencing/tombstones, and durable jobs. Static seeds only establish first contact; stable persisted node UUIDs and committed membership remain authoritative.
+The implemented slice separates an authoritative **Cluster Control Plane** from the direct **Cluster Data Plane** while co-locating one Ratis voter and one replica server in each of three JVMs. Stable UUIDs and separate identity, Ratis, object, temporary, and runtime roots survive a complete restart. An identical static A/B/C manifest bootstraps the group but does not implement admission, replacement, removal, or any other dynamic membership transition.
 
-Immutable replica or EC artifacts stream directly between selected nodes through internal protobuf gRPC/HTTP2 with mandatory mTLS, Reactor backpressure/cancellation bridging, deadlines, and bounded buffers. Initial replication is `N=3, W=2`; no reference is committed until the data threshold has durably acknowledged checksum-valid bytes, and degraded writes are disabled by default. Reads first resolve the consensus-committed generation and then require a configurable checksum-valid data quorum (default one), retrying alternate referenced replicas and recording durable repair work rather than reconciling eventual metadata.
+For unconditional `CreateBucket`, whole-object `PUT`, and whole-object `GET`, Apache Ratis orders bucket and object-reference generations. Whole-object bytes remain outside the Ratis log and transfer directly over independent grpc-java services with mTLS and bounded manual flow control. Replication is fixed at `N=3, W=2`: success requires two checksum-valid durable replica acknowledgements followed by consensus publication, and the implementation does not degrade below either data or control quorum.
 
-The topology catalog grows additively to `zone → rack → host → disk-set → device`. Existing PA-6 placement, quorum, anti-entropy, rebalance, and readiness classes remain deterministic policy core. See link:../../adr/0027-authoritative-cluster-control-plane-and-direct-quorum-data-path.md[ADR 0027] for ordering, failure semantics, alternatives, and the planned CycloneDX/SPDX/OWASP/container-hardening evidence strategy.
+Shared real-process WebTestClient and AWS CLI scenarios validate `REQ-CLUSTER-001..005` in both modes (10 scenarios, 108 steps): cross-node bucket visibility, exact-byte read after coordinator A stops, failure below data/control quorum, and complete A/B/C restart. Focused real Ratis, gRPC, mTLS, flow-control, cancellation/deadline, and cross-module gates validate `REQ-CLUSTER-008..013`. Ordinary root Maven success is supporting integration evidence, not a substitute for these semantic gates.
+
+The existing Object Store-to-Storage Engine adapter remains the only S3 integration boundary, and PA-6 placement/quorum/planning types remain pure domain policy. `REQ-CLUSTER-014` is still partial. Clustered multipart, conditional/versioned or chunked writes, erasure coding, dynamic membership and certificate lifecycle, healing, rebalance, automated orphan cleanup, rolling upgrades, and broader partition/fault behavior are not implemented (`REQ-CLUSTER-006/007`, `015..018`). See link:../../adr/0027-authoritative-cluster-control-plane-and-direct-quorum-data-path.md[ADR 0027] for the wider target and link:../../adr/0028-first-three-node-cluster-implementation-baseline.md[ADR 0028] for the accepted bounded baseline.
 
 === Quality Strategy
 

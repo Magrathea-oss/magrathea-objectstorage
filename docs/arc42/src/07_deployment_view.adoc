@@ -99,31 +99,43 @@ When the `storage-engine` profile is active, durable state is organized under th
 
 Every document under `metadata/**` is committed with the same crash-safe discipline: write to a temp file in the target directory, then atomically rename over the final path. Concurrent writers to the same key are serialized through striped per-key locks.
 
-=== Validated EP-8 Hardened Single-node Evidence Deployment
+=== Historical EP-8 Hardened Single-node Evidence Deployment
 
 [NOTE]
 ====
-Status: *implementation-informed / bounded*. This validates evidence wiring and a hardened single-node container only. It is not a cluster deployment or publication claim.
+Status: *implementation-informed / bounded historical packet*. The hardened single-node and evidence-wiring results remain evidence for their recorded revision only. Current complete-reactor `REQ-SUPPLY-001` is `@implemented-not-e2e-validated`; this is not a cluster deployment or publication claim.
 ====
 
-The clean evidence run is bound to revision `209b3170b64d3311ba9b773fdb7bd5581519e682` and exact local image ID `sha256:e5b5862948853a613f8b92adc8135fa81b84bdd9f36c9ae8d69b9a6bd6dd7966`; the manifest records `published=false`. Runtime validation passed with UID/GID 10001, read-only root filesystem, explicit writable data and temporary mounts, `no-new-privileges`, capability drop `ALL`, no host PID/IPC/network/UTS namespaces, and no container-engine socket. User-namespace remapping was unavailable in the local engine and is recorded as unavailable rather than claimed.
+The historical clean evidence run is bound to revision `209b3170b64d3311ba9b773fdb7bd5581519e682` and exact local image ID `sha256:e5b5862948853a613f8b92adc8135fa81b84bdd9f36c9ae8d69b9a6bd6dd7966`; the manifest records `published=false`. Runtime validation passed with UID/GID 10001, read-only root filesystem, explicit writable data and temporary mounts, `no-new-privileges`, capability drop `ALL`, no host PID/IPC/network/UTS namespaces, and no container-engine socket. User-namespace remapping was unavailable in the local engine and is recorded as unavailable rather than claimed. The production reactor subsequently gained four cluster modules; no new clean-revision application SBOM/license/image packet covers them, and the later dirty-working-tree root test is not acceptance supply-chain evidence.
 
 The configured Admin readiness endpoint reported the `storage-engine` backend ready. An exact 129-byte object with recorded checksum and ETag remained byte-identical after replacement from the same image and persisted storage. This proves the bounded hardened-container contract, not multi-node durability.
 
 CI runs the architecture contract and application evidence job on ordinary workflow execution. A scheduled or explicitly requested job runs the image SBOM, hardened runtime, fail-closed OWASP, and complete supply-chain evidence contract, retaining both successful artifacts and scan-error evidence for 30 days. These jobs do not publish an application or image.
 
-=== Planned Initial Cluster Deployment (ADR 0027)
+=== Implemented Fixed Three-Node First Slice (ADRs 0027 and 0028)
 
 [NOTE]
 ====
-Status: *planned / absent*. No multi-node deployment or Ratis validation exists.
+Status: *implementation-informed / partial*. The fixed real-process A/B/C runtime and acceptance topology are validated for the first slice only. This is not a production deployment recommendation or a complete EP-10 deployment.
 ====
 
-The initial topology has three storage-node deployments. Each co-locates one logical Cluster Control Plane voter and one Cluster Data Plane role while keeping control and data responsibilities distinct. Voters should span the best available independent `zone → rack → host` failure domains; a three-voter group tolerates one unavailable voter, not two. Each node persists its UUID and cluster state separately from replaceable process/container identity.
+.Fixed three-node runtime baseline
+image::../../c4/images/FixedThreeNodeRuntimeDeployment.png[Fixed Three-Node Runtime Deployment, width=600]
 
-Only internal mTLS-authenticated protobuf gRPC/HTTP2 is permitted between nodes. Static seed addresses provide bootstrap contact and do not define membership. Writable mounts must be explicit for storage data, Ratis log/snapshots, and runtime state; planned hardening validation requires non-root execution, dropped unnecessary capabilities, no privilege escalation, and a read-only root filesystem outside those mounts.
+The cluster profile starts fixed nodes A, B, and C as separate JVMs. Each JVM co-locates one Ratis voter and one whole-object replica server and owns distinct persisted identity, Ratis log/snapshot, object, temporary, and runtime roots. Control and data services have separate ports and lifecycle ownership. The implemented version baseline is Ratis 3.2.2/`ratis-grpc`, grpc-java 1.82.2/`grpc-netty-shaded`, and protobuf 3.25.8.
 
-The embedded Apache Ratis deployment remains conditional on a spike covering persistence/snapshots, membership change, leader transfer/restart, mTLS integration, upgrade compatibility, bounded resources, Reactor bridging, and partition/fault behavior. Dedicated control-plane nodes or an external consensus service remain future reconsideration points if co-location or Ratis validation is unacceptable.
+A static manifest is identical on A/B/C and contains their stable UUIDs plus control/data addresses. It bootstraps exactly one three-voter group and does not overwrite recovered non-empty consensus or identity state; reordered seeds are restart-tested. It cannot add, promote, demote, replace, or remove nodes. Health suspicion, timeout, address edits, or seed order are not membership transitions.
+
+All cluster control and direct-replica connections use mutually authenticated TLS bound to stable node identities in the validated slice. Plaintext, anonymous, server-authentication-only, wrong-CA, expired, and UUID-mismatched peers are rejected by focused mechanism scenarios. Operational enrollment, trust distribution, key custody, rotation, revocation, expiry monitoring, and recovery remain absent production PKI infrastructure.
+
+.Real-process acceptance baseline
+image::../../c4/images/FixedThreeNodeAcceptanceDeployment.png[Fixed Three-Node Acceptance Deployment, width=600]
+
+The focused S3 acceptance gate starts three real child JVM processes with separate roots and test-local CA, per-node certificate, and trust-store fixtures. Shared WebTestClient and AWS CLI scenarios create and resolve a bucket across nodes, replicate a whole object at fixed `N=3/W=2`, stop coordinator A and retrieve exact bytes through B while B+C retain quorum, reject publication below data or control quorum, then stop and restart all three JVMs from non-empty roots and retrieve the same object. `REQ-CLUSTER-001..005` pass as 10 scenarios and 108 steps.
+
+Test-local certificate generation proves only that mTLS was exercised in this environment. The Testcontainers 2.0.2 dependency remains pinned but is not the process isolation used by this real-process S3 gate. Ordinary root Maven results remain supporting integration evidence and must not be reported as the focused EP-10 acceptance result.
+
+The runtime intentionally covers only unconditional `CreateBucket`, whole-object `PUT`, and whole-object `GET`. Clustered multipart, conditional/versioned or chunked writes, erasure coding, dynamic membership, certificate lifecycle, healing/rebalance/orphan cleanup, rolling upgrade, online multi-node backup/DR, and broader partition behavior remain not implemented or unvalidated. No production distributed-cluster claim is made.
 
 === Production Deployment (Future)
 
@@ -136,7 +148,7 @@ The current single-process deployment is intentionally monolithic for single-nod
 * EP-5 (Operability & Delivery): implemented and validated for the `0.1.0` single-node JVM 21 preview. Mandatory CI runs the full root gate and generated/source checks before image validation. The tag-driven release workflow enforces SemVer/OCI identity, immutable version/minor/SHA tags, digest recording, persistent-volume container replacement, and live Prometheus-to-Alertmanager delivery before publication. SIGTERM validation covers committed, streaming, multipart, concurrent, cancellation, abort-race, and bounded mixed-load paths. Offline backup/restore and same-node DR validate RTO 30 seconds and RPO as the last completed backup. Typed object manifests use schema `2`; multipart sessions, bucket registry, object configuration, object references, ACL sidecars, and capacity ledgers use schema `1`; all accept documented legacy version `0` and reject unsupported future versions. Live Loki/external paging is deployment integration, sustained/production load belongs to EP-6, and online/multi-node DR belongs to EP-10.
 * EP-6 (Performance & Capacity): implemented and validated for the `0.1.x` single-node safety envelope. S3 routes enforce 256 MiB single/assembled object limits, 64 MiB multipart parts, finite timeout, 16 active requests, 64 TCP connections, and a 100 requests/s token bucket with burst 200. Mandatory 45-second CI load and weekly/manual 15-minute soak run eight deterministic workers under `-Xmx256m`, produce machine-readable evidence, and assert bounded heap, checksums, and idle resources. These gates are not production sizing or competitive benchmarks.
 * EP-7 (Complete Admin Panel): `REQ-ADMIN-001..031` UI/contracts and reproducible packaging are implemented and validated. The phase remains partial because credential/tenant administration and real recovery/GC/scrub/audit/metrics/traces providers are absent; provider routes return truthful HTTP 503 not-configured responses.
-* EP-8 (Cluster Architecture ADR & Supply Chain): `@implemented-and-validated` only for accepted architecture/evidence wiring. Clean-revision SBOM/license/image-hardening evidence and CI retention are validated without publication; current OWASP vulnerability status is unknown/error.
-* EP-10 (S3 Cluster, multi-node): `@absent` after the accepted architecture-only ADR — membership, consensus, quorum transfer, failover, healing, rebalance, and partition behavior still require multi-node semantic and fault-injection scenarios
+* EP-8 (Cluster Architecture ADR & Supply Chain): accepted architecture wiring and the explicitly validated evidence guards remain implementation-informed. Current complete-reactor `REQ-SUPPLY-001` is `@implemented-not-e2e-validated` because the historical clean-revision SBOM/license/image packet predates the four cluster modules; its hashes remain historical only. No publication occurred, and OWASP vulnerability status remains unknown/error.
+* EP-10 (S3 Cluster, multi-node): `@partial`. The fixed A/B/C first slice is implementation-informed and validated for `REQ-CLUSTER-001..005` and `008..013`; `006/007` and `015..018` are not implemented, and `014` remains partial. Broader transfer semantics, dynamic membership, healing/rebalance, and partition behavior remain open.
 
-No production distributed-cluster claims are made until EP-10 is validated end to end; see `PLAN.md` for current status per phase.
+No production distributed-cluster claim follows from the bounded first slice; see `PLAN.md` for current status per phase.

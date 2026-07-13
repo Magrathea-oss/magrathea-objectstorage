@@ -25,6 +25,10 @@
         <dependency><groupId>com.example</groupId><artifactId>s3-reactive-api-adapter</artifactId></dependency>
         <dependency><groupId>com.example</groupId><artifactId>object-store-domain</artifactId></dependency>
         <dependency><groupId>com.example</groupId><artifactId>storage-engine-domain</artifactId></dependency>
+        <dependency><groupId>com.example</groupId><artifactId>cluster-protocol</artifactId></dependency>
+        <dependency><groupId>com.example</groupId><artifactId>storage-engine-cluster-application</artifactId></dependency>
+        <dependency><groupId>com.example</groupId><artifactId>cluster-control-ratis-infrastructure</artifactId></dependency>
+        <dependency><groupId>com.example</groupId><artifactId>cluster-data-grpc-infrastructure</artifactId></dependency>
         <dependency><groupId>com.example</groupId><artifactId>storage-engine-reactive-repository-application</artifactId></dependency>
         <dependency><groupId>com.example</groupId><artifactId>storage-engine-reactive-application</artifactId></dependency>
         <dependency><groupId>com.example</groupId><artifactId>storage-engine-reactive-infrastructure</artifactId></dependency>

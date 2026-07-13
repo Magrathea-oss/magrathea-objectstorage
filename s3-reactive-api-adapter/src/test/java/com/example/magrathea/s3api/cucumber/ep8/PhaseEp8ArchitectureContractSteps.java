@@ -17,6 +17,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** Executable document/source boundary checks. These steps never simulate cluster execution. */
 public class PhaseEp8ArchitectureContractSteps {
     private static final String ADR_PATH = "docs/adr/0027-authoritative-cluster-control-plane-and-direct-quorum-data-path.md";
+    private static final String IMPLEMENTATION_ADR_PATH = "docs/adr/0028-first-three-node-cluster-implementation-baseline.md";
+    private static final List<String> CLUSTER_MODULES = List.of(
+            "cluster-protocol",
+            "storage-engine-cluster-application",
+            "cluster-control-ratis-infrastructure",
+            "cluster-data-grpc-infrastructure");
     private static final List<String> PUBLICATION_STAGES = List.of(
             "reject or redirect a stale or fenced coordinator",
             "deterministically place the generation on the exact PA-6-selected targets",
@@ -35,15 +41,19 @@ public class PhaseEp8ArchitectureContractSteps {
             "consensus reference publication fails after 2 durable acknowledgements");
 
     private String adr;
+    private String implementationAdr;
     private String arc42;
     private String c4;
+    private String testReport;
     private String failure;
 
     @Before
     public void reset() {
         adr = null;
+        implementationAdr = null;
         arc42 = null;
         c4 = null;
+        testReport = null;
         failure = null;
     }
 
@@ -108,14 +118,23 @@ public class PhaseEp8ArchitectureContractSteps {
     @Then("it identifies EP-10 as the owner of networked execution and multi-node fault validation")
     public void ep10OwnsExecution() {
         assertThat(adr).contains("EP-10 must execute", "EP-10", "semantic multi-node, fault-injection");
-        assertThat(arc42).contains("EP-10", "planned / absent");
-    }
-
-    @Then("no accepted wording reports Ratis, Raft correctness, membership, quorum transfer, healing, rebalance, or multi-node durability as implemented")
-    public void noImplementationClaim() {
-        assertThat(adr).contains("architectural decision only", "remain planned/absent", "not evidence of networked membership");
-        assertThat(c4).contains("PLANNED / NOT IMPLEMENTED");
-        assertNoClusterRuntimeDependenciesOrRoutes();
+        assertThat(implementationAdr).contains(
+                "Accepted — implementation-informed baseline for the bounded first fixed three-node EP-10 slice",
+                "Acceptance is limited to the evidenced A/B/C topology",
+                "EP-10 remains partial",
+                "`REQ-CLUSTER-006` and `REQ-CLUSTER-007` are not implemented",
+                "`REQ-CLUSTER-014` is partial",
+                "`REQ-CLUSTER-015` through `REQ-CLUSTER-018` are not implemented",
+                "No evidence above supports a production-readiness or general distributed-storage claim");
+        assertThat(arc42).contains(
+                "EP-10 (S3 Cluster, multi-node): `@partial`",
+                "fixed A/B/C first slice is implementation-informed and validated for `REQ-CLUSTER-001..005` and `008..013`",
+                "No production distributed-cluster claim follows from the bounded first slice");
+        assertThat(testReport).contains(
+                "These opt-in/focused results are the semantic basis for the slice and are not folded into the ordinary root Maven totals above.",
+                "These hashes remain historical evidence only: the production reactor now composes `cluster-protocol`, `storage-engine-cluster-application`, `cluster-control-ratis-infrastructure`, and `cluster-data-grpc-infrastructure`, and no new clean-revision application SBOM/license/image packet was generated after that expansion.",
+                "Therefore current complete-reactor `REQ-SUPPLY-001` is `@implemented-not-e2e-validated`; the other EP-8 requirement statuses and their explicit limitations remain unchanged.",
+                "EP-10 remains `@partial`: `006/007` and `015..018` are not implemented, `014` is partial, and clustered multipart, conditional/versioned/chunked writes, EC, dynamic membership, healing/rebalance, and the broader partition suite remain absent.");
     }
 
     @Given("ADR 0027 defines the planned gRPC surface for membership, control coordination, artifact transfer, verification, health evidence, and durable recovery-job execution")
@@ -143,7 +162,7 @@ public class PhaseEp8ArchitectureContractSteps {
     public void noAlternateObjectApi() throws IOException {
         String admin = Ep8EvidenceSupport.read("admin-api-adapter/src/main/java/com/example/magrathea/admin/web/AdminRouter.java");
         assertThat(admin).doesNotContain("/admin/objects", "/admin/buckets/{bucket}/objects", "/admin/multipart");
-        assertNoClusterRuntimeDependenciesOrRoutes();
+        assertInternalClusterCompositionBoundary();
     }
 
     @Then("an inter-node request cannot bypass S3 authentication, authorization, or the object-store to storage-engine application boundary")
@@ -163,7 +182,12 @@ public class PhaseEp8ArchitectureContractSteps {
     @Then("the inter-node listener is classified as internal-only and mutual-TLS authenticated rather than advertised as a supported client endpoint")
     public void listenerIsInternal() {
         assertThat(adr).contains("internal-only protobuf gRPC", "mutual TLS", "not a third public facade");
-        assertThat(c4).contains("Internal protobuf gRPC/HTTP2 with mTLS", "PLANNED / NOT IMPLEMENTED");
+        assertThat(c4).contains(
+                "Internal only; not an object API and not a production-readiness claim",
+                "Ratis gRPC/HTTP2 with mTLS",
+                "Application gRPC/HTTP2 streaming with mTLS",
+                "peers require stable-UUID-bound mTLS");
+        assertInternalClusterCompositionBoundary();
     }
 
     @Given("the initial replicated policy is {string} with degraded writes disabled")
@@ -197,19 +221,29 @@ public class PhaseEp8ArchitectureContractSteps {
             assertThat(current).as("ordered ADR marker %s", marker).isGreaterThan(previous);
             previous = current;
         }
-        assertThat(c4).contains("9. PLANNED: stream", "10. PLANNED: transfer directly",
-                "11. PLANNED: submit verified", "12. PLANNED: revalidate fencing");
+        assertInOrder(c4, List.of(
+                "Runtime: Bounded Fixed-Cluster Whole-Object Write",
+                "7. Use pure PA-6 placement to select A/B/C at N=3/W=2",
+                "8. Stage and directly transfer the immutable whole-object artifact",
+                "9. Return identity-bound checksum-valid durable acknowledgements from selected nodes",
+                "10. Only after W=2, submit the verified object-reference generation",
+                "11. Commit the reference through A/B/C quorum before S3 success"));
+        assertThat(c4).contains(
+                "IMPLEMENTED AND VALIDATED FOR THE FIRST SLICE",
+                "direct replica transfer must obtain W=2 checksum-valid durable acknowledgements",
+                "There is no degraded write: fewer than two data acknowledgements or loss of control quorum fails publication",
+                "Future Cluster Capabilities — Planned / Not Implemented",
+                "DISTINCT FUTURE SCOPE, NOT PART OF THE VALIDATED FIRST SLICE",
+                "Future clustered object semantics\" \"PLANNED / NOT IMPLEMENTED",
+                "Future erasure-coded transfer\" \"PLANNED / NOT IMPLEMENTED",
+                "Future dynamic membership lifecycle\" \"PLANNED / NOT IMPLEMENTED",
+                "Future healing and rebalance execution\" \"PLANNED / NOT IMPLEMENTED",
+                "Future broader partition handling\" \"PLANNED / NOT VALIDATED");
     }
 
     @Then("stable operation and artifact identifiers make a retried stage idempotent")
     public void idempotentRetries() {
         assertThat(adr).contains("Retries use stable operation and artifact identifiers", "idempotent acknowledgement");
-    }
-
-    @Then("the contract does not assert that any stage has a networked implementation in EP-8")
-    public void publicationNotImplemented() {
-        assertThat(c4).contains("PLANNED / NOT IMPLEMENTED (EP-8 EARLY)");
-        assertNoClusterRuntimeDependenciesOrRoutes();
     }
 
     @Given("replicated write operation {string} requires policy {string}")
@@ -357,6 +391,7 @@ public class PhaseEp8ArchitectureContractSteps {
 
     private void loadArchitectureDocuments() throws IOException {
         if (adr == null) adr = Ep8EvidenceSupport.read(ADR_PATH);
+        if (implementationAdr == null) implementationAdr = Ep8EvidenceSupport.read(IMPLEMENTATION_ADR_PATH);
         if (arc42 == null) arc42 = Ep8EvidenceSupport.read("docs/arc42/src/02_architecture_constraints.adoc")
                 + Ep8EvidenceSupport.read("docs/arc42/src/04_solution_strategy.adoc")
                 + Ep8EvidenceSupport.read("docs/arc42/src/05_building_block_view.adoc")
@@ -365,22 +400,76 @@ public class PhaseEp8ArchitectureContractSteps {
                 + Ep8EvidenceSupport.read("docs/arc42/src/08_concepts.adoc")
                 + Ep8EvidenceSupport.read("docs/arc42/src/10_quality_requirements.adoc");
         if (c4 == null) c4 = Ep8EvidenceSupport.read("docs/c4/workspace.dsl");
+        if (testReport == null) testReport = Ep8EvidenceSupport.read("docs/test-report.md");
     }
 
-    private void assertNoClusterRuntimeDependenciesOrRoutes() {
+    private void assertInternalClusterCompositionBoundary() {
         try {
-            StringBuilder build = new StringBuilder();
-            try (Stream<java.nio.file.Path> files = Files.walk(Ep8EvidenceSupport.ROOT)) {
-                files.filter(path -> path.getFileName().toString().equals("pom.xml"))
-                        .forEach(path -> { try { build.append(Files.readString(path)); } catch (IOException e) { throw new RuntimeException(e); } });
+            String bootstrapPom = Ep8EvidenceSupport.read("bootstrap-application/pom.xml");
+            assertThat(dependencyBlock(bootstrapPom, "cluster-control-ratis-infrastructure"))
+                    .contains("<scope>compile</scope>");
+            assertThat(dependencyBlock(bootstrapPom, "cluster-data-grpc-infrastructure"))
+                    .contains("<scope>compile</scope>");
+
+            String bootstrapComposition = Ep8EvidenceSupport.read(
+                    "bootstrap-application/src/main/java/com/example/magrathea/bootstrap/ClusterProfileConfiguration.java");
+            assertThat(bootstrapComposition).contains(
+                    "@Profile(\"storage-engine & cluster\")",
+                    "ClusterNodeRuntime clusterNodeRuntime(",
+                    "ClusterWriteCoordinator clusterWriteCoordinator(");
+            assertThat(Ep8EvidenceSupport.read(
+                    "bootstrap-application/src/main/java/com/example/magrathea/bootstrap/ClusterNodeRuntime.java"))
+                    .contains(
+                            "com.example.magrathea.cluster.control.ratis",
+                            "com.example.magrathea.cluster.data.grpc",
+                            "com.example.magrathea.storageengine.cluster.application");
+
+            String s3Pom = Ep8EvidenceSupport.read("s3-reactive-api-adapter/pom.xml");
+            for (String module : CLUSTER_MODULES) {
+                assertThat(dependencyBlock(s3Pom, module))
+                        .as("%s must remain test-only in the public S3 adapter", module)
+                        .contains("<scope>test</scope>")
+                        .doesNotContain("<scope>compile</scope>", "<scope>runtime</scope>");
             }
-            assertThat(build.toString()).doesNotContain("<artifactId>grpc-", "<artifactId>ratis-", "<artifactId>protobuf-java");
-            assertThat(Ep8EvidenceSupport.read("s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/adapter/web/S3PathRouter.java"))
+            assertThat(Ep8EvidenceSupport.read(
+                    "s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/adapter/web/S3PathRouter.java"))
                     .doesNotContain("/cluster", "/grpc", "/raft", "/ratis");
-            assertThat(Ep8EvidenceSupport.read("admin-api-adapter/src/main/java/com/example/magrathea/admin/web/AdminRouter.java"))
-                    .doesNotContain("/admin/cluster/objects", "/admin/cluster/buckets", "/admin/objects");
+            assertThat(s3Pom).doesNotContain(
+                    "<artifactId>grpc-netty</artifactId>",
+                    "<artifactId>grpc-netty-shaded</artifactId>",
+                    "<artifactId>ratis-grpc</artifactId>",
+                    "<artifactId>protobuf-java</artifactId>");
+            String adminPom = Ep8EvidenceSupport.read("admin-api-adapter/pom.xml");
+            assertThat(adminPom).doesNotContain(
+                    "<artifactId>cluster-protocol</artifactId>",
+                    "<artifactId>storage-engine-cluster-application</artifactId>",
+                    "<artifactId>cluster-control-ratis-infrastructure</artifactId>",
+                    "<artifactId>cluster-data-grpc-infrastructure</artifactId>");
+            assertThat(Ep8EvidenceSupport.read(
+                    "admin-api-adapter/src/main/java/com/example/magrathea/admin/web/AdminRouter.java"))
+                    .doesNotContain("/admin/cluster/objects", "/admin/cluster/buckets", "/admin/objects", "/admin/grpc", "/admin/ratis");
         } catch (IOException e) {
             throw new AssertionError(e);
+        }
+    }
+
+    private static String dependencyBlock(String pom, String artifactId) {
+        String marker = "<artifactId>" + artifactId + "</artifactId>";
+        int markerIndex = pom.indexOf(marker);
+        assertThat(markerIndex).as("dependency %s is declared", artifactId).isNotNegative();
+        int start = pom.lastIndexOf("<dependency>", markerIndex);
+        int end = pom.indexOf("</dependency>", markerIndex);
+        assertThat(start).as("dependency start for %s", artifactId).isNotNegative();
+        assertThat(end).as("dependency end for %s", artifactId).isGreaterThan(markerIndex);
+        return pom.substring(start, end + "</dependency>".length());
+    }
+
+    private static void assertInOrder(String document, List<String> markers) {
+        int previous = -1;
+        for (String marker : markers) {
+            int current = document.indexOf(marker);
+            assertThat(current).as("ordered document marker %s", marker).isGreaterThan(previous);
+            previous = current;
         }
     }
 }

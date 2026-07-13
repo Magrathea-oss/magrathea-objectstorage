@@ -32,6 +32,12 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- EP-10: cluster use cases remain behind this existing Object Store-to-Storage Engine ACL. -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>storage-engine-cluster-application</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>com.example</groupId>
             <artifactId>storage-engine-reactive-infrastructure</artifactId>

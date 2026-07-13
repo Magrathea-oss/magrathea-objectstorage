@@ -1,13 +1,19 @@
 @spec @phase-ep8 @architecture @supply-chain @security
-Ability: Gate future cluster work with an authoritative architecture and reproducible supply-chain evidence
+Ability: Gate cluster evolution with an authoritative architecture and reproducible supply-chain evidence
   Maintainers need an accepted, executable cluster architecture contract and verifiable supply-chain evidence
-  before networked cluster implementation begins, so that EP-10 cannot invent weaker consistency,
+  while networked cluster implementation evolves, so that EP-10 cannot invent weaker consistency,
   public inter-node APIs, unverifiable artifacts, or privileged runtime assumptions.
 
-  EP-8 completes only the architecture decision and supply-chain gates described here. Cluster transport,
-  membership execution, consensus, multi-node persistence, quorum transfer, healing, rebalance, and
-  fault-injection evidence remain planned for EP-10. Passing an architecture-contract scenario is not
-  evidence that the corresponding cluster behavior exists.
+  EP-8 completed only the architecture decision and supply-chain gates described here. The bounded EP-10
+  first slice now implements and validates fixed A/B/C CreateBucket plus unconditional single-part whole-object
+  PUT/GET, direct N=3/W=2 replication without degraded writes, one-coordinator failover, and complete restart
+  under REQ-CLUSTER-001..005 and REQ-CLUSTER-008..013. ADR 0027 remains "Accepted — architectural
+  decision only", and REQ-HA-001..008 remain implemented-and-validated architecture contracts rather than
+  runtime requirements. The bounded slice realizes only part of their Ratis control-plane and direct-data-path
+  intent. Overall EP-10 remains partial: dynamic membership, erasure coding, healing and rebalance execution,
+  and comprehensive partition and fault suites remain not implemented. Passing these EP-8 architecture-contract
+  scenarios remains evidence of architecture intent, not duplicate validation of either the bounded runtime
+  slice or the later EP-10 backlog.
 
   The cluster protocol is internal infrastructure behind the object-store and storage-engine boundaries.
   S3-compatible endpoints remain the only external object and bucket API. The Admin API may expose
@@ -27,35 +33,40 @@ Ability: Gate future cluster work with an authoritative architecture and reprodu
   exact root Maven release version, but no evidence producer may remove, replace, or otherwise rewrite a
   version qualifier or claim that a non-published development evidence run was released.
 
-  Rule: ADR 0027 is the complete authority for the planned cluster boundary
+  Rule: ADR 0027 remains architectural authority while ADR 0028 records bounded current execution
+    ADR 0028 records only the fixed A/B/C runtime slice validated by REQ-CLUSTER-001..005 and REQ-CLUSTER-008..013.
+    It neither replaces ADR 0027 as target architecture authority nor turns this architecture-contract evidence into runtime evidence.
 
-    @REQ-HA-001 @non-functional-requirement @architecture @architecture-decision @internal-api @security @ep10-runtime-absent @implemented-and-validated
-    Scenario: The accepted decision is complete without claiming a cluster implementation
+    @REQ-HA-001 @non-functional-requirement @architecture @architecture-decision @internal-api @security @ep10-runtime-partial @implemented-and-validated
+    Scenario: ADR 0027 remains authority while ADR 0028 supplies bounded REQ-CLUSTER-001..005 and REQ-CLUSTER-008..013 execution evidence
       Given the canonical decision is "docs/adr/0027-authoritative-cluster-control-plane-and-direct-quorum-data-path.md"
       When the architecture-contract runner evaluates ADR 0027
       Then its status is "Accepted — architectural decision only"
       And it selects internal protobuf gRPC over HTTP/2 with mutual TLS and bounded Reactor bridges
       And it selects consensus-committed membership and metadata with direct checksum-validated data transfer outside the consensus log
-      And it records embedded Apache Ratis as a planned implementation subject to a time-boxed integration and fault-behavior spike
       And it decides static seeds, stable node identity, membership authority, topology hierarchy, ordered write and read publication, fencing, and failure semantics
       And it defines CycloneDX, SPDX-normalized license, OWASP, and hardened-runtime evidence gates
       And it compares RSocket, plain HTTP/2, gossip authority, static membership authority, quorum-only metadata, external consensus, data in Raft, and degraded writes
       And it identifies EP-10 as the owner of networked execution and multi-node fault validation
-      And no accepted wording reports Ratis, Raft correctness, membership, quorum transfer, healing, rebalance, or multi-node durability as implemented
+      And architecture-contract scenarios are reported separately from runtime and artifact evidence
 
-    @REQ-HA-002 @functional-requirement @non-functional-requirement @architecture @boundary @internal-api @s3-api @security @ep10-runtime-absent @implemented-and-validated
-    Scenario: Inter-node transport cannot become a public object or bucket facade
+  Rule: Production bootstrap composition preserves the private cluster boundary
+    The bootstrap application may depend on cluster-protocol, storage-engine-cluster-application,
+    cluster-control-ratis-infrastructure, and cluster-data-grpc-infrastructure as production composition.
+    Those internal dependencies do not become supported client endpoints or alternate object APIs.
+
+    @REQ-HA-002 @functional-requirement @non-functional-requirement @architecture @boundary @internal-api @s3-api @security @ep10-runtime-partial @implemented-and-validated
+    Scenario: Production bootstrap composes internal cluster infrastructure without creating a public object or bucket facade
       Given ADR 0027 defines the planned gRPC surface for membership, control coordination, artifact transfer, verification, health evidence, and durable recovery-job execution
       When the architecture boundary is compared with the S3 Data Plane and Admin Control Plane
       Then external create, list, read, write, delete, tagging, versioning, ACL, metadata, multipart, bucket, and object operations remain available only through S3-compatible endpoints
-      And no cluster protobuf service or Admin route exposes those object or bucket operations
       And an inter-node request cannot bypass S3 authentication, authorization, or the object-store to storage-engine application boundary
       And Admin access remains limited to topology, configuration, backend status, and operational evidence that has no S3 API equivalent
       And the inter-node listener is classified as internal-only and mutual-TLS authenticated rather than advertised as a supported client endpoint
 
-  Rule: Ordered publication is an architecture contract and not EP-10 execution evidence
+  Rule: ADR 0027 remains ordered-publication authority while ADR 0028 records bounded current execution
 
-    @REQ-HA-003 @functional-requirement @non-functional-requirement @architecture @consistency @write-ordering @determinism @integrity @durability @ep10-runtime-absent @implemented-and-validated
+    @REQ-HA-003 @functional-requirement @non-functional-requirement @architecture @consistency @write-ordering @determinism @integrity @durability @ep10-runtime-partial @implemented-and-validated
     Scenario: A replicated write contract has one deterministic place-stream-verify-publish-response order
       Given the initial replicated policy is "N=3, W=2" with degraded writes disabled
       And a coordinator has resolved a consensus-committed membership snapshot, topology epoch "topology-42", policy epoch "policy-17", and current object generation "generation-8"
@@ -70,10 +81,9 @@ Ability: Gate future cluster work with an authoritative architecture and reprodu
         | 6     | revalidate fencing and consensus-commit one object-reference or manifest generation naming only verified artifacts |
         | 7     | return the successful S3 response only after that consensus publication commits |
       And stable operation and artifact identifiers make a retried stage idempotent
-      And the contract does not assert that any stage has a networked implementation in EP-8
 
-    @REQ-HA-004 @functional-requirement @non-functional-requirement @architecture @consistency @failure-handling @no-degraded-writes @integrity @ep10-runtime-absent @implemented-and-validated
-    Scenario Outline: Write failure cannot degrade durability or expose an unpublished generation
+    @REQ-HA-004 @functional-requirement @non-functional-requirement @architecture @consistency @failure-handling @no-degraded-writes @integrity @ep10-runtime-partial @implemented-and-validated
+    Scenario Outline: The write-failure architecture remains broader than bounded EP-10 failure validation
       Given replicated write operation "put-photos-2026-002" requires policy "N=3, W=2"
       And the planned failure is "<failure>"
       When the architecture-contract runner evaluates its publication outcome
@@ -82,7 +92,6 @@ Ability: Gate future cluster work with an authoritative architecture and reprodu
       And no object-reference or manifest generation is visible for the failed operation
       And any durable staged artifacts remain unreachable orphans eligible only for durable fenced cleanup
       And the architecture never lowers target diversity, write quorum, checksum validation, or consensus publication requirements as an implicit fallback
-      And this expected failure is a planned EP-10 contract rather than evidence of implemented fault handling
 
       Examples:
         | failure |
@@ -96,8 +105,8 @@ Ability: Gate future cluster work with an authoritative architecture and reprodu
 
   Rule: Identity, bootstrap, membership, and suspicion have separate authorities
 
-    @REQ-HA-005 @functional-requirement @non-functional-requirement @architecture @node-identity @membership @consensus @security @failure-handling @ep10-runtime-absent @implemented-and-validated
-    Scenario: Stable UUID identity survives endpoint and certificate changes while consensus controls membership
+    @REQ-HA-005 @functional-requirement @non-functional-requirement @architecture @node-identity @membership @consensus @security @failure-handling @ep10-runtime-partial @implemented-and-validated
+    Scenario: Dynamic stable-identity membership remains beyond the fixed A B C bootstrap
       Given storage node "node-7f4c" has persisted UUID "3f32679d-f51e-46ce-a720-1f5d927c78d2"
       And static seed addresses "10.42.0.11:9443,10.42.0.12:9443,10.42.0.13:9443" are bootstrap hints
       When the planned node changes address and rotates its mutual-TLS certificate
@@ -106,9 +115,8 @@ Ability: Gate future cluster work with an authoritative architecture and reprodu
       And adding or removing a seed does not add, remove, promote, demote, or replace a member
       And admission, promotion, demotion, replacement, removal, incarnation, and fencing become authoritative only through a committed consensus transition
       And a second live node presenting UUID "3f32679d-f51e-46ce-a720-1f5d927c78d2" is rejected or fenced
-      And these transitions remain planned until EP-10 supplies networked consensus evidence
 
-    @REQ-HA-006 @functional-requirement @non-functional-requirement @architecture @membership @failure-suspicion @consensus @availability @ep10-runtime-absent @implemented-and-validated
+    @REQ-HA-006 @functional-requirement @non-functional-requirement @architecture @membership @failure-suspicion @consensus @availability @ep10-runtime-partial @implemented-and-validated
     Scenario: Failure suspicion may affect placement eligibility but cannot evict a member
       Given node "node-7f4c" is a consensus-committed member
       And its heartbeats are missed until liveness state "SUSPECT" is reached
@@ -121,7 +129,7 @@ Ability: Gate future cluster work with an authoritative architecture and reprodu
 
   Rule: Cluster topology extends rather than contaminates PA-6 policy
 
-    @REQ-HA-007 @functional-requirement @non-functional-requirement @architecture @topology @failure-domain @determinism @pa-6 @ep10-runtime-absent @implemented-and-validated
+    @REQ-HA-007 @functional-requirement @non-functional-requirement @architecture @topology @failure-domain @determinism @pa-6 @ep10-runtime-partial @implemented-and-validated
     Scenario: Parent-linked topology preserves deterministic PA-6 policy components
       Given the planned YAML topology catalog "config/storage/cluster-topology.yml" declares the hierarchy "zone → rack → host → disk-set → device"
       And host "host-a-01" binds node UUID "3f32679d-f51e-46ce-a720-1f5d927c78d2"
@@ -135,8 +143,10 @@ Ability: Gate future cluster work with an authoritative architecture and reprodu
       And cluster application services adapt authoritative snapshots into PA-6 inputs and execute its decisions without replacing PA-6 semantics
 
   Rule: Application and image SBOMs are complete, traceable, and reproducible
+    The expanded production inventory is the contract for a future acceptance-eligible clean evidence run.
+    Historical EP-8 evidence does not claim SBOM coverage for the four newly composed EP-10 modules.
 
-    @REQ-SUPPLY-001 @non-functional-requirement @security @supply-chain @sbom @cyclonedx @reproducibility @machine-readable @implemented-and-validated
+    @REQ-SUPPLY-001 @non-functional-requirement @security @supply-chain @sbom @cyclonedx @reproducibility @machine-readable @implemented-not-e2e-validated
     Scenario: CycloneDX JSON and XML describe the complete production application reactor
       Given the current checkout has a clean working tree
       And the evidence runner records the full Git revision of the checked-out HEAD
@@ -149,6 +159,10 @@ Ability: Gate future cluster work with an authoritative architecture and reprodu
         | s3-reactive-api-adapter |
         | object-store-domain |
         | storage-engine-domain |
+        | cluster-protocol |
+        | storage-engine-cluster-application |
+        | cluster-control-ratis-infrastructure |
+        | cluster-data-grpc-infrastructure |
         | storage-engine-reactive-repository-application |
         | storage-engine-reactive-application |
         | storage-engine-reactive-infrastructure |
@@ -249,10 +263,10 @@ Ability: Gate future cluster work with an authoritative architecture and reprodu
       And an S3 read returns the same object bytes, content length, ETag, and SHA-256
       And no write outside the two explicit writable mounts was required for startup, request handling, or restart recovery
 
-  Rule: EP-8 evidence cannot upgrade EP-10 cluster status
+  Rule: EP-8 evidence remains distinct from bounded EP-10 validation and the later cluster backlog
 
-    @REQ-HA-008 @REQ-SUPPLY-006 @non-functional-requirement @architecture @supply-chain @status-reporting @observability @ep10-runtime-absent @implemented-and-validated
-    Scenario: Architecture and supply-chain completion remains distinct from vulnerability and cluster status
+    @REQ-HA-008 @REQ-SUPPLY-006 @non-functional-requirement @architecture @supply-chain @status-reporting @observability @ep10-runtime-partial @implemented-and-validated
+    Scenario: Architecture and supply-chain completion preserves partial EP-10 status
       Given ADR 0027 is accepted
       And every required evidence producer and policy handler has been exercised for one clean full source revision and one exact immutable image ID
       And the application SBOM, image SBOM, license, and hardened-runtime evidence gates have passed for that same revision and image
@@ -261,6 +275,5 @@ Ability: Gate future cluster work with an authoritative architecture and reprodu
       Then they may report the validated EP-8 architecture wiring and evidence-contract scope as complete
       And an incomplete OWASP assessment keeps vulnerability status explicitly "unknown/error" and is never reported as clean, complete, or zero vulnerabilities
       And no EP-8 result claims that an image or application was published merely because development evidence passed
-      But EP-10 and networked cluster execution remain "@absent" until their own shared semantic multi-node and fault-injection scenarios pass
       And no EP-8 result claims implemented membership, consensus correctness, multi-node persistence, quorum transfer, healing, rebalance, partition safety, or distributed production readiness
       And architecture-contract scenarios are reported separately from runtime and artifact evidence

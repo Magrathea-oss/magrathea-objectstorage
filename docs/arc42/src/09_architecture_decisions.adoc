@@ -115,5 +115,9 @@ All architectural decisions are documented as Architecture Decision Records (ADR
 
 |link:../../adr/0027-authoritative-cluster-control-plane-and-direct-quorum-data-path.md[0027]
 |Authoritative cluster control plane and direct quorum data path
-|✅ Accepted architecture only — EP-8 evidence wiring validated; EP-10 runtime absent
+|✅ Accepted target architecture — bounded fixed A/B/C subset implemented; wider lifecycle remains future EP-10 scope
+
+|link:../../adr/0028-first-three-node-cluster-implementation-baseline.md[0028]
+|First three-node cluster implementation baseline
+|✅ Accepted — implementation-informed for the bounded fixed A/B/C slice; EP-10 remains partial
 |===

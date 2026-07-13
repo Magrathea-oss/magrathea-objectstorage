@@ -79,12 +79,82 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
         storageEngineRepositoryAdapter = component "object-store-reactive-repository-storage-engine-infrastructure" "Anti-Corruption Layer + adapter: implements Object Store repository interfaces using the Storage Engine backend. Contains ObjectStoreToStorageEngineTranslator, StorageEngineReactiveS3ObjectRepository, StorageEngineReactiveBucketRepository, StorageEngineReactiveMultipartUploadRepository." "Spring @Repository, Reactor"
       }
 
-      plannedClusterControlPlane = container "Planned Cluster Control Plane" "PLANNED / NOT IMPLEMENTED (EP-8 EARLY): authoritative membership, epochs, fencing, metadata generations, tombstones, and durable jobs. Initially three embedded Ratis voters, one per storage-node deployment; Ratis remains spike-gated." "Planned Java 21, embedded Apache Ratis, protobuf gRPC/HTTP2, mTLS" {
-        tags "Planned"
-      }
+      clusterNode = container "Cluster Node Runtime" "Implemented and validated only for the bounded EP-10 first slice: one co-located voter/storage runtime, instantiated as fixed nodes A, B, and C. Each JVM owns one Ratis voter and one independent replica data server. Consensus orders bucket and immutable whole-object-reference generations; direct N=3/W=2 replication has no degraded writes. Internal only; not an object API and not a production-readiness claim." "Java 21, Apache Ratis 3.2.2, grpc-java 1.82.2, protobuf 3.25.8, mTLS" {
+        tags "FirstSlice"
+        storageEngineClusterApplication = component "storage-engine-cluster-application" "Implemented transport-neutral CreateBucket, whole-object write/read coordination, PA-6 placement, authoritative metadata ports, local-artifact ports, acknowledgement fencing, and replica-transfer ports. Reactor-facing where needed; contains no Ratis, protobuf, generated-stub, or gRPC types." "Java 21 application module"
+        clusterProtocol = component "cluster-protocol" "Implemented versioned internal protobuf contracts and generated messages/stubs for health and immutable-artifact stage/read transfer. It contains no S3 facade, Spring application behavior, storage-policy decisions, or domain logic." "protobuf/protoc 3.25.8 module"
+        clusterControlRatisInfrastructure = component "cluster-control-ratis-infrastructure" "Implemented embedded Ratis lifecycle, deterministic bucket/object-reference generation state machine, fixed A/B/C bootstrap manifest, stable UUID identity recovery, persisted log/snapshots, and identity-bound control mTLS. Dynamic membership is future scope." "Apache Ratis 3.2.2, ratis-grpc"
+        clusterDataGrpcInfrastructure = component "cluster-data-grpc-infrastructure" "Implemented independent replica gRPC server/clients, peer identity checks, bounded 64 KiB framing and manual flow control, deadlines/cancellation, checksum validation, durable local artifacts, and replica acknowledgements." "grpc-java 1.82.2, grpc-netty-shaded"
 
-      plannedClusterDataPlane = container "Planned Cluster Data Plane" "PLANNED / NOT IMPLEMENTED (EP-8 EARLY): bounded direct immutable-artifact transfer, durable checksum-valid acknowledgements and reads, plus fenced recovery execution. Internal only; not an object API." "Planned Java 21, Reactor-to-gRPC bridge, protobuf gRPC/HTTP2, mTLS" {
-        tags "Planned"
+        futureClusteredObjectSemantics = component "Future clustered object semantics" "PLANNED / NOT IMPLEMENTED: clustered multipart state and part transfer, conditional writes, S3 versioning, and chunked-object transfer. Existing single-node behavior is not cluster evidence." "Future cluster application capability" {
+          tags "Planned"
+        }
+        futureErasureCodedTransfer = component "Future erasure-coded transfer" "PLANNED / NOT IMPLEMENTED: encode and transfer data/parity shards, apply policy-specific acknowledgement thresholds, and reconstruct reads. Whole-object N=3/W=2 replication is not erasure-coding evidence." "Future cluster application and data-plane capability" {
+          tags "Planned"
+        }
+        futureMembershipLifecycle = component "Future dynamic membership lifecycle" "PLANNED / NOT IMPLEMENTED: consensus-controlled admission, catch-up, promotion, demotion, replacement, removal, fencing, certificate lifecycle, and rolling compatibility. Static A/B/C bootstrap is not dynamic membership." "Future control-plane capability" {
+          tags "Planned"
+        }
+        futureRepairMovement = component "Future healing and rebalance execution" "PLANNED / NOT IMPLEMENTED: durable anti-entropy, healing, rebalance, and orphan-cleanup jobs. Existing planning models do not execute repair or movement." "Future cluster operations capability" {
+          tags "Planned"
+        }
+        futurePartitionResilience = component "Future broader partition handling" "PLANNED / NOT VALIDATED: behavior for asymmetric partitions, delayed or reordered messages, split control/data paths, stale leaders, duplicate identities, and repeated coordinator changes. The validated baseline covers only one stopped coordinator while the surviving peers remain mutually reachable." "Future cluster resilience capability" {
+          tags "Planned"
+        }
+      }
+    }
+
+    deploymentEnvironment "EP-10 Fixed Three-Node Runtime Baseline" {
+      deploymentNode "Independent failure domains" "Bounded implemented topology: fixed nodes A, B, and C are placed in distinct available failure domains. This baseline is not a production topology recommendation. Production certificate enrollment, custody, rotation, revocation, expiry monitoring, recovery, and broader operational readiness remain outside the slice." "Deployment infrastructure" {
+        tags "FirstSlice"
+        deploymentNode "Node A JVM" "One Java process owns the S3 composition, one Ratis voter, and one independent replica data server. Its stable UUID is recovered from the identity root; consensus, object, temporary, and runtime roots are independent. Internal peers authenticate the UUID through configured mutual TLS trust." "Java 21 JVM" {
+          tags "FirstSlice"
+          containerInstance magrathea.bootstrapApplication
+          containerInstance magrathea.s3ReactiveApiAdapter
+          containerInstance magrathea.storageEngine
+          containerInstance magrathea.clusterNode
+        }
+        deploymentNode "Node B JVM" "One Java process owns the S3 composition, one Ratis voter, and one independent replica data server. Its stable UUID and persisted roots survive complete restart; B serves failover reads with C retaining quorum after A stops." "Java 21 JVM" {
+          tags "FirstSlice"
+          containerInstance magrathea.bootstrapApplication
+          containerInstance magrathea.s3ReactiveApiAdapter
+          containerInstance magrathea.storageEngine
+          containerInstance magrathea.clusterNode
+        }
+        deploymentNode "Node C JVM" "One Java process owns the S3 composition, one Ratis voter, and one independent replica data server. Its stable UUID and persisted roots survive complete restart; C retains control quorum with B after A stops." "Java 21 JVM" {
+          tags "FirstSlice"
+          containerInstance magrathea.bootstrapApplication
+          containerInstance magrathea.s3ReactiveApiAdapter
+          containerInstance magrathea.storageEngine
+          containerInstance magrathea.clusterNode
+        }
+      }
+    }
+
+    deploymentEnvironment "EP-10 Real-Process Acceptance Baseline" {
+      deploymentNode "Isolated acceptance environment" "Validated test topology starts fixed A/B/C as real child JVM processes with separate roots, ephemeral test-local CA material, per-node certificates, and test-only trust stores. The fixtures exercise mTLS locally; they are not production PKI or production-readiness evidence." "Isolated real-process test environment" {
+        tags "FirstSlice"
+        deploymentNode "Acceptance node A" "Initial S3 coordinator and co-located voter/storage node; stopped after successful CreateBucket and whole-object PUT." "Java 21 child JVM" {
+          tags "FirstSlice"
+          containerInstance magrathea.bootstrapApplication
+          containerInstance magrathea.s3ReactiveApiAdapter
+          containerInstance magrathea.storageEngine
+          containerInstance magrathea.clusterNode
+        }
+        deploymentNode "Acceptance node B" "Surviving S3 endpoint and co-located voter/storage node used for exact-byte GET and post-restart recovery." "Java 21 child JVM" {
+          tags "FirstSlice"
+          containerInstance magrathea.bootstrapApplication
+          containerInstance magrathea.s3ReactiveApiAdapter
+          containerInstance magrathea.storageEngine
+          containerInstance magrathea.clusterNode
+        }
+        deploymentNode "Acceptance node C" "Surviving co-located voter/storage node that retains control quorum with B and recovers persisted state after complete restart." "Java 21 child JVM" {
+          tags "FirstSlice"
+          containerInstance magrathea.bootstrapApplication
+          containerInstance magrathea.s3ReactiveApiAdapter
+          containerInstance magrathea.storageEngine
+          containerInstance magrathea.clusterNode
+        }
       }
     }
 
@@ -178,25 +248,30 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
     magrathea.storageEngine.storageEngineReactiveApplication -> magrathea.storageEngine.storageEngineReactiveRepositoryApplication "Uses ports and catalogs (ChunkStorePort, ContentAddressIndex, ObjectManifestRepository, StoredObjectRepository, StoragePolicyCatalog, StorageDeviceCatalog, DiskSetCatalog)" "Repository interfaces"
     magrathea.storageEngine.storageEngineReactiveRepositoryApplication -> magrathea.storageEngine.storageEngineReactiveInfrastructure "Implemented by filesystem and YAML adapters" "Implements"
 
-    magrathea.storageEngine.storageEngineReactiveApplication -> magrathea.plannedClusterControlPlane "PLANNED / NOT IMPLEMENTED: resolves committed membership, topology/policy epochs, fencing, namespace generations, and submits reference publication" "Internal protobuf gRPC/HTTP2 with mTLS" {
+    magrathea.storageEngine.storageEngineRepositoryAdapter -> magrathea.clusterNode.storageEngineClusterApplication "For the cluster profile, delegates unconditional CreateBucket and whole-object PUT/GET through transport-neutral cluster ports; remains the sole S3-to-Storage-Engine ACL" "In-process Java calls"
+    magrathea.clusterNode.storageEngineClusterApplication -> magrathea.storageEngine.storageEngineDomain "Invokes pure PA-6 placement for fixed N=3/W=2 without adding transport or lifecycle types to storage-engine-domain" "In-process Java calls"
+    magrathea.clusterNode.storageEngineClusterApplication -> magrathea.clusterNode.clusterControlRatisInfrastructure "Resolves and commits bucket/object-reference generations through the fixed three-voter control group" "Transport-neutral control ports"
+    magrathea.clusterNode.storageEngineClusterApplication -> magrathea.clusterNode.clusterDataGrpcInfrastructure "Stages, sends, or reads immutable whole-object artifacts and requires checksum-valid durable acknowledgements" "Transport-neutral replica ports"
+    magrathea.clusterNode.clusterDataGrpcInfrastructure -> magrathea.clusterNode.clusterProtocol "Uses versioned replica transfer contracts with bounded manual flow control" "Generated protobuf/gRPC contracts"
+    magrathea.clusterNode.clusterControlRatisInfrastructure -> magrathea.clusterNode.clusterControlRatisInfrastructure "A/B/C voters commit bucket and object-reference generations; peers require stable-UUID-bound mTLS" "Ratis gRPC/HTTP2 with mTLS"
+    magrathea.clusterNode.clusterDataGrpcInfrastructure -> magrathea.clusterNode.clusterDataGrpcInfrastructure "Selected A/B/C storage roles transfer whole-object replicas directly and return durable checksum-valid acknowledgements; peers require stable-UUID-bound mTLS" "Application gRPC/HTTP2 streaming with mTLS"
+
+    magrathea.clusterNode.storageEngineClusterApplication -> magrathea.clusterNode.futureClusteredObjectSemantics "PLANNED: extend the bounded object coordinator beyond unconditional whole-object PUT/GET" "Future in-process capability" {
       tags "Planned"
     }
-    magrathea.storageEngine.storageEngineReactiveApplication -> magrathea.plannedClusterDataPlane "PLANNED / NOT IMPLEMENTED: coordinates bounded immutable artifact writes and checksum-valid reads against the consensus-selected generation" "Internal protobuf gRPC/HTTP2 streaming with mTLS" {
+    magrathea.clusterNode.storageEngineClusterApplication -> magrathea.clusterNode.futureErasureCodedTransfer "PLANNED: coordinate policy-specific shard placement, transfer, acknowledgement, and reconstruction" "Future in-process capability" {
       tags "Planned"
     }
-    magrathea.plannedClusterControlPlane -> magrathea.storageEngine.storageEngineDomain "PLANNED / NOT IMPLEMENTED: invokes PA-6 deterministic placement, quorum, healing, rebalance, and readiness policy using authoritative snapshots" "In-process Java calls" {
+    magrathea.clusterNode.clusterControlRatisInfrastructure -> magrathea.clusterNode.futureMembershipLifecycle "PLANNED: commit safe membership and lifecycle transitions instead of editing fixed bootstrap" "Future control capability" {
       tags "Planned"
     }
-    magrathea.plannedClusterControlPlane -> magrathea.plannedClusterControlPlane "PLANNED / NOT IMPLEMENTED: commits authoritative membership, epochs, fencing, object references, tombstones, and durable job ownership across the three metadata voters" "Internal protobuf gRPC/HTTP2 and Raft with mTLS" {
+    magrathea.clusterNode.storageEngineClusterApplication -> magrathea.clusterNode.futureRepairMovement "PLANNED: execute durable fenced healing, rebalance, and cleanup work" "Future operations capability" {
       tags "Planned"
     }
-    magrathea.plannedClusterControlPlane -> magrathea.plannedClusterDataPlane "PLANNED / NOT IMPLEMENTED: supplies committed generations/epochs and dispatches fenced durable recovery work" "Internal protobuf gRPC/HTTP2 with mTLS" {
+    magrathea.clusterNode.clusterControlRatisInfrastructure -> magrathea.clusterNode.futurePartitionResilience "PLANNED: extend and validate control behavior beyond one stopped coordinator" "Future resilience capability" {
       tags "Planned"
     }
-    magrathea.plannedClusterDataPlane -> magrathea.plannedClusterDataPlane "PLANNED / NOT IMPLEMENTED: streams immutable replicas/chunks/EC shards directly between selected nodes with bounded backpressure, deadlines, cancellation, checksum and durable acknowledgements" "Internal protobuf gRPC/HTTP2 streaming with mTLS" {
-      tags "Planned"
-    }
-    magrathea.plannedClusterDataPlane -> magrathea.plannedClusterControlPlane "PLANNED / NOT IMPLEMENTED: submits verified artifact acknowledgements, reference publication requests, and durable repair/cleanup job evidence" "Internal protobuf gRPC/HTTP2 with mTLS" {
+    magrathea.clusterNode.clusterDataGrpcInfrastructure -> magrathea.clusterNode.futurePartitionResilience "PLANNED: extend and validate data-path behavior under broader partitions and message faults" "Future resilience capability" {
       tags "Planned"
     }
   }
@@ -213,7 +288,7 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
 
     container magrathea "Container" {
       title "C2 Container: Magrathea ObjectStore"
-      description "Implemented boundaries remain unchanged: bootstrap-application assembles the S3 and Admin runtimes, the browser uses only those established interfaces, and storage-engine remains behind the Object Store ACL. ADR 0027 adds two explicitly PLANNED / NOT IMPLEMENTED internal roles: an authoritative consensus Cluster Control Plane and a direct immutable-object Cluster Data Plane. Initially, three control-plane voter instances are planned one-per-storage-node deployment and co-located with data-plane instances across the best available independent failure domains; one unavailable voter is tolerated, not two. They are not public facades, and the PA-6 policy core remains inside storage-engine-domain rather than becoming a runtime container."
+      description "Implemented boundaries remain unchanged: bootstrap-application assembles the S3 and Admin runtimes, the browser uses only those established interfaces, and storage-engine remains behind the Object Store ACL. ADR 0028 records the bounded implementation-informed EP-10 baseline: fixed co-located voter/storage nodes A/B/C for unconditional CreateBucket and whole-object PUT/GET. Each JVM owns one Ratis voter and one replica data server. Consensus orders bucket/object-reference generations; direct N=3/W=2 replica transfer has no degraded writes. Stable UUID identities and roots survive complete restart. Internal links use identity-bound mTLS. Fixed bootstrap is not dynamic membership, and this slice is not distributed production readiness."
       include user
       include administrator
       include magrathea.bootstrapApplication
@@ -225,8 +300,7 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
       include magrathea.reactiveRepositoryApplication
       include magrathea.reactiveInfrastructure
       include magrathea.storageEngine
-      include magrathea.plannedClusterControlPlane
-      include magrathea.plannedClusterDataPlane
+      include magrathea.clusterNode
       autolayout lr
     }
 
@@ -321,8 +395,35 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
 
     component magrathea.storageEngine "StorageEngineComponents" {
       title "C3 Component: storage-engine"
-      description "Storage Engine bounded context: domain model, reactive repository/application ports, reactive orchestration layer, filesystem/YAML adapters, and Anti-Corruption Layer adapter that implements Object Store repository interfaces using the Storage Engine backend. MINIO_STANDARD semantics are STANDARD with dedup disabled and EC enabled (4 data / 2 parity); this view does not claim verified physical EC shard placement."
+      description "Storage Engine bounded context: domain model, reactive repository/application ports, reactive orchestration layer, filesystem/YAML adapters, and Anti-Corruption Layer adapter that implements Object Store repository interfaces using the Storage Engine backend. The existing adapter remains the only S3 integration boundary. PA-6 storage-engine-domain remains pure; the bounded EP-10 cluster modules stay outside this container and call its transport-free placement model."
       include *
+      include magrathea.clusterNode
+      autolayout lr
+    }
+
+    component magrathea.clusterNode "ClusterNodeComponents" {
+      title "C3 Component: Bounded First-Slice Cluster Node Runtime"
+      description "IMPLEMENTED AND VALIDATED FOR THE BOUNDED FIRST SLICE ONLY. The node runtime contains transport-neutral cluster application code, versioned replica protocol, one embedded Ratis voter, and one independent grpc-java data server per JVM. Fixed A/B/C bootstrap, stable UUID-backed roots, identity-bound mTLS, N=3/W=2 whole-object replication, consensus publication, one-coordinator failover, and complete restart are in scope. This diagram excludes later capabilities and does not claim production readiness."
+      include magrathea.storageEngine.storageEngineRepositoryAdapter
+      include magrathea.storageEngine.storageEngineDomain
+      include magrathea.clusterNode.storageEngineClusterApplication
+      include magrathea.clusterNode.clusterProtocol
+      include magrathea.clusterNode.clusterControlRatisInfrastructure
+      include magrathea.clusterNode.clusterDataGrpcInfrastructure
+      autolayout lr
+    }
+
+    component magrathea.clusterNode "FutureClusterCapabilities" {
+      title "C3 Component: Future Cluster Capabilities — Planned / Not Implemented"
+      description "DISTINCT FUTURE SCOPE, NOT PART OF THE VALIDATED FIRST SLICE. Clustered multipart and conditional/versioned writes, erasure-coded transfer/reconstruction, dynamic membership and certificate lifecycle, durable healing/rebalance/orphan cleanup, and broader partition behavior remain planned or unvalidated. Single-node features and PA-6 planning models do not upgrade these cluster capabilities."
+      include magrathea.clusterNode.storageEngineClusterApplication
+      include magrathea.clusterNode.clusterControlRatisInfrastructure
+      include magrathea.clusterNode.clusterDataGrpcInfrastructure
+      include magrathea.clusterNode.futureClusteredObjectSemantics
+      include magrathea.clusterNode.futureErasureCodedTransfer
+      include magrathea.clusterNode.futureMembershipLifecycle
+      include magrathea.clusterNode.futureRepairMovement
+      include magrathea.clusterNode.futurePartitionResilience
       autolayout lr
     }
 
@@ -339,37 +440,64 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
       autolayout lr
     }
 
-    dynamic magrathea.s3ReactiveApiAdapter "PlannedClusterWriteRuntime" {
-      title "Runtime: Planned Consensus-Published Quorum Write"
-      description "PLANNED / NOT IMPLEMENTED (EP-8 EARLY). Resolve committed state, select targets through the pure PA-6 policy, transfer bytes directly, require the configured durable checksum-valid threshold (initial replication N=3/W=2), then consensus-commit the reference before acknowledging S3. Timeout, cancellation, stale epoch, checksum failure, insufficient acknowledgements, or loss of control quorum fails publication and leaves only unreachable artifacts for fenced cleanup."
-      user -> magrathea.s3ReactiveApiAdapter.objectOperationsHandler "1. Submit S3 PutObject" "HTTP"
-      magrathea.s3ReactiveApiAdapter.objectOperationsHandler -> magrathea.reactiveObjectStore.reactiveObjectService "2. Invoke object write use case" "Java service calls"
-      magrathea.reactiveObjectStore.reactiveObjectService -> magrathea.reactiveObjectStore.s3ObjectRepositoryPort "3. Persist through the existing repository boundary" "Repository interfaces"
-      magrathea.reactiveObjectStore.s3ObjectRepositoryPort -> magrathea.reactiveRepositoryApplication.s3ObjectCommandRepository "4. Select the configured repository implementation" "Implemented by"
-      magrathea.reactiveRepositoryApplication.s3ObjectCommandRepository -> magrathea.storageEngine.storageEngineRepositoryAdapter "5. Enter the Storage Engine ACL" "Implements"
-      magrathea.storageEngine.storageEngineRepositoryAdapter -> magrathea.storageEngine.storageEngineReactiveApplication "6. Coordinate the planned clustered write" "Java calls"
-      magrathea.storageEngine.storageEngineReactiveApplication -> magrathea.plannedClusterControlPlane "7. PLANNED: resolve committed membership, generations, fencing, topology and policy epochs" "Internal protobuf gRPC/HTTP2 with mTLS"
-      magrathea.plannedClusterControlPlane -> magrathea.storageEngine.storageEngineDomain "8. PLANNED: select exact targets using the pure PA-6 policy" "In-process Java calls"
-      magrathea.storageEngine.storageEngineReactiveApplication -> magrathea.plannedClusterDataPlane "9. PLANNED: stream the unpublished immutable artifacts to selected targets" "Internal protobuf gRPC/HTTP2 streaming with mTLS"
-      magrathea.plannedClusterDataPlane -> magrathea.plannedClusterDataPlane "10. PLANNED: transfer directly and return checksum-valid durable acknowledgements" "Internal protobuf gRPC/HTTP2 streaming with mTLS"
-      magrathea.plannedClusterDataPlane -> magrathea.plannedClusterControlPlane "11. PLANNED: submit verified artifact references only after the required threshold" "Internal protobuf gRPC/HTTP2 with mTLS"
-      magrathea.plannedClusterControlPlane -> magrathea.plannedClusterControlPlane "12. PLANNED: revalidate fencing and consensus-commit the object-reference generation" "Internal protobuf gRPC/HTTP2 and Raft with mTLS"
+    dynamic magrathea.s3ReactiveApiAdapter "ClusterCreateBucketRuntime" {
+      title "Runtime: Bounded Fixed-Cluster CreateBucket"
+      description "IMPLEMENTED AND VALIDATED FOR THE FIRST SLICE. The existing S3 and Object Store boundaries submit an unconditional CreateBucket through the Storage Engine ACL. The fixed A/B/C voter group commits the new bucket generation before S3 success. Dynamic membership and broader bucket configuration are outside this slice."
+      user -> magrathea.s3ReactiveApiAdapter.bucketOperationsHandler "1. Submit unconditional S3 CreateBucket through node A" "HTTP"
+      magrathea.s3ReactiveApiAdapter.bucketOperationsHandler -> magrathea.reactiveBucketManagement.reactiveBucketService "2. Invoke existing bucket use case" "Java service calls"
+      magrathea.reactiveBucketManagement.reactiveBucketService -> magrathea.reactiveBucketManagement.bucketRepositoryPort "3. Persist through the existing repository boundary" "Repository interfaces"
+      magrathea.reactiveBucketManagement.bucketRepositoryPort -> magrathea.reactiveRepositoryApplication.bucketCommandRepository "4. Select the cluster-profile repository" "Implemented by"
+      magrathea.reactiveRepositoryApplication.bucketCommandRepository -> magrathea.storageEngine.storageEngineRepositoryAdapter "5. Enter the existing Storage Engine ACL" "Implements"
+      magrathea.storageEngine.storageEngineRepositoryAdapter -> magrathea.clusterNode.storageEngineClusterApplication "6. Submit the transport-neutral CreateBucket command" "In-process Java calls"
+      magrathea.clusterNode.storageEngineClusterApplication -> magrathea.clusterNode.clusterControlRatisInfrastructure "7. Commit the next bucket generation through A/B/C quorum" "Transport-neutral control ports"
+      magrathea.clusterNode.clusterControlRatisInfrastructure -> magrathea.clusterNode.clusterControlRatisInfrastructure "8. Replicate and commit the generation before success" "Ratis gRPC/HTTP2 with mTLS"
       autolayout lr
     }
 
-    dynamic magrathea.s3ReactiveApiAdapter "PlannedClusterReadRuntime" {
-      title "Runtime: Planned Consensus-Selected Checksum-Valid Read"
-      description "PLANNED / NOT IMPLEMENTED (EP-8 EARLY). Resolve only the consensus-committed manifest generation, then stream a referenced immutable artifact or reconstruct from referenced EC shards while validating checksum and length. The default replica read quorum is one valid replica; failed fallback records durable repair work and never selects or resurrects another generation."
-      user -> magrathea.s3ReactiveApiAdapter.objectOperationsHandler "1. Submit S3 GetObject" "HTTP"
-      magrathea.s3ReactiveApiAdapter.objectOperationsHandler -> magrathea.reactiveObjectStore.reactiveObjectService "2. Invoke object read use case" "Java service calls"
+    dynamic magrathea.s3ReactiveApiAdapter "ClusterWriteRuntime" {
+      title "Runtime: Bounded Fixed-Cluster Whole-Object Write"
+      description "IMPLEMENTED AND VALIDATED FOR THE FIRST SLICE. Node A coordinates one unconditional, single-part whole-object PUT. PA-6 selects fixed storage nodes A/B/C for N=3; direct replica transfer must obtain W=2 checksum-valid durable acknowledgements, then the A/B/C control quorum commits the object-reference generation before S3 success. There is no degraded write: fewer than two data acknowledgements or loss of control quorum fails publication."
+      user -> magrathea.s3ReactiveApiAdapter.objectOperationsHandler "1. Submit unconditional whole-object S3 PutObject through node A" "HTTP"
+      magrathea.s3ReactiveApiAdapter.objectOperationsHandler -> magrathea.reactiveObjectStore.reactiveObjectService "2. Invoke existing object write use case" "Java service calls"
+      magrathea.reactiveObjectStore.reactiveObjectService -> magrathea.reactiveObjectStore.s3ObjectRepositoryPort "3. Persist through the existing repository boundary" "Repository interfaces"
+      magrathea.reactiveObjectStore.s3ObjectRepositoryPort -> magrathea.reactiveRepositoryApplication.s3ObjectCommandRepository "4. Select the cluster-profile repository" "Implemented by"
+      magrathea.reactiveRepositoryApplication.s3ObjectCommandRepository -> magrathea.storageEngine.storageEngineRepositoryAdapter "5. Enter the existing Storage Engine ACL" "Implements"
+      magrathea.storageEngine.storageEngineRepositoryAdapter -> magrathea.clusterNode.storageEngineClusterApplication "6. Coordinate the transport-neutral whole-object write" "In-process Java calls"
+      magrathea.clusterNode.storageEngineClusterApplication -> magrathea.storageEngine.storageEngineDomain "7. Use pure PA-6 placement to select A/B/C at N=3/W=2" "In-process Java calls"
+      magrathea.clusterNode.storageEngineClusterApplication -> magrathea.clusterNode.clusterDataGrpcInfrastructure "8. Stage and directly transfer the immutable whole-object artifact" "Transport-neutral replica ports"
+      magrathea.clusterNode.clusterDataGrpcInfrastructure -> magrathea.clusterNode.clusterDataGrpcInfrastructure "9. Return identity-bound checksum-valid durable acknowledgements from selected nodes" "Application gRPC/HTTP2 streaming with mTLS"
+      magrathea.clusterNode.storageEngineClusterApplication -> magrathea.clusterNode.clusterControlRatisInfrastructure "10. Only after W=2, submit the verified object-reference generation" "Transport-neutral control ports"
+      magrathea.clusterNode.clusterControlRatisInfrastructure -> magrathea.clusterNode.clusterControlRatisInfrastructure "11. Commit the reference through A/B/C quorum before S3 success" "Ratis gRPC/HTTP2 with mTLS"
+      autolayout lr
+    }
+
+    dynamic magrathea.s3ReactiveApiAdapter "ClusterFailoverReadRuntime" {
+      title "Runtime: Exact-Byte GET After Coordinator A Stops"
+      description "IMPLEMENTED AND VALIDATED FOR THE FIRST-SLICE FAILOVER PROOF. After a successful whole-object PUT, coordinator A is stopped. B and C retain the two-voter control quorum. A client uses node B's existing S3 endpoint; B resolves the committed object-reference generation and returns bytes from a referenced checksum-valid replica. This proves only the narrow one-node-stop slice, not dynamic membership, healing, rebalance, broader partitions, upgrades, or production readiness."
+      user -> magrathea.s3ReactiveApiAdapter.objectOperationsHandler "1. After stopping A, submit S3 GetObject through node B" "HTTP"
+      magrathea.s3ReactiveApiAdapter.objectOperationsHandler -> magrathea.reactiveObjectStore.reactiveObjectService "2. Invoke existing object read use case" "Java service calls"
       magrathea.reactiveObjectStore.reactiveObjectService -> magrathea.reactiveObjectStore.s3ObjectRepositoryPort "3. Read through the existing repository boundary" "Repository interfaces"
-      magrathea.reactiveObjectStore.s3ObjectRepositoryPort -> magrathea.reactiveRepositoryApplication.s3ObjectQueryRepository "4. Select the configured repository implementation" "Implemented by"
-      magrathea.reactiveRepositoryApplication.s3ObjectQueryRepository -> magrathea.storageEngine.storageEngineRepositoryAdapter "5. Enter the Storage Engine ACL" "Implements"
-      magrathea.storageEngine.storageEngineRepositoryAdapter -> magrathea.storageEngine.storageEngineReactiveApplication "6. Coordinate the planned clustered read" "Java calls"
-      magrathea.storageEngine.storageEngineReactiveApplication -> magrathea.plannedClusterControlPlane "7. PLANNED: resolve the consensus-committed object-reference generation" "Internal protobuf gRPC/HTTP2 with mTLS"
-      magrathea.storageEngine.storageEngineReactiveApplication -> magrathea.plannedClusterDataPlane "8. PLANNED: fetch only referenced replicas or the referenced EC reconstruction set" "Internal protobuf gRPC/HTTP2 streaming with mTLS"
-      magrathea.plannedClusterDataPlane -> magrathea.plannedClusterDataPlane "9. PLANNED: retry referenced sources and validate checksum and length through bounded buffers" "Internal protobuf gRPC/HTTP2 streaming with mTLS"
-      magrathea.plannedClusterDataPlane -> magrathea.plannedClusterControlPlane "10. PLANNED: record durable fenced repair work after successful fallback" "Internal protobuf gRPC/HTTP2 with mTLS"
+      magrathea.reactiveObjectStore.s3ObjectRepositoryPort -> magrathea.reactiveRepositoryApplication.s3ObjectQueryRepository "4. Select the cluster-profile repository" "Implemented by"
+      magrathea.reactiveRepositoryApplication.s3ObjectQueryRepository -> magrathea.storageEngine.storageEngineRepositoryAdapter "5. Enter the existing Storage Engine ACL on B" "Implements"
+      magrathea.storageEngine.storageEngineRepositoryAdapter -> magrathea.clusterNode.storageEngineClusterApplication "6. Coordinate the transport-neutral whole-object read" "In-process Java calls"
+      magrathea.clusterNode.storageEngineClusterApplication -> magrathea.clusterNode.clusterControlRatisInfrastructure "7. B resolves the committed reference while B+C retain quorum" "Transport-neutral control ports"
+      magrathea.clusterNode.clusterControlRatisInfrastructure -> magrathea.clusterNode.clusterControlRatisInfrastructure "8. B+C serve the authoritative committed generation; A is unavailable" "Ratis gRPC/HTTP2 with mTLS"
+      magrathea.clusterNode.storageEngineClusterApplication -> magrathea.clusterNode.clusterDataGrpcInfrastructure "9. Read a referenced whole-object replica and validate checksum and length" "Transport-neutral replica ports"
+      magrathea.clusterNode.clusterDataGrpcInfrastructure -> magrathea.clusterNode.clusterDataGrpcInfrastructure "10. Stream exact bytes to B from a surviving referenced replica when needed" "Application gRPC/HTTP2 streaming with mTLS"
+      autolayout lr
+    }
+
+    dynamic magrathea.s3ReactiveApiAdapter "ClusterCompleteRestartRuntime" {
+      title "Runtime: Complete A/B/C Restart Recovery"
+      description "IMPLEMENTED AND VALIDATED FOR THE FIRST-SLICE RESTART PROOF. All three JVMs stop and discard process memory, then restart from their original non-empty roots. Each node recovers its stable UUID, Ratis state, immutable replicas, and committed bucket/object-reference generations. Reordered seeds do not rewrite persisted membership. An exact-byte GET through B verifies recovery; rolling upgrade and membership change are outside this proof."
+      user -> magrathea.s3ReactiveApiAdapter.objectOperationsHandler "1. Before restart, address a consensus-committed whole object through S3" "HTTP"
+      magrathea.clusterNode.clusterControlRatisInfrastructure -> magrathea.clusterNode.clusterControlRatisInfrastructure "2. Stop all A/B/C voters after persisted log and snapshots" "Ratis gRPC/HTTP2 with mTLS"
+      magrathea.clusterNode.clusterDataGrpcInfrastructure -> magrathea.clusterNode.clusterDataGrpcInfrastructure "3. Stop all A/B/C replica servers with published artifacts on independent roots" "Application gRPC/HTTP2 streaming with mTLS"
+      magrathea.clusterNode.clusterControlRatisInfrastructure -> magrathea.clusterNode.clusterControlRatisInfrastructure "4. Restart each voter from its stable UUID and non-empty Ratis root" "Ratis gRPC/HTTP2 with mTLS"
+      magrathea.clusterNode.clusterDataGrpcInfrastructure -> magrathea.clusterNode.clusterDataGrpcInfrastructure "5. Restart each replica server from its object root" "Application gRPC/HTTP2 streaming with mTLS"
+      magrathea.storageEngine.storageEngineRepositoryAdapter -> magrathea.clusterNode.storageEngineClusterApplication "6. Node B requests the committed object through the cluster profile" "In-process Java calls"
+      magrathea.clusterNode.storageEngineClusterApplication -> magrathea.clusterNode.clusterControlRatisInfrastructure "7. Resolve recovered bucket and object-reference generations" "Transport-neutral control ports"
+      magrathea.clusterNode.storageEngineClusterApplication -> magrathea.clusterNode.clusterDataGrpcInfrastructure "8. Validate length and checksum and return exact bytes" "Transport-neutral replica ports"
       autolayout lr
     }
 
@@ -469,6 +597,20 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
       autolayout lr
     }
 
+    deployment magrathea "EP-10 Fixed Three-Node Runtime Baseline" "FixedThreeNodeRuntimeDeployment" {
+      title "Deployment: Bounded Fixed A/B/C Runtime Baseline"
+      description "IMPLEMENTED FIRST-SLICE TOPOLOGY; NOT A PRODUCTION-READINESS CLAIM. Three co-located voter/storage JVMs use an identical static manifest, stable UUID identities, and independent identity, Ratis, object, temporary, and runtime roots. Each JVM owns one Ratis voter and one replica data server. Control and direct replica links require identity-bound mutual TLS. Fixed bootstrap supports no add, promote, demote, replace, or remove operation; production PKI and operational readiness remain outside this slice."
+      include *
+      autolayout tb
+    }
+
+    deployment magrathea "EP-10 Real-Process Acceptance Baseline" "FixedThreeNodeAcceptanceDeployment" {
+      title "Deployment: Validated Real-Process A/B/C Acceptance Baseline"
+      description "IMPLEMENTED AND VALIDATED FOR THE BOUNDED TEST TOPOLOGY. Real child JVMs run isolated A/B/C roots with ephemeral test-local CA/certificate/trust fixtures. After CreateBucket and N=3/W=2 whole-object PUT through A, A stops and exact bytes are read through B while B+C retain quorum. A later complete stop/restart recovers stable identities, committed control state, and object bytes. Test certificates are not production identity, enrollment, rotation, revocation, recovery, or readiness evidence."
+      include *
+      autolayout tb
+    }
+
     styles {
       element "Person" {
         shape person
@@ -491,6 +633,11 @@ workspace "Magrathea ObjectStore" "C4 model for the Magrathea S3-compatible obje
       element "Component" {
         background #85bbf0
         color #000000
+      }
+      element "FirstSlice" {
+        background #2f855a
+        color #ffffff
+        stroke #22543d
       }
       element "Planned" {
         background #6b7280

@@ -61,7 +61,7 @@ import org.springframework.context.annotation.Profile;
  * </p>
  */
 @Repository
-@Profile("storage-engine")
+@Profile("storage-engine & !cluster")
 public class StorageEngineReactiveS3ObjectRepository
         implements S3ObjectCommandRepository, S3ObjectQueryRepository {
 

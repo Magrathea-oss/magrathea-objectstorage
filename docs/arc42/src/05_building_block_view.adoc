@@ -126,21 +126,45 @@ The current static distribution is generated and handed to `bootstrap-applicatio
 - **Required Interface:** Storage Engine domain model and filesystem/configuration resources
 - **Technology:** Java 21, Reactor, YAML configuration, filesystem adapters
 
-=== Planned Cluster Runtime Roles (ADR 0027)
+=== Implemented Fixed Three-Node First Slice (ADRs 0027 and 0028)
 
 [NOTE]
 ====
-Status: *planned / not implemented*. These are logical C2 runtime roles, initially intended to be co-located in each of three storage-node deployments. They are not new public APIs and do not imply separate artifacts or production readiness.
+Status: *implementation-informed / partial*. The fixed A/B/C decomposition and its bounded behavior are implemented and validated. The diagram does not represent dynamic membership, broader S3 clustering, healing/rebalance, general partition tolerance, or production readiness.
 ====
 
-.Planned Cluster roles in the C2 Container Diagram
-image::../../c4/images/Container.png[Container Diagram with planned cluster roles, width=600]
+.Cluster Node Runtime components
+image::../../c4/images/ClusterNodeComponents.png[Cluster Node Runtime Components, width=600]
 
-- **Planned Cluster Control Plane** — three initial embedded-Ratis metadata voters; owns consensus-authoritative membership, epochs, fencing, namespace/object-reference generations, tombstones, and durable job state. Ratis remains spike-gated.
-- **Planned Cluster Data Plane** — bounded, deadline-aware direct transfer and read of immutable replicas/chunks/EC shards with mTLS, checksum/length validation, durable acknowledgement, retry, repair, and cleanup execution.
-- **Pure PA-6 policy core** — `DistributedPlacementPlanner`, `QuorumPolicy`, `AntiEntropyPlanner`, `RebalancePlanner`, and `DistributedReadinessReporter` remain components inside `storage-engine-domain`; they are not deployable C2 containers.
+The **Cluster Node Runtime** is one logical C2 container instantiated as fixed nodes A, B, and C. Each JVM co-locates one Ratis voter and one replica data server while keeping control and data transports, ports, executors, limits, metrics, and lifecycle ownership separate. Its implemented first-slice C3 decomposition is:
 
-Both planned roles remain behind the existing Object Store-to-Storage Engine ACL. The S3 adapter remains the only external object API, and the Admin adapter remains a non-object operational surface.
+[cols="3,5",options="header"]
+|===
+|Module |Responsibility
+
+|`storage-engine-cluster-application`
+|Transport-neutral cluster use cases and ports for consensus-authoritative bucket/object-reference generations, local artifacts, fixed `N=3/W=2` whole-object write coordination, and committed-reference reads. It has no Ratis, protobuf, generated-stub, or gRPC dependencies.
+
+|`cluster-protocol`
+|Versioned application-owned protobuf contracts and generated messages/stubs for internal cluster communication. It contains no S3 API or policy decisions.
+
+|`cluster-control-ratis-infrastructure`
+|Apache Ratis 3.2.2 with `ratis-grpc`, the deterministic control state machine, fixed A/B/C bootstrap, persisted log/snapshot state, control-plane mTLS, and infrastructure mapping. Dynamic membership remains future scope.
+
+|`cluster-data-grpc-infrastructure`
+|Independent grpc-java 1.82.2 `grpc-netty-shaded` replica servers/clients using protobuf 3.25.8, checksum/length validation, durable acknowledgements, deadlines/cancellation, replica mTLS, and a bounded manual 64 KiB flow-control bridge.
+|===
+
+`bootstrap-application` composes one runtime per JVM, and `object-store-reactive-repository-storage-engine-infrastructure` selects cluster bucket/object repositories for the cluster profile. That adapter remains the only S3-to-Storage Engine integration boundary; no Ratis or replica listener is a public object API. Each node owns separate stable-UUID identity, Ratis, object, temporary, and runtime roots.
+
+The implemented behavior is restricted to unconditional `CreateBucket`, single-part whole-object `PUT`, and whole-object `GET`. Consensus orders bucket and object-reference generations; payload bytes do not enter the Ratis log. Direct replication uses fixed `N=3, W=2`, and no object-reference generation is published below `W=2` durable checksum-valid acknowledgements or without control quorum.
+
+The PA-6 `DistributedPlacementPlanner`, `QuorumPolicy`, `AntiEntropyPlanner`, `RebalancePlanner`, and `DistributedReadinessReporter` remain pure components inside `storage-engine-domain`; they do not acquire Ratis, gRPC, protobuf, Spring, filesystem, certificate, retry, or lifecycle dependencies. This larger module-boundary requirement is still partial (`REQ-CLUSTER-014`) even though the first-slice Ratis/gRPC/cross-module mechanisms in `REQ-CLUSTER-008..013` pass.
+
+.Future cluster capabilities — deliberately not part of the implemented slice
+image::../../c4/images/FutureClusterCapabilities.png[Future Cluster Capabilities, width=600]
+
+Clustered multipart, conditional/versioned and chunked writes, erasure coding, consensus-controlled dynamic membership and certificate lifecycle, healing/rebalance/orphan-cleanup execution, rolling upgrades, and the broader partition suite remain not implemented or unvalidated. Fixed A/B/C bootstrap and test-local mTLS fixtures must not be presented as those future capabilities or as production PKI.
 
 === Level 2 — Component Diagram (s3-reactive-api-adapter)
 

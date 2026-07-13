@@ -31,7 +31,7 @@ import java.util.function.UnaryOperator;
  * </p>
  */
 @Repository
-@Profile("storage-engine")
+@Profile("storage-engine & !cluster")
 public class StorageEngineReactiveBucketRepository
         implements BucketCommandRepository, BucketQueryRepository {
 

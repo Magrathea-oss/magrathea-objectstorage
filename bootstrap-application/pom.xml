@@ -68,6 +68,17 @@
             <artifactId>object-store-reactive-repository-storage-engine-infrastructure</artifactId>
             <scope>compile</scope>
         </dependency>
+        <!-- EP-10 production packaging only; cluster bean composition is introduced separately. -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>cluster-control-ratis-infrastructure</artifactId>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>cluster-data-grpc-infrastructure</artifactId>
+            <scope>compile</scope>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>
@@ -83,6 +94,21 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>io.cucumber</groupId>
+            <artifactId>cucumber-java</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.cucumber</groupId>
+            <artifactId>cucumber-junit-platform-engine</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.platform</groupId>
+            <artifactId>junit-platform-suite</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>io.opentelemetry</groupId>
             <artifactId>opentelemetry-sdk-trace</artifactId>
             <scope>test</scope>
@@ -95,6 +121,14 @@
     </dependencies>
 
     <build>
+        <testResources>
+            <testResource>
+                <directory>${maven.multiModuleProjectDirectory}/s3-reactive-api-adapter/src/test/features</directory>
+            </testResource>
+            <testResource>
+                <directory>${maven.multiModuleProjectDirectory}/s3-reactive-api-adapter/src/test/resources</directory>
+            </testResource>
+        </testResources>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>

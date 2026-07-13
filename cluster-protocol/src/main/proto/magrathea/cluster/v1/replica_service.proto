@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package magrathea.cluster.v1;
+
+option java_multiple_files = true;
+option java_outer_classname = "ReplicaServiceProto";
+option java_package = "com.example.magrathea.cluster.protocol.v1";
+
+// Internal node-to-node health and immutable-artifact transfer contract.
+// This protocol intentionally has no bucket, object-key, HTTP, or S3 facade.
+service ClusterHealthService {
+  rpc Check(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+service ReplicaTransferService {
+  rpc Stage(stream StageReplicaRequest) returns (StageReplicaResponse);
+  rpc Read(ReadReplicaRequest) returns (stream ReplicaPayloadFrame);
+}
+
+message HealthCheckRequest {
+  string expected_node_id = 1;
+}
+
+message HealthCheckResponse {
+  enum ServingStatus {
+    SERVING_STATUS_UNSPECIFIED = 0;
+    SERVING = 1;
+    NOT_SERVING = 2;
+  }
+
+  string node_id = 1;
+  ServingStatus status = 2;
+}
+
+message ReplicaStageMetadata {
+  string operation_id = 1;
+  string artifact_id = 2;
+  string target_node_id = 3;
+  int64 expected_length = 4;
+  bytes expected_sha256 = 5;
+  string topology_epoch = 6;
+  string policy_epoch = 7;
+}
+
+message StageReplicaRequest {
+  oneof part {
+    ReplicaStageMetadata metadata = 1;
+    ReplicaPayloadFrame payload = 2;
+  }
+}
+
+message ReplicaPayloadFrame {
+  int64 offset = 1;
+  bytes payload = 2;
+}
+
+message StageReplicaResponse {
+  string operation_id = 1;
+  string artifact_id = 2;
+  string node_id = 3;
+  int64 durable_length = 4;
+  bytes durable_sha256 = 5;
+  string topology_epoch = 6;
+  string policy_epoch = 7;
+}
+
+message ReadReplicaRequest {
+  string artifact_id = 1;
+  int64 expected_length = 2;
+  bytes expected_sha256 = 3;
+}

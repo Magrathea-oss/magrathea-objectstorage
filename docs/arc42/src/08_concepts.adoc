@@ -24,6 +24,21 @@ Every durable document written by the Storage Engine backend follows the same cr
 
 This guarantees a reader or a crash never observes a torn or partially written document: the final path always contains either the previous complete document or the new complete document, never a mixture. Concurrent writers to the **same** key are serialized through a striped `ReentrantLock` array (typically 64 stripes, selected by `Math.floorMod(key.hashCode(), stripes)`); writers to **different** keys proceed independently. At process startup, each store's constructor performs a `loadAll()` pass over its directory to repopulate an in-memory cache from the durable files, so restart-safety in storage-engine mode does not depend on incremental replay of events.
 
+=== Fixed-Cluster Publication, Identity, and Transport (EP-10 first slice)
+
+[NOTE]
+====
+Status: *implementation-informed / partial*. This concept is evidenced only for fixed A/B/C and the unconditional whole-object slice in `REQ-CLUSTER-001..005` and `008..013`.
+====
+
+The cluster profile composes one Ratis voter and one independent replica data server per JVM. Each node recovers a stable UUID from its identity root and keeps identity, Ratis, object, temporary, and runtime roots separate. A common static A/B/C manifest bootstraps the group but cannot rewrite recovered non-empty state or perform membership changes.
+
+Publication is ordered in two stages: direct data transfer first, authoritative metadata second. A whole-object `PUT` stages immutable replicas outside Ratis, validates length and checksum, and requires `W=2` durable acknowledgements from fixed `N=3`. Only then may the control group commit an object-reference generation. Loss of either threshold fails the S3 operation; unreferenced staged bytes remain unreachable, and the slice has no degraded-write mode. Bucket generations use the same consensus authority without object payload traffic.
+
+Ratis control and replica data use different internal servers, ports, executors, bounds, metrics, and lifecycle ownership. Both use mTLS bound to the expected stable node identity. The grpc-java bridge limits payload frames to 64 KiB and explicitly bounds demand, queues, in-flight frames, deadlines, idle timeout, retries, and terminal cleanup. Test-local certificates establish exercised peer authentication only; production enrollment, custody, rotation, revocation, expiry handling, and recovery remain absent.
+
+This concept does not extend single-node multipart/versioning/EC support into cluster mode. Dynamic membership, clustered multipart, conditional/versioned and chunked writes, erasure coding, healing, rebalance, orphan cleanup, rolling upgrades, and broader partition behavior remain future work.
+
 === Reactive Non-blocking I/O
 
 All HTTP request handling is reactive:
@@ -366,28 +381,30 @@ AWS CLI v2 does NOT send `Content-Type` by default unless `--content-type` is ex
 |[green]#Low#
 |===
 
-=== Planned Cluster Consistency, Transport, and Identity (ADR 0027)
+=== Future Cluster Concepts Beyond the Fixed Slice (ADR 0027)
 
 [NOTE]
 ====
-Status: *planned / absent*. The following is accepted architecture, not implementation evidence.
+Status: *planned / not implemented beyond the bounded ADR 0028 baseline*. The implemented identity, transport, and publication subset is documented above; this section records only the remaining target.
 ====
 
-**Authority and identity.** A stable persisted node UUID identifies storage identity across address, certificate, and process changes. Static seeds only bootstrap contact. Membership changes, topology/policy epochs, fencing, tombstones, namespace and manifest generations, and durable recovery jobs are ordered by the consensus control log. Suspicion can suppress placement or prompt repair but cannot remove a member.
+**Membership and authority.** Consensus-controlled admission, catch-up, promotion, demotion, replacement, removal, topology/policy epochs, fencing, tombstones, wider namespace/configuration generations, and durable recovery jobs remain future work. Health suspicion must not become membership mutation.
 
-**Transport.** Node-to-node calls use internal protobuf gRPC/HTTP2 with mandatory mTLS. Reactor adapters must bridge demand and cancellation without blocking event loops; buffers, message sizes, retries, and in-flight work are bounded, and every operation has a deadline. This API carries control coordination and immutable data transfer only and cannot bypass the S3 Data Plane.
+**Transfer and reads.** Chunked, multipart, conditional/versioned, and EC transfer/reconstruction are not implemented in cluster mode. Alternate-source fallback with authoritative durable repair, healing, rebalance, and automated orphan cleanup remain planned rather than inferred from whole-object `N=3/W=2` replication.
 
-**Publication and reads.** Immutable data is checksummed and durably acknowledged directly by selected nodes before a reference is committed. Initial replication uses `N=3, W=2`, with no degraded writes by default. Reads first resolve the committed generation, then require a configurable checksum-valid data quorum (default one) with alternate retry and durable repair. Metadata is not eventually reconciled between replicas.
+**Operations and security.** Production certificate enrollment/rotation/revocation/recovery, rolling and mixed-version upgrades, broader partition handling, online multi-node backup/DR, and deployment hardening require separate evidence. Test-local mTLS and one-coordinator-stop validation do not satisfy these obligations.
 
-**Policy separation.** Cluster application/infrastructure adapters execute authoritative snapshots and decisions from PA-6. Ratis/protobuf/Reactor/persistence concerns do not enter `DistributedPlacementPlanner`, `QuorumPolicy`, `AntiEntropyPlanner`, `RebalancePlanner`, or `DistributedReadinessReporter`.
+**Policy separation.** Future cluster adapters must continue executing authoritative decisions without moving Ratis/protobuf/Reactor/persistence concerns into `DistributedPlacementPlanner`, `QuorumPolicy`, `AntiEntropyPlanner`, `RebalancePlanner`, or `DistributedReadinessReporter`.
 
-=== Validated Supply-chain Evidence Wiring (ADR 0027)
+=== Supply-chain Evidence Wiring and Historical Packet (ADR 0027)
 
-Status: *implementation-informed / `@implemented-and-validated` for the bounded evidence contract*. A clean run at revision `209b3170b64d3311ba9b773fdb7bd5581519e682` generated CycloneDX 1.6 application JSON (102 components, 103 dependencies; SHA-256 `4025d7206af01683da5cffa84862f20f68c7568dd9338ee9920d55947df545d1`) and XML (SHA-256 `b934de56a243cf6b5464566f45635e1f6ac0fc244d2ceb7c1f7418308012952f`). The SPDX-normalized inventory reports 85 recognized, 13 unknown, and 4 ambiguous entries (SHA-256 `0df3a3eac37e554dce6d67f227ffead9b28675f47fca9dab741d6850ac47b214`) and explicitly makes no compliance conclusion.
+Status: *implementation-informed*. The evidence producers, dirty-tree fail-closed guard, and other explicitly validated EP-8 contracts retain their declared statuses. Current complete-reactor `REQ-SUPPLY-001` is `@implemented-not-e2e-validated`: the production composition gained `cluster-protocol`, `storage-engine-cluster-application`, `cluster-control-ratis-infrastructure`, and `cluster-data-grpc-infrastructure`, but no new clean-revision application SBOM/license/image packet covers those modules.
 
-Syft 1.31.0, itself bound to image ID `sha256:c15fa8af4c25edd72c0daf026d095fe51adbcfc7ad5d79a66e93d88f249e5abb`, inspected exact local application image ID `sha256:e5b5862948853a613f8b92adc8135fa81b84bdd9f36c9ae8d69b9a6bd6dd7966`. The image CycloneDX inventory contains 7,105 components and has SHA-256 `8d13ae409ef7230d52b4d850d0700db69132297910e55cffdbe27c08e28a90ba`. Hardened runtime evidence passed with UID/GID 10001, read-only root, explicit data/tmp mounts, `no-new-privileges`, capability drop `ALL`, no host namespace sharing or engine socket, ready `storage-engine`, and exact 129-byte object/checksum/ETag persistence across replacement. User-namespace remapping was unavailable and remains explicitly recorded.
+The prior clean run at revision `209b3170b64d3311ba9b773fdb7bd5581519e682` remains historical evidence only. It generated CycloneDX 1.6 application JSON (102 components, 103 dependencies; SHA-256 `4025d7206af01683da5cffa84862f20f68c7568dd9338ee9920d55947df545d1`) and XML (SHA-256 `b934de56a243cf6b5464566f45635e1f6ac0fc244d2ceb7c1f7418308012952f`). The SPDX-normalized inventory reports 85 recognized, 13 unknown, and 4 ambiguous entries (SHA-256 `0df3a3eac37e554dce6d67f227ffead9b28675f47fca9dab741d6850ac47b214`) and explicitly makes no compliance conclusion.
 
-OWASP Dependency-Check remains truthful monitoring evidence, not a vulnerability finding claim: the current-revision run received NVD HTTP 429 after 190,000/364,891 records and records `scanStatus=error`, `clean=null`, and 8 errors. No clean, zero-vulnerability, findings, compliance, or remediation claim is made. CI retains evidence and error artifacts but performs no publication.
+Syft 1.31.0, itself bound to image ID `sha256:c15fa8af4c25edd72c0daf026d095fe51adbcfc7ad5d79a66e93d88f249e5abb`, inspected exact local application image ID `sha256:e5b5862948853a613f8b92adc8135fa81b84bdd9f36c9ae8d69b9a6bd6dd7966`. The historical image CycloneDX inventory contains 7,105 components and has SHA-256 `8d13ae409ef7230d52b4d850d0700db69132297910e55cffdbe27c08e28a90ba`. Hardened runtime evidence passed with UID/GID 10001, read-only root, explicit data/tmp mounts, `no-new-privileges`, capability drop `ALL`, no host namespace sharing or engine socket, ready `storage-engine`, and exact 129-byte object/checksum/ETag persistence across replacement. User-namespace remapping was unavailable and remains explicitly recorded.
+
+OWASP Dependency-Check remains truthful monitoring evidence, not a vulnerability finding claim: that historical clean-revision run received NVD HTTP 429 after 190,000/364,891 records and records `scanStatus=error`, `clean=null`, and 8 errors. No clean, zero-vulnerability, findings, compliance, or remediation claim is made. CI retains evidence and error artifacts but performs no publication. The later dirty-working-tree ordinary root test is supporting integration evidence only and does not refresh or supersede this packet.
 
 === Testing Strategy
 
@@ -398,4 +415,4 @@ Four levels of testing:
 3. **S3 Integration:** Cucumber BDD with WebTestClient — verify HTTP endpoints.
 4. **AWS CLI Compatibility:** targeted AWS CLI Cucumber runners sharing the same requirement feature files as the WebTestClient runners (see the generated Gherkin requirements appendix).
 
-Current point-in-time evidence is tracked in `docs/test-report.md` and is intentionally not duplicated here. That report owns full-gate counts, runner environments, EP-8 clean-revision evidence, OWASP error status, and current limitations. JaCoCo remains the coverage baseline.
+Current point-in-time evidence is tracked in `docs/test-report.md` and is intentionally not duplicated here. That report owns full-gate counts, runner environments, the historical EP-8 clean-revision packet, OWASP error status, and current limitations. JaCoCo remains the coverage baseline.

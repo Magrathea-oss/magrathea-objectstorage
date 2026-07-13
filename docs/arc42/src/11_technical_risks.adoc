@@ -52,10 +52,10 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |EP-6 (`@implemented-and-validated` safety envelope; KA-6 remains pending)
 
 |8
-|**Distributed readiness is modeled, not executed** — placement, quorum, anti-entropy, and rebalance planning are unit-validated in `storage-engine-domain`, but there is no real networked membership, replication execution, or multi-node e2e validation.
-|Multi-node/cluster claims would be premature; no HA guarantee exists today
-|Do not claim cluster readiness until EP-10 (S3 Cluster) is validated end to end by multi-node scenarios, gated on the EP-8 cluster architecture ADR
-|EP-8 (`@implemented-and-validated` architecture contract only) / EP-10 (`@absent`, high priority)
+|**Distributed evidence is limited to one fixed slice** — real A/B/C consensus, whole-object `N=3/W=2` replication, failover, and complete restart are validated, while multipart/conditional/versioned/EC transfer, dynamic membership, healing/rebalance, and broader partition behavior are absent.
+|Consumers may overgeneralize one-coordinator-stop evidence into HA, broad S3 clustering, or distributed production readiness.
+|Keep EP-10 `@partial`; name the exact `REQ-CLUSTER-001..005` and `008..013` boundary and prohibit broader claims until each later capability has semantic and fault evidence.
+|EP-10 (`@partial`, fixed first slice validated; broader distributed readiness not claimed)
 
 |9
 |**Product-shell boundary regression** — ADR 0026 separation and REQ-ADMIN-032 task-group composition are implemented and validated, but future extensions could reintroduce Object Storage routes, endpoint knowledge, or models into the reusable shell.
@@ -76,22 +76,22 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |EP-7 (`@partial`; human scope review required before closure)
 
 |12
-|**Dependency vulnerability status remains unknown/error** — the current-revision OWASP Dependency-Check 12.2.2 run failed closed after NVD HTTP 429 at 190,000/364,891 records. Evidence records `scanStatus=error`, `clean=null`, and 8 errors; EP-8 makes no vulnerability-findings, clean-scan, zero-vulnerability, or remediation claim.
+|**Dependency vulnerability status remains unknown/error** — the historical EP-8 clean-revision OWASP Dependency-Check 12.2.2 run failed closed after NVD HTTP 429 at 190,000/364,891 records. Evidence records `scanStatus=error`, `clean=null`, and 8 errors; EP-8 makes no vulnerability-findings, clean-scan, zero-vulnerability, or remediation claim. The later dirty-working-tree root test did not refresh the assessment.
 |Vulnerable dependencies may remain unidentified. Monitoring/evidence wiring completion could be misread as dependency safety.
-|Keep the CVSS 7.0 policy and current-revision error evidence visible; rerun through scheduled/manual CI with securely injected `NVD_API_KEY`. Require a complete assessment before any vulnerability cleanliness statement, independently of EP-8 architecture/evidence closure.
+|Keep the CVSS 7.0 policy and historical clean-revision error evidence visible; rerun through scheduled/manual CI with securely injected `NVD_API_KEY`. Require a complete assessment before any vulnerability cleanliness statement, independently of EP-8 architecture/evidence status.
 |EP-8 monitoring wiring (`@implemented-and-validated`); vulnerability assessment (`unknown/error`, `needs-review`)
 
 |13
-|**Embedded Apache Ratis fit is unproven** — ADR 0027 selects Ratis as the planned Raft implementation, but persistence/snapshots, Reactor and mTLS integration, membership change, upgrades, leader transfer, partition behavior, and resource bounds have no repository proof.
-|A poor integration could block event loops, lose control state, complicate upgrades, or violate quorum/fencing assumptions.
-|Run the time-boxed spike and fault matrix before production implementation acceptance; preserve the consensus boundary so an external service/alternative adapter remains possible.
-|EP-8 / EP-10 (`planned`, `needs-review`)
+|**Apache Ratis proof is bounded** — the fixed three-voter lifecycle, persisted restart, consensus bucket/reference publication, control mTLS, and loss-of-control-quorum refusal are exercised. Membership change, rolling upgrade/leader-transfer behavior, snapshots under sustained load, asymmetric partitions, and operational resource limits remain unproven.
+|The bounded integration can still fail under lifecycle and network conditions outside the first slice.
+|Preserve the consensus adapter boundary; add focused membership, upgrade, snapshot/load, and partition fault matrices before extending the support claim.
+|EP-10 first slice (`implementation-informed`); wider Ratis lifecycle (`not implemented` / `needs-review`)
 
 |14
-|**Initial voter/data co-location couples failures and resources** — each of three initial storage-node deployments also hosts a metadata voter.
-|Host/resource failure can remove both data capacity and a voter; two such losses remove control quorum.
-|Place voters across the best available independent topology domains, enforce bounded transport/Ratis resources, validate one-loss/two-loss behavior, and retain a future dedicated-voter deployment option.
-|EP-10 (`planned`)
+|**Implemented voter/data co-location couples failures and resources** — each fixed A/B/C JVM hosts both one metadata voter and one replica server.
+|A process/host/resource failure removes both roles; two voter losses block publication, and the current evidence does not establish failure-domain placement or capacity isolation.
+|Keep separate ports/executors/limits, deploy across independent domains when evaluated, retain a future dedicated-voter option, and do not infer two-node-loss tolerance from the validated refusal to publish.
+|EP-10 first slice (`implementation-informed`, ongoing deployment risk)
 
 |15
 |**Topology/catalog migration is undefined** — current YAML lacks concrete parent-linked `zone/rack/host/disk-set/device` identities and persisted UUID ownership.
@@ -100,8 +100,32 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |EP-10 (`planned`, `needs-review`)
 
 |16
-|**Supply-chain evidence can be overread as compliance, publication, or cluster readiness** — clean-revision application/image SBOMs, license inventory, CI wiring, and hardened single-node replacement now pass, but 13 license entries are unknown, 4 are ambiguous, user-namespace remapping was unavailable, OWASP is unknown/error, and no artifact was published.
-|Consumers could mistake inventory generation for license approval, a local image for a release, bounded container hardening for every deployment environment, or EP-8 evidence for EP-10 runtime behavior.
-|Keep `NOASSERTION`/manual-review entries, `published=false`, unavailable userns status, exact image/revision binding, and OWASP error visible. Prohibit compliance, vulnerability-cleanliness, publication, membership, consensus, quorum-transfer, healing, rebalance, and distributed-readiness claims without their own evidence.
-|EP-8 (`@implemented-and-validated` evidence wiring); compliance/publication/EP-10 runtime (`not claimed` / `@absent`)
+|**Supply-chain and focused cluster evidence can be overread** — the clean-revision SBOM/hardening packet predates four newly composed cluster modules, while the fixed A/B/C semantic gates are separate evidence. No artifact was published, OWASP remains unknown/error, and EP-10 capabilities outside the first slice are absent.
+|Consumers could mistake historical inventory generation for current complete-reactor coverage or compliance, a local image for a release, a dirty root pass for supply-chain acceptance, single-node hardening for clustered deployment hardening, or bounded failover for production distributed readiness.
+|Keep historical hashes explicitly scoped, `REQ-SUPPLY-001` at `@implemented-not-e2e-validated` until a new clean packet covers all production modules, `NOASSERTION`/manual-review entries, `published=false`, unavailable userns status, and OWASP error visible. Report focused EP-10 gates separately from ordinary root Maven and prohibit broader membership, repair, partition, or readiness claims.
+|EP-8 architecture/other evidence guards (declared statuses retained); `REQ-SUPPLY-001` (`@implemented-not-e2e-validated`); EP-10 (`@partial`); compliance/publication/production readiness (`not claimed`)
+
+|17
+|**The implemented fixed A/B/C bootstrap can be mistaken for dynamic membership** — one identical static manifest and stable UUID roots recover successfully, but there is no admission, promotion, demotion, replacement, or removal flow.
+|Operators could treat configuration edits, address changes, timeout, or seed order as membership transitions, risking split-brain, duplicate identity, or unsafe replacement.
+|Keep the mode named fixed bootstrap, reject mismatch against non-empty persisted state, and prohibit membership claims. Implement ADR 0027's consensus-controlled lifecycle and fencing in a separate validated slice.
+|EP-10 first slice (`implementation-informed`); dynamic membership (`not implemented`, `needs-review`)
+
+|18
+|**The manual Reactor/grpc-java bridge remains correctness-sensitive** — focused `REQ-CLUSTER-011/012` scenarios exercise 64 KiB frames, slow demand, finite bounds, cancellation, deadline, and cleanup, but wider workloads and repeated network faults are not covered.
+|Undiscovered demand bugs could still deadlock, buffer excessively, block event loops, leak resources, or mishandle terminal races outside the tested slice.
+|Keep the bridge infrastructure-only and every bound explicit; extend stress, repeated-fault, and long-duration evidence before raising payload/concurrency limits or broadening transfer semantics.
+|EP-10 first slice (`implementation-informed`; residual high risk)
+
+|19
+|**Pinned versions are bounded build evidence, not general compatibility or security evidence** — Ratis 3.2.2, grpc-java 1.82.2, and protobuf/protoc 3.25.8 resolve and pass focused lifecycle/TLS/persistence gates; Testcontainers 2.0.2 is pinned but not used by the real-process S3 acceptance gate.
+|Rolling/mixed-version operation, future dependency convergence, vulnerability status, shaded transport changes, and upgrade compatibility remain unknown.
+|Retain separate modules/ports and focused convergence gates; require upgrade, mixed-version, and complete vulnerability evidence before changing the baseline or claiming compatibility/security.
+|EP-10 / ADR 0028 (`accepted` bounded baseline; wider compatibility `needs-review`)
+
+|20
+|**Test-local mTLS can be overread as production PKI readiness** — focused control/data scenarios reject wrong or mismatched peers, but ephemeral local CA, node certificates, and trust stores prove only the exercised test environment.
+|Passing TLS and failover gates can conceal absent operational enrollment, key custody, trust distribution, rotation, revocation, expiry monitoring, and disaster recovery.
+|Keep production mTLS mandatory and test-only certificate infrastructure visibly separate. Require an operational certificate lifecycle and stable-node-identity evidence before any production security claim.
+|EP-10 first slice (`implementation-informed`); production PKI (`blocked`, owner/review point: security and operations)
 |===

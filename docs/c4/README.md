@@ -12,18 +12,36 @@ The C2 model includes the independently built **Object Storage Admin Browser App
 
 The model does not represent Product Shell or a product extension as separately running C4 containers: they are build-time package boundaries that execute as components in the browser application. It also does not invent operational report providers. The current Admin Control Plane returns explicit provider-not-configured responses when no real recovery, garbage-collection, scrub, audit, metrics, or trace provider is present.
 
-## EP-8 EARLY cluster planning boundary
+## EP-10 bounded first-cluster implementation baseline
 
-ADR 0027 adds explicitly **PLANNED / NOT IMPLEMENTED** C2 roles for the internal Cluster Control Plane and direct Cluster Data Plane. The C2 plan records one metadata voter and one data-plane role co-located on each of three initial storage-node deployments; physical/virtual deployment-node details remain intentionally unspecified. Planned relationships are tagged and rendered separately from implemented relationships. The model preserves these constraints:
+ADRs 0027 and 0028 define the architecture and the **implemented-and-validated bounded first slice**. This status applies only to the fixed A/B/C baseline; it is not an EP-10 completion or distributed production-readiness claim.
 
-- S3 remains the only external object/bucket API, and the Admin API remains operational only.
-- Internal cluster traffic is protobuf gRPC over HTTP/2 with mandatory mTLS; it is not another public facade.
-- Consensus owns authoritative membership, epochs, fencing, metadata generations, tombstones, and durable job state.
-- Immutable object data moves directly between selected storage nodes and does not transit the Raft log.
-- PA-6 deterministic policy remains a pure `storage-engine-domain` component, not a separately running C2 container.
-- The three-voter initial plan tolerates one unavailable metadata voter, not two; no networked cluster implementation or validation is claimed.
+C2 models one Cluster Node Runtime instantiated as fixed co-located voter/storage nodes A, B, and C. Each node JVM owns one Ratis voter and one independent replica data server. The implemented C3 view contains `storage-engine-cluster-application`, `cluster-protocol`, `cluster-control-ratis-infrastructure`, and `cluster-data-grpc-infrastructure`. The model preserves these implementation-informed constraints:
 
-The planned write/read dynamic views show publication ordering, direct checksum/quorum transfer, consensus-selected reads, fallback, and durable repair recording without upgrading EP-8 or EP-10 implementation status.
+- The existing object-store-to-storage-engine adapter remains the only S3 integration boundary; no cluster module exposes a second object API.
+- The cluster slice is limited to unconditional `CreateBucket`, single-part whole-object `PUT`, and whole-object `GET`.
+- Consensus orders bucket and object-reference generations; object bytes stay out of the Ratis log.
+- Direct whole-object replication uses fixed `N=3, W=2`; insufficient data acknowledgements or control quorum fails the write, with no degraded mode.
+- Stable node UUIDs are recovered from per-node identity roots. Identity, Ratis, object, temporary, and runtime roots remain independent and survive complete process restart.
+- PA-6 placement remains pure inside `storage-engine-domain`, without Ratis, gRPC, protobuf, Spring, filesystem, certificate, or lifecycle types.
+- Fixed A/B/C bootstrap is a first-slice constraint, not dynamic membership.
+- Internal Ratis control and replica-data connections use mutual TLS bound to stable node identities. Ephemeral test-local CA/certificate/trust fixtures exercise that path only and are not production PKI evidence.
+- The failover runtime stops coordinator A after a successful write, then requires exact-byte `GET` through B while B and C retain quorum.
+- The restart runtime stops all A/B/C JVMs, restarts them from non-empty roots, recovers identities and committed generations, and verifies the exact object through B.
+
+The implemented first-slice diagrams are:
+
+- `ClusterNodeComponents` — implemented module and boundary decomposition;
+- `ClusterCreateBucketRuntime` — consensus bucket-generation publication;
+- `ClusterWriteRuntime` — direct whole-object replication followed by consensus reference publication;
+- `ClusterFailoverReadRuntime` — exact-byte read after coordinator A stops;
+- `ClusterCompleteRestartRuntime` — stable-identity and persisted-state recovery;
+- `FixedThreeNodeRuntimeDeployment` — one voter and one data server per node JVM with separate roots; and
+- `FixedThreeNodeAcceptanceDeployment` — validated real-child-process topology with test-local mTLS fixtures.
+
+A separate `FutureClusterCapabilities` diagram keeps later scope visibly distinct and labeled **PLANNED / NOT IMPLEMENTED** (or **NOT VALIDATED** for broader partition behavior): clustered multipart, conditional/versioned and chunked writes, erasure-coded transfer/reconstruction, dynamic membership and certificate lifecycle, durable healing/rebalance/orphan cleanup, and broader partition handling. Existing single-node features and PA-6 planning models are not evidence for those cluster capabilities.
+
+None of these diagrams claims production PKI, dynamic membership, rolling upgrades, repair execution, general partition tolerance, two-node-loss tolerance, broader S3 cluster support, or distributed production readiness.
 
 This project uses **Structurizr local** through the official `docker.io/structurizr/structurizr` container image, following the current Structurizr local workflow. The helper scripts are compatible with both **Podman** and **Docker**; Podman is preferred when both are available.
 
