@@ -99,6 +99,19 @@ When the `storage-engine` profile is active, durable state is organized under th
 
 Every document under `metadata/**` is committed with the same crash-safe discipline: write to a temp file in the target directory, then atomically rename over the final path. Concurrent writers to the same key are serialized through striped per-key locks.
 
+=== Validated EP-8 Hardened Single-node Evidence Deployment
+
+[NOTE]
+====
+Status: *implementation-informed / bounded*. This validates evidence wiring and a hardened single-node container only. It is not a cluster deployment or publication claim.
+====
+
+The clean evidence run is bound to revision `209b3170b64d3311ba9b773fdb7bd5581519e682` and exact local image ID `sha256:e5b5862948853a613f8b92adc8135fa81b84bdd9f36c9ae8d69b9a6bd6dd7966`; the manifest records `published=false`. Runtime validation passed with UID/GID 10001, read-only root filesystem, explicit writable data and temporary mounts, `no-new-privileges`, capability drop `ALL`, no host PID/IPC/network/UTS namespaces, and no container-engine socket. User-namespace remapping was unavailable in the local engine and is recorded as unavailable rather than claimed.
+
+The configured Admin readiness endpoint reported the `storage-engine` backend ready. An exact 129-byte object with recorded checksum and ETag remained byte-identical after replacement from the same image and persisted storage. This proves the bounded hardened-container contract, not multi-node durability.
+
+CI runs the architecture contract and application evidence job on ordinary workflow execution. A scheduled or explicitly requested job runs the image SBOM, hardened runtime, fail-closed OWASP, and complete supply-chain evidence contract, retaining both successful artifacts and scan-error evidence for 30 days. These jobs do not publish an application or image.
+
 === Planned Initial Cluster Deployment (ADR 0027)
 
 [NOTE]
@@ -123,6 +136,7 @@ The current single-process deployment is intentionally monolithic for single-nod
 * EP-5 (Operability & Delivery): implemented and validated for the `0.1.0` single-node JVM 21 preview. Mandatory CI runs the full root gate and generated/source checks before image validation. The tag-driven release workflow enforces SemVer/OCI identity, immutable version/minor/SHA tags, digest recording, persistent-volume container replacement, and live Prometheus-to-Alertmanager delivery before publication. SIGTERM validation covers committed, streaming, multipart, concurrent, cancellation, abort-race, and bounded mixed-load paths. Offline backup/restore and same-node DR validate RTO 30 seconds and RPO as the last completed backup. Typed object manifests use schema `2`; multipart sessions, bucket registry, object configuration, object references, ACL sidecars, and capacity ledgers use schema `1`; all accept documented legacy version `0` and reject unsupported future versions. Live Loki/external paging is deployment integration, sustained/production load belongs to EP-6, and online/multi-node DR belongs to EP-10.
 * EP-6 (Performance & Capacity): implemented and validated for the `0.1.x` single-node safety envelope. S3 routes enforce 256 MiB single/assembled object limits, 64 MiB multipart parts, finite timeout, 16 active requests, 64 TCP connections, and a 100 requests/s token bucket with burst 200. Mandatory 45-second CI load and weekly/manual 15-minute soak run eight deterministic workers under `-Xmx256m`, produce machine-readable evidence, and assert bounded heap, checksums, and idle resources. These gates are not production sizing or competitive benchmarks.
 * EP-7 (Complete Admin Panel): `REQ-ADMIN-001..031` UI/contracts and reproducible packaging are implemented and validated. The phase remains partial because credential/tenant administration and real recovery/GC/scrub/audit/metrics/traces providers are absent; provider routes return truthful HTTP 503 not-configured responses.
-* EP-10 (S3 Cluster, multi-node): after an accepted cluster architecture ADR (EP-8) — membership, quorum, failover, healing, rebalance validated by multi-node scenarios
+* EP-8 (Cluster Architecture ADR & Supply Chain): `@implemented-and-validated` only for accepted architecture/evidence wiring. Clean-revision SBOM/license/image-hardening evidence and CI retention are validated without publication; current OWASP vulnerability status is unknown/error.
+* EP-10 (S3 Cluster, multi-node): `@absent` after the accepted architecture-only ADR — membership, consensus, quorum transfer, failover, healing, rebalance, and partition behavior still require multi-node semantic and fault-injection scenarios
 
 No production distributed-cluster claims are made until EP-10 is validated end to end; see `PLAN.md` for current status per phase.

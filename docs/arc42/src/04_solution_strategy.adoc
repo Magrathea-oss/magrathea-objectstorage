@@ -82,7 +82,7 @@ Operational report availability is fail-closed: without a configured recovery, g
 
 [NOTE]
 ====
-Status: *planned / absent*. The architecture is accepted; no networked cluster, embedded Ratis integration, multi-node durability, SBOM/license output, or expanded hardening proof exists yet.
+Status: *confirmed architecture / implementation-informed evidence wiring*. ADR 0027 is accepted for architecture only, and EP-8 supply-chain/hardening evidence wiring is validated. No networked cluster, embedded Ratis integration, multi-node durability, quorum-transfer execution, healing, rebalance, or cluster fault behavior exists; those remain EP-10 `@absent`.
 ====
 
 The planned cluster separates a small authoritative **Cluster Control Plane** from the high-volume **Cluster Data Plane**. Three initially co-located metadata voters use embedded Apache Ratis (subject to a mandatory spike) to order membership, bucket/configuration namespace, object-reference generations, topology/policy epochs, fencing/tombstones, and durable jobs. Static seeds only establish first contact; stable persisted node UUIDs and committed membership remain authoritative.

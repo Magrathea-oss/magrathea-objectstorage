@@ -17,13 +17,17 @@ rm -f "$TARGET/dependency-check-report.json" \
 cd "$ROOT"
 echo "Dependency-Check data cache: $ROOT/.cache/dependency-check"
 if [[ -z "${NVD_API_KEY:-}" ]]; then
-  echo "NVD_API_KEY is not set; the unauthenticated NVD API may rate-limit this scan." >&2
+  printf '%s\n' \
+    'NVD_API_KEY is not set; refusing to report an unauthenticated assessment as complete.' \
+    'Dependency-Check vulnerability status is unknown and this monitoring gate fails closed.' \
+    | tee "$LOG" >&2
+  MAVEN_STATUS=2
+else
+  set +e
+  mvn -Pdependency-check -DskipTests verify "$@" 2>&1 | tee "$LOG"
+  MAVEN_STATUS=${PIPESTATUS[0]}
+  set -e
 fi
-
-set +e
-mvn -Pdependency-check -DskipTests verify "$@" 2>&1 | tee "$LOG"
-MAVEN_STATUS=${PIPESTATUS[0]}
-set -e
 
 ANALYZE_ARGS=(--report "$REPORT" --log "$LOG" --output "$ANALYSIS"
   --suppression-file "$ROOT/config/dependency-check-suppressions.xml")

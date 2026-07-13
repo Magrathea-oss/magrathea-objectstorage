@@ -1,6 +1,6 @@
 # Magrathea ObjectStore — Public Roadmap
 
-> **Status:** Derived from [`PLAN.md`](../PLAN.md) (updated 2026-07-12). Completion claims are limited to the declared and validated scope; this roadmap is not a promise of delivery dates.
+> **Status:** Derived from [`PLAN.md`](../PLAN.md) (updated 2026-07-13). Completion claims are limited to the declared and validated scope; this roadmap is not a promise of delivery dates.
 
 ---
 
@@ -31,7 +31,7 @@
 | **EP-5** Operability & Delivery | High | `@implemented-and-validated` for `0.1.0` preview | Full CI gate, SemVer/OCI release workflow, persistent-volume replacement, backup/DR, schema compatibility, SLOs, probes, and graceful shutdown |
 | **EP-6** Performance & Capacity Validation | High | `@implemented-and-validated` for single-node envelope | Enforced object/admission/timeout/connection limits, deterministic 45-second CI load, 15-minute soak, bounded-memory and reproducible result manifests |
 | **EP-7** Complete Admin Panel | High | `@partial` overall; `REQ-ADMIN-001..037` complete | Product Shell, Object Storage extension/application, task-grouped navigation, priority dashboard, progressive disclosure, operation feedback, appearance support, truthful unavailable states, accessibility, visual regression, and packaging are validated. Credential/tenant administration and real recovery/GC/scrub/audit/metrics/traces providers remain absent; unavailable providers truthfully return 503 not-configured. |
-| **EP-8** Cluster Architecture ADR & Supply Chain | Medium | `@absent` | ADR deciding inter-node transport, membership, consistency model, failure-domain topology; SBOM, CVE scanning, image hardening |
+| **EP-8** Cluster Architecture ADR & Supply Chain | Medium | `@implemented-and-validated` for architecture/evidence wiring only | ADR 0027 accepted architecture-only; clean-revision CycloneDX application/image SBOMs, truthful license inventory, fail-closed OWASP monitoring evidence, hardened runtime proof, and CI artifact retention validated. No publication and no cluster runtime claim. |
 | **EP-10** S3 Cluster (Multi-Node) | High | `@absent` | Node membership, replica/EC-shard placement, quorum writes/reads, manifest replication, anti-entropy healing, rebalance |
 | **EP-9** WebDAV API Adapter | Future | `@absent` | Optional WebDAV protocol adapter; delegates to S3 services (INV-4) |
 | **EP-11** SMB Gateway (Samba VFS) | Future | `@absent` | Optional Samba VFS C module; maps file ops to S3 semantics (INV-4) |
@@ -45,7 +45,7 @@
 - [x] EP-5: `0.1.0` preview CI/delivery gates, backup/restore, probes, shutdown, and persistent-volume replacement validated
 - [x] EP-6: Single-node load/soak limits documented and reproducibly validated under `-Xmx256m` (non-benchmark scope)
 - [ ] EP-7: Complete authoritative scope delivered and validated — `REQ-ADMIN-001..037` is complete, but credential/tenant administration and real operational report providers remain
-- [ ] EP-8: Cluster architecture ADR accepted; supply-chain gates wired
+- [x] EP-8: ADR 0027 accepted for architecture only; supply-chain evidence/CI wiring validated without publication. OWASP remains unknown/error and EP-10 runtime remains absent.
 - [ ] EP-10: Cluster behavior validated by multi-node e2e scenarios
 - [ ] EP-9 (optional): WebDAV adapter, if built, meets binding constraints
 - [ ] EP-11 (optional): SMB gateway, if built, meets binding constraints

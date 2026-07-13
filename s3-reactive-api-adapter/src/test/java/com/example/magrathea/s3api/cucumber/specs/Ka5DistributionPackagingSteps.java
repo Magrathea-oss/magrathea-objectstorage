@@ -8,6 +8,7 @@ import io.cucumber.java.en.When;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -239,7 +240,7 @@ public class Ka5DistributionPackagingSteps {
         var jsonCommand = "[\"java\", \"-jar\", \"/app.jar\"]";
         assertTrue(inspectedSource.contains(jsonCommand), "Dockerfile should start with " + command);
         assertTrue(inspectedSource.contains("HEALTHCHECK"), "Dockerfile should define a runtime healthcheck");
-        assertTrue(inspectedSource.contains("USER magrathea"), "Dockerfile should run as non-root user magrathea");
+        assertNonRootRuntimeIdentity(inspectedSource);
     }
 
     @Then("the CI workflow uses Java {string}")
@@ -358,6 +359,34 @@ public class Ka5DistributionPackagingSteps {
 
     private void assertInspected() {
         assertTrue(inspectedSource != null && inspectedPath != null, "A distribution source path must be inspected first");
+    }
+
+    private static void assertNonRootRuntimeIdentity(String source) {
+        String runtimeStage = source.substring(source.lastIndexOf("FROM "));
+        var userMatcher = Pattern.compile("(?m)^USER\\s+(\\S+)\\s*$").matcher(runtimeStage);
+        assertTrue(userMatcher.find(), "Dockerfile runtime stage must declare a USER");
+
+        String runtimeIdentity = userMatcher.group(1);
+        assertFalse(runtimeIdentity.equals("root") || runtimeIdentity.startsWith("root:")
+                || runtimeIdentity.equals("0") || runtimeIdentity.startsWith("0:"),
+            "Dockerfile runtime USER must reject root identities");
+
+        boolean numericIdentity = runtimeIdentity.equals("10001:10001");
+        boolean namedIdentity = runtimeIdentity.equals("magrathea")
+            || runtimeIdentity.equals("magrathea:magrathea");
+        assertTrue(numericIdentity || namedIdentity,
+            "Dockerfile runtime USER must be numeric 10001:10001 or the created magrathea user");
+
+        assertTrue(runtimeStage.contains("ARG RUNTIME_UID=10001")
+                && runtimeStage.contains("ARG RUNTIME_GID=10001"),
+            "Dockerfile must pin the non-root runtime UID and GID");
+        assertTrue(runtimeStage.contains("addgroup --system --gid \"${RUNTIME_GID}\" magrathea")
+                && runtimeStage.contains("adduser --system --uid \"${RUNTIME_UID}\" --gid \"${RUNTIME_GID}\"")
+                && runtimeStage.contains("--no-create-home magrathea"),
+            "Dockerfile must create the runtime user and group for the declared identity");
+        assertTrue(runtimeStage.contains("chown -R magrathea:magrathea /app")
+                && runtimeStage.contains("--chown=magrathea:magrathea"),
+            "Dockerfile must give the created non-root identity ownership of runtime files");
     }
 
     private static void assertDocsAndUiRegeneration(String source) {

@@ -1,6 +1,6 @@
 @spec @phase-ep8 @architecture @supply-chain @security
 Ability: Gate future cluster work with an authoritative architecture and reproducible supply-chain evidence
-  Maintainers need an accepted, executable cluster architecture contract and verifiable release evidence
+  Maintainers need an accepted, executable cluster architecture contract and verifiable supply-chain evidence
   before networked cluster implementation begins, so that EP-10 cannot invent weaker consistency,
   public inter-node APIs, unverifiable artifacts, or privileged runtime assumptions.
 
@@ -14,17 +14,22 @@ Ability: Gate future cluster work with an authoritative architecture and reprodu
   operational topology or status with no S3 equivalent, but neither Admin nor cluster transport may become
   an alternate object API.
 
-  Shared release evidence identity is derived and recorded for each evidence run:
+  Shared supply-chain evidence identity is derived and recorded for each evidence run:
     | identity field      | authoritative recorded value |
     | source revision     | full Git revision of the current clean checked-out HEAD |
-    | application version | release version declared by the root Maven project |
+    | application version | exact root Maven project version, including every qualifier such as -SNAPSHOT |
+    | publication status  | explicit evidence-run classification; a development evidence run is not a published release |
     | source date epoch   | deterministic SOURCE_DATE_EPOCH associated with that revision |
     | evidence timestamp  | UTC timestamp derived exactly from SOURCE_DATE_EPOCH |
     | image identity      | exact immutable local image ID built and validated for that revision and application version |
 
+  The current root Maven project version is "0.1.0-SNAPSHOT". A future release workflow may supply its
+  exact root Maven release version, but no evidence producer may remove, replace, or otherwise rewrite a
+  version qualifier or claim that a non-published development evidence run was released.
+
   Rule: ADR 0027 is the complete authority for the planned cluster boundary
 
-    @REQ-HA-001 @non-functional-requirement @architecture @architecture-decision @internal-api @security @partial
+    @REQ-HA-001 @non-functional-requirement @architecture @architecture-decision @internal-api @security @ep10-runtime-absent @implemented-and-validated
     Scenario: The accepted decision is complete without claiming a cluster implementation
       Given the canonical decision is "docs/adr/0027-authoritative-cluster-control-plane-and-direct-quorum-data-path.md"
       When the architecture-contract runner evaluates ADR 0027
@@ -38,7 +43,7 @@ Ability: Gate future cluster work with an authoritative architecture and reprodu
       And it identifies EP-10 as the owner of networked execution and multi-node fault validation
       And no accepted wording reports Ratis, Raft correctness, membership, quorum transfer, healing, rebalance, or multi-node durability as implemented
 
-    @REQ-HA-002 @functional-requirement @non-functional-requirement @architecture @boundary @internal-api @s3-api @security @partial
+    @REQ-HA-002 @functional-requirement @non-functional-requirement @architecture @boundary @internal-api @s3-api @security @ep10-runtime-absent @implemented-and-validated
     Scenario: Inter-node transport cannot become a public object or bucket facade
       Given ADR 0027 defines the planned gRPC surface for membership, control coordination, artifact transfer, verification, health evidence, and durable recovery-job execution
       When the architecture boundary is compared with the S3 Data Plane and Admin Control Plane
@@ -50,7 +55,7 @@ Ability: Gate future cluster work with an authoritative architecture and reprodu
 
   Rule: Ordered publication is an architecture contract and not EP-10 execution evidence
 
-    @REQ-HA-003 @functional-requirement @non-functional-requirement @architecture @consistency @write-ordering @determinism @integrity @durability @absent
+    @REQ-HA-003 @functional-requirement @non-functional-requirement @architecture @consistency @write-ordering @determinism @integrity @durability @ep10-runtime-absent @implemented-and-validated
     Scenario: A replicated write contract has one deterministic place-stream-verify-publish-response order
       Given the initial replicated policy is "N=3, W=2" with degraded writes disabled
       And a coordinator has resolved a consensus-committed membership snapshot, topology epoch "topology-42", policy epoch "policy-17", and current object generation "generation-8"
@@ -67,7 +72,7 @@ Ability: Gate future cluster work with an authoritative architecture and reprodu
       And stable operation and artifact identifiers make a retried stage idempotent
       And the contract does not assert that any stage has a networked implementation in EP-8
 
-    @REQ-HA-004 @functional-requirement @non-functional-requirement @architecture @consistency @failure-handling @no-degraded-writes @integrity @absent
+    @REQ-HA-004 @functional-requirement @non-functional-requirement @architecture @consistency @failure-handling @no-degraded-writes @integrity @ep10-runtime-absent @implemented-and-validated
     Scenario Outline: Write failure cannot degrade durability or expose an unpublished generation
       Given replicated write operation "put-photos-2026-002" requires policy "N=3, W=2"
       And the planned failure is "<failure>"
@@ -91,7 +96,7 @@ Ability: Gate future cluster work with an authoritative architecture and reprodu
 
   Rule: Identity, bootstrap, membership, and suspicion have separate authorities
 
-    @REQ-HA-005 @functional-requirement @non-functional-requirement @architecture @node-identity @membership @consensus @security @failure-handling @absent
+    @REQ-HA-005 @functional-requirement @non-functional-requirement @architecture @node-identity @membership @consensus @security @failure-handling @ep10-runtime-absent @implemented-and-validated
     Scenario: Stable UUID identity survives endpoint and certificate changes while consensus controls membership
       Given storage node "node-7f4c" has persisted UUID "3f32679d-f51e-46ce-a720-1f5d927c78d2"
       And static seed addresses "10.42.0.11:9443,10.42.0.12:9443,10.42.0.13:9443" are bootstrap hints
@@ -103,7 +108,7 @@ Ability: Gate future cluster work with an authoritative architecture and reprodu
       And a second live node presenting UUID "3f32679d-f51e-46ce-a720-1f5d927c78d2" is rejected or fenced
       And these transitions remain planned until EP-10 supplies networked consensus evidence
 
-    @REQ-HA-006 @functional-requirement @non-functional-requirement @architecture @membership @failure-suspicion @consensus @availability @absent
+    @REQ-HA-006 @functional-requirement @non-functional-requirement @architecture @membership @failure-suspicion @consensus @availability @ep10-runtime-absent @implemented-and-validated
     Scenario: Failure suspicion may affect placement eligibility but cannot evict a member
       Given node "node-7f4c" is a consensus-committed member
       And its heartbeats are missed until liveness state "SUSPECT" is reached
@@ -116,7 +121,7 @@ Ability: Gate future cluster work with an authoritative architecture and reprodu
 
   Rule: Cluster topology extends rather than contaminates PA-6 policy
 
-    @REQ-HA-007 @functional-requirement @non-functional-requirement @architecture @topology @failure-domain @determinism @pa-6 @absent
+    @REQ-HA-007 @functional-requirement @non-functional-requirement @architecture @topology @failure-domain @determinism @pa-6 @ep10-runtime-absent @implemented-and-validated
     Scenario: Parent-linked topology preserves deterministic PA-6 policy components
       Given the planned YAML topology catalog "config/storage/cluster-topology.yml" declares the hierarchy "zone → rack → host → disk-set → device"
       And host "host-a-01" binds node UUID "3f32679d-f51e-46ce-a720-1f5d927c78d2"
@@ -131,11 +136,12 @@ Ability: Gate future cluster work with an authoritative architecture and reprodu
 
   Rule: Application and image SBOMs are complete, traceable, and reproducible
 
-    @REQ-SUPPLY-001 @non-functional-requirement @security @supply-chain @sbom @cyclonedx @reproducibility @machine-readable @absent
+    @REQ-SUPPLY-001 @non-functional-requirement @security @supply-chain @sbom @cyclonedx @reproducibility @machine-readable @implemented-and-validated
     Scenario: CycloneDX JSON and XML describe the complete production application reactor
       Given the current checkout has a clean working tree
       And the evidence runner records the full Git revision of the checked-out HEAD
-      And the root Maven project declares the application release version
+      And the root Maven project declares the exact application version "0.1.0-SNAPSHOT"
+      And the evidence run is classified as non-published development evidence
       And SOURCE_DATE_EPOCH is deterministically associated with that revision and determines the recorded UTC evidence timestamp
       And the production reactor inventory is:
         | module |
@@ -151,27 +157,28 @@ Ability: Gate future cluster work with an authoritative architecture and reprodu
         | object-store-reactive-application |
         | object-store-reactive-infrastructure |
         | object-store-reactive-repository-storage-engine-infrastructure |
-      When the canonical release evidence build generates "target/supply-chain/application.cdx.json" and "target/supply-chain/application.cdx.xml"
+      When the canonical supply-chain evidence build generates "target/supply-chain/application.cdx.json" and "target/supply-chain/application.cdx.xml"
       Then both artifacts validate against the same supported CycloneDX specification version
       And both represent every production module and all resolved production dependencies without test-only or coverage-aggregator components
-      And their metadata agrees on the recorded full source revision, root Maven release version, SOURCE_DATE_EPOCH-derived timestamp, and released application component
+      And their metadata agrees on the recorded full source revision, exact root Maven project version including "-SNAPSHOT", SOURCE_DATE_EPOCH-derived timestamp, and application component
+      And neither artifact rewrites "0.1.0-SNAPSHOT" as "0.1.0" or claims release publication
       And "target/supply-chain/evidence-manifest.json" records those exact identity values and the SHA-256 of each SBOM
       And components retain package coordinates, exact resolved versions, dependency relationships, and available cryptographic hashes
       And normalized JSON and XML inventories reconcile to the same component identities and dependency relationships
       And rebuilding from the same locked inputs and SOURCE_DATE_EPOCH produces identical normalized content and SHA-256 evidence
 
-    @REQ-SUPPLY-001 @non-functional-requirement @security @supply-chain @fail-closed @reproducibility @absent
-    Scenario: Dirty content cannot be labeled as release evidence for the checked-out revision
+    @REQ-SUPPLY-001 @non-functional-requirement @security @supply-chain @fail-closed @reproducibility @implemented-and-validated
+    Scenario: Dirty content cannot be labeled as acceptance evidence for the checked-out revision
       Given the current checkout contains a tracked or untracked working-tree change
-      When the canonical release evidence build derives its source identity
-      Then release-evidence generation fails before publishing application, image, or license artifacts
+      When the canonical supply-chain evidence build derives its source identity
+      Then acceptance-evidence generation fails before producing application, image, or license artifacts
       And it does not label the dirty content with the full revision of the checked-out HEAD
       And it does not reuse identity values or artifacts from a prior clean evidence run
 
-    @REQ-SUPPLY-002 @non-functional-requirement @security @supply-chain @sbom @cyclonedx @oci @image-digest @reproducibility @absent
+    @REQ-SUPPLY-002 @non-functional-requirement @security @supply-chain @sbom @cyclonedx @oci @image-digest @reproducibility @implemented-and-validated
     Scenario: OCI image SBOM is bound to the exact locally validated image ID
-      Given the shared evidence identity records the current clean checkout's full Git revision, root Maven release version, SOURCE_DATE_EPOCH, and derived UTC timestamp
-      And the local image reference for that recorded version resolves to the exact immutable local image ID produced by the release build
+      Given the shared evidence identity records the current clean checkout's full Git revision, exact root Maven project version including any qualifier, SOURCE_DATE_EPOCH, and derived UTC timestamp
+      And the local image reference for that recorded version resolves to the exact immutable local image ID produced by the evidence build
       When the evidence runner generates "target/supply-chain/image.cdx.json" by inspecting that recorded image ID rather than a mutable tag
       Then the SBOM identifies the subject image by that exact immutable image ID
       And its source revision, application version, and timestamp agree with the shared recorded evidence identity
@@ -183,9 +190,9 @@ Ability: Gate future cluster work with an authoritative architecture and reprodu
 
   Rule: License and vulnerability evidence remains truthful without phase-local remediation
 
-    @REQ-SUPPLY-003 @non-functional-requirement @security @supply-chain @license-compliance @spdx @observability @reproducibility @absent
+    @REQ-SUPPLY-003 @non-functional-requirement @security @supply-chain @license-compliance @spdx @observability @reproducibility @implemented-and-validated
     Scenario: SPDX-normalized license inventory keeps unknown and ambiguous licenses visible
-      Given the CycloneDX application inventory for the shared recorded full source revision and root Maven release version has passed reactor reconciliation
+      Given the CycloneDX application inventory for the shared recorded full source revision and exact root Maven project version including any qualifier has passed reactor reconciliation
       And its timestamp is derived from the recorded SOURCE_DATE_EPOCH associated with that revision
       When license evidence is generated at "target/supply-chain/license-inventory.json" and "target/supply-chain/license-inventory.html"
       Then both license artifacts agree with the application JSON, application XML, image SBOM, and evidence manifest on the recorded source revision, application version, SOURCE_DATE_EPOCH, and derived timestamp
@@ -194,11 +201,11 @@ Ability: Gate future cluster work with an authoritative architecture and reprodu
       And missing evidence is reported as "NOASSERTION" with review status "unknown"
       And conflicting or non-normalizable evidence is retained with review status "ambiguous"
       And unknown, ambiguous, copyleft, exception-bearing, and manually concluded entries remain visible in machine-readable and human-readable reports
-      And generation does not label the release compliant merely because an inventory exists
+      And generation does not label the application or a release compliant merely because an inventory exists
       And no license identifier, conclusion, approval, or compatibility decision is fabricated from absent evidence
       And repeated normalization of the same component and source evidence produces the same ordered inventory and SHA-256
 
-    @REQ-SUPPLY-004 @non-functional-requirement @security @supply-chain @owasp-dependency-check @fail-closed @observability @partial
+    @REQ-SUPPLY-004 @non-functional-requirement @security @supply-chain @owasp-dependency-check @fail-closed @observability @implemented-and-validated
     Scenario Outline: EP-8 preserves OWASP monitoring and fail-closed evidence without remediation or suppression
       Given OWASP Dependency-Check scans every resolved production reactor dependency
       And the configured gate rejects unsuppressed findings with CVSS 7.0 or greater
@@ -217,9 +224,9 @@ Ability: Gate future cluster work with an authoritative architecture and reprodu
         | complete with unsuppressed CVSS 7.0+     | fail |
         | incomplete because vulnerability data is unavailable or stale | fail closed |
 
-  Rule: The exact release image runs with least privilege without losing required behavior
+  Rule: The exact evidence image runs with least privilege without losing required behavior
 
-    @REQ-SUPPLY-005 @functional-requirement @non-functional-requirement @security @supply-chain @container-hardening @least-privilege @durability @restart-safety @absent
+    @REQ-SUPPLY-005 @functional-requirement @non-functional-requirement @security @supply-chain @container-hardening @least-privilege @durability @restart-safety @implemented-and-validated
     Scenario: Hardened JVM image preserves Admin health, S3 behavior, and object bytes across restart
       Given the hardened-runtime runner builds the current source revision into a local JVM image
       And the runner records the exact immutable local image ID produced for that revision
@@ -244,12 +251,16 @@ Ability: Gate future cluster work with an authoritative architecture and reprodu
 
   Rule: EP-8 evidence cannot upgrade EP-10 cluster status
 
-    @REQ-HA-008 @REQ-SUPPLY-006 @non-functional-requirement @architecture @supply-chain @status-reporting @observability @partial
-    Scenario: Architecture and supply-chain completion remains distinct from cluster execution
+    @REQ-HA-008 @REQ-SUPPLY-006 @non-functional-requirement @architecture @supply-chain @status-reporting @observability @ep10-runtime-absent @implemented-and-validated
+    Scenario: Architecture and supply-chain completion remains distinct from vulnerability and cluster status
       Given ADR 0027 is accepted
-      And all required application SBOM, image SBOM, license, OWASP, and hardened-runtime evidence gates have passed for one immutable revision and image digest
-      When the requirements appendix, roadmap, and release evidence summarize EP-8
-      Then they may report the validated EP-8 architecture and supply-chain gate scope as complete
+      And every required evidence producer and policy handler has been exercised for one clean full source revision and one exact immutable image ID
+      And the application SBOM, image SBOM, license, and hardened-runtime evidence gates have passed for that same revision and image
+      And OWASP Dependency-Check either completed under the configured monitoring policy or produced current-revision evidence that fails closed because the assessment is incomplete
+      When the requirements appendix, roadmap, and supply-chain evidence summarize EP-8
+      Then they may report the validated EP-8 architecture wiring and evidence-contract scope as complete
+      And an incomplete OWASP assessment keeps vulnerability status explicitly "unknown/error" and is never reported as clean, complete, or zero vulnerabilities
+      And no EP-8 result claims that an image or application was published merely because development evidence passed
       But EP-10 and networked cluster execution remain "@absent" until their own shared semantic multi-node and fault-injection scenarios pass
       And no EP-8 result claims implemented membership, consensus correctness, multi-node persistence, quorum transfer, healing, rebalance, partition safety, or distributed production readiness
       And architecture-contract scenarios are reported separately from runtime and artifact evidence

@@ -55,7 +55,7 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |**Distributed readiness is modeled, not executed** — placement, quorum, anti-entropy, and rebalance planning are unit-validated in `storage-engine-domain`, but there is no real networked membership, replication execution, or multi-node e2e validation.
 |Multi-node/cluster claims would be premature; no HA guarantee exists today
 |Do not claim cluster readiness until EP-10 (S3 Cluster) is validated end to end by multi-node scenarios, gated on the EP-8 cluster architecture ADR
-|EP-8 / EP-10 (`@absent`, high priority after ADR acceptance)
+|EP-8 (`@implemented-and-validated` architecture contract only) / EP-10 (`@absent`, high priority)
 
 |9
 |**Product-shell boundary regression** — ADR 0026 separation and REQ-ADMIN-032 task-group composition are implemented and validated, but future extensions could reintroduce Object Storage routes, endpoint knowledge, or models into the reusable shell.
@@ -76,10 +76,10 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |EP-7 (`@partial`; human scope review required before closure)
 
 |12
-|**Dependency vulnerability status is currently unknown** — OWASP Dependency-Check 12.2.2 failed closed during its initial NVD update after 40,000/364,882 records because NVD returned HTTP 429. The retained analysis has `scanStatus=error`, `clean=null`, and 8 scan errors; no JSON/HTML vulnerability report was produced.
-|Vulnerable dependencies may remain unidentified. Zero finding counters from the absent report could be misread as a clean scan.
-|Do not make vulnerability-finding or clean-scan claims. Inject `NVD_API_KEY` securely through CI/environment and rerun `scripts/run-dependency-check.sh`; retain the CVSS 7.0 gate and require a complete report plus executable semantic validation before closing `REQ-QUAL-003/004`.
-|Quality/security evidence (`@partial`, `needs-review`)
+|**Dependency vulnerability status remains unknown/error** — the current-revision OWASP Dependency-Check 12.2.2 run failed closed after NVD HTTP 429 at 190,000/364,891 records. Evidence records `scanStatus=error`, `clean=null`, and 8 errors; EP-8 makes no vulnerability-findings, clean-scan, zero-vulnerability, or remediation claim.
+|Vulnerable dependencies may remain unidentified. Monitoring/evidence wiring completion could be misread as dependency safety.
+|Keep the CVSS 7.0 policy and current-revision error evidence visible; rerun through scheduled/manual CI with securely injected `NVD_API_KEY`. Require a complete assessment before any vulnerability cleanliness statement, independently of EP-8 architecture/evidence closure.
+|EP-8 monitoring wiring (`@implemented-and-validated`); vulnerability assessment (`unknown/error`, `needs-review`)
 
 |13
 |**Embedded Apache Ratis fit is unproven** — ADR 0027 selects Ratis as the planned Raft implementation, but persistence/snapshots, Reactor and mTLS integration, membership change, upgrades, leader transfer, partition behavior, and resource bounds have no repository proof.
@@ -100,8 +100,8 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |EP-10 (`planned`, `needs-review`)
 
 |16
-|**Supply-chain artifacts and expanded hardening are absent** — CycloneDX JSON/XML, SPDX-normalized inventory, CI reconciliation, and read-only-root/capability/no-new-privileges runtime proof are decisions only. Current OWASP evidence is fail-closed but incomplete, and remediation is intentionally out of scope for this slice.
-|Release consumers lack complete component/license evidence and may overread current non-root checks as full hardening.
-|Generate and schema-validate artifacts, report unresolved licenses/findings truthfully, retain OWASP failure semantics, and execute S3/Admin/persistence validation under hardened runtime settings. Revisit remediation separately.
-|EP-8 (`planned`, `needs-review`)
+|**Supply-chain evidence can be overread as compliance, publication, or cluster readiness** — clean-revision application/image SBOMs, license inventory, CI wiring, and hardened single-node replacement now pass, but 13 license entries are unknown, 4 are ambiguous, user-namespace remapping was unavailable, OWASP is unknown/error, and no artifact was published.
+|Consumers could mistake inventory generation for license approval, a local image for a release, bounded container hardening for every deployment environment, or EP-8 evidence for EP-10 runtime behavior.
+|Keep `NOASSERTION`/manual-review entries, `published=false`, unavailable userns status, exact image/revision binding, and OWASP error visible. Prohibit compliance, vulnerability-cleanliness, publication, membership, consensus, quorum-transfer, healing, rebalance, and distributed-readiness claims without their own evidence.
+|EP-8 (`@implemented-and-validated` evidence wiring); compliance/publication/EP-10 runtime (`not claimed` / `@absent`)
 |===

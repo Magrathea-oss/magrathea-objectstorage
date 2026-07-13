@@ -115,5 +115,5 @@ All architectural decisions are documented as Architecture Decision Records (ADR
 
 |link:../../adr/0027-authoritative-cluster-control-plane-and-direct-quorum-data-path.md[0027]
 |Authoritative cluster control plane and direct quorum data path
-|✅ Accepted architecture — implementation absent/planned
+|✅ Accepted architecture only — EP-8 evidence wiring validated; EP-10 runtime absent
 |===

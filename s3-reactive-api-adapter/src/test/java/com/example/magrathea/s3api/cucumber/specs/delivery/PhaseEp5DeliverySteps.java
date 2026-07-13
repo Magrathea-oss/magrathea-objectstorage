@@ -7,6 +7,7 @@ import io.cucumber.java.en.When;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -34,7 +35,7 @@ public class PhaseEp5DeliverySteps {
 
     @Then("the workflow executes the complete root Maven test gate without fail-never mode")
     public void workflowExecutesCompleteRootMavenGate() {
-        String gate = job(ciWorkflow, "canonical-quality-gate", "focused-cucumber-supplementary");
+        String gate = job(ciWorkflow, "canonical-quality-gate");
         assertThat(gate).contains("mvn -B --no-transfer-progress test");
         assertThat(gate).doesNotContain(" -fn", "--fail-never");
         assertThat(gate).doesNotContain("-pl ", "-Dtest=");
@@ -136,6 +137,15 @@ public class PhaseEp5DeliverySteps {
 
     private String read(String relativePath) throws IOException {
         return Files.readString(projectRoot.resolve(relativePath));
+    }
+
+    private static String job(String workflow, String jobName) {
+        int start = workflow.indexOf("  " + jobName + ":");
+        assertThat(start).as("job %s", jobName).isGreaterThanOrEqualTo(0);
+
+        var followingJob = Pattern.compile("(?m)^  [A-Za-z0-9_-]+:").matcher(workflow);
+        int end = followingJob.find(start + 1) ? followingJob.start() : workflow.length();
+        return workflow.substring(start, end);
     }
 
     private static String job(String workflow, String jobName, String nextJobName) {

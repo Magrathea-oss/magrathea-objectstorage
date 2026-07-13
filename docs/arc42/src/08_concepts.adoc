@@ -381,9 +381,13 @@ Status: *planned / absent*. The following is accepted architecture, not implemen
 
 **Policy separation.** Cluster application/infrastructure adapters execute authoritative snapshots and decisions from PA-6. Ratis/protobuf/Reactor/persistence concerns do not enter `DistributedPlacementPlanner`, `QuorumPolicy`, `AntiEntropyPlanner`, `RebalancePlanner`, or `DistributedReadinessReporter`.
 
-=== Planned Supply-chain Evidence (ADR 0027)
+=== Validated Supply-chain Evidence Wiring (ADR 0027)
 
-Status: *planned / absent* for CycloneDX generation, SPDX normalization, CI integration, and expanded runtime-hardening validation. The strategy requires CycloneDX JSON/XML SBOMs, an SPDX-normalized license inventory with unresolved/manual-review results, retained fail-closed OWASP Dependency-Check evidence, and runtime container validation under least privilege and read-only-root constraints. The current user decision separates evidence collection from remediation: no dependency upgrades or suppressions are authorized by this EARLY slice, and scan failures or findings remain visible.
+Status: *implementation-informed / `@implemented-and-validated` for the bounded evidence contract*. A clean run at revision `209b3170b64d3311ba9b773fdb7bd5581519e682` generated CycloneDX 1.6 application JSON (102 components, 103 dependencies; SHA-256 `4025d7206af01683da5cffa84862f20f68c7568dd9338ee9920d55947df545d1`) and XML (SHA-256 `b934de56a243cf6b5464566f45635e1f6ac0fc244d2ceb7c1f7418308012952f`). The SPDX-normalized inventory reports 85 recognized, 13 unknown, and 4 ambiguous entries (SHA-256 `0df3a3eac37e554dce6d67f227ffead9b28675f47fca9dab741d6850ac47b214`) and explicitly makes no compliance conclusion.
+
+Syft 1.31.0, itself bound to image ID `sha256:c15fa8af4c25edd72c0daf026d095fe51adbcfc7ad5d79a66e93d88f249e5abb`, inspected exact local application image ID `sha256:e5b5862948853a613f8b92adc8135fa81b84bdd9f36c9ae8d69b9a6bd6dd7966`. The image CycloneDX inventory contains 7,105 components and has SHA-256 `8d13ae409ef7230d52b4d850d0700db69132297910e55cffdbe27c08e28a90ba`. Hardened runtime evidence passed with UID/GID 10001, read-only root, explicit data/tmp mounts, `no-new-privileges`, capability drop `ALL`, no host namespace sharing or engine socket, ready `storage-engine`, and exact 129-byte object/checksum/ETag persistence across replacement. User-namespace remapping was unavailable and remains explicitly recorded.
+
+OWASP Dependency-Check remains truthful monitoring evidence, not a vulnerability finding claim: the current-revision run received NVD HTTP 429 after 190,000/364,891 records and records `scanStatus=error`, `clean=null`, and 8 errors. No clean, zero-vulnerability, findings, compliance, or remediation claim is made. CI retains evidence and error artifacts but performs no publication.
 
 === Testing Strategy
 
@@ -394,4 +398,4 @@ Four levels of testing:
 3. **S3 Integration:** Cucumber BDD with WebTestClient — verify HTTP endpoints.
 4. **AWS CLI Compatibility:** targeted AWS CLI Cucumber runners sharing the same requirement feature files as the WebTestClient runners (see the generated Gherkin requirements appendix).
 
-Current evidence (point-in-time, not a completion claim) is tracked in `docs/test-report.md` and must not be duplicated verbatim here to avoid staleness. As of the latest full gate in Podman (`magrathea-build:fedora42`; JDK 21, Maven 3.9.9, AWS CLI 2.34.29): `mvn -B --no-transfer-progress clean test` at the repo root passed with **BUILD SUCCESS across all 13 reactor modules, 949 tests, 0 failures, 0 errors**. This includes the EP-2 metadata durability restart-simulation suite (`MetadataDurabilityRestartTest`, `object-store-reactive-repository-storage-engine-infrastructure`) and the upgraded bootstrap restart-safety test (`StorageEngineRestartSafetyTest`, `bootstrap-application`) proving REQ-DUR-001 (durable bucket registry) end to end across a real Spring context restart. JaCoCo remains the current coverage baseline; see `docs/test-report.md` for the latest per-module breakdown.
+Current point-in-time evidence is tracked in `docs/test-report.md` and is intentionally not duplicated here. That report owns full-gate counts, runner environments, EP-8 clean-revision evidence, OWASP error status, and current limitations. JaCoCo remains the coverage baseline.

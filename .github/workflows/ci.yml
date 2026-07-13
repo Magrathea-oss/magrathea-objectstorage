@@ -36,6 +36,14 @@ on:
         options:
           - "false"
           - "true"
+      run-ep8-full-supply-chain:
+        description: "Build and validate complete EP-8 supply-chain evidence (never publishes)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 jobs:
   canonical-quality-gate:
@@ -70,11 +78,111 @@ jobs:
       - name: Check source hygiene
         run: bash scripts/check-source-hygiene.sh
 
+      - name: Validate GitHub Actions workflows
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7
+
       - name: Run complete root Maven test gate
         run: mvn -B --no-transfer-progress test
 
       - name: Check Git diff whitespace
         run: git diff --check
+
+  ep8-application-supply-chain:
+    name: EP-8 architecture and application supply-chain evidence
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out clean sources
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Validate EP-8 architecture contract
+        run: >-
+          mvn -B --no-transfer-progress -pl s3-reactive-api-adapter -am
+          -Dsurefire.failIfNoSpecifiedTests=false
+          -Dtest=PhaseEp8ArchitectureContractCucumberTest test
+
+      - name: Generate application CycloneDX and license evidence
+        run: bash scripts/generate-application-supply-chain.sh
+
+      - name: Upload EP-8 application supply-chain evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ep8-application-supply-chain-${{ github.run_id }}
+          path: |
+            target/supply-chain/
+            target/site/supply-chain/
+            s3-reactive-api-adapter/target/cucumber-json/ep8-architecture-contract.json
+            s3-reactive-api-adapter/target/surefire-reports/*PhaseEp8ArchitectureContract*.xml
+            s3-reactive-api-adapter/target/surefire-reports/*PhaseEp8ArchitectureContract*.txt
+          if-no-files-found: warn
+          retention-days: 30
+
+  ep8-full-supply-chain-scheduled-or-manual:
+    name: EP-8 full image, runtime, OWASP, and evidence contract
+    runs-on: ubuntu-latest
+    needs: ep8-application-supply-chain
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run-ep8-full-supply-chain == 'true')
+    steps:
+      - name: Check out clean sources
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Build and validate full fail-closed supply-chain evidence
+        shell: bash
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+          SUPPLY_CHAIN_SOURCE_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          set -uo pipefail
+          mkdir -p target
+          set +e
+          bash scripts/run-supply-chain-evidence.sh 2>&1 | tee target/ep8-supply-chain-evidence.log
+          evidence_status=${PIPESTATUS[0]}
+          mvn -B --no-transfer-progress -pl s3-reactive-api-adapter -am \
+            -Dsurefire.failIfNoSpecifiedTests=false \
+            -Dtest=PhaseEp8SupplyChainEvidenceCucumberIT test
+          contract_status=$?
+          set -e
+          if (( contract_status != 0 )); then
+            echo "EP-8 supply-chain evidence contract failed with exit $contract_status" >&2
+            exit "$contract_status"
+          fi
+          if (( evidence_status != 0 )); then
+            echo "EP-8 producer or fail-closed OWASP gate failed with exit $evidence_status" >&2
+            exit "$evidence_status"
+          fi
+
+      - name: Upload complete EP-8 supply-chain and error evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ep8-full-supply-chain-${{ github.run_id }}
+          path: |
+            target/ep8-supply-chain-evidence.log
+            target/supply-chain/
+            target/site/supply-chain/
+            target/site/dependency-check-analysis.json
+            target/dependency-check-report.json
+            target/dependency-check-report.html
+            target/dependency-check-scan.log
+            target/dependency-check-scan-error.json
+            s3-reactive-api-adapter/target/cucumber-json/ep8-supply-chain-evidence.json
+            s3-reactive-api-adapter/target/surefire-reports/*PhaseEp8SupplyChainEvidenceCucumberIT*
+          if-no-files-found: warn
+          retention-days: 30
 
   ep7-browser-acceptance:
     name: EP-7 Playwright and axe acceptance (360/768/1440)

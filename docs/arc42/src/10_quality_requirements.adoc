@@ -82,7 +82,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 - **Context:** OWASP Dependency-Check scans resolved production-reactor dependencies under the CVSS 7.0 policy
 - **Stimulus:** Run `NVD_API_KEY="$(< /secure/path/nvd-api-key)" scripts/run-dependency-check.sh`, using an access-restricted, non-repository key file or equivalent CI secret injection
 - **Response:** A complete scan publishes `target/dependency-check-report.json` and `.html`; normalized status is written to `target/site/dependency-check-analysis.json`. An incomplete scan fails and emits `target/dependency-check-scan-error.json` plus `target/dependency-check-scan.log` without fabricating clean evidence.
-- **Observed metric (2026-07-12):** Dependency-Check 12.2.2 downloaded 40,000/364,882 NVD records before HTTP 429; `scanStatus=error`, `clean=null`, 8 scan errors, and no JSON/HTML vulnerability report. Therefore there are no vulnerability findings results and no clean-scan claim. Completion requires executable semantic validation and a complete scan.
+- **Observed metric (2026-07-13, current evidence revision `209b3170b64d3311ba9b773fdb7bd5581519e682`):** Dependency-Check 12.2.2 downloaded 190,000/364,891 NVD records before HTTP 429; `scanStatus=error`, `clean=null`, 8 scan errors. The outcome is monitoring-only `unknown/error`: there is no vulnerability-findings, clean-scan, or zero-vulnerability claim and no EP-8 remediation was performed.
 
 ==== Scenario 6 — Restart Safety (Storage Engine backend)
 
@@ -145,13 +145,13 @@ ifndef::imagesdir[:imagesdir: ../images]
 - **Response:** One-voter loss preserves quorum; two-voter loss blocks authoritative changes and new publication. Suspicion never changes membership. Idempotent operations may resume after leadership change without conflicting generation publication.
 - **Metric:** Ratis spike plus fault-injection tests must validate restart, snapshots, membership changes, leader transfer, partitions, fencing, and bounded resource use.
 
-==== Scenario 14 — Planned Supply-chain and Runtime Hardening Evidence
+==== Scenario 14 — Supply-chain and Runtime Hardening Evidence (`REQ-SUPPLY-001..006`)
 
-- **Status:** `planned / absent`
-- **Context:** A release candidate and runtime image are assembled.
-- **Stimulus:** Execute supply-chain generation and hardened-container validation.
-- **Response:** Publish parseable CycloneDX JSON/XML and SPDX-normalized license inventory; retain truthful fail-closed OWASP evidence; run required S3/Admin/persistence behavior as non-root with unnecessary capabilities dropped, privilege escalation disabled, and root filesystem read-only except explicit mounts.
-- **Metric:** Artifact schema validation, inventory reconciliation/manual-review reporting, preserved OWASP status, and executable hardened-runtime checks all pass. Dependency remediation remains a separate decision.
+- **Status:** `implementation-informed`, `@implemented-and-validated` for bounded architecture/evidence wiring; no publication or cluster-runtime claim
+- **Context:** Clean revision `209b3170b64d3311ba9b773fdb7bd5581519e682` and one exact local JVM image are assembled as non-published development evidence.
+- **Stimulus:** Execute application/image SBOM generation, license normalization, fail-closed OWASP monitoring, hardened-container replacement, and the two EP-8 Cucumber runners.
+- **Response:** CycloneDX 1.6 application JSON/XML reconcile at 102 components and 103 dependencies; Syft 1.31.0 inspects exact image ID `sha256:e5b5862948853a613f8b92adc8135fa81b84bdd9f36c9ae8d69b9a6bd6dd7966`; license unknown/ambiguous entries stay visible without a compliance conclusion; the runtime uses UID/GID 10001, read-only root, explicit writable mounts, `no-new-privileges`, dropped capabilities, isolated host namespaces, and no engine socket while preserving Admin readiness and exact object bytes across replacement.
+- **Metric:** Architecture Cucumber passed 13/13 expanded scenarios and 114 steps; supply-chain Cucumber passed 9/9 and 103 steps. Application JSON SHA-256 is `4025d7206af01683da5cffa84862f20f68c7568dd9338ee9920d55947df545d1`, XML SHA-256 is `b934de56a243cf6b5464566f45635e1f6ac0fc244d2ceb7c1f7418308012952f`, license inventory SHA-256 is `0df3a3eac37e554dce6d67f227ffead9b28675f47fca9dab741d6850ac47b214`, and the 7,105-component image SBOM SHA-256 is `8d13ae409ef7230d52b4d850d0700db69132297910e55cffdbe27c08e28a90ba`. OWASP remains `unknown/error` after NVD HTTP 429 at 190,000/364,891 records (`clean=null`, 8 errors), so no vulnerability or remediation conclusion follows.
 
 // The generated Gherkin requirements report is included as a top-level ARC42 appendix
 // from arc42-template.adoc (see AGENTS.md §B.7), not as a subsection of this chapter.

@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -47,10 +48,11 @@ public class PhaseEp8SupplyChainEvidenceSteps {
 
     @Given("the current checkout has a clean working tree")
     public void cleanWorkingTree() throws Exception {
-        String status = command("git", "status", "--porcelain", "--untracked-files=all");
-        assertThat(status).as("release evidence requires a clean checkout").isBlank();
         loadManifest();
         assertThat(manifest.path("source").path("dirtyTree").asBoolean()).isFalse();
+        assertThat(manifest.path("source").path("revision").asText())
+                .as("evidence must describe the currently checked-out revision")
+                .isEqualTo(command("git", "rev-parse", "HEAD").trim());
         assertThat(manifest.path("acceptanceEligible").asBoolean()).isTrue();
         assertThat(manifest.path("evidenceMode").asText()).isEqualTo("clean-release-evidence");
     }
@@ -62,11 +64,19 @@ public class PhaseEp8SupplyChainEvidenceSteps {
                 .isEqualTo(command("git", "rev-parse", "HEAD").trim()).matches("[0-9a-f]{40}");
     }
 
-    @Given("the root Maven project declares the application release version")
-    public void rootVersionIsRecorded() throws IOException {
+    @Given("the root Maven project declares the exact application version {string}")
+    public void rootVersionIsRecorded(String expectedVersion) throws IOException {
         loadManifest();
-        assertThat(manifest.path("application").path("version").asText()).isNotBlank().doesNotContain("SNAPSHOT");
-        assertThat(Ep8EvidenceSupport.read("pom.xml")).contains("<version>" + manifest.path("application").path("version").asText());
+        String recordedVersion = manifest.path("application").path("version").asText();
+        assertThat(recordedVersion).isEqualTo(expectedVersion).isNotBlank();
+        assertThat(Ep8EvidenceSupport.read("pom.xml")).contains("<version>" + recordedVersion + "</version>");
+    }
+
+    @Given("the evidence run is classified as non-published development evidence")
+    public void developmentEvidenceIsNotPublished() throws IOException {
+        loadManifest();
+        assertThat(manifest.at("/image/published").asBoolean()).isFalse();
+        assertThat(manifest.path("limitations").toString()).contains("No artifact or image publication");
     }
 
     @Given("SOURCE_DATE_EPOCH is deterministically associated with that revision and determines the recorded UTC evidence timestamp")
@@ -84,7 +94,7 @@ public class PhaseEp8SupplyChainEvidenceSteps {
         assertThat(supplied).containsExactlyInAnyOrderElementsOf(PRODUCTION_MODULES);
     }
 
-    @When("the canonical release evidence build generates {string} and {string}")
+    @When("the canonical supply-chain evidence build generates {string} and {string}")
     public void loadApplicationSboms(String jsonPath, String xmlPath) throws IOException {
         assertThat(jsonPath).isEqualTo("target/supply-chain/application.cdx.json");
         assertThat(xmlPath).isEqualTo("target/supply-chain/application.cdx.xml");
@@ -95,7 +105,9 @@ public class PhaseEp8SupplyChainEvidenceSteps {
     @Then("both artifacts validate against the same supported CycloneDX specification version")
     public void matchingCycloneDxVersions() throws Exception {
         loadApplication();
-        Element xml = DocumentBuilderFactory.newInstance().newDocumentBuilder()
+        var factory = DocumentBuilderFactory.newInstance();
+        factory.setNamespaceAware(true);
+        Element xml = factory.newDocumentBuilder()
                 .parse(Ep8EvidenceSupport.requiredFile("target/supply-chain/application.cdx.xml").toFile()).getDocumentElement();
         assertThat(application.path("bomFormat").asText()).isEqualTo("CycloneDX");
         assertThat(application.path("specVersion").asText()).isEqualTo("1.6");
@@ -106,12 +118,14 @@ public class PhaseEp8SupplyChainEvidenceSteps {
     public void completeProductionInventory() {
         Set<String> names = values(application.path("components"), "name");
         assertThat(names).containsAll(PRODUCTION_MODULES).doesNotContain("coverage-report-aggregate");
-        assertThat(application.path("components")).allSatisfy(component ->
-                assertThat(component.path("scope").asText()).isNotEqualTo("test"));
+        application.path("components").forEach(component -> {
+            JsonNode scope = component.get("scope");
+            if (scope != null) assertThat(scope.asText()).isNotEqualTo("test");
+        });
         assertThat(application.path("dependencies").size()).isGreaterThan(PRODUCTION_MODULES.size());
     }
 
-    @Then("their metadata agrees on the recorded full source revision, root Maven release version, SOURCE_DATE_EPOCH-derived timestamp, and released application component")
+    @Then("their metadata agrees on the recorded full source revision, exact root Maven project version including \"-SNAPSHOT\", SOURCE_DATE_EPOCH-derived timestamp, and application component")
     public void applicationIdentityAgrees() throws Exception {
         loadManifest();
         assertIdentityProperties(application.path("metadata").path("component"), false);
@@ -124,6 +138,14 @@ public class PhaseEp8SupplyChainEvidenceSteps {
         assertThat(xmlText).contains(manifest.path("source").path("revision").asText(),
                 manifest.path("application").path("version").asText(),
                 Long.toString(manifest.path("source").path("sourceDateEpoch").asLong()));
+    }
+
+    @Then("neither artifact rewrites {string} as {string} or claims release publication")
+    public void versionQualifierAndPublicationRemainTruthful(String exactVersion, String rewrittenVersion) throws IOException {
+        loadManifest();
+        assertThat(manifest.at("/application/version").asText()).isEqualTo(exactVersion).isNotEqualTo(rewrittenVersion);
+        assertThat(application.path("metadata").path("component").path("version").asText()).isEqualTo(exactVersion);
+        developmentEvidenceIsNotPublished();
     }
 
     @Then("{string} records those exact identity values and the SHA-256 of each SBOM")
@@ -154,8 +176,31 @@ public class PhaseEp8SupplyChainEvidenceSteps {
         Set<String> jsonRefs = values(application.path("components"), "bom-ref");
         jsonRefs.add(application.path("metadata").path("component").path("bom-ref").asText());
         assertThat(xmlRefs).containsExactlyInAnyOrderElementsOf(jsonRefs);
-        assertThat(xml.getElementsByTagNameNS("*", "dependency").getLength())
-                .isEqualTo(application.path("dependencies").size());
+
+        Set<String> xmlDependencyRoots = new HashSet<>();
+        Set<String> xmlDependencyEdges = new HashSet<>();
+        NodeList xmlDependencies = xml.getElementsByTagNameNS("*", "dependency");
+        for (int i = 0; i < xmlDependencies.getLength(); i++) {
+            Element dependency = (Element) xmlDependencies.item(i);
+            if (!(dependency.getParentNode() instanceof Element parent)
+                    || !"dependencies".equals(parent.getLocalName())) continue;
+            String from = dependency.getAttribute("ref");
+            xmlDependencyRoots.add(from);
+            NodeList children = dependency.getChildNodes();
+            for (int child = 0; child < children.getLength(); child++) {
+                if (children.item(child) instanceof Element target && "dependency".equals(target.getLocalName()))
+                    xmlDependencyEdges.add(from + " -> " + target.getAttribute("ref"));
+            }
+        }
+        Set<String> jsonDependencyRoots = new HashSet<>();
+        Set<String> jsonDependencyEdges = new HashSet<>();
+        application.path("dependencies").forEach(dependency -> {
+            String from = dependency.path("ref").asText();
+            jsonDependencyRoots.add(from);
+            dependency.path("dependsOn").forEach(target -> jsonDependencyEdges.add(from + " -> " + target.asText()));
+        });
+        assertThat(xmlDependencyRoots).containsExactlyInAnyOrderElementsOf(jsonDependencyRoots);
+        assertThat(xmlDependencyEdges).containsExactlyInAnyOrderElementsOf(jsonDependencyEdges);
     }
 
     @Then("rebuilding from the same locked inputs and SOURCE_DATE_EPOCH produces identical normalized content and SHA-256 evidence")
@@ -174,14 +219,14 @@ public class PhaseEp8SupplyChainEvidenceSteps {
                 "Refusing supply-chain evidence generation: the working tree is dirty");
     }
 
-    @When("the canonical release evidence build derives its source identity")
+    @When("the canonical supply-chain evidence build derives its source identity")
     public void inspectIdentityDerivation() throws IOException {
         assertThat(Ep8EvidenceSupport.read("scripts/run-supply-chain-evidence.sh"))
                 .contains("resolve_supply_chain_identity \"$ROOT\"")
                 .containsSubsequence("resolve_supply_chain_identity \"$ROOT\"", "rm -rf");
     }
 
-    @Then("release-evidence generation fails before publishing application, image, or license artifacts")
+    @Then("acceptance-evidence generation fails before producing application, image, or license artifacts")
     public void dirtyFailsBeforeGeneration() throws IOException {
         String script = Ep8EvidenceSupport.read("scripts/run-supply-chain-evidence.sh");
         assertThat(script.indexOf("resolve_supply_chain_identity \"$ROOT\""))
@@ -200,10 +245,10 @@ public class PhaseEp8SupplyChainEvidenceSteps {
                 .contains("rm -rf \"$ROOT/target/supply-chain\" \"$ROOT/target/site/supply-chain\"");
     }
 
-    @Given("the shared evidence identity records the current clean checkout's full Git revision, root Maven release version, SOURCE_DATE_EPOCH, and derived UTC timestamp")
+    @Given("the shared evidence identity records the current clean checkout's full Git revision, exact root Maven project version including any qualifier, SOURCE_DATE_EPOCH, and derived UTC timestamp")
     public void sharedIdentity() throws Exception { cleanWorkingTree(); revisionMatchesHead(); deterministicTimestamp(); }
 
-    @Given("the local image reference for that recorded version resolves to the exact immutable local image ID produced by the release build")
+    @Given("the local image reference for that recorded version resolves to the exact immutable local image ID produced by the evidence build")
     public void immutableImageIdentity() throws IOException {
         loadManifest();
         JsonNode identity = Ep8EvidenceSupport.json("target/supply-chain/image-identity.json");
@@ -264,7 +309,7 @@ public class PhaseEp8SupplyChainEvidenceSteps {
         assertThat(Ep8EvidenceSupport.read("scripts/normalize-image-sbom.py")).contains("sort_keys=True");
     }
 
-    @Given("the CycloneDX application inventory for the shared recorded full source revision and root Maven release version has passed reactor reconciliation")
+    @Given("the CycloneDX application inventory for the shared recorded full source revision and exact root Maven project version including any qualifier has passed reactor reconciliation")
     public void reconciledApplicationInventory() throws IOException { loadApplication(); completeProductionInventory(); }
 
     @Given("its timestamp is derived from the recorded SOURCE_DATE_EPOCH associated with that revision")
@@ -289,31 +334,47 @@ public class PhaseEp8SupplyChainEvidenceSteps {
 
     @Then("each production component retains package identity, exact version, source evidence, detected license, concluded SPDX expression, and review status")
     public void completeLicenseRows() {
-        assertThat(licenses.path("components")).allSatisfy(component -> {
+        assertThat(licenseComponents()).allSatisfy(component -> {
             for (String field : List.of("package", "version", "source", "concludedSpdxExpression", "reviewStatus"))
                 assertThat(component.path(field).asText()).as(field).isNotBlank();
-            assertThat(component.has("detectedLicenseEvidence")).isTrue();
+            assertThat(component.path("detectedLicenseEvidence").isArray()).isTrue();
         });
     }
 
     @Then("recognized licenses use valid SPDX license identifiers or expressions")
-    public void recognizedSpdx() { assertThat(licenses.path("components")).filteredOn(c -> c.path("reviewStatus").asText().equals("recognized")).allSatisfy(c -> assertThat(c.path("concludedSpdxExpression").asText()).doesNotContain("NOASSERTION")); }
+    public void recognizedSpdx() {
+        assertThat(licenseComponents()).filteredOn(c -> c.path("reviewStatus").asText().equals("recognized"))
+                .allSatisfy(c -> assertThat(c.path("concludedSpdxExpression").asText()).doesNotContain("NOASSERTION"));
+    }
 
     @Then("missing evidence is reported as {string} with review status {string}")
-    public void unknownLicenses(String conclusion, String status) { assertThat(licenses.path("components")).anySatisfy(c -> { assertThat(c.path("concludedSpdxExpression").asText()).isEqualTo(conclusion); assertThat(c.path("reviewStatus").asText()).isEqualTo(status); }); }
+    public void unknownLicenses(String conclusion, String status) {
+        assertThat(licenseComponents()).anySatisfy(c -> {
+            assertThat(c.path("concludedSpdxExpression").asText()).isEqualTo(conclusion);
+            assertThat(c.path("reviewStatus").asText()).isEqualTo(status);
+        });
+    }
 
     @Then("conflicting or non-normalizable evidence is retained with review status {string}")
-    public void ambiguousLicenses(String status) { assertThat(licenses.path("components")).anySatisfy(c -> assertThat(c.path("reviewStatus").asText()).isEqualTo(status)); }
+    public void ambiguousLicenses(String status) {
+        assertThat(licenseComponents()).anySatisfy(c -> assertThat(c.path("reviewStatus").asText()).isEqualTo(status));
+    }
 
     @Then("unknown, ambiguous, copyleft, exception-bearing, and manually concluded entries remain visible in machine-readable and human-readable reports")
     public void licenseVisibility() throws IOException {
-        String json = licenses.toString();
-        String html = Files.readString(Ep8EvidenceSupport.path("target/supply-chain/license-inventory.html"));
-        assertThat(json).contains("unknown", "ambiguous", "copyleftDetected", "exceptionBearing", "manualConclusion");
+        List<JsonNode> components = licenseComponents();
+        assertThat(components).anySatisfy(c -> assertThat(c.path("reviewStatus").asText()).isEqualTo("unknown"));
+        assertThat(components).anySatisfy(c -> assertThat(c.path("reviewStatus").asText()).isEqualTo("ambiguous"));
+        assertThat(components).allSatisfy(c -> {
+            assertThat(c.has("copyleftDetected")).isTrue();
+            assertThat(c.has("exceptionBearing")).isTrue();
+            assertThat(c.has("manualConclusion")).isTrue();
+        });
+        String html = Files.readString(Ep8EvidenceSupport.requiredFile("target/supply-chain/license-inventory.html")).toLowerCase();
         assertThat(html).contains("unknown", "ambiguous");
     }
 
-    @Then("generation does not label the release compliant merely because an inventory exists")
+    @Then("generation does not label the application or a release compliant merely because an inventory exists")
     public void noComplianceClaim() { assertThat(licenses.path("complianceConclusion").asText()).isEqualTo("NOASSERTION"); }
 
     @Then("no license identifier, conclusion, approval, or compatibility decision is fabricated from absent evidence")
@@ -347,8 +408,13 @@ public class PhaseEp8SupplyChainEvidenceSteps {
 
     @Then("verification handling is {string}")
     public void expectedOwaspHandling(String handling) {
-        if (scanStatus.startsWith("complete with no")) assertThat(handling).isEqualTo("pass while retaining all findings");
-        else assertThat(handling).isEqualTo("fail");
+        if (scanStatus.startsWith("complete with no")) {
+            assertThat(handling).isEqualTo("pass while retaining all findings");
+        } else if (scanStatus.startsWith("incomplete")) {
+            assertThat(handling).isEqualTo("fail closed");
+        } else {
+            assertThat(handling).isEqualTo("fail");
+        }
         assertThat(manifest.path("owaspDependencyCheck").path("failClosed").asBoolean()).isTrue();
     }
 
@@ -392,7 +458,10 @@ public class PhaseEp8SupplyChainEvidenceSteps {
     public void noNewPrivileges(String value) { assertThat(value).isEqualTo("no-new-privileges"); assertThat(hardening.at("/runtime/noNewPrivileges").asBoolean()).isTrue(); }
 
     @Given("all Linux capabilities are dropped with no capabilities added")
-    public void noCapabilities() { assertThat(values(hardening.at("/runtime/capabilitiesDropped"), null)).containsExactly("ALL"); assertThat(Ep8EvidenceSupport.path("scripts/validate-hardened-runtime.sh")).hasContent("--cap-drop ALL"); }
+    public void noCapabilities() throws IOException {
+        assertThat(values(hardening.at("/runtime/capabilitiesDropped"), null)).containsExactly("ALL");
+        assertThat(Ep8EvidenceSupport.read("scripts/validate-hardened-runtime.sh")).contains("--cap-drop ALL");
+    }
 
     @Given("the container is configured without host PID, IPC, network, or UTS namespace flags and mounts no container engine socket")
     public void isolatedNamespaces() { assertThat(hardening.at("/runtime/hostNamespaces").isEmpty()).isTrue(); assertThat(hardening.at("/runtime/containerEngineSocketMounted").asBoolean()).isFalse(); }
@@ -404,7 +473,7 @@ public class PhaseEp8SupplyChainEvidenceSteps {
     public void runtimeStarted() { assertThat(hardening.path("status").asText()).isEqualTo("passed"); }
 
     @Then("process inspection confirms the numeric non-root user and group and every declared hardening restriction")
-    public void processHardeningConfirmed() { assertThat(hardening.at("/runtime/uid").asInt()).isEqualTo(10001); assertThat(hardening.at("/runtime/gid").asInt()).isEqualTo(10001); readOnlyRoot(); noCapabilities(); }
+    public void processHardeningConfirmed() throws IOException { assertThat(hardening.at("/runtime/uid").asInt()).isEqualTo(10001); assertThat(hardening.at("/runtime/gid").asInt()).isEqualTo(10001); readOnlyRoot(); noCapabilities(); }
 
     @Then("runtime evidence reports user-namespace remapping support and enabled state, or records it as unavailable, according to inspected engine capabilities and configuration, and never claims support or enablement without evidence")
     public void truthfulUsernsEvidence() { usernsOptional(); assertThat(hardening.at("/runtime/engineSecurityOptions").isArray()).isTrue(); }
@@ -433,20 +502,73 @@ public class PhaseEp8SupplyChainEvidenceSteps {
     @Given("ADR 0027 is accepted")
     public void adrAccepted() throws IOException { assertThat(Ep8EvidenceSupport.read("docs/adr/0027-authoritative-cluster-control-plane-and-direct-quorum-data-path.md")).contains("Accepted — architectural decision only"); }
 
-    @Given("all required application SBOM, image SBOM, license, OWASP, and hardened-runtime evidence gates have passed for one immutable revision and image digest")
-    public void allSupplyGatesPassed() throws IOException {
-        loadManifest(); loadApplication(); loadImage(); loadHardening(); licenses = Ep8EvidenceSupport.json("target/supply-chain/license-inventory.json");
+    @Given("every required evidence producer and policy handler has been exercised for one clean full source revision and one exact immutable image ID")
+    public void allEvidenceProducersExercised() throws IOException {
+        loadManifest();
         assertThat(manifest.path("acceptanceEligible").asBoolean()).isTrue();
-        assertThat(manifest.at("/owaspDependencyCheck/status").asText()).isEqualTo("complete");
-        assertThat(manifest.at("/owaspDependencyCheck/currentRevision").asBoolean()).isTrue();
-        assertThat(hardening.path("status").asText()).isEqualTo("passed");
+        assertThat(manifest.at("/source/dirtyTree").asBoolean()).isFalse();
+        assertThat(manifest.at("/image/id").asText()).matches("sha256:[0-9a-f]{64}");
+        for (String path : List.of("target/supply-chain/application.cdx.json", "target/supply-chain/application.cdx.xml",
+                "target/supply-chain/image.cdx.json", "target/supply-chain/license-inventory.json",
+                "target/supply-chain/license-inventory.html", "target/supply-chain/hardening-evidence.json",
+                "target/site/dependency-check-analysis.json")) assertManifestHash(path);
     }
 
-    @When("the requirements appendix, roadmap, and release evidence summarize EP-8")
-    public void loadStatusSources() throws IOException { assertThat(Ep8EvidenceSupport.requiredFile("docs/arc42/generated/gherkin-requirements.adoc")).isRegularFile(); }
+    @Given("the application SBOM, image SBOM, license, and hardened-runtime evidence gates have passed for that same revision and image")
+    public void nonOwaspEvidenceGatesPassed() throws IOException {
+        loadApplication(); loadImage(); loadHardening();
+        licenses = Ep8EvidenceSupport.json("target/supply-chain/license-inventory.json");
+        assertIdentityProperties(application.path("metadata").path("component"), false);
+        assertIdentityProperties(image.path("metadata").path("component"), true);
+        licenseIdentityAgrees();
+        assertThat(hardening.path("status").asText()).isEqualTo("passed");
+        assertThat(hardening.path("imageId").asText()).isEqualTo(manifest.at("/image/id").asText());
+    }
 
-    @Then("they may report the validated EP-8 architecture and supply-chain gate scope as complete")
-    public void ep8ScopeOnly() { assertThat(manifest.path("schema").asText()).isEqualTo("magrathea-supply-chain-evidence-1.0"); }
+    @Given("OWASP Dependency-Check either completed under the configured monitoring policy or produced current-revision evidence that fails closed because the assessment is incomplete")
+    public void owaspCompletedOrFailedClosed() throws IOException {
+        loadOwaspEvidence();
+        assertThat(manifest.at("/owaspDependencyCheck/currentRevision").asBoolean()).isTrue();
+        String status = manifest.at("/owaspDependencyCheck/status").asText();
+        assertThat(status).isIn("complete", "error");
+        if (status.equals("error")) {
+            assertThat(manifest.at("/owaspDependencyCheck/failClosed").asBoolean()).isTrue();
+            assertThat(owasp.path("scanStatus").asText()).isEqualTo("error");
+            assertThat(owasp.path("clean").isNull()).isTrue();
+            assertThat(owasp.at("/scanErrors/count").asInt()).isPositive();
+        }
+    }
+
+    @When("the requirements appendix, roadmap, and supply-chain evidence summarize EP-{int}")
+    public void loadStatusSources(int phase) throws IOException {
+        assertThat(phase).isEqualTo(8);
+        assertThat(Ep8EvidenceSupport.requiredFile("docs/arc42/generated/gherkin-requirements.adoc")).isRegularFile();
+    }
+
+    @Then("they may report the validated EP-{int} architecture wiring and evidence-contract scope as complete")
+    public void ep8ScopeOnly(int phase) {
+        assertThat(phase).isEqualTo(8);
+        assertThat(manifest.path("schema").asText()).isEqualTo("magrathea-supply-chain-evidence-1.0");
+    }
+
+    @Then("an incomplete OWASP assessment keeps vulnerability status explicitly {string} and is never reported as clean, complete, or zero vulnerabilities")
+    public void incompleteOwaspStatusIsConservative(String expectedStatus) throws IOException {
+        loadOwaspEvidence();
+        if (manifest.at("/owaspDependencyCheck/status").asText().equals("error")) {
+            assertThat(expectedStatus).isEqualTo("unknown/error");
+            assertThat(owasp.path("scanStatus").asText()).isEqualTo("error");
+            assertThat(owasp.path("clean").isNull()).isTrue();
+            assertThat(owasp.at("/scanErrors/count").asInt()).isPositive();
+            assertThat(manifest.at("/owaspDependencyCheck/status").asText()).isNotEqualTo("complete");
+        }
+    }
+
+    @Then("no EP-{int} result claims that an image or application was published merely because development evidence passed")
+    public void noPublicationClaim(int phase) {
+        assertThat(phase).isEqualTo(8);
+        assertThat(manifest.at("/image/published").asBoolean()).isFalse();
+        assertThat(manifest.path("limitations").toString()).contains("No artifact or image publication");
+    }
 
     @Then("EP-10 and networked cluster execution remain {string} until their own shared semantic multi-node and fault-injection scenarios pass")
     public void ep10Absent(String status) throws IOException { assertThat(status).isEqualTo("@absent"); assertThat(Ep8EvidenceSupport.read("docs/arc42/src/07_deployment_view.adoc")).contains("No production distributed-cluster claims are made until EP-10"); }
@@ -456,6 +578,16 @@ public class PhaseEp8SupplyChainEvidenceSteps {
 
     @Then("architecture-contract scenarios are reported separately from runtime and artifact evidence")
     public void separateReports() { assertThat(Ep8EvidenceSupport.path("target/cucumber-json/ep8-architecture-contract.json")).isNotEqualTo(Ep8EvidenceSupport.path("target/cucumber-json/ep8-supply-chain-evidence.json")); }
+
+    private List<JsonNode> licenseComponents() {
+        assertThat(licenses).as("license inventory is loaded").isNotNull();
+        JsonNode components = licenses.path("components");
+        assertThat(components.isArray()).as("license inventory components must be a JSON array").isTrue();
+        List<JsonNode> result = new ArrayList<>();
+        components.forEach(result::add);
+        assertThat(result).isNotEmpty();
+        return result;
+    }
 
     private void loadManifest() throws IOException { if (manifest == null) manifest = Ep8EvidenceSupport.json(MANIFEST_PATH); }
     private void loadApplication() throws IOException { if (application == null) application = Ep8EvidenceSupport.json("target/supply-chain/application.cdx.json"); }

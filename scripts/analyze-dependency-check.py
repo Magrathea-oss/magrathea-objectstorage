@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 ERROR_PATTERNS = re.compile(
-    r"(?i)(NoDataException|UpdateException|Unable to update|NVD.*(?:403|429)|"
+    r"(?i)(NoDataException|UpdateException|Unable to update|NVD_API_KEY is not set|NVD.*(?:403|429)|"
     r"rate.?limit|connection (?:refused|reset)|timed? out|database.*(?:corrupt|error)|"
     r"fatal exception)"
 )
@@ -130,9 +130,6 @@ def main() -> int:
     # otherwise they remain visible as warnings and do not masquerade as findings.
     if not report or not data_sources:
         scan_errors.extend(log_matches)
-    if args.command_exit_code is not None and not scan_errors and not report:
-        scan_errors.append(f"Maven exited {args.command_exit_code} before producing complete scan evidence")
-
     dependencies = [dep for dep in as_list(report.get("dependencies")) if isinstance(dep, dict)]
     unsuppressed: list[dict[str, Any]] = []
     suppressed: list[dict[str, Any]] = []
@@ -149,6 +146,18 @@ def main() -> int:
     for finding in as_list(report.get("suppressedVulnerabilities")):
         if isinstance(finding, dict):
             suppressed.append({"fileName": finding.get("fileName"), "finding": finding})
+
+    if args.command_exit_code not in (None, 0):
+        # A completed report with unsuppressed findings may exit nonzero solely because
+        # failBuildOnCVSS enforced the configured gate. Scanner/update diagnostics are
+        # different: they keep the assessment explicitly incomplete even if stale cached
+        # report bytes happen to exist.
+        if report and data_sources and log_matches:
+            scan_errors.extend(log_matches)
+        if not unsuppressed and not scan_errors:
+            scan_errors.append(
+                f"Dependency-Check command exited {args.command_exit_code}; the assessment fails closed"
+            )
 
     suppression_entries, suppression_errors = suppression_policy(args.suppression_file)
     scan_errors.extend(suppression_errors)
