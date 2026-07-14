@@ -4,6 +4,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -42,28 +43,39 @@ public final class ClusterRepairWorker {
     }
 
     public Mono<RepairJob> claimAndRepair(RepairJobId jobId) {
-        return executionGate.awaitClaimPermission()
-                .then(controlPlane.repairJob(jobId))
-                .flatMap(job -> {
-                    if (!job.specification().target().equals(localNode)
-                            || terminal(job.state())) return Mono.just(job);
-                    return exactCurrent(job.specification()).flatMap(current -> {
-                        Instant now = clock.instant();
-                        NodeIdentity sourceHint = current.replicas().stream()
-                                .filter(identity -> !identity.equals(job.specification().target()))
-                                .findFirst().orElse(null);
-                        Instant deadline = now.plus(job.specification().retryPolicy().maximumClaimDuration());
-                        RepairCommands.Claim claim = new RepairCommands.Claim(commandId("claim"), jobId,
-                                localNode, processSession, now, deadline, sourceHint);
-                        return controlPlane.claimRepair(claim).flatMap(result -> {
+        return controlPlane.repairJob(jobId).flatMap(job -> {
+            if (!job.specification().target().equals(localNode)
+                    || terminal(job.state())) return Mono.just(job);
+            return exactCurrent(job.specification()).flatMap(current -> {
+                Instant now = clock.instant();
+                NodeIdentity sourceHint = current.replicas().stream()
+                        .filter(identity -> !identity.equals(job.specification().target()))
+                        .findFirst().orElse(null);
+                Instant deadline = now.plus(job.specification().retryPolicy().maximumClaimDuration());
+                RepairCommands.Claim claim = new RepairCommands.Claim(commandId("claim"), jobId,
+                        localNode, processSession, now, deadline, sourceHint);
+                RepairExecutionGate.Observation beforeClaim = new RepairExecutionGate.Observation(
+                        jobId, job.claimGeneration(), 0);
+                return executionGate.await(
+                                RepairExecutionGate.Checkpoint.BEFORE_CLAIM_PROPOSED, beforeClaim)
+                        .then(controlPlane.claimRepair(claim))
+                        .flatMap(result -> {
                             if (!result.accepted() || result.state() != RepairState.CLAIMED) {
                                 return awaitResult(jobId, 0);
                             }
                             metrics.claimed();
-                            return controlPlane.repairJob(jobId).flatMap(this::executeClaim);
+                            RepairExecutionGate.Observation claimed =
+                                    new RepairExecutionGate.Observation(
+                                            jobId, result.claimGeneration(), 0);
+                            return executionGate.await(
+                                            RepairExecutionGate.Checkpoint
+                                                    .CLAIM_COMMITTED_BEFORE_TRANSFER,
+                                            claimed)
+                                    .then(controlPlane.repairJob(jobId))
+                                    .flatMap(this::executeClaim);
                         });
-                    });
-                });
+            });
+        });
     }
 
     private Mono<RepairJob> executeClaim(RepairJob job) {
@@ -126,7 +138,8 @@ public final class ClusterRepairWorker {
         LocalArtifactPort.RepairToken token = new LocalArtifactPort.RepairToken(
                 specification.jobId(), claim.claimGeneration());
         return Mono.usingWhen(
-                Mono.fromCallable(() -> localArtifacts.beginRepair(request, token))
+                Mono.fromCallable(() -> checkpointingSink(
+                                localArtifacts.beginRepair(request, token), specification, claim))
                         .subscribeOn(Schedulers.boundedElastic()),
                 sink -> {
                     metrics.fetched();
@@ -135,6 +148,14 @@ public final class ClusterRepairWorker {
                             .then(Mono.fromCallable(sink::publishVerified)
                                     .subscribeOn(Schedulers.boundedElastic()))
                             .doOnNext(ignored -> metrics.published())
+                            .flatMap(result -> executionGate.await(
+                                            RepairExecutionGate.Checkpoint
+                                                    .TARGET_DURABLY_PUBLISHED_BEFORE_COMPLETION,
+                                            new RepairExecutionGate.Observation(
+                                                    specification.jobId(),
+                                                    claim.claimGeneration(),
+                                                    specification.length()))
+                                    .thenReturn(result))
                             .then(exactCurrent(specification))
                             .then(succeed(job, "exact durable publication"));
                 },
@@ -149,7 +170,8 @@ public final class ClusterRepairWorker {
         RepairCommands.Succeed command = new RepairCommands.Succeed(commandId("succeed"),
                 specification.jobId(), claim.claimGeneration(), localNode, processSession,
                 clock.instant(), specification.length(), specification.sha256(), reason);
-        return controlPlane.succeedRepair(command).then(controlPlane.repairJob(specification.jobId()));
+        return controlPlane.succeedRepair(command)
+                .then(controlPlane.repairJob(specification.jobId()));
     }
 
     private Mono<RepairJob> obsolete(RepairJob job, String reason) {
@@ -263,6 +285,43 @@ public final class ClusterRepairWorker {
             throw new IllegalArgumentException(name + " must be positive");
         }
         return value;
+    }
+
+    private LocalArtifactPort.RepairSink checkpointingSink(
+            LocalArtifactPort.RepairSink delegate, RepairSpecification specification,
+            RepairClaim claim) {
+        return new LocalArtifactPort.RepairSink() {
+            @Override
+            public void accept(long offset, ByteBuffer bytes) throws IOException {
+                int count = bytes.remaining();
+                delegate.accept(offset, bytes);
+                executionGate.awaitSynchronously(
+                        RepairExecutionGate.Checkpoint.PAYLOAD_BYTES_STAGED,
+                        new RepairExecutionGate.Observation(
+                                specification.jobId(), claim.claimGeneration(),
+                                offset + count));
+            }
+
+            @Override
+            public TransferResult verify() throws IOException {
+                return delegate.verify();
+            }
+
+            @Override
+            public TransferResult publishVerified() throws IOException {
+                return delegate.publishVerified();
+            }
+
+            @Override
+            public void abort() {
+                delegate.abort();
+            }
+
+            @Override
+            public void close() throws IOException {
+                delegate.close();
+            }
+        };
     }
 
     private record CandidateFailures(int attempts, boolean retryableSeen) {

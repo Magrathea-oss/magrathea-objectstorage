@@ -290,13 +290,14 @@ jobs:
           mkdir -p target/ci-ep10
 
           cleanup_ep10_jvms() {
-            mapfile -t pids < <(pgrep -f 'com[.]example[.]magrathea[.]bootstrap[.]ep10[.]Ep10AcceptanceApplication' || true)
+            local process_pattern='com[.]example[.]magrathea[.](bootstrap[.]ep10[.]Ep10AcceptanceApplication|cluster[.]control[.]ratis[.]ep10[.]ReqCluster024RepairProcess)'
+            mapfile -t pids < <(pgrep -f "$process_pattern" || true)
             if (( ${#pids[@]} == 0 )); then
               return
             fi
             kill -TERM "${pids[@]}" 2>/dev/null || true
             for _ in $(seq 1 10); do
-              mapfile -t pids < <(pgrep -f 'com[.]example[.]magrathea[.]bootstrap[.]ep10[.]Ep10AcceptanceApplication' || true)
+              mapfile -t pids < <(pgrep -f "$process_pattern" || true)
               (( ${#pids[@]} == 0 )) && return
               sleep 1
             done
@@ -325,7 +326,7 @@ jobs:
             mvn -B --no-transfer-progress -Pep10-cluster-tests \
               -pl cluster-control-ratis-infrastructure,cluster-data-grpc-infrastructure,s3-reactive-api-adapter -am \
               -Dsurefire.failIfNoSpecifiedTests=false \
-              -Dtest=PhaseEp10ControlPlaneCucumberTest,PhaseEp10ControlPlaneTlsCucumberTest,PhaseEp10RepairControlCucumberTest,PhaseEp10DataPlaneCucumberTest,PhaseEp10ClusterCoordinationCucumberTest test \
+              -Dtest=PhaseEp10ControlPlaneCucumberTest,PhaseEp10ControlPlaneTlsCucumberTest,PhaseEp10RepairControlCucumberTest,ReqCluster024CucumberTest,PhaseEp10DataPlaneCucumberTest,PhaseEp10ClusterCoordinationCucumberTest test \
             2>&1 | tee target/ci-ep10/req-cluster-008-013-021-026-focused-mechanisms.log
           focused_status=${PIPESTATUS[0]}
           set -e
@@ -339,11 +340,12 @@ jobs:
         if: always()
         shell: bash
         run: |
-          mapfile -t pids < <(pgrep -f 'com[.]example[.]magrathea[.]bootstrap[.]ep10[.]Ep10AcceptanceApplication' || true)
+          process_pattern='com[.]example[.]magrathea[.](bootstrap[.]ep10[.]Ep10AcceptanceApplication|cluster[.]control[.]ratis[.]ep10[.]ReqCluster024RepairProcess)'
+          mapfile -t pids < <(pgrep -f "$process_pattern" || true)
           if (( ${#pids[@]} > 0 )); then
             kill -TERM "${pids[@]}" 2>/dev/null || true
             sleep 5
-            mapfile -t pids < <(pgrep -f 'com[.]example[.]magrathea[.]bootstrap[.]ep10[.]Ep10AcceptanceApplication' || true)
+            mapfile -t pids < <(pgrep -f "$process_pattern" || true)
             (( ${#pids[@]} == 0 )) || kill -KILL "${pids[@]}" 2>/dev/null || true
           fi
 
@@ -359,9 +361,12 @@ jobs:
             bootstrap-application/target/ep10/evidence/
             bootstrap-application/target/ep10/three-node/*.log
             cluster-control-ratis-infrastructure/target/cucumber-json/ep10-*.json
+            cluster-control-ratis-infrastructure/target/cucumber-json/req-cluster-024.json
             cluster-control-ratis-infrastructure/target/surefire-reports/*PhaseEp10ControlPlaneCucumberTest*
             cluster-control-ratis-infrastructure/target/surefire-reports/*PhaseEp10ControlPlaneTlsCucumberTest*
             cluster-control-ratis-infrastructure/target/surefire-reports/*PhaseEp10RepairControlCucumberTest*
+            cluster-control-ratis-infrastructure/target/surefire-reports/*ReqCluster024CucumberTest*
+            cluster-control-ratis-infrastructure/target/ep10/three-node/
             cluster-data-grpc-infrastructure/target/cucumber-json/ep10-*.json
             cluster-data-grpc-infrastructure/target/surefire-reports/*PhaseEp10DataPlaneCucumberTest*
             s3-reactive-api-adapter/target/cucumber-json/ep10-*.json

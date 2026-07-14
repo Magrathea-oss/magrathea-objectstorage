@@ -24,13 +24,23 @@ final class ClusterControlStateMachine extends BaseStateMachine {
     private static final int SNAPSHOT_VERSION_1 = 1;
     private static final int SNAPSHOT_VERSION_2 = 2;
     private final MembershipSnapshot membership;
+    private final ControlSnapshotCheckpoint snapshotCheckpoint;
     private final SimpleStateMachineStorage storage = new SimpleStateMachineStorage();
     private final NavigableMap<String, BucketNamespace> buckets = new TreeMap<>();
     private final NavigableMap<String, ObjectReferenceGeneration> references = new TreeMap<>();
     private final NavigableMap<RepairJobId, MutableRepairJob> repairJobs = new TreeMap<>();
     private final NavigableMap<String, RepairCommandResult> commandResults = new TreeMap<>();
 
-    ClusterControlStateMachine(MembershipSnapshot membership) { this.membership = membership; }
+    ClusterControlStateMachine(MembershipSnapshot membership) {
+        this(membership, ControlSnapshotCheckpoint.open());
+    }
+
+    ClusterControlStateMachine(
+            MembershipSnapshot membership, ControlSnapshotCheckpoint snapshotCheckpoint) {
+        this.membership = Objects.requireNonNull(membership, "membership");
+        this.snapshotCheckpoint = Objects.requireNonNull(
+                snapshotCheckpoint, "snapshotCheckpoint");
+    }
 
     @Override
     public synchronized void initialize(RaftServer server, org.apache.ratis.protocol.RaftGroupId groupId, RaftStorage raftStorage) throws IOException {
@@ -127,6 +137,7 @@ final class ClusterControlStateMachine extends BaseStateMachine {
             out.writeInt(repairJobs.size()); for (MutableRepairJob job : repairJobs.values()) ControlPlaneCodec.writeRepairJob(out, view(job));
             out.writeInt(commandResults.size()); for (RepairCommandResult result : commandResults.values()) ControlPlaneCodec.writeRepairResult(out, result);
         }
+        snapshotCheckpoint.versionedStateWritten(temporary.toPath());
         Files.move(temporary.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         var digest = MD5FileUtil.computeAndSaveMd5ForFile(target);
         storage.updateLatestSnapshot(new SingleFileSnapshotInfo(new FileInfo(target.toPath(), digest), applied));

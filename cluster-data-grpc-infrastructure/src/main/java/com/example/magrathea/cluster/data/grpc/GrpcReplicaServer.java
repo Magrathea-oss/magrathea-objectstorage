@@ -125,7 +125,7 @@ public final class GrpcReplicaServer implements AutoCloseable {
                         if (!draining.compareAndSet(false,true)) return;
                         try {
                             while (!done.get() && out.isReady()) {
-                                ByteBuffer bytes=ByteBuffer.allocate(FRAME_BYTES); int n=source.read(bytes);
+                                ByteBuffer bytes=ByteBuffer.allocate(limits.maxFrameBytes()); int n=source.read(bytes);
                                 if(n<0){done.set(true);source.close();out.onCompleted();break;}
                                 bytes.flip(); byte[] payload=new byte[n];bytes.get(payload); metrics.readyFrame();
                                 out.onNext(ReplicaPayloadFrame.newBuilder().setOffset(offset).setPayload(ByteString.copyFrom(payload)).build());offset+=n;

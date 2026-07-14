@@ -137,22 +137,20 @@ public class PhaseEp8ArchitectureContractSteps {
                 "`REQ-CLUSTER-015` through `REQ-CLUSTER-018` are not implemented",
                 "No evidence above supports a production-readiness or general distributed-storage claim");
         assertThat(arc42).contains(
-                "EP-10 (S3 Cluster, multi-node): `@partial`",
-                "Fixed A/B/C is implementation-informed and validated for `REQ-CLUSTER-001..005`, `008..013`, `019..023`, `025`, and `026`",
-                "`014`, `017`, and `024` remain partial",
-                "`006/007`, `015/016`, and `018` remain not implemented",
+                "EP-10 (S3 Cluster, multi-node): `@partial`. Fixed A/B/C is implementation-informed and validated for `REQ-CLUSTER-001..005`, `008..013`, and `019..026`, including bounded `024`; `014` and broad `017` remain partial, while `006/007`, `015/016`, and `018` remain not implemented. Broader transfer semantics, dynamic membership, broad anti-entropy/rebalance/cleanup, general chaos, rolling upgrades, and broader partitions remain open.",
                 "Consensus-owned Durable Current-generation Repair (accepted ADR 0029)",
-                "`REQ-CLUSTER-019/020/021/022/023/025/026` are `@implemented-and-validated`",
-                "`REQ-CLUSTER-024` and broad `REQ-CLUSTER-017` are `@partial`",
-                "No production distributed-cluster claim follows from the bounded first slice");
+                "Status: *implementation-informed / bounded*. `REQ-CLUSTER-019..026`, including `024`, are `@implemented-and-validated`; broad `REQ-CLUSTER-017` remains `@partial`. `REQ-CLUSTER-014` remains `@partial`, and `006/007/015/016/018` remain `@not-implemented`. No production-readiness or broad healing claim follows.",
+                "No production distributed-cluster claim follows from the bounded first slice; see `PLAN.md` for current status per phase.");
         assertThat(testReport).contains(
                 "The opt-in EP-10 14-scenario / 188-step shared gate, 4-scenario / 80-step repair-only run, and focused mechanism/repair-control gates remain separate and are not folded into these totals",
                 "These hashes remain historical evidence only: the production reactor now composes `cluster-protocol`, `storage-engine-cluster-application`, `cluster-control-ratis-infrastructure`, and `cluster-data-grpc-infrastructure`, and no new clean-revision application SBOM/license/image packet was generated after that expansion.",
                 "Therefore current complete-reactor `REQ-SUPPLY-001` is `@implemented-not-e2e-validated`; the other EP-8 requirement statuses and their explicit limitations remain unchanged.",
-                "EP-10 bounded fixed-cluster and current-generation repair evidence",
-                "Exact status: `019/020/021/022/023/025/026` are `@implemented-and-validated`; `024` is `@partial`",
-                "broad `017` is `@partial` because periodic anti-entropy, rebalance, and automated orphan cleanup remain absent",
-                "No production-readiness or broader distributed-support claim is made.");
+                "Historical EP-10 bounded fixed-cluster and current-generation repair evidence (2026-07-13)",
+                "That evidence point did not yet execute the complete `024` real-filesystem/gRPC matrix; this sentence records the historical limitation rather than current status.",
+                "Focused `REQ-CLUSTER-024` completion evidence (2026-07-14)",
+                "`REQ-CLUSTER-024` is now `@implemented-and-validated`; broad `017` and `014` remain `@partial`, while `006/007/015/016/018` remain `@not-implemented`.",
+                "This evidence is bounded: it is not general chaos, broad partition tolerance, rolling upgrade, dynamic membership, anti-entropy, rebalance, orphan cleanup, or production readiness.",
+                "Exact repair status is represented from source tags: `019..026`, including `024`, are implemented-and-validated, while broad `017` and `014` remain partial; `006/007/015/016/018` remain not implemented.");
     }
 
     @Given("ADR 0027 defines the planned gRPC surface for membership, control coordination, artifact transfer, verification, health evidence, and durable recovery-job execution")

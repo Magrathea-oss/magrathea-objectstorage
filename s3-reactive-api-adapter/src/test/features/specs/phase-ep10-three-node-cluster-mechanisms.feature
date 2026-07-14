@@ -7,12 +7,16 @@ Ability: Execute a bounded and durable fixed three-node control and replica mech
   This feature specifies internal mechanism evidence. It complements, but cannot replace, the shared S3
   Business Need in "requirements/phase-ep10-three-node-s3-cluster.feature". No gRPC or Ratis endpoint is a
   supported client endpoint. The implemented-and-validated mechanism scope includes the fixed first slice
-  covered by REQ-CLUSTER-008 through REQ-CLUSTER-013 and the real Ratis control and snapshot gates covered by
-  REQ-CLUSTER-021, REQ-CLUSTER-022, REQ-CLUSTER-023, REQ-CLUSTER-025, and REQ-CLUSTER-026. REQ-CLUSTER-024
-  remains partial: its seven interruption examples validate control persistence, fencing, and some scheduler
-  reconciliation, but not the full real filesystem and gRPC repair side effect at every listed crash point.
-  This bounded repair slice does not mark the whole EP-10 mechanism backlog complete and excludes orphan
-  cleanup, rebalance, broad or periodic anti-entropy, dynamic membership, and erasure coding.
+  covered by REQ-CLUSTER-008 through REQ-CLUSTER-013 and the bounded repair scopes covered by
+  REQ-CLUSTER-021 through REQ-CLUSTER-026. For REQ-CLUSTER-024 only, the focused internal Ability gate validates
+  all seven named real-data-path interruption points with independent B-JVM crash and restart from real
+  persisted Ratis voter state, actual grpc-java mTLS reads from source C, FileLocalArtifactStore staging,
+  publication, and filesystem inspection, snapshot-write interruption, withheld completion replies,
+  exact-target no-recopy reconciliation, stale-token fencing, and live A-to-C leader transfer. That internal
+  Ability validation mode is the requirement's only agreed mode; REQ-CLUSTER-024 is not S3 behavior and does
+  not require WebTestClient or AWS CLI validation. This bounded repair evidence does not mark the whole EP-10
+  mechanism backlog complete and excludes orphan cleanup, rebalance, broad or periodic anti-entropy, dynamic
+  membership, and erasure coding.
 
   Fixed node configuration:
     | node | stable UUID                          | Ratis address   | replica address | identity root                              | Ratis root                           | object root                            | temporary root                          | runtime root                          |
@@ -197,30 +201,42 @@ Ability: Execute a bounded and durable fixed three-node control and replica mech
 
   Rule: Repair remains idempotent across worker crashes process restarts snapshots and leader changes
 
-    @REQ-CLUSTER-024 @functional-requirement @non-functional-requirement @repair @durability @restart-safety @leader-change @idempotence @fault-injection @partial
-    Scenario Outline: Recovery after interruption preserves one job and safely reconciles any completed side effect
-      Given current generation 7 requires artifact "whole-7f351d76-50d8-4f48-9b86-6f94e777a101" at B with length 134 and SHA-256 "46918899a9ddbe1d1c2f1613416501b3e8d7cdbc2a63a78298d0cc3ee388e800"
-      And one consensus-owned repair job uses token-specific staging under "target/ep10/three-node/node-b/temporary/repair/repair-current-7-b/11"
-      And interruption occurs "<failure_point>"
-      When the affected worker or node restarts and a leader is elected from persisted snapshot plus log state
-      Then the scheduler queries committed "READY", due "RETRY_WAIT", and expired or superseded-session "CLAIMED" work before proposing another claim
-      And there remains exactly one logical repair identity with monotonic attempt and claim generations
-      And replayed ensure, claim, renew, fail, block, obsolete, and completion commands are idempotent
-      And no stale token can change lifecycle state after a committed reclaim
-      And no incomplete or checksum-invalid transfer is published from the temporary root
-      And a complete transfer is published only after incremental length and SHA-256 verification, file fsync, atomic publication, and parent-directory fsync
-      And if exact bytes reached "target/ep10/three-node/node-b/objects/whole-7f351d76-50d8-4f48-9b86-6f94e777a101.artifact" before completion committed, the next current claim probes those facts and completes as already-valid success without recopying bytes
-      And recovery eventually commits "SUCCEEDED", "BLOCKED", or "OBSOLETE" rather than silently losing or duplicating work
+    @REQ-CLUSTER-024 @functional-requirement @non-functional-requirement @repair @durability @restart-safety @leader-change @idempotence @fault-injection @grpc @mtls @filesystem @real-process-required @filesystem-inspection-required @implemented-and-validated
+    Scenario Outline: A fixed-node repair survives interruption at a real data-path boundary without duplicate publication
+      Given validation mode "fixed A/B/C real-process repair with Ratis persistence, gRPC/mTLS transfer, filesystem inspection, and replica-read attempt counting" is selected for requirement "REQ-CLUSTER-024"
+      And current consensus-committed "WHOLE_OBJECT" reference generation 7 for bucket "ep10-repair-archive" and key "evidence/2026/current-generation-repair.bin" names artifact "whole-7f351d76-50d8-4f48-9b86-6f94e777a101" on source C and target B
+      And fixture "s3-reactive-api-adapter/src/test/resources/fixtures/upload/large-object.bin" has length 134 and SHA-256 "46918899a9ddbe1d1c2f1613416501b3e8d7cdbc2a63a78298d0cc3ee388e800"
+      And source replica C path "target/ep10/three-node/node-c/objects/whole-7f351d76-50d8-4f48-9b86-6f94e777a101.artifact" is byte-for-byte equal to that fixture
+      But target B path "target/ep10/three-node/node-b/objects/whole-7f351d76-50d8-4f48-9b86-6f94e777a101.artifact" is initially absent
+      And the one canonical consensus-owned job "repair-e0e88640c5538c99201e0fa7201b08fdb6024ecef4fc739640e2d3ef3a1dcdd2" targets B and has next admissible claim generation 11
+      And claim 11 may stage only at "target/ep10/three-node/node-b/temporary/repair/repair-e0e88640c5538c99201e0fa7201b08fdb6024ecef4fc739640e2d3ef3a1dcdd2/11/payload.part", while a post-restart claim 12 may stage only at "target/ep10/three-node/node-b/temporary/repair/repair-e0e88640c5538c99201e0fa7201b08fdb6024ecef4fc739640e2d3ef3a1dcdd2/12/payload.part"
+      When the focused requirement gate reaches "<failure_point>"
+      Then immediately before interruption, claim and staging inspection reports "<claim_and_staging_state>"
+      And replica-read instrumentation reports "<transfer_state_at_interruption>"
+      And target filesystem inspection reports "<target_state_at_interruption>"
+      When validation performs "<interruption_action>" at that exact semantic point
+      Then a crashed B process recovers from its original non-empty roots, or the named leader action completes while B remains alive
+      And the scheduler recovers the one committed job before proposing work, with monotonic attempt and claim generations and no authority for a stale token
+      And direct-repair evidence across interruption and recovery is "<expected_transfer_evidence>"
+      And every expected transfer is an actual grpc-java replica-read RPC opened by B to source C at "127.0.0.1:19903" with B and C mutually authenticated by their UUID-bound certificates under "target/ep10/pki/nodes/B" and "target/ep10/pki/nodes/C"
+      And no in-memory replica-read port, Ratis command, target pre-seeding, or test-file copy counts as replica transfer evidence
+      And each received byte is written only to the current token's "payload.part" before incremental length and SHA-256 verification, file fsync, atomic target publication, and parent-directory fsync
+      And at every observation the target path is either absent or the exact 134-byte fixture, never a partial or checksum-invalid publication
+      And recovery reconciliation is "<expected_reconciliation>"
+      And if the exact target was durable before interruption, recovery probes it in place without another replica-read RPC, another staging payload, or replacement of its bytes
+      And the final target is byte-for-byte equal to the fixture with length 134 and SHA-256 "46918899a9ddbe1d1c2f1613416501b3e8d7cdbc2a63a78298d0cc3ee388e800"
+      And the one repair job commits or restores "SUCCEEDED" exactly once while reference generation 7, its artifact, the fixed A/B/C topology, and its named replica obligation remain unchanged
+      But the focused semantic gate does not provide a general chaos or partition engine, periodic or broad anti-entropy, rebalance, orphan cleanup, superseded-generation collection, or reference rewriting
 
-      Examples: Required interruption points
-        | failure_point                                                         |
-        | after ensure commit and before claim                                  |
-        | after claim commit and before transfer                                |
-        | during bounded direct transfer                                        |
-        | after durable target publication and before completion commit         |
-        | after completion commit and before its acknowledgement reaches worker |
-        | while a version 2 snapshot is written                                 |
-        | during a Ratis leader change with an active claim                     |
+      Examples: Required real data-path interruption points
+        | failure_point                                                                                     | claim_and_staging_state                                                                 | transfer_state_at_interruption                                             | target_state_at_interruption                                                                                 | interruption_action                                                                                                        | expected_transfer_evidence                                                                    | expected_reconciliation                                                                                          |
+        | READY ensure is committed and before claim 11 is proposed                                        | the job is READY and neither the claim-11 directory nor payload.part exists             | zero replica-read RPCs                                                     | absent                                                                                                       | crash B, retain the A/C quorum, and restart B from its original roots                                                       | one post-restart claim-11 mTLS gRPC read from C and no other replica-read RPC                    | claim 11 publishes once and commits SUCCEEDED once                                                              |
+        | claim 11 is committed and before B opens a replica read to C                                     | claim 11 is committed and claim-11 payload.part does not exist                           | zero replica-read RPCs                                                     | absent                                                                                                       | crash B, let its process session expire, then restart B and reclaim as claim 12                                             | one post-restart claim-12 mTLS gRPC read from C and no other replica-read RPC                    | stale claim 11 cannot publish; claim 12 publishes once and commits SUCCEEDED once                                  |
+        | claim 11 has staged a non-empty strict prefix during the bounded replica read from C             | claim 11 is committed and claim-11 payload.part is a non-empty strict fixture prefix     | one live mTLS gRPC read from C has delivered fewer than 134 bytes          | absent while partial bytes exist only in claim-11 staging                                                     | crash B and terminate the in-flight RPC before another byte is staged, then restart B and reclaim as claim 12              | the interrupted claim-11 RPC plus one complete claim-12 mTLS gRPC read from C and no third RPC   | partial claim-11 staging is never published; claim 12 publishes once and commits SUCCEEDED once                    |
+        | claim 11 has durably published the exact target and before completion is proposed                | claim-11 staging has been atomically removed after publication                           | one mTLS gRPC read from C delivered and verified exactly 134 bytes         | present with length 134 and SHA-256 46918899a9ddbe1d1c2f1613416501b3e8d7cdbc2a63a78298d0cc3ee388e800       | crash B after parent-directory fsync and before completion is proposed, then restart B and reclaim as claim 12             | the one completed claim-11 mTLS gRPC read from C and zero replica-read RPCs after restart       | claim 12 probes the already-exact target and commits SUCCEEDED without recopy                                   |
+        | claim-11 completion is committed and before its acknowledgement reaches B                       | claim-11 staging is absent and the committed job is SUCCEEDED                            | one mTLS gRPC read from C delivered and verified exactly 134 bytes         | present with length 134 and SHA-256 46918899a9ddbe1d1c2f1613416501b3e8d7cdbc2a63a78298d0cc3ee388e800       | withhold only that committed completion reply, crash B, and restart B from its original roots                                 | the one completed claim-11 mTLS gRPC read from C and zero replica-read RPCs after restart       | restored SUCCEEDED and duplicate completion return the committed result without another claim or recopy          |
+        | B writes snapshot version 2 after claim 11 commits and before transfer starts                    | claim 11 is committed and claim-11 payload.part does not exist                           | zero replica-read RPCs                                                     | absent                                                                                                       | crash B during its snapshot write, retain the A/C quorum, then restart B from the last valid snapshot plus its later log    | one post-restart claim-12 mTLS gRPC read from C and no other replica-read RPC                    | restored claim fencing rejects claim 11; claim 12 publishes once and commits SUCCEEDED once                       |
+        | claim 11 is active before transfer while A is the Ratis leader                                   | live B owns claim 11 and claim-11 payload.part does not exist                             | zero replica-read RPCs                                                     | absent                                                                                                       | transfer Ratis leadership from A to C while claim 11 remains owned by the live B process                                    | one claim-11 mTLS gRPC read from C after leader transfer and no duplicate replica-read RPC      | the still-current claim publishes once and completion commits under the new leader without a replacement claim    |
 
   Rule: A repair job cannot outlive the exact current-reference obligation
 
@@ -287,11 +303,10 @@ Ability: Execute a bounded and durable fixed three-node control and replica mech
     @REQ-CLUSTER-017 @functional-requirement @non-functional-requirement @healing @rebalance @orphan-cleanup @later-slice @partial
     Scenario: Bounded current-generation repair does not imply broad healing rebalance or cleanup
       Given PA-6 can model healing and rebalance plans without executing their data side effects
-      And REQ-CLUSTER-019, REQ-CLUSTER-020, REQ-CLUSTER-021, REQ-CLUSTER-022, REQ-CLUSTER-023, REQ-CLUSTER-025, and REQ-CLUSTER-026 are "implemented-and-validated"
-      But REQ-CLUSTER-024 is "partial" because the seven listed crash points lack full real filesystem and gRPC repair-side-effect proof
+      And REQ-CLUSTER-019, REQ-CLUSTER-020, REQ-CLUSTER-021, REQ-CLUSTER-022, REQ-CLUSTER-023, REQ-CLUSTER-024, REQ-CLUSTER-025, and REQ-CLUSTER-026 are "implemented-and-validated" within their bounded repair scopes
       When cluster execution status is reported against production behavior and semantic validation
-      Then bounded current-generation whole-object repair is implemented only within those narrower requirement scopes
-      But broad or periodic anti-entropy execution, rebalance execution, and automated orphan cleanup remain "absent"
+      Then bounded current-generation whole-object repair is "implemented-and-validated" only within those narrower requirement scopes
+      But REQ-CLUSTER-017 remains "partial" because broad or periodic anti-entropy execution, rebalance execution, and automated orphan cleanup remain "absent"
       And no planner result, dry run, job schema, route, or in-memory scheduler is reported as copied, repaired, rebalanced, or reclaimed data
 
     @REQ-CLUSTER-018 @functional-requirement @non-functional-requirement @partition @fault-injection @later-slice @not-implemented

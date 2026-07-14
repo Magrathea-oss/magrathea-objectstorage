@@ -38,6 +38,7 @@ public final class SingleNodeRatisVoter implements AutoCloseable {
     private final Path identityRoot;
     private final Path ratisRoot;
     private final RatisTlsConfig tls;
+    private final ControlSnapshotCheckpoint snapshotCheckpoint;
     private final RaftGroup group;
     private final RaftProperties clientProperties;
     private final Parameters clientParameters;
@@ -51,11 +52,24 @@ public final class SingleNodeRatisVoter implements AutoCloseable {
             Path identityRoot,
             Path ratisRoot,
             RatisTlsConfig tls) {
+        this(membership, localIdentity, identityRoot, ratisRoot, tls,
+                ControlSnapshotCheckpoint.open());
+    }
+
+    public SingleNodeRatisVoter(
+            MembershipSnapshot membership,
+            NodeIdentity localIdentity,
+            Path identityRoot,
+            Path ratisRoot,
+            RatisTlsConfig tls,
+            ControlSnapshotCheckpoint snapshotCheckpoint) {
         this.membership = Objects.requireNonNull(membership, "membership");
         this.localIdentity = Objects.requireNonNull(localIdentity, "localIdentity");
         this.identityRoot = Objects.requireNonNull(identityRoot, "identityRoot");
         this.ratisRoot = Objects.requireNonNull(ratisRoot, "ratisRoot");
         this.tls = Objects.requireNonNull(tls, "cluster mode requires Ratis mTLS");
+        this.snapshotCheckpoint = Objects.requireNonNull(
+                snapshotCheckpoint, "snapshotCheckpoint");
         Set<NodeIdentity> voters = membership.voterIdentities();
         if (voters.size() != 3 || !voters.contains(localIdentity)) {
             throw new ControlPlaneException(ControlPlaneException.Code.INVALID_MEMBERSHIP,
@@ -89,7 +103,7 @@ public final class SingleNodeRatisVoter implements AutoCloseable {
         RaftServerConfigKeys.Snapshot.setAutoTriggerEnabled(properties, true);
         RaftServerConfigKeys.Snapshot.setAutoTriggerThreshold(properties, 8);
         RaftServerConfigKeys.Snapshot.setTriggerWhenStopEnabled(properties, true);
-        stateMachine = new ClusterControlStateMachine(membership);
+        stateMachine = new ClusterControlStateMachine(membership, snapshotCheckpoint);
         try {
             server = RaftServer.newBuilder()
                     .setServerId(RaftPeerId.valueOf(localIdentity.toString()))

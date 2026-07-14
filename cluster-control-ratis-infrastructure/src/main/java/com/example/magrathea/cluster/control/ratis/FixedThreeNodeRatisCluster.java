@@ -2,6 +2,7 @@ package com.example.magrathea.cluster.control.ratis;
 
 import com.example.magrathea.storageengine.cluster.application.*;
 import org.apache.ratis.RaftConfigKeys;
+import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcConfigKeys;
@@ -25,6 +26,7 @@ public final class FixedThreeNodeRatisCluster implements AutoCloseable {
     private final Map<NodeIdentity, Path> identityRoots;
     private final Map<NodeIdentity, Path> ratisRoots;
     private final Map<NodeIdentity, RatisTlsConfig> tlsConfigs;
+    private final Map<NodeIdentity, ControlSnapshotCheckpoint> snapshotCheckpoints;
     private final Map<NodeIdentity, SingleNodeRatisVoter> voters = new LinkedHashMap<>();
     private final RaftGroup group;
     private final RaftProperties clientProperties;
@@ -34,15 +36,27 @@ public final class FixedThreeNodeRatisCluster implements AutoCloseable {
                                       Map<NodeIdentity, Path> ratisRoots,
                                       Map<NodeIdentity, RatisTlsConfig> tlsConfigs,
                                       RatisTlsConfig clientTlsConfig) {
+        this(membership, identityRoots, ratisRoots, tlsConfigs, clientTlsConfig,
+                openSnapshotCheckpoints(membership));
+    }
+
+    public FixedThreeNodeRatisCluster(MembershipSnapshot membership, Map<NodeIdentity, Path> identityRoots,
+                                      Map<NodeIdentity, Path> ratisRoots,
+                                      Map<NodeIdentity, RatisTlsConfig> tlsConfigs,
+                                      RatisTlsConfig clientTlsConfig,
+                                      Map<NodeIdentity, ControlSnapshotCheckpoint> snapshotCheckpoints) {
         this.membership = Objects.requireNonNull(membership);
         this.identityRoots = Map.copyOf(identityRoots); this.ratisRoots = Map.copyOf(ratisRoots);
         this.tlsConfigs = Map.copyOf(Objects.requireNonNull(tlsConfigs,
                 "cluster mode requires Ratis mTLS configuration for every voter"));
+        this.snapshotCheckpoints = Map.copyOf(Objects.requireNonNull(
+                snapshotCheckpoints, "snapshotCheckpoints"));
         Set<NodeIdentity> voters = membership.voterIdentities();
         if (!identityRoots.keySet().equals(voters) || !ratisRoots.keySet().equals(voters)
-                || !this.tlsConfigs.keySet().equals(voters))
+                || !this.tlsConfigs.keySet().equals(voters)
+                || !this.snapshotCheckpoints.keySet().equals(voters))
             throw new ControlPlaneException(ControlPlaneException.Code.INVALID_MEMBERSHIP,
-                    "every fixed voter requires identity, Ratis, and mTLS configuration");
+                    "every fixed voter requires identity, Ratis, mTLS, and snapshot checkpoint configuration");
         for (Map.Entry<NodeIdentity, RatisTlsConfig> entry : this.tlsConfigs.entrySet()) {
             if (!entry.getKey().equals(entry.getValue().localIdentity())
                     || !entry.getValue().acceptedPeers().equals(voters)) {
@@ -68,7 +82,8 @@ public final class FixedThreeNodeRatisCluster implements AutoCloseable {
         for (NodeIdentity id : seedOrder) {
             if (voters.containsKey(id)) continue;
             SingleNodeRatisVoter voter = new SingleNodeRatisVoter(
-                    membership, id, identityRoots.get(id), ratisRoots.get(id), tlsConfigs.get(id));
+                    membership, id, identityRoots.get(id), ratisRoots.get(id), tlsConfigs.get(id),
+                    snapshotCheckpoints.get(id));
             try {
                 voter.startBlocking();
                 voters.put(id, voter);
@@ -98,6 +113,35 @@ public final class FixedThreeNodeRatisCluster implements AutoCloseable {
         SingleNodeRatisVoter voter = voters.get(id); return voter == null ? -1 : voter.lastAppliedIndex();
     }
 
+    /** Transfers leadership between two live members without changing fixed membership. */
+    public synchronized void transferLeadership(
+            NodeIdentity expectedLeader, NodeIdentity newLeader) {
+        Objects.requireNonNull(expectedLeader, "expectedLeader");
+        Objects.requireNonNull(newLeader, "newLeader");
+        if (expectedLeader.equals(newLeader)) return;
+        if (!voters.keySet().containsAll(Set.of(expectedLeader, newLeader))) {
+            throw new ControlPlaneException(ControlPlaneException.Code.QUORUM_UNAVAILABLE,
+                    "leadership transfer requires both fixed voters to be running");
+        }
+        Optional<NodeIdentity> current = leaderIdentity();
+        if (current.isEmpty() || !current.get().equals(expectedLeader)) {
+            throw new ControlPlaneException(ControlPlaneException.Code.QUORUM_UNAVAILABLE,
+                    "expected leader is not currently leader-ready");
+        }
+        try (RaftClient client = RaftClient.newBuilder().setRaftGroup(group)
+                .setLeaderId(RaftPeerId.valueOf(expectedLeader.toString()))
+                .setProperties(clientProperties).setParameters(clientParameters).build()) {
+            RaftClientReply reply = client.admin().transferLeadership(
+                    RaftPeerId.valueOf(newLeader.toString()), 10_000L);
+            if (!reply.isSuccess()) {
+                throw new IOException(String.valueOf(reply.getException()));
+            }
+        } catch (IOException failure) {
+            throw new ControlPlaneException(ControlPlaneException.Code.QUORUM_UNAVAILABLE,
+                    "live Ratis leadership transfer failed", failure);
+        }
+    }
+
     public Mono<Void> stop(NodeIdentity id) {
         return Mono.fromRunnable(() -> stopBlocking(id)).subscribeOn(Schedulers.boundedElastic()).then();
     }
@@ -118,5 +162,14 @@ public final class FixedThreeNodeRatisCluster implements AutoCloseable {
         voters.clear();
         Collections.reverse(closing);
         closing.forEach(SingleNodeRatisVoter::close);
+    }
+
+    private static Map<NodeIdentity, ControlSnapshotCheckpoint> openSnapshotCheckpoints(
+            MembershipSnapshot membership) {
+        Map<NodeIdentity, ControlSnapshotCheckpoint> checkpoints = new LinkedHashMap<>();
+        Objects.requireNonNull(membership, "membership").voterIdentities()
+                .forEach(identity -> checkpoints.put(
+                        identity, ControlSnapshotCheckpoint.open()));
+        return checkpoints;
     }
 }

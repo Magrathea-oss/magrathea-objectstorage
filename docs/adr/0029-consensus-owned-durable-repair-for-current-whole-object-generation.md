@@ -4,9 +4,9 @@ Date: 2026-07-13
 
 ## Status
 
-Accepted — implementation-informed for the bounded EP-10 current-generation whole-object repair slice.
+Accepted — bounded architectural decision; implementation evidence is current through 2026-07-14 for the EP-10 current-generation whole-object repair slice.
 
-The exact status is deliberately narrower than broad healing. `REQ-CLUSTER-019`, `020`, `021`, `022`, `023`, `025`, and `026` are `@implemented-and-validated`. `REQ-CLUSTER-024` is `@partial` because its seven interruption points have control-state, fencing, snapshot, and scheduler-reconciliation evidence, but the full seven-point real-filesystem and gRPC repair-side-effect matrix was not executed. Broad `REQ-CLUSTER-017` is `@partial`: bounded current-generation repair exists, while broad or periodic anti-entropy execution, rebalance, and automated orphan cleanup remain absent. This acceptance is not a production-readiness or general distributed-support claim.
+The exact status is deliberately narrower than broad healing. `REQ-CLUSTER-019` through `REQ-CLUSTER-026`, including `REQ-CLUSTER-024`, are `@implemented-and-validated`. Broad `REQ-CLUSTER-017` remains `@partial`: bounded current-generation repair exists, while broad or periodic anti-entropy execution, rebalance, and automated orphan cleanup remain absent. `REQ-CLUSTER-014` remains `@partial`; `REQ-CLUSTER-006`, `REQ-CLUSTER-007`, `REQ-CLUSTER-015`, `REQ-CLUSTER-016`, and `REQ-CLUSTER-018` remain `@not-implemented`. This acceptance is not a production-readiness or general distributed-support claim.
 
 ## Context
 
@@ -35,7 +35,7 @@ The executable requirements separate:
 - a shared S3 `Business Need` for missing-local fallback and for the fail-current-request/repair-later behavior after single-pass corruption detection, reused by WebTestClient and AWS CLI validation where both modes apply; and
 - internal `Ability` scenarios for deduplication, lifecycle transitions, fencing, direct verified transfer, snapshot migration, crash/restart recovery, and leader-change idempotence.
 
-`REQ-CLUSTER-017` is the broad capability statement and is `@partial`: bounded current-generation repair is implemented under `REQ-CLUSTER-019` through `REQ-CLUSTER-026`, with `REQ-CLUSTER-024` still partial, while broad or periodic anti-entropy, rebalance, and automated orphan cleanup remain absent. Planner unit tests, route presence, job records without execution, or status-only checks cannot upgrade repair status.
+`REQ-CLUSTER-017` is the broad capability statement and remains `@partial`: bounded current-generation repair is `@implemented-and-validated` under `REQ-CLUSTER-019` through `REQ-CLUSTER-026`, including the seven-point `REQ-CLUSTER-024` interruption catalogue, while broad or periodic anti-entropy, rebalance, and automated orphan cleanup remain absent. Planner unit tests, route presence, job records without execution, or status-only checks cannot upgrade repair status.
 
 ### PA-6 planning and execution boundary
 
@@ -160,7 +160,7 @@ Leader-ready and leader-change notifications may wake a scheduler, but they neit
 
 After process restart or leader change, a scheduler queries committed `READY`, due `RETRY_WAIT`, and expired/superseded-session `CLAIMED` work and proposes claims. Replayed ensure/claim/result commands remain idempotent. Snapshot plus log replay preserves job identity, attempt history, claim generation, and stale-token fences.
 
-The seven-point interruption catalogue covers interruption after ensure, after claim, during transfer, after durable publication but before success commit, after success commit, during snapshot, and across leader change. Control persistence, fencing, and scheduler reconciliation are validated across that catalogue, but the full real-filesystem and gRPC side-effect matrix is not. `REQ-CLUSTER-024` therefore remains `@partial`; no broader crash-tolerance claim follows.
+The seven-point interruption catalogue covers interruption after ensure, after claim, during transfer, after durable publication but before success commit, after success commit, during snapshot, and across leader change. The bounded `REQ-CLUSTER-024` harness now exercises every point with real filesystem and gRPC repair side effects. B runs as an independently crashable and restarted JVM with distinct process IDs while retaining its original identity, Ratis, and filesystem roots, all non-empty across restart; the A/C voters and source-C real grpc-java server remain in the parent Cucumber JVM. The scenarios perform actual B-to-C grpc-java reads with UUID-bound mTLS, token-specific `FileLocalArtifactStore` staging and publication, filesystem byte and hash inspection, exact-target no-recopy reconciliation, stale-token fencing, interrupted version-2 snapshot installation with last-valid-snapshot-plus-log recovery, completion committed with its reply withheld, and live A-to-C leadership transfer. `REQ-CLUSTER-024` is therefore `@implemented-and-validated` for this bounded validation mode. No general chaos, broad partition tolerance, rolling upgrade, dynamic membership, anti-entropy, rebalance, orphan cleanup, or production-readiness claim follows.
 
 ### Explicitly deferred scope
 
@@ -183,7 +183,7 @@ Those capabilities require separate requirements and decisions. This repair slic
 - A source can change between attempts without producing duplicate logical jobs.
 - Stable claim-generation fencing prevents stale workers from changing lifecycle state after reclaim, while immutable exact-content publication keeps repeated side effects safe.
 - Repair remains bound to authoritative current metadata and cannot resurrect an old generation or silently change placement.
-- Ratis snapshots grow with job and attempt metadata, requiring retention/compaction policy and migration validation, but object payload volume remains outside consensus.
+- Ratis snapshots grow with job and attempt metadata. Snapshot-history growth and retention/compaction remain operational risks even after the bounded interrupted-version-2 recovery evidence; object payload volume remains outside consensus.
 - Missing-local GET can incur a full verified remote transfer before response latency. Corrupt-local GET intentionally fails the current request; availability improves only for a later request after repair.
 - `BLOCKED` makes unrecoverable or exhausted work visible instead of retrying forever or copying unverified bytes.
 - Deferring cleanup means a narrow race with generation change can leave unreachable exact artifacts. They are non-authoritative and must remain until a separately fenced cleanup design exists.
@@ -233,7 +233,7 @@ Implementation-informed evidence was reviewed on 2026-07-13 in a dirty working t
 
 - The Java 21 real-process shared EP-10 runner passed **14 scenarios / 188 steps** for `REQ-CLUSTER-001..005`, `019`, and `020` across WebTestClient and AWS CLI modes.
 - The focused repair-only real-process run for `REQ-CLUSTER-019/020` passed **4 scenarios / 80 steps**.
-- The focused repair-control run for `REQ-CLUSTER-021..026` passed **22 scenarios / 210 steps**. This validates `021/022/023/025/026`; `024` remains partial because the complete seven-point real-filesystem/gRPC crash matrix was not executed.
+- The focused repair-control run for `REQ-CLUSTER-021..026` passed **22 scenarios / 210 steps**. This remains the exact historical result for that 2026-07-13 run.
 - The cluster data-plane regression passed after repair integration.
 - `ClusterControlStateMachine` and `ControlPlaneCodec` persist version-2 repair identity, lifecycle, deduplication, fencing, retry, history, and snapshot migration state. `ClusterRepairScheduler` stores no authoritative job data: startup and committed-work signals only trigger bounded queries of consensus-owned work. `ClusterNodeRuntime` owns starting and stopping that process-local scheduler alongside the voter and replica server.
 - `ClusterRepairWorker` executes direct verified transfer and filesystem publication outside the replicated state machine, rechecks the current reference around side effects, and reports results only through the current claim-generation/process-session token.
@@ -241,14 +241,24 @@ Implementation-informed evidence was reviewed on 2026-07-13 in a dirty working t
 - `docs/adr/0027-authoritative-cluster-control-plane-and-direct-quorum-data-path.md` remains the wider architectural authority, while this ADR provides the accepted bounded refinement for current-generation repair and the single-pass corruption constraint.
 - Wiki domain analysis `/home/paperboy/.llm-wiki/wiki/analyses/ep-10-fixed-cluster-durable-repair-and-orphan-cleanup-slice.md` remains non-normative research/recommendation input, not requirement or implementation evidence.
 
+Focused completion evidence was reviewed separately on 2026-07-14 for the bounded `REQ-CLUSTER-024` gate:
+
+- On **2026-07-14**, focused `ReqCluster024CucumberTest` passed **7 scenarios / 168 steps**. B ran as an independently crashable and restarted JVM with distinct process IDs while retaining its original identity, Ratis, and filesystem roots, all non-empty across restart; the A/C voters and source-C real grpc-java server remained in the parent Cucumber JVM. The scenarios performed actual B-to-C grpc-java reads with UUID-bound mTLS, token-specific `FileLocalArtifactStore` staging and publication, filesystem byte and hash inspection, exact-target no-recopy reconciliation, stale-token fencing, interrupted version-2 snapshot installation with last-valid-snapshot-plus-log recovery, completion committed with its reply withheld, and live A-to-C leadership transfer.
+- In the same 2026-07-14 validation set, the existing repair-control suite passed **22 scenarios / 294 steps**, the data-plane suite passed **4 scenarios / 40 steps**, and the control and TLS regressions passed.
+- On 2026-07-14, module compilation, layering, source hygiene, and diff checks passed.
+
+This is bounded evidence only. It is not evidence of general chaos, broad partition tolerance, rolling upgrades, dynamic membership, broad anti-entropy, rebalance, orphan cleanup, or production readiness.
+
 ## Related Requirements
 
-- `REQ-CLUSTER-017` — partial broad healing capability: bounded current-generation repair exists, while broad or periodic anti-entropy execution, rebalance, and automated orphan cleanup remain absent.
+- `REQ-CLUSTER-006`, `REQ-CLUSTER-007`, `REQ-CLUSTER-015`, `REQ-CLUSTER-016`, and `REQ-CLUSTER-018` — remain `@not-implemented`; this ADR does not upgrade them.
+- `REQ-CLUSTER-014` — remains `@partial`; this bounded repair evidence does not broaden it.
+- `REQ-CLUSTER-017` — remains `@partial`: bounded current-generation repair exists, while broad or periodic anti-entropy execution, rebalance, and automated orphan cleanup remain absent.
 - `REQ-DIST-004-A..C` — PA-6 modeled missing/corrupt-replica findings and healing plans; planning evidence only.
 - `REQ-UPLOAD-006` — committed integrity metadata and single-pass GET corruption detection.
 - `REQ-CLUSTER-019` and `REQ-CLUSTER-020` — implemented-and-validated S3 repair Business Need scenarios for real-process WebTestClient and AWS CLI modes.
 - `REQ-CLUSTER-021`, `REQ-CLUSTER-022`, `REQ-CLUSTER-023`, `REQ-CLUSTER-025`, and `REQ-CLUSTER-026` — implemented-and-validated Ratis control, fencing, currentness, and snapshot Ability scenarios.
-- `REQ-CLUSTER-024` — partial crash/restart Ability: control persistence, fencing, and some scheduler reconciliation are validated, but full real filesystem and gRPC repair side effects are not exercised at every listed interruption point.
+- `REQ-CLUSTER-024` — `@implemented-and-validated` crash/restart Ability for the complete seven-point real-filesystem and gRPC interruption matrix in the bounded independent-B-JVM validation mode.
 
 ## Related ADRs
 
