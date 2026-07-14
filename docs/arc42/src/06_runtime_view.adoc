@@ -14,9 +14,9 @@ image::../../c4/images/CreateBucketRuntime.png[CreateBucket Runtime, width=600]
 1. User → s3-reactive-api-adapter: `PUT /{bucket}`
 2. s3-reactive-api-adapter → reactive-bucket-management: CreateBucket use case
 3. reactive-bucket-management → reactive-repository-application: Save Bucket aggregate via command repository
-4. reactive-repository-application → reactive-infrastructure (default) or object-store-reactive-repository-storage-engine-infrastructure (storage-engine profile): Persist Bucket aggregate
+4. reactive-repository-application → object-store-reactive-repository-storage-engine-infrastructure: Persist Bucket aggregate through the default Storage Engine backend
 
-**Durability note:** in storage-engine mode, the full `BucketConfig` document is committed to `metadata/buckets/` via `BucketStore` with a crash-safe temp-file + atomic-rename write, so the bucket survives a process restart. In the default in-memory profile, the bucket does not survive a restart.
+**Durability note:** the full `BucketConfig` document is committed to `metadata/buckets/` via `BucketStore` with a crash-safe temp-file + atomic-rename write, so the bucket survives a process restart. Legacy in-memory adapters are test/retirement scaffolding and are not an alternate single-node runtime.
 
 === Scenario 2 — PutObject
 
@@ -251,8 +251,10 @@ image::../../c4/images/CorruptReplicaRepairRuntime.png[Corrupt Replica Repair Ru
 
 [NOTE]
 ====
-Status: *implementation-informed*. Control persistence, fencing, snapshot migration, lifecycle, and some scheduler reconciliation are validated by `REQ-CLUSTER-021/022/023/025/026`. `REQ-CLUSTER-024` remains partial because the full seven-point real-filesystem/gRPC crash matrix was not executed. No general partition or rolling-upgrade behavior is implied.
+Status: *implementation-informed / implemented-and-validated for bounded `REQ-CLUSTER-024`*. The 2026-07-14 focused gate passed 7 scenarios / 168 steps across all seven real-filesystem/gRPC interruption points. No general chaos, broad partition, rolling-upgrade, dynamic-membership, anti-entropy, rebalance, cleanup, or production-readiness behavior is implied.
 ====
+
+In this focused runtime harness, B is the independently crashable/restarted JVM, receives distinct PIDs, and reuses its original non-empty identity, Ratis, and filesystem roots. A/C voters and the source-C real grpc-java server remain in the parent Cucumber JVM. The runtime executes actual B-to-C reads with UUID-bound mTLS and token-specific staging/publication, then inspects bytes/hashes and verifies exact-target no-recopy, stale-token fencing, last-valid-snapshot-plus-log recovery after interrupted version-2 snapshot installation, a committed completion whose reply is withheld, and live A-to-C leadership transfer.
 
 .Runtime — snapshot recovery, reclaim, and stale-token rejection
 image::../../c4/images/RepairRestartRetryRuntime.png[Repair Restart Retry Runtime, width=600]

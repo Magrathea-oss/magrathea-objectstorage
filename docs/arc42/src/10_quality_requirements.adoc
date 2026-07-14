@@ -27,12 +27,17 @@ ifndef::imagesdir[:imagesdir: ../images]
 |Reliability / Consistency / Integrity
 |Bounded current-generation repair
 |Restore only a missing or corrupt whole-object target named by the current committed reference, with consensus-owned lifecycle and single-pass GET semantics
-|`REQ-CLUSTER-019/020/021/022/023/025/026` implemented and validated; `024` partial for incomplete seven-point real-filesystem/gRPC crash proof; broad `017` partial
+|`REQ-CLUSTER-019..026`, including bounded seven-point real-filesystem/gRPC interruption evidence for `024`, implemented and validated; broad `017` partial
 
-|Performance
-|Reactive non-blocking I/O
-|Upload/download without thread blocking
-|DataBuffer streaming, no byte[] in handlers; bounded-memory GetObject/multipart streaming remains open (EP-3)
+|Performance / Reliability
+|Repository-wide bounded reactive payload processing
+|Bounded frames, explicit pooled-buffer ownership, finite byte budgets, and role-specific blocking/CPU bulkheads from HTTP ingress through security, transforms, persistence, replication, and response egress
+|`planned / needs-validation`: P1 freezes a formula-based byte/queue budget; normal-path P3 measures it under configured maximum concurrency and exercises success/error/cancellation/discard without pooled-buffer leaks or event-loop filesystem work
+
+|Reliability / Testability
+|Deterministic storage-pipeline fault evidence
+|Replayable typed corruption at named integrity/publication boundaries without degraded writes, false durable acknowledgements, payload in Ratis, or secret-bearing evidence
+|ADR 0030 accepted target; identical plan/event input must produce an identical decision trace, and all implementation/Cucumber/fault-safety evidence remains `planned / needs-validation`
 
 |Testability
 |Layered testing
@@ -55,14 +60,34 @@ ifndef::imagesdir[:imagesdir: ../images]
 |Static boundary and extension-removal tests; 86/86 Vitest across 14 files; 57/57 Playwright Chromium (19 per 360/768/1440), including axe 3/3 with zero violations and visual regression 12/12
 |===
 
+[[quality-reactive-pipeline]]
+=== Reactive Pipeline and Deterministic-chaos Quality Contract
+
+[WARNING]
+====
+Status: *deferred / needs-validation while EP-10 remains active*. The 2026-07-14 link:../audits/2026-07-14-reactive-streaming-and-pipeline-chaos-source-audit.adoc[source audit] identifies static review items but does not replace the EP roadmap or revoke earlier semantic evidence. Signed authentication, SSE-S3, and named blocking/ownership paths require reproduction in supported Storage Engine compositions. The legacy in-memory adapter is not the owner-confirmed single-node/default backend, is isolated behind `legacy-in-memory-test`, and may be retired separately.
+====
+
+The quality tree for this roadmap is:
+
+- *resource boundedness*: maximum frame bytes, demand/prefetch, concurrent stages, queued tasks/bytes, residual/cache state, retries, and fault delays are finite and compose into one reviewed budget;
+- *thread responsiveness*: no filesystem/channel access, credential/policy reload, durable audit fsync, ACL access, cleanup, replica sink write, or unbounded CPU transform runs on a Reactor event-loop or gRPC callback thread;
+- *resource safety*: every pooled buffer and file/channel lifecycle closes exactly once across success, error, cancellation, discard, over-limit, ignored-body, and injected-fault paths;
+- *integrity truthfulness*: source, transformed, persisted, published, response-time, and at-rest integrity are named separately; one-open/single-pass GET remains explicit and no payload preflight is inferred;
+- *determinism*: the same canonical plan and logical event sequence produce the same bounded decision trace despite concurrent scheduling; and
+- *publication safety*: injected corruption cannot create a checksum-valid durable acknowledgement, bypass `W=2`, enable a degraded write, put payload in Ratis, or publish a reachable partial artifact.
+
+P1 must freeze numeric frame, queue, concurrency, scheduler, and memory-budget values before normal-path P3 can validate them. Until then, the absence of a full-payload aggregator and the finiteness of every budget term are mandatory architecture gates, but no portable peak-memory or throughput number is claimed. ADR 0030 chaos evidence is final P4 and cannot substitute for P3.
+
 === Quality Scenarios
 
-==== Scenario 1 — Object Upload Performance
+==== Scenario 1 — Repository-wide Object Upload Memory Safety
 
-- **Context:** User uploads large files (100+ MB)
-- **Stimulus:** PUT /{bucket}/{key} with binary body
-- **Response:** Upload completes without OutOfMemoryError
-- **Metric:** Throughput > 50 MB/s, peak memory < 256 MB
+- **Status:** `planned / needs-validation`; current critical gaps are recorded in the dated source audit.
+- **Context:** A client uploads objects through each applicable unsecured, exact-SigV4-signed, and SSE-S3 composition at the configured object-size and concurrency envelope.
+- **Stimulus:** Sustain concurrent PUT streams, including slow producers/consumers and capacity rejection, without pre-materializing bodies in the runner.
+- **Response:** No filter, repository, transform, or adapter retains a complete payload; demand and queues remain finite; rejection releases the offending buffer; no `OutOfMemoryError` or false success occurs.
+- **Metric:** Measured payload retention stays below the P1-approved sum of per-stage frame/in-flight/residual/queue budgets plus a frozen runtime baseline and margin. The budget and environment manifest are prerequisites; no numeric pass result exists yet.
 
 ==== Scenario 2 — S3 API Compatibility
 
@@ -181,11 +206,12 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 ==== Scenario 17 — Durable-job Authority, Fencing, and Idempotent Recovery (`REQ-CLUSTER-021..025`)
 
-- **Status:** `implementation-informed`; `021/022/023/025` are `@implemented-and-validated`, while `024` is `@partial`.
+- **Status:** `implementation-informed`; `021/022/023/024/025` are `@implemented-and-validated` within the bounded current-generation repair scope.
 - **Context:** One repair job is deduplicated, transitions through consensus, or is interrupted around claim, transfer, durable publication, completion, snapshot, restart, or leader change.
 - **Stimulus:** A process-local scheduler queries committed work; a new process session claims/reclaims while a stale worker may resume.
 - **Response:** Ratis, not scheduler memory, owns one semantic job and monotonic attempt/claim history. `ClusterNodeRuntime` owns scheduler start/stop; wake signals contain no job state. Reclaim increments `claimGeneration`; already-valid target bytes are idempotent success; stale result commands have no effect; a changed reference makes the job `OBSOLETE`.
-- **Metric (2026-07-13):** Repair-control `REQ-CLUSTER-021..026` passes 22 scenarios / 210 steps and the data-plane regression passes. `REQ-CLUSTER-024` remains partial because control persistence, fencing, and some scheduler reconciliation do not constitute the full seven-point real-filesystem/gRPC crash-side-effect matrix.
+- **Historical metric (2026-07-13):** Repair-control `REQ-CLUSTER-021..026` passed 22 scenarios / 210 steps and the data-plane regression passed. That result is retained as the earlier control/reconciliation evidence and is not relabeled as the later full `024` gate.
+- **Focused metric (2026-07-14):** `ReqCluster024CucumberTest` passed 7 scenarios / 168 steps. B ran as an independently crashable/restarted JVM with distinct PIDs and its original non-empty identity, Ratis, and filesystem roots; A/C voters and source-C real grpc-java remained in the parent Cucumber JVM. The gate exercised actual B-to-C reads with UUID-bound mTLS, token-specific filesystem staging/publication, byte/hash inspection, exact-target no-recopy reconciliation, stale-token fencing, interrupted version-2 snapshot installation with last-valid-snapshot-plus-log recovery, completion committed with reply withheld, and live A-to-C leadership transfer. Repair-control then passed 22 / 294, data-plane 4 / 40, and control/TLS plus compilation/layering/hygiene/diff regressions passed. This does not prove general chaos, broad partitions, rolling upgrades, dynamic membership, anti-entropy, rebalance, cleanup, or production readiness.
 
 ==== Scenario 18 — Snapshot Migration and Fail-closed Compatibility (`REQ-CLUSTER-026`)
 
@@ -196,6 +222,62 @@ ifndef::imagesdir[:imagesdir: ../images]
 - **Metric (2026-07-13):** `REQ-CLUSTER-026` passes in the focused 22-scenario / 210-step repair-control gate, including stale-token rejection after restore.
 
 These scenarios deliberately exclude prepared-artifact intents, orphan cleanup, rebalance, broad periodic anti-entropy, dynamic membership, erasure coding, multipart, and broader partitions. Broad `REQ-CLUSTER-017` remains partial, and no production-readiness claim follows.
+
+==== Scenario 19 — Pooled-buffer Ownership Under Every Terminal Path
+
+- **Status:** `planned / needs-validation`; no leak-test result is claimed.
+- **Context:** Signed/SSE uploads, over-limit rejection, ignored-body handling, dedup/EC stages, filesystem persistence, and response streaming use pooled buffers.
+- **Stimulus:** Exercise normal completion, upstream/downstream error, cancellation at every hand-off, discard, timeout, over-limit, and each enabled injected corruption.
+- **Response:** Every owned buffer is transferred or released exactly once; files/channels close; no late buffer is retained by fault evidence; cleanup remains reachable and no durable acknowledgement is fabricated.
+- **Metric:** Zero pooled-buffer leak reports under the selected paranoid detector, explicit ownership assertions for each hand-off, and one terminal outcome per operation. Normal-path tooling/execution is P3; injected-fault ownership paths are added only in final P4.
+
+==== Scenario 20 — Reactive and gRPC Callback Thread Isolation
+
+- **Status:** `planned / needs-validation`.
+- **Context:** Credential/policy snapshots, audit append/fsync, ACL access, encrypted inspection output, filesystem cleanup, repair reception, and transform/EC work are active.
+- **Stimulus:** Run each path while its dedicated finite executor is both healthy and deliberately saturated.
+- **Response:** Reactor event-loop and gRPC callback threads perform no blocking file/channel operation; per-resource ordering is preserved; saturation produces a typed bounded failure rather than unbounded queuing, callback starvation, or a false success.
+- **Metric:** Thread-affinity assertions cover every named call site; executor manifests state thread and task/byte queue limits; saturation and shutdown/cancellation outcomes are observed. No such complete gate has run.
+
+==== Scenario 21 — Deterministic Corruption Replay
+
+- **Status:** `accepted target / planned / needs-validation` under ADR 0030.
+- **Context:** A canonical version-1 plan selects one operation and a finite occurrence/byte offset or frame index for each initial action.
+- **Stimulus:** Replay the same logical event sequence repeatedly and with unrelated operations interleaved.
+- **Response:** The selected rule fires or skips at the same semantic coordinate with the same typed outcome; unrelated operations do not consume its occurrence or fire budget.
+- **Metric:** Decision traces are identical after excluding non-oracle diagnostic timestamps and contain matching plan hash, rule/decision ID, operation, point, coordinate, fire ordinal/count, and outcome. No replay evidence exists yet.
+
+==== Scenario 22 — Faulted Replica Cannot Satisfy Publication Quorum
+
+- **Status:** `planned / needs-validation`.
+- **Context:** Fixed A/B/C uses `N=3/W=2`, direct bounded replica transfer, and consensus reference publication.
+- **Stimulus:** Mutate a selected receive frame before sink verification, including cases leaving two valid replicas and fewer than two valid replicas.
+- **Response:** The corrupted target emits no checksum-valid durable acknowledgement. Two other valid acknowledgements may satisfy the unchanged `W=2` policy; fewer than two fail publication. No degraded path, payload-in-Ratis path, or premature reference exists.
+- **Metric:** Durable-ack evidence and committed Ratis state reconcile exactly with the typed fault trace; the final reachable reference, if any, names only the normally permitted publication result. This is not yet validated.
+
+==== Scenario 23 — Temp and Source Corruption Fail Before Reachable Publication
+
+- **Status:** `planned / needs-validation`.
+- **Context:** Source checksum, temporary write, persisted-byte verification, fsync, atomic publication, and acknowledgement are distinct ordered stages.
+- **Stimulus:** Flip one byte after source checksum/before persistence, or corrupt one unpublished temp-file byte before persisted-byte verification.
+- **Response:** The appropriate later integrity gate detects the mismatch; no false durable acknowledgement or reachable partial artifact is created; temporary state is deleted or visibly quarantined by lifecycle-owned cleanup.
+- **Metric:** One typed fired decision, one integrity failure, zero reference publication for insufficient valid acknowledgements, bounded cleanup completion evidence, and no second source subscription. No such result is claimed yet.
+
+==== Scenario 24 — Fault Activation and Evidence Fail Closed
+
+- **Status:** `planned / needs-validation`.
+- **Context:** Production/no-profile startup, non-production fault profile, opt-in property, valid/invalid plans, and multi-node plan hashes are evaluated.
+- **Stimulus:** Omit either activation guard; combine active injection with production; load unknown versions/stages/actions or unbounded parameters; create a node plan-hash mismatch; exhaust the finite evidence sink.
+- **Response:** Ordinary production selects the no-op port. Requested active experiments reject unsafe/malformed/mismatched state before payload processing or fail explicitly; they never silently downgrade to a different plan/no-op and never emit payloads, paths, object keys, credentials, secrets, or keys in evidence.
+- **Metric:** Startup/experiment outcomes and bounded redaction assertions cover every fail-closed case. No activation or evidence gate has run.
+
+==== Scenario 25 — One-open Single-pass GET Contract Remains Truthful
+
+- **Status:** `implementation-informed` for the existing bounded filesystem read; application-contract migration and any online checksum behavior are `planned / needs-review`.
+- **Context:** A manifest and metadata exist for a single-node object.
+- **Stimulus:** Stream GET normally, cancel mid-stream, and expose corruption late in the one payload read if online verification is later added.
+- **Response:** Each artifact is opened/read once, frames remain bounded, cancellation closes the resource, and no full preflight/second read or transparent already-started-response replacement occurs. Documentation states whether only committed checksum/client validation applies or an incremental late-failure check is active.
+- **Metric:** Open/read/subscription counters equal one for the declared path and emitted frames respect the configured cap; no full-payload array is introduced at the application boundary. Current source evidence is not a new test result.
 
 // The generated Gherkin requirements report is included as a top-level ARC42 appendix
 // from arc42-template.adoc (see AGENTS.md §B.7), not as a subsection of this chapter.

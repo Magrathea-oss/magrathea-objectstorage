@@ -20,11 +20,11 @@ ifndef::imagesdir[:imagesdir: ../images]
 |Static resources
 |Generated browser application and documentation assets, ARC42 JSON, ADR JSON, JaCoCo JSON exports, C4 PNGs, and ARC42 images served by `bootstrap-application` from classpath `static/**`
 
-|Bare local default backend (`single-node` profile)
-|In-memory (ConcurrentHashMap), allocated in the same JVM heap as the server; does not persist across restarts. This default is retained for unpackaged development/test compatibility.
+|Default single-node backend (`storage-engine` profile)
+|Filesystem-durable: bucket registry, multipart upload state, per-object configuration, and S3 object manifest references are committed under a configurable filesystem root (`storage.engine.filesystem.root`) with crash-safe temp-file + atomic-rename writes. This is the owner-confirmed default for packaged and unpackaged single-node product runtimes.
 
-|Storage Engine backend (`storage-engine` profile)
-|Filesystem-durable: bucket registry, multipart upload state, per-object configuration, and S3 object manifest references are committed under a configurable filesystem root (`storage.engine.filesystem.root`) with crash-safe temp-file + atomic-rename writes; packaged JVM/native container images activate this backend by default for single-node deployments.
+|Legacy in-memory adapters
+|Unsupported as a product backend and isolated behind `legacy-in-memory-test`; adapters may be retired separately.
 
 |Java Runtime
 |JDK 21 bytecode for the normal JAR path; the optional Spring Boot 4 native executable is built with GraalVM 25 and removes the runtime JVM requirement
@@ -139,11 +139,13 @@ The implemented runtime covers unconditional `CreateBucket`, whole-object `PUT`/
 
 ==== Implemented bounded repair deployment (accepted ADR 0029)
 
-Status: *implementation-informed / bounded*. `REQ-CLUSTER-019/020/021/022/023/025/026` are implemented and validated; `REQ-CLUSTER-024` and broad `REQ-CLUSTER-017` are partial.
+Status: *implementation-informed / bounded*. `REQ-CLUSTER-019..026`, including `024`, are implemented and validated; broad `REQ-CLUSTER-017` remains partial.
 
 Repair adds no deployment node, external API, or alternate byte path. `ClusterNodeRuntime` co-locates and owns the start/stop lifecycle of the process-local scheduler and fenced worker in each A/B/C JVM. Each process uses its stable UUID plus a new process-session ID. Existing Ratis roots persist version-2 snapshot/log repair metadata; object/temporary roots hold token-specific staging and final artifacts. Control ports carry ensure/claim/result commands, while direct mTLS replica ports carry verified whole-object bytes.
 
-The scheduler is not authority and carries no durable work: startup or committed-work signals only wake bounded consensus queries. Restart and leader change do not transfer ownership implicitly; reclaim requires a newer committed claim generation, and a stale process cannot renew or complete the reclaimed job. The full seven-point real-filesystem/gRPC crash matrix remains unexecuted, so `REQ-CLUSTER-024` stays partial. This deployment does not establish failure-domain placement, production scheduling capacity, rolling upgrade, or broader partition tolerance.
+The scheduler is not authority and carries no durable work: startup or committed-work signals only wake bounded consensus queries. Restart and leader change do not transfer ownership implicitly; reclaim requires a newer committed claim generation, and a stale process cannot renew or complete the reclaimed job.
+
+The focused 2026-07-14 `REQ-CLUSTER-024` deployment harness passed 7 scenarios / 168 steps. B alone runs as an independently crashable/restarted JVM with distinct PIDs and its original non-empty identity, Ratis, and filesystem roots. The A/C voters and source-C real grpc-java server remain in the parent Cucumber JVM. This is a test deployment boundary for bounded interruption evidence; it does not establish production failure-domain placement, scheduling capacity, general chaos, rolling upgrade, dynamic membership, broad healing, cleanup, or broader partition tolerance.
 
 Prepared-artifact intents and orphan cleanup, rebalance, broad periodic anti-entropy, dynamic membership, erasure coding, multipart, and broader partition handling remain outside the deployment change.
 
@@ -159,6 +161,6 @@ The current single-process deployment is intentionally monolithic for single-nod
 * EP-6 (Performance & Capacity): implemented and validated for the `0.1.x` single-node safety envelope. S3 routes enforce 256 MiB single/assembled object limits, 64 MiB multipart parts, finite timeout, 16 active requests, 64 TCP connections, and a 100 requests/s token bucket with burst 200. Mandatory 45-second CI load and weekly/manual 15-minute soak run eight deterministic workers under `-Xmx256m`, produce machine-readable evidence, and assert bounded heap, checksums, and idle resources. These gates are not production sizing or competitive benchmarks.
 * EP-7 (Complete Admin Panel): `REQ-ADMIN-001..031` UI/contracts and reproducible packaging are implemented and validated. The phase remains partial because credential/tenant administration and real recovery/GC/scrub/audit/metrics/traces providers are absent; provider routes return truthful HTTP 503 not-configured responses.
 * EP-8 (Cluster Architecture ADR & Supply Chain): accepted architecture wiring and the explicitly validated evidence guards remain implementation-informed. Current complete-reactor `REQ-SUPPLY-001` is `@implemented-not-e2e-validated` because the historical clean-revision SBOM/license/image packet predates the four cluster modules; its hashes remain historical only. No publication occurred, and OWASP vulnerability status remains unknown/error.
-* EP-10 (S3 Cluster, multi-node): `@partial`. Fixed A/B/C is implementation-informed and validated for `REQ-CLUSTER-001..005`, `008..013`, `019..023`, `025`, and `026`; `014`, `017`, and `024` remain partial, while `006/007`, `015/016`, and `018` remain not implemented. Broader transfer semantics, dynamic membership, broad anti-entropy/rebalance/cleanup, the complete crash matrix, and broader partitions remain open.
+* EP-10 (S3 Cluster, multi-node): `@partial`. Fixed A/B/C is implementation-informed and validated for `REQ-CLUSTER-001..005`, `008..013`, and `019..026`, including bounded `024`; `014` and broad `017` remain partial, while `006/007`, `015/016`, and `018` remain not implemented. Broader transfer semantics, dynamic membership, broad anti-entropy/rebalance/cleanup, general chaos, rolling upgrades, and broader partitions remain open.
 
 No production distributed-cluster claim follows from the bounded first slice; see `PLAN.md` for current status per phase.

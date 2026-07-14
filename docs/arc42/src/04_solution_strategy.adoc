@@ -41,6 +41,12 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 |Striped per-key locking for durable-metadata writers
 |Serializes concurrent same-key mutation without serializing unrelated keys
+
+|Repository-wide bounded payload and role-specific bulkheads
+|Makes byte bounds, pooled-buffer ownership, terminal cleanup, filesystem/crypto/CPU scheduling, and integrity scopes one end-to-end contract rather than local reactive syntax (`planned / needs-validation`)
+
+|Transport-neutral deterministic storage fault injection (ADR 0030)
+|Provides replayable typed semantic points and bounded evidence without coupling application contracts to WebFlux, filesystem, gRPC, or Ratis (`accepted target; implementation planned`)
 |===
 
 === Bucket Configuration Redesign (ADR 0011)
@@ -49,7 +55,21 @@ ADR 0011 records a course correction: each configuration feature (CORS, Lifecycl
 
 === Reactive Migration (ADR 0010)
 
-ADR 0010 records a course correction that completed the reactive migration from ADR 0009. All application services now return `Mono<T>` or `Flux<T>` natively (no `.join()`), handlers chain reactive operators directly (no `.subscribeOn()`), and repository implementations are fully reactive (no `Mono.fromCallable` stubs). Runtime effects (CORS validation, Website routing, OwnershipControls enforcement, PublicAccessBlock evaluation, Accelerate headers, RequestPayment enforcement) were added.
+ADR 0010 records the API/composition migration from ADR 0009: application services return `Mono<T>` or `Flux<T>` natively and handlers chain reactive operators without future `.join()` bridges. That historical decision does not establish repository-wide byte boundedness, pooled-buffer ownership, or event-loop safety. The 2026-07-14 static review identified full-payload aggregation in signed authentication and SSE-S3 plus synchronous security/ACL/cleanup/repair I/O on reactive or callback paths; these are source-review risks that require reproduction in supported Storage Engine compositions, not failed semantic gates. Quadratic accumulation in the legacy in-memory adapter is isolated `legacy-in-memory-test` scope and does not define the single-node backend. See link:../audits/2026-07-14-reactive-streaming-and-pipeline-chaos-source-audit.adoc[the bounded source audit].
+
+[[solution-reactive-streaming-chaos]]
+=== Repository-wide Streaming and Pipeline-chaos Strategy (ADR 0030)
+
+[NOTE]
+====
+Status: *deferred / needs-validation*. EP-10 remains the active implementation phase. Existing bounded controls and prior scoped evidence remain in place; the static source-review sequence does not replace the EP roadmap. After normal EP work, deferred P0-P3 may review supported paths, and deterministic chaos begins only in final P4.
+====
+
+The target establishes bounded payload frames and explicit buffer ownership from S3 ingress through security, transform, persistence, replica transfer, and response egress. Blocking filesystem/crypto/policy/audit and CPU-intensive transform work use finite role-specific bulkheads. Integrity continues to distinguish source-stream checksums, transformed representation checksums, persisted-byte verification, committed metadata, single-pass response behavior, and at-rest scrub.
+
+After source-review risks are reproduced and confirmed against supported Storage Engine compositions, conservative corrections and static architecture gates establish allowed payload representations and byte-budget formulas. Transform/dedup/EC work then proceeds under those contracts, followed by normal-path semantic, load, pooled-buffer, cancellation, and saturation evidence.
+
+Chaos engineering is deliberately last. Only after the normal pipeline gates pass does a transport-neutral `StorageFaultInjectionPort` consolidate filesystem, cluster, and replica fault seams behind versioned deterministic points. The initial actions target corruption detection rather than generic timing failures: mutate bytes after source checksum/before persistence, mutate an unpublished temp file before persisted-byte verification, and mutate a replica frame before sink verification. Activation is fail-closed and requires both a non-production profile and explicit property. See link:../../adr/0030-deterministic-storage-pipeline-fault-injection.md[ADR 0030] for normative details.
 
 === Handler Minimal Pattern
 
@@ -97,7 +117,7 @@ The existing Object Store-to-Storage Engine adapter remains the only S3 integrat
 
 [NOTE]
 ====
-Status: *implementation-informed / bounded*. `REQ-CLUSTER-019/020/021/022/023/025/026` are `@implemented-and-validated`; `REQ-CLUSTER-024` and broad `REQ-CLUSTER-017` are `@partial`. No production-readiness or broad healing claim follows.
+Status: *implementation-informed / bounded*. `REQ-CLUSTER-019..026`, including `024`, are `@implemented-and-validated`; broad `REQ-CLUSTER-017` remains `@partial`. `REQ-CLUSTER-014` remains `@partial`, and `006/007/015/016/018` remain `@not-implemented`. No production-readiness or broad healing claim follows.
 ====
 
 The bounded EP-10 strategy restores only an obligation already present in the current consensus-committed `ObjectReferenceGeneration`: a named target whose exact `WHOLE_OBJECT` artifact is missing or corrupt. It neither changes placement nor publishes a new generation. Application code maps still-applicable evidence into one deterministic repair job; Ratis owns `READY`, `CLAIMED`, `RETRY_WAIT`, `SUCCEEDED`, `BLOCKED`, and `OBSOLETE` lifecycle facts; and an application worker performs direct verified transfer and crash-safe target publication outside consensus.
@@ -108,12 +128,14 @@ The scheduler is process-local wake-up machinery, not job authority. `ClusterNod
 
 GET preserves the single-pass integrity contract. Known absence before response streaming is repaired from a different named, fully verified replica and then served from one local filesystem read. Corruption discovered while the present local payload is streamed fails that request, durably schedules repair, and permits only a later GET to succeed. There is no complete local-payload preflight, second filesystem read, or transparent corrupt-read retry.
 
-Snapshot schema version 2 persists job metadata and explicitly migrates reference-only version 1; payload bytes do not enter snapshots. The shared Java 21 real-process gate passed 14 scenarios / 188 steps for `REQ-CLUSTER-001..005`, `019`, and `020`; the focused repair-only subset passed 4 / 80; repair-control `021..026` passed 22 / 210; and the data-plane regression passed. `REQ-CLUSTER-024` remains partial because those control/reconciliation results do not execute the full seven-point real-filesystem/gRPC crash matrix.
+Snapshot schema version 2 persists job metadata and explicitly migrates reference-only version 1; payload bytes do not enter snapshots. The 2026-07-13 evidence remains unchanged: the shared Java 21 real-process gate passed 14 scenarios / 188 steps for `REQ-CLUSTER-001..005`, `019`, and `020`; the focused repair-only subset passed 4 / 80; repair-control `021..026` passed 22 / 210; and the data-plane regression passed.
 
-Prepared-artifact intents and orphan cleanup, rebalance, broad periodic anti-entropy, dynamic membership, erasure coding, multipart, and broader partition behavior remain separate future decisions. See link:../../adr/0029-consensus-owned-durable-repair-for-current-whole-object-generation.md[accepted ADR 0029]. Architecture evidence was reviewed on 2026-07-13 against dirty working-tree base `3eb2a508317a`; the domain-expert wiki page `analyses/ep-10-fixed-cluster-durable-repair-and-orphan-cleanup-slice.md` remains research/recommendation input, not a requirement or implementation claim.
+On 2026-07-14, focused `ReqCluster024CucumberTest` passed 7 scenarios / 168 steps. B ran as an independently crashable/restarted JVM with distinct PIDs and its original non-empty identity, Ratis, and filesystem roots, while the A/C voters and source-C real grpc-java server remained in the parent Cucumber JVM. Every interruption point exercised actual B-to-C grpc-java reads with UUID-bound mTLS, token-specific `FileLocalArtifactStore` staging/publication, filesystem byte/hash inspection, exact-target no-recopy reconciliation, stale-token fencing, interrupted version-2 snapshot installation with last-valid-snapshot-plus-log recovery, completion committed with its reply withheld, and live A-to-C leadership transfer. The same validation set passed repair-control 22 / 294, data-plane 4 / 40, control/TLS regressions, module compilation, layering, source hygiene, and diff checks.
+
+This is bounded `024` evidence, not general chaos, broad partition tolerance, rolling upgrade, dynamic membership, anti-entropy, rebalance, orphan cleanup, or production readiness. Prepared-artifact intents and orphan cleanup, rebalance, broad periodic anti-entropy, dynamic membership, erasure coding, multipart, and broader partition behavior remain separate future decisions. See link:../../adr/0029-consensus-owned-durable-repair-for-current-whole-object-generation.md[accepted ADR 0029]. The earlier architecture evidence was reviewed on 2026-07-13 against dirty working-tree base `3eb2a508317a`; the domain-expert wiki page `analyses/ep-10-fixed-cluster-durable-repair-and-orphan-cleanup-slice.md` remains research/recommendation input, not a requirement or implementation claim.
 
 === Quality Strategy
 
 - **Testability**: domain tested with pure JUnit (no Spring), integration tested with Cucumber BDD, targeted S3 compatibility verified with AWS CLI; the first AWS CLI object CRUD increment passes, but full S3 scenario parity remains open
-- **Simplicity and explicit backend selection**: single-node in-memory stores remain the default backend; Storage Engine is selected explicitly and must be verified separately
+- **Durable backend authority**: Storage Engine is the default and only supported single-node product backend; legacy in-memory adapters remain isolated behind the explicit `legacy-in-memory-test` profile and may be retired separately
 - **Traceability**: ADRs document every architectural decision, ARC42 provides full architecture documentation

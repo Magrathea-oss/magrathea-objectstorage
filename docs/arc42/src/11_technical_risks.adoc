@@ -3,17 +3,17 @@ ifndef::imagesdir[:imagesdir: ../images]
 [[section-technical-risks]]
 == Risks and Technical Debts
 
-Risk status is cross-referenced with the Enterprise Production Readiness Plan (`PLAN.md`, EP-0..EP-11) so that mitigation ownership stays traceable. No risk below is closed until the referenced EP phase is `@implemented-and-validated`.
+This chapter is the central mutable architecture risk and remediation-status source. `PLAN.md` may schedule work, and dated audits remain bounded evidence satellites, but neither supersedes the risk boundaries recorded here. An earlier EP capability status does not close a newly discovered cross-cutting quality risk; closure requires the specific semantic, load, leak, cancellation, and fault evidence named below.
 
 [cols="1,4,3,4,2",options="header"]
 |===
 |# |Risk |Impact |Mitigation |EP reference
 
 |1
-|**Bare local default backend is in-memory** — the unpackaged `single-node` profile's reactive in-memory repositories do not persist to disk. The Storage Engine backend (`storage-engine` profile) now durably persists object bytes/manifests/references AND (as of EP-2) the bucket registry, multipart upload state, and per-object/bucket configuration. Packaged JVM/native single-node containers activate `storage-engine` by default with packaged YAML catalogs.
-|Data loss on restart when operators bypass the packaged container defaults and run the bare local `single-node` profile
-|Keep the in-memory profile explicitly documented as development/test compatibility; require packaged single-node deployment paths to activate storage-engine and keep CI Docker readiness expecting configured catalogs
-|EP-2 (`@implemented-and-validated` for the declared storage-engine metadata durability scope; the in-memory profile remains explicitly exempt for dev/test compatibility)
+|**Single-node backend authority can regress from Storage Engine** — owner authority confirms the durable `storage-engine` backend for every single-node product runtime. The 2026-07-14 correction sets `spring.profiles.default=storage-engine`, resolves blank backend selection to Storage Engine, and isolates production in-memory adapters behind `legacy-in-memory-test`; packaged images already selected Storage Engine.
+|A future profile/configuration regression or unreconciled legacy test could silently reintroduce non-durable repositories and invalidate restart, integrity, capacity, and operability contracts.
+|Keep `REQ-PKG-005`, `DefaultBackendContextTest`, module-layering checks, and packaged runtime smoke mandatory. Reconcile or retire legacy `single-node-backend` feature text and test-local adapters so they no longer claim product authority.
+|EP-2 / EP-5 / KA-5 (`REQ-PKG-005` implemented and validated; legacy test-suite reconciliation remains)
 
 |2
 |**S3 semantic depth** — the in-scope route surface is mapped, but route count is not semantic completion. AWS CLI parity has improved for the canonical object CRUD subset and metadata durability, but full S3 scenario parity is incomplete.
@@ -22,16 +22,16 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |Ongoing (S3 API Semantic Completion Plan, `PLAN.md`)
 
 |3
-|**Streaming remains bounded to the validated preview envelope** — EP-3 removed full-object aggregation and introduced typed whole-object/dedup/EC artifacts; EP-6 now enforces and validates the 256 MiB object envelope under `-Xmx256m`.
-|Larger objects, higher concurrency, or changed limits may exceed the tested memory/latency envelope even though the streaming architecture remains bounded
-|Treat configured EP-6 bounds as preview safety limits; rerun capacity/load/soak evidence after raising them and reserve portable performance claims for KA-6
-|EP-3 and EP-6 (`@implemented-and-validated` for declared single-node scopes)
+|**Static review identifies cross-cutting streaming risks outside the previously validated Storage Engine pipeline slice** — the 2026-07-14 source audit found complete-payload aggregation in exact-SigV4 authentication and SSE-S3 PUT. It also found quadratic accumulation in a legacy in-memory adapter, but that adapter is not the owner-confirmed single-node product backend. Signed-body exposure arithmetic is configuration analysis, not a measured heap result or a failed semantic gate.
+|If reproduced in supported Storage Engine compositions, whole-body stages could cause OOM or long garbage-collection pauses before persistence; count-only `limitRate` cannot bound a cached whole-body element. Static inspection alone does not invalidate prior EP-3 evidence.
+|Execute P0 reproduction/containment and P1 end-to-end frame/byte-budget contracts against supported Storage Engine compositions; quarantine the legacy adapter separately; run P3 normal-path load/soak before broadening or downgrading completion language.
+|Reactive-streaming roadmap P0/P1/P3 (`implementation-informed`, needs semantic/load validation; owners: S3 security, storage pipeline, performance evidence)
 
 |4
-|**Security must be explicitly enabled** — EP-1 secured mode now proves SigV4, exact payload hashes, deny-by-default, explicit deny, PublicAccessBlock/public ACL denial, expected-owner mismatch, durable redacted tamper-evident audit, durable credentials/policies, and SSE-S3 encrypted-at-rest inspection through Spring Security Reactive plus WebTestClient/AWS CLI/component specs. The remaining risk is operational: the default profile is still anonymous/permit-all for trusted environments.
-|Deployments that forget `s3.security.enabled=true` still allow anonymous writes/reads
-|Document secured-mode deployment defaults and keep CI gates for EP-1 WebTestClient, AWS CLI/e2e, and backing-service specs
-|EP-1 (`@implemented-and-validated` for local built-in scope)
+|**Secured mode combines opt-in exposure with unbounded/blocking implementation paths** — EP-1 semantic evidence covers SigV4/policy/audit/SSE behavior for its declared local scope, but exact signed payloads and SSE-S3 PUT aggregate complete bodies. Credential/policy reload, audit-file scan/append/fsync, and encrypted inspection writes can execute synchronously on reactive security/request paths. The default profile also remains anonymous/permit-all for trusted environments.
+|A deployment can be anonymously exposed when security is omitted, or suffer OOM/event-loop starvation when secured behavior is enabled; semantic security success does not establish resource safety.
+|Retain existing semantic gates, make secured-mode activation explicit, reproduce and correct confirmed P0 streaming/bulkhead/cap risks, and require P3 secured-mode memory/thread/leak evidence before changing the security-readiness claim.
+|EP-1 semantic scope retained; resource-safety review P0/P3 (`implementation-informed`, needs validation; owners: security and operations)
 
 |5
 |**Space management remains single-node scoped** — typed GC, dedup reachability, quotas, ENOSPC mapping, and transform-aware scrubbing are implemented, but quota coordination and reclamation are not distributed.
@@ -52,7 +52,7 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |EP-6 (`@implemented-and-validated` safety envelope; KA-6 remains pending)
 
 |8
-|**Distributed evidence is limited to fixed A/B/C and bounded repair** — real consensus, whole-object `N=3/W=2` replication, failover/restart, and current-generation repair are validated only for `001..005/008..013/019..023/025/026`; `014/017/024` are partial, while multipart/conditional/versioned/EC transfer, dynamic membership, broad anti-entropy/rebalance/cleanup, and broader partitions remain absent or unvalidated.
+|**Distributed evidence is limited to fixed A/B/C and bounded repair** — real consensus, whole-object `N=3/W=2` replication, failover/restart, and current-generation repair are validated only for `001..005/008..013/019..026`, including bounded `024`; `014/017` remain partial, while multipart/conditional/versioned/EC transfer, dynamic membership, broad anti-entropy/rebalance/cleanup, general chaos, rolling upgrades, and broader partitions remain absent or unvalidated.
 |Consumers may overgeneralize one-coordinator-stop or bounded repair evidence into HA, broad S3 clustering, broad healing, or distributed production readiness.
 |Keep EP-10 `@partial`; name the exact validated and partial requirement boundaries and prohibit broader claims until each later capability has semantic and fault evidence.
 |EP-10 (`@partial`, bounded fixed-cluster repair validated; broader distributed readiness not claimed)
@@ -82,9 +82,9 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |EP-8 monitoring wiring (`@implemented-and-validated`); vulnerability assessment (`unknown/error`, `needs-review`)
 
 |13
-|**Apache Ratis proof is bounded** — the fixed three-voter lifecycle, persisted restart, consensus bucket/reference publication, control mTLS, and loss-of-control-quorum refusal are exercised. Membership change, rolling upgrade/leader-transfer behavior, snapshots under sustained load, asymmetric partitions, and operational resource limits remain unproven.
+|**Apache Ratis proof is bounded** — the fixed three-voter lifecycle, persisted restart, consensus bucket/reference publication, control mTLS, loss-of-control-quorum refusal, and one live A-to-C repair leadership transfer are exercised. Membership change, rolling upgrade, broader leadership lifecycle, snapshots under sustained load, asymmetric partitions, and operational resource limits remain unproven.
 |The bounded integration can still fail under lifecycle and network conditions outside the first slice.
-|Preserve the consensus adapter boundary; add focused membership, upgrade, snapshot/load, and partition fault matrices before extending the support claim.
+|Preserve the consensus adapter boundary; add focused membership, upgrade, broader leadership, snapshot/load, and partition fault matrices before extending the support claim.
 |EP-10 first slice (`implementation-informed`); wider Ratis lifecycle (`not implemented` / `needs-review`)
 
 |14
@@ -112,10 +112,10 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |EP-10 first slice (`implementation-informed`); dynamic membership (`not implemented`, `needs-review`)
 
 |18
-|**The manual Reactor/grpc-java bridge remains correctness-sensitive** — focused `REQ-CLUSTER-011/012` scenarios exercise 64 KiB frames, slow demand, finite bounds, cancellation, deadline, and cleanup, but wider workloads and repeated network faults are not covered.
-|Undiscovered demand bugs could still deadlock, buffer excessively, block event loops, leak resources, or mishandle terminal races outside the tested slice.
-|Keep the bridge infrastructure-only and every bound explicit; extend stress, repeated-fault, and long-duration evidence before raising payload/concurrency limits or broadening transfer semantics.
-|EP-10 first slice (`implementation-informed`; residual high risk)
+|**The manual Reactor/grpc-java bridge performs synchronous repair writes in the client receive callback** — existing `REQ-CLUSTER-011/012` evidence retains value for 64 KiB framing, manual demand, cancellation, and deadlines, but `GrpcReplicaClient.java:73-74` invokes `FileLocalArtifactStore` `FileChannel.write` synchronously before requesting the next frame.
+|Slow disks can block the gRPC callback/event-loop thread, delay cancellation/deadlines and unrelated calls, or create terminal races even though one-message demand bounds frame count.
+|Preserve manual one-message demand; hand each frame to a finite serialized per-transfer disk executor and request the next only after acceptance. Add saturation, repeated-fault, cancellation, and long-duration evidence before broadening transfer claims.
+|EP-10 first slice plus streaming roadmap P0/P3 (`implementation-informed`; residual high risk; owner: cluster data adapter)
 
 |19
 |**Pinned versions are bounded build evidence, not general compatibility or security evidence** — Ratis 3.2.2, grpc-java 1.82.2, and protobuf/protoc 3.25.8 resolve and pass focused lifecycle/TLS/persistence gates; Testcontainers 2.0.2 is pinned but not used by the real-process S3 acceptance gate.
@@ -132,7 +132,7 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |21
 |**Bounded repair can be overread as broad healing** — accepted ADR 0029 and the implementation restore one missing/corrupt target named by the current reference, but broad `REQ-CLUSTER-017` remains partial and does not include periodic anti-entropy, rebalance, or orphan cleanup.
 |Operators could treat a planner result or process-local scheduler as durable ownership, infer fleet-wide discovery/cleanup behavior, or mistake bounded repair for production readiness.
-|Keep consensus as job/lifecycle authority and scheduler signals message-free; report `019/020/021/022/023/025/026` separately from partial `017/024`; retain prepared-artifact intents, orphan cleanup, rebalance, broad anti-entropy, dynamic membership, EC, multipart, and partitions as explicit exclusions.
+|Keep consensus as job/lifecycle authority and scheduler signals message-free; report bounded implemented-and-validated `019..026`, including `024`, separately from partial broad `017`; retain prepared-artifact intents, orphan cleanup, rebalance, broad anti-entropy, dynamic membership, EC, multipart, and partitions as explicit exclusions.
 |EP-10 repair (`implementation-informed`, bounded); broad healing/cleanup (`partial/absent`; owners: cluster implementation and operations)
 
 |22
@@ -142,14 +142,105 @@ Risk status is cross-referenced with the Enterprise Production Readiness Plan (`
 |EP-10 `REQ-CLUSTER-020` (`implementation-informed`, high-impact ongoing contract risk; owners: S3/API and requirements)
 
 |23
-|**Repair lifecycle growth is not production-bounded and crash-side-effect evidence is incomplete** — version-2 migration and lifecycle restoration are validated, but jobs, attempts, dedup history, retry metadata, and terminal states enlarge snapshots, and the full seven-point real-filesystem/gRPC crash matrix was not executed.
-|Unbounded history could increase snapshot/recovery time; a side-effect crash outside covered combinations could delay or duplicate exact publication even though fencing protects lifecycle state.
-|Keep unknown-version fail-closed behavior and monotonic claim generation; complete the seven-point side-effect matrix before upgrading `REQ-CLUSTER-024`; measure snapshot growth before defining terminal-history retention/compaction and never silently discard dedup/fencing evidence.
-|EP-10 `REQ-CLUSTER-024` (`partial`, `needs-review`; owners: Ratis adapter, data plane, and operations)
+|**Repair lifecycle history growth is not production-bounded** — version-2 migration, interrupted snapshot installation recovery, and the bounded seven-point `REQ-CLUSTER-024` side-effect matrix are validated, but jobs, attempts, dedup history, retry metadata, and terminal states still enlarge snapshots.
+|Unbounded history could increase snapshot size, installation time, and restart/log-replay time even though object payloads remain outside consensus.
+|Keep unknown-version fail-closed behavior and monotonic claim generation; measure snapshot-history growth before defining terminal-history retention/compaction, establish operational limits, and never silently discard dedup/fencing evidence.
+|EP-10 bounded repair (`implementation-informed`; `needs-review`; owners: Ratis adapter and operations); `REQ-CLUSTER-024` is implemented-and-validated, but retention/compaction remains open
 
 |24
 |**Current-generation races and unavailable sources can leave repair blocked or unreachable exact bytes** — the reference can change during transfer, or every named source can be missing/corrupt/unavailable.
 |An old artifact might be durably published but non-authoritative, while endless retry or copying an unverified source would threaten integrity and capacity.
 |Retain implemented currentness checks before source selection, publication, and success; keep changed work terminal `OBSOLETE`, finite retries, visible `BLOCKED`, and integrity alerts. Never return/copy unverified bytes. Leave resulting unreachable artifacts in place until separately fenced orphan cleanup is decided.
 |EP-10 bounded repair (`implementation-informed`; owner: cluster application/operations); orphan cleanup (`absent/deferred`, separate ADR required)
+
+|25
+|**Pooled-buffer ownership is incomplete on rejection, ignored-body, and aggregate-repository paths** — the capacity filter does not explicitly release the over-limit buffer; `writeGetObjectResponse` ignores body buffers via `.then()` without an explicit contract; the in-memory repository reductions consume without explicit release.
+|Reference-count leaks or double-release fixes can exhaust direct memory and appear only under error/cancellation or pooled Netty integration, not ordinary heap tests.
+|Confirm ownership in supported Storage Engine compositions during P0, retain chunker discard controls, document every transfer/release, require normal-path paranoid pooled-buffer evidence in P3, and add injected-fault paths only in final P4. Do not claim an observed leak solely from static source.
+|Reactive-streaming roadmap P0/P1/P3/P4 (`implementation-informed` / `needs-review`; owners: S3 adapter and storage pipeline)
+
+|26
+|**Blocking filesystem/security/control-plane work crosses reactive or terminal callbacks** — credential/policy reload, audit scan/append/fsync, ACL files, encryption inspection copies, cancellation cleanup, and multipart temp deletion lack a complete finite bulkhead/lifecycle contract.
+|Event-loop starvation, unpredictable latency, delayed cancellation, unbounded executor queues, or silently abandoned cleanup can violate availability and durability assumptions.
+|Use lifecycle-owned immutable snapshots and finite role-specific executors with task/byte bounds, per-resource ordering, saturation outcomes, shutdown ownership, and cleanup evidence. Cap small policy bodies before decoding.
+|Reactive-streaming roadmap P0/P1/P3 (`implementation-informed`; owners: security, S3 metadata, storage lifecycle, operations)
+
+|27
+|**Dedup and erasure-coding bounds are technically finite but operationally unsafe/undefined** — dedup permits a 1 GiB window and copies it; EC can retain stripe, copy, data, and parity arrays with `k + m <= 32` and has no coupled byte/CPU budget.
+|Valid configuration can cause severe transient heap pressure or CPU starvation and undermine concurrency assumptions without ever violating a simple “bounded” assertion.
+|P1 freezes formula-based memory/CPU/scheduler limits; P2 lowers unsafe maxima and implements bounded/reusable streaming windows/shards; P3 validates configured worst cases and saturation.
+|Reactive-streaming roadmap P1/P2/P3 (`implementation-informed`; owners: storage policy/domain and pipeline infrastructure)
+
+|28
+|**Current pipeline-chaos mechanisms are fragmented and not replayable** — `FileSystemWriteFaultInjector`, its property implementation, `ReplicaTransferFaultPlan`, and `FaultInjectingStorageCluster`/`ChaosStrategy` use different contracts; broad strategies use unseeded percentages/random timing.
+|A regression can neither prove which semantic boundary fired nor reproduce the same decision under concurrency. Fault evidence can be overread while safety points remain unexercised.
+|Implement accepted ADR 0030 only in final P4, after the normal Storage Engine pipeline and P3 evidence gates are stable: one no-op-default transport-neutral port, versioned typed points/actions, stable operation/occurrence/offset/frame matching, finite fire/evidence budgets, dual non-production activation, fail-closed plans, and redacted typed outcomes. Keep probabilistic mode explicitly exploratory or retire it.
+|ADR 0030 / final roadmap P4 (`accepted target`; implementation and validation deferred until normal-path closure; owners: storage/cluster application and evidence)
+
+|29
+|**Application read representation and online-integrity scope remain ambiguous to consumers** — filesystem GET emits bounded 64 KiB arrays from one open/read, but `StorageContext` and `ReactiveStorageOrchestrator` expose `Flux<byte[]>`, and `streamFrom` does not compare payload checksum online.
+|Maintainers may apply a blanket array ban that breaks valid bounded frames, or may infer server-side online payload verification/preflight that the one-pass contract does not provide.
+|Preserve one-open/single-pass GET, migrate to a transport-neutral bounded-frame/DataBuffer contract in P1/P2, explicitly distinguish committed checksum/client validation from optional late-failure online verification and at-rest scrub, and validate open/read/subscription counts in P3.
+|Reactive-streaming roadmap P1/P2/P3 (`implementation-informed` limitation / contract change needs-review; owners: storage application, S3 API, requirements)
+
+|30
+|**Static audit counts can drift or be misclassified** — the dated audit now reproduces tracked Java, `byte[]`, `DataBuffer`, `collectList`, `join`, `block`, and `subscribe` counts, but the planner's broader filesystem/channel marker regex and machine-readable result set remain unavailable. Static occurrences are not automatically defects, and host `target/` output made the earlier 720-file total build-state-dependent rather than a source inventory.
+|Future readers could treat stale counts as current coverage, remove valid digest/frame/codecs, or close findings without reproducing the inventory and semantic evidence.
+|Keep counts only in the dated audit satellite, store reproducible P1 static checks plus narrow allow-lists, define the remaining filesystem marker set, rerun against the closure commit, and use semantic P3 gates rather than occurrence totals for completion.
+|Roadmap P1/P3 (`needs-review`; owners: architecture and build/evidence)
 |===
+
+[[reactive-streaming-remediation-roadmap]]
+=== Deferred Reactive-streaming Review and Final Pipeline-chaos Sequence
+
+[NOTE]
+====
+Status: *deferred / needs-validation*. EP-10 remains the active implementation phase; this source-review sequence does not replace or reprioritize the EP roadmap and does not revoke earlier scoped evidence. An item may enter active EP-10 work only when an EP-10 requirement directly needs it. Shared Cucumber requirements/specifications must be created or refreshed before corresponding implementation. The dated link:../audits/2026-07-14-reactive-streaming-and-pipeline-chaos-source-audit.adoc[source audit] owns point-in-time evidence; ADR 0030 chaos engineering remains final, after normal EP work.
+====
+
+When this deferred work is activated after EP-10 normal-path completion, its phases are sequential. It is not a new EP track. P0 may add conservative containment before ideal contracts, but no phase may broaden object sizes, concurrency, transform widths, fault actions, or support claims before its predecessor exit criteria pass.
+
+[cols="1,2,5,5,2",options="header"]
+|===
+|Phase |Purpose |Executable scope |Exit criteria |Status / review owners
+
+|P0
+|Reconcile and contain source-review risks against the supported backend
+|Treat Storage Engine as the only single-node product backend and preserve the validated default/profile correction. Reproduce each signed/SSE, ownership, blocking, cleanup, and gRPC callback finding in supported compositions before changing status; correct confirmed hazards conservatively. Reconcile or retire legacy in-memory test features/adapters. Add a small policy-document cap.
+|Prior EP evidence remains scoped and unchanged unless a semantic regression fails. The default and single-node runtime resolve to Storage Engine; no supported critical path retains a complete object or performs named blocking work on an event-loop/callback thread; buffers have explicit disposition; focused semantic regressions and initial leak/thread evidence pass before P1.
+|`actionable`, planned / needs-validation. Owners: bootstrap/backend composition, S3 security/adapter, storage filesystem, cluster data adapter.
+
+|P1
+|Establish enforceable streaming contracts and static architecture gates
+|Define a transport-neutral bounded payload/frame contract at application boundaries; inventory each representation and permit only bounded arrays/digests/capped control-plane codecs/generated protocol values. Publish formula-based byte budgets for ingress, prefetch, residuals, transforms, queues, executors, transport, retries, and concurrency. Define buffer ownership and blocking-boundary rules; add reproducible static checks/allow-lists. Run RefactorKit reference verification before quarantining/removing legacy full-array ports/adapters.
+|Every supported Storage Engine payload stage has a reviewed finite byte/task/CPU budget and ownership table; static gates run reproducibly with narrow allow-lists; `StorageContext` migration shape is approved; no proven-live API is removed; the dated inventory is rerun at the phase commit.
+|`planned / needs-validation`. Owners: architecture, storage/S3 application contracts, build/evidence; human review for bounds and compatibility.
+
+|P2
+|Stream transforms, deduplication, and erasure coding under explicit budgets
+|Correct only gaps confirmed against the Storage Engine product path. Replace array-wide SSE/transform contracts where required, reduce unsafe dedup maxima/copies, stream/reuse EC shards under coupled stripe/shard/in-flight budgets and a dedicated CPU scheduler, and migrate `Flux<byte[]>` application reads while retaining bounded 64 KiB filesystem reads and one-open/single-pass GET.
+|No supported transform aggregates a complete object; dedup and EC satisfy frozen memory/CPU formulas; saturation is typed/bounded; representation-specific checksums remain correct; every terminal path closes ownership; GET retains one subscription/open/read and truthful integrity semantics.
+|`planned / needs-validation`, begins after P1. Owners: storage transform/pipeline/application and S3 encryption.
+
+|P3
+|Gate the normal pipeline with semantic, load, leak, cancellation, and saturation evidence
+|Run shared Business Need scenarios through agreed WebTestClient/AWS CLI modes and Ability specifications for internal mechanisms. Add pinned-environment maximum-envelope load/soak, slow producer/consumer, scheduler saturation, paranoid pooled-buffer leak, cancellation/error/discard matrices, and one-open/read counters. Do not inject ADR 0030 chaos in this phase.
+|All P0-P2 requirements have exactly scoped declared/observed status; measured memory stays within the approved formula/baseline margin; zero leak reports and no blocking-thread violations occur; cancellation leaves no false acknowledgement or reachable partial artifact. Only then is the normal pipeline stable enough for chaos engineering.
+|`planned / needs-validation`. Owners: requirements, S3/storage/cluster validation, performance/evidence, operations review.
+
+|P4
+|Implement and validate deterministic typed pipeline chaos last
+|After P3 closure, write/refresh the shared chaos Gherkin and implement ADR 0030's no-op-default `StorageFaultInjectionPort`, canonical version-1 plans, stable coordinates, finite counters/evidence, dual non-production activation, fail-closed loading/redaction, and only the three initial corruption actions. Add replay/interleaving and `N=3/W=2` durable-ack/reference reconciliation.
+|Normal-path evidence is already green; no-op equivalence holds; malformed or production-active plans fail closed; traces replay deterministically; faulted replicas cannot acknowledge; no reference publishes below `W=2`; evidence is bounded and secret/payload-free.
+|`accepted target`, deliberately final; implementation and validation planned only after P3. Owners: storage/cluster application, infrastructure adapters, requirements/evidence.
+|===
+
+==== Closure rules
+
+- Static review does not revoke prior semantic evidence. P0 changes status only when a supported Storage Engine composition reproduces a regression or confirms a contract violation.
+- The owner-confirmed single-node/default backend is Storage Engine. Legacy in-memory adapters are test/retirement scope, not an alternate product backend.
+- P1 static counts cannot close a semantic risk; they prevent regression and define the finite budget that P3 must measure.
+- P2 must preserve the positive controls: no production `DataBufferUtils.join`/`block*`, one-open/single-pass GET, `DataBufferUtils.write` plus incremental digest/persisted verification, 64 KiB cluster frames, manual gRPC demand, dedicated executors, and chunker discard release.
+- P3 closes the normal path before any deterministic chaos implementation begins.
+- P4 deterministic hook evidence cannot substitute for realistic filesystem/network/process fault evidence, and exploratory random chaos cannot substitute for replay evidence.
+- A phase closes only on the exact implementation and validation evidence in its exit criteria. Unknown, skipped, stale, or runner-missing evidence remains `needs-validation`; no test result is inferred from this plan.

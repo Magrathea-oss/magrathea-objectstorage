@@ -119,7 +119,7 @@ Done: plugin/coverage-profile centralization, hygiene ignores, `wget` healthchec
 | Affected modules/files | Application/infrastructure module dependencies; Spring configuration; `scripts/check-module-layering.sh` |
 | Acceptance gates | No application→infrastructure dependency inversion; context tests prove backend selection; duplicate repository beans fail fast; package scanning covers intended beans |
 
-Done: layering guard wired into root `validate` (application modules cannot depend on infrastructure); explicit `objectstore`/`objectstorage` scan-root bridge; profile-guarded backend beans with conflict fail-fast; `DefaultBackendContextTest`/`StorageEngineBackendContextTest` cover selection. Remaining: no package rename (naming bridge stays); `bootstrap-application` still depends on many modules for assembly; guard is shell/POM based, no ArchUnit test.
+Done: layering guard wired into root `validate` (application modules cannot depend on infrastructure); explicit `objectstore`/`objectstorage` scan-root bridge; profile-guarded backend beans with conflict fail-fast. Owner correction on 2026-07-14 makes Storage Engine the default and only supported single-node product backend: `spring.profiles.default=storage-engine`, blank backend selection resolves to Storage Engine, production in-memory repositories require explicit `legacy-in-memory-test`, and `DefaultBackendContextTest` plus `REQ-PKG-005` validate default composition. Remaining: reconcile or retire legacy `single-node-backend` features/test-local adapters; no package rename (naming bridge stays); `bootstrap-application` still depends on many modules for assembly; guard is shell/POM based, no ArchUnit test.
 
 ### C. Domain quality
 
@@ -243,7 +243,7 @@ This section implements [ADR 0018](docs/adr/0018-course-correction-classify-s3-a
 
 | Priority | Correction focus | Status / gate |
 |---|---|---|
-| S3-P0 | Replace `111/111` claims with a semantic matrix; inventory all operations. | ✅ Closed 2026-07-11 by generated `docs/api-coverage.md` and `REQ-DOC-001`: 111 canonical official operations, 108 with mapped router handlers, 20 with explicit operation-linked `@implemented-and-validated` evidence, and 91 still ineligible for a 100% completion claim. |
+| S3-P0 | Replace `111/111` claims with a semantic matrix; inventory all operations. | ✅ Closed and reconciled 2026-07-14 against generated `docs/api-coverage.md` and `REQ-DOC-001`: 111 canonical official operations, 108 with mapped router handlers, 21 with explicit operation-linked `@implemented-and-validated` evidence, and 90 still ineligible for a 100% completion claim. |
 | S3-P1 | Object CRUD + bucket baseline against both backends. | ⚠️ First AWS CLI CRUD/bucket increments complete (CC-9); metadata/checksum/copy semantics, fuller list semantics, and storage-engine scenarios remain. |
 | S3-P2 | Multipart + object metadata/tagging/ACL persistence. | Open; multipart part persistence/assembly is EP-3. |
 | S3-P3 | Bucket configuration statefulness; versioning/delete markers. | Open. |
@@ -407,7 +407,7 @@ The product owner has decided the deployment target: a **real multi-node S3 clus
 | OWASP boundary | Current-revision Dependency-Check remains monitoring-only `unknown/error`: NVD HTTP 429 after 190,000/364,891 records, `scanStatus=error`, `clean=null`, 8 errors. There is no vulnerability-findings, clean-scan, zero-vulnerability, or remediation claim. |
 | CI and publication boundary | CI always validates the architecture contract and application evidence; scheduled/manual opt-in wiring runs image, hardening, OWASP, and supply-chain contract gates and retains success/error artifacts. The workflow performs no publication. |
 | Validation evidence | Architecture Cucumber: 13/13 expanded scenarios, 114 steps. Supply-chain Cucumber: 9/9 expanded scenarios, 103 steps. Appendix freshness and deterministic diff checks pass. |
-| Status | `@implemented-and-validated` for the bounded architecture/evidence wiring only. Every networked membership, consensus, quorum-transfer, topology-execution, failure, healing, rebalance, and other cluster runtime behavior remains `@absent` under EP-10. |
+| Status | `@implemented-and-validated` for the bounded architecture/evidence wiring only. EP-10 has since implemented a partial fixed-cluster runtime and bounded repair; broader membership, topology execution, healing, rebalance, and distributed production readiness remain outside EP-8 and retain their exact EP-10 statuses. |
 
 ### EP-9 — WebDAV API Adapter (FUTURE, OPTIONAL)
 
@@ -439,13 +439,25 @@ Owner rule (2026-07-02): the WebDAV adapter sets the pattern for optional facade
 |---|---|
 | Focus | Evolve from single instance to a real multi-node S3 cluster: turn the PA-6 modeled domain (`DistributedPlacementPlanner`, `QuorumPolicy`, `AntiEntropyPlanner`, `RebalancePlanner`, `DistributedReadinessReporter` — already unit-validated) into executed networked behavior: node membership + health, replica/EC-shard placement across failure domains, quorum writes/reads, manifest/metadata replication, anti-entropy healing execution, rebalance execution. |
 | Owner agents | `java-domain-coder` (consistency/placement semantics), `java-infra-coder` (gRPC transport, membership), `java-scaffolder` (modules/protobuf build), `java-tester` (multi-node Cucumber harness) |
-| Requirement feature file | `phase-ep10-s3-cluster.feature` |
+| Requirement feature files | `requirements/phase-ep10-three-node-s3-cluster.feature` and `specs/phase-ep10-three-node-cluster-mechanisms.feature` |
 | Key requirement IDs | REQ-CLUSTER-* (`Ability` for internals: membership, replication, quorum, healing, rebalance; `Business Need` for externally observable cluster behavior: S3 write on node A / read on node B, node-failure read availability) |
-| Validation modes | Multi-node e2e via docker-compose/Testcontainers (2–4 nodes) + AWS CLI against the cluster endpoint; fault-injection scenarios (node kill during PUT, quorum loss, partition) as Cucumber scenarios; INV-2 applies. |
-| Planned modules | PLANNED in the module map: `storage-engine-cluster-application` (ports: membership, replica transport, sync); `storage-engine-cluster-grpc-infrastructure` (internal gRPC transport adapters, protobuf contracts). |
+| Validation modes | Shared Java 21 real-process multi-node WebTestClient/AWS CLI runner for externally observable S3 behavior; focused real Ratis control/snapshot/mTLS and gRPC data-plane Ability runners; explicit interruption/fault matrices for each claimed boundary. Docker/Testcontainers may supplement but do not replace the observed real-process gates. |
+| Implemented modules | `cluster-protocol`, `storage-engine-cluster-application`, `cluster-control-ratis-infrastructure`, and `cluster-data-grpc-infrastructure`; all are included in JVM/native Docker reactor contexts. |
 | Prerequisites | EP-2 (durable metadata — replicating in-memory maps is meaningless), EP-3 (streaming), EP-1 (mTLS/identity for nodes), EP-8 ADR accepted. |
-| Acceptance gates | Cluster behavior proven only by multi-node e2e + fault-injection scenarios; no distributed claims beyond validated scope. |
-| Status | `@absent` |
+| Acceptance gates | Cluster behavior is proven only by the agreed multi-node and focused mechanism modes; no distributed claim broadens beyond explicit requirement status. The bounded `REQ-CLUSTER-024` gate requires all seven real-filesystem/gRPC interruption points, not only control-state simulation; the 2026-07-14 focused result meets that bounded gate without proving broader chaos or cluster readiness. |
+| Validation evidence | The historical 2026-07-13 repair-control result remains **22 scenarios / 210 steps**. On **2026-07-14**, focused `ReqCluster024CucumberTest` passed **7 / 168**; expanded repair-control passed **22 / 294**, data-plane passed **4 / 40**, and control/TLS regressions plus module compilation, layering, source hygiene, and diff checks passed. B alone was independently crashed/restarted with distinct PIDs and its original non-empty roots; A/C voters and source-C grpc-java remained in the parent Cucumber JVM. |
+| Status | `@partial` — fixed A/B/C baseline and bounded current-generation repair are validated. `REQ-CLUSTER-001..005`, `008..013`, and `019..026` are implemented-and-validated; `014/017` remain partial; `006/007/015/016/018` remain not implemented. EP-10 remains the active implementation phase. |
+
+EP-10 continuation is explicit and requirement-first:
+
+| Order | Next bounded slice | Current status / gate |
+|---|---|---|
+| **1** | Close `REQ-CLUSTER-014` architecture-boundary evidence | `@partial`; close the remaining boundary assertions without payloads in Ratis or a public cluster object API. |
+| **2** | Split `REQ-CLUSTER-017`: periodic discovery and anti-entropy | Planned requirement-first slice; define bounded behavior and observable outcomes before implementation. No implementation claim. |
+| **3** | Split `REQ-CLUSTER-017`: rebalance | Planned requirement-first slice; define placement-change authority, fencing, and evidence independently. No implementation claim. |
+| **4** | Split `REQ-CLUSTER-017`: prepared artifacts and orphan cleanup | Planned requirement-first slice; define reachability, retention, and deletion fences independently. No implementation claim; broad `017` remains partial. |
+| **5** | Later explicit requirements | `006/007/015/016/018` remain not implemented and require separate requirement-first slices. |
+| **Final, after normal EP work** | ADR 0030 deterministic chaos | Remains deferred final chaos work after normal Storage Engine and EP-10 path closure. |
 
 Inter-node transport — gRPC evaluation (input to the EP-8 ADR):
 
@@ -481,15 +493,15 @@ Owner rule (2026-07-02): any gRPC used by the SMB/VFS gateway follows the same r
 
 | Order | Phase | Priority | Status |
 |---|---|---|---|
-| 1 | EP-2 Metadata durability | Blocker | `@implemented-and-validated` for declared storage-engine scope (in-memory profile explicitly exempt) |
+| 1 | EP-2 Metadata durability | Blocker | `@implemented-and-validated` for declared Storage Engine scope; legacy in-memory tests are not a product backend |
 | 2 | EP-3 Reactive streaming completion | Blocker | `@implemented-and-validated` |
 | 3 | EP-1 Security & identity | Blocker | `@implemented-and-validated` — current S3 security slice plus built-in durable credential, policy, audit, and key-management services validated |
 | 4 | EP-4 Space management & data hygiene | High | `@implemented-and-validated` for declared single-node scope |
 | 5 | EP-5 Operability & delivery | High | `@implemented-and-validated` for the `0.1.0` single-node JVM preview |
 | 6 | EP-6 Performance & capacity | High | `@implemented-and-validated` for declared single-node envelope |
 | 7 | EP-7 Complete admin panel | High | `@partial` overall; `REQ-ADMIN-001..037` bounded scope implemented and validated, credential/tenant administration and real report providers absent |
-| 8 | EP-8 HA decision & supply chain | Medium | `@implemented-and-validated` for bounded architecture/evidence wiring only; cluster runtime absent |
-| 9 | EP-10 S3 cluster (multi-node; after the EP-8 ADR is accepted) | High | `@absent` |
+| 8 | EP-8 HA decision & supply chain | Medium | `@implemented-and-validated` for bounded architecture/evidence wiring only |
+| **9 — active** | **EP-10 S3 cluster** | **High** | **`@partial`; resume with `REQ-CLUSTER-014` boundary closure, then separately requirement-first `017` slices and explicit later requirements** |
 | 10 | EP-11 SMB gateway (optional; after EP-1 and EP-3; independent of EP-10) | Future | `@absent` |
 | 11 | EP-9 WebDAV adapter (optional; any time after EP-1 and EP-3) | Future | `@absent` |
 
@@ -504,7 +516,7 @@ EP-0 governance applies continuously from the start.
 - [x] EP-5: declared `0.1.0` single-node JVM preview CI pipeline is green on the full gate + appendix/API/source checks + Docker replacement/local-publication rehearsals; offline backup/restore, SIGTERM shutdown validation covers committed state plus single PutObject, multipart UploadPart, CompleteMultipartUpload, cancelled-and-aborted UploadPart cleanup, abort-wins overlapping multipart completion, two-request concurrent PutObject streams, and a bounded five-request mixed read/write load, first single-node DR RTO/RPO rehearsal, object-manifest, multipart-session, bucket-registry, object-configuration, object-reference, object-ACL, and bucket-capacity-ledger schema-versioning, first SLO/alerting rule bundle, and live Prometheus-to-Alertmanager webhook delivery exist; online/multi-node DR is assigned to EP-10, sustained/production-scale load and repeated contention to EP-6, live Loki/external paging to deployment integration, and schema contracts remain mandatory for any future durable metadata family.
 - [x] EP-6: enforced preview limits plus deterministic 45-second load and 15-minute soak are documented and reproducibly validated under `-Xmx256m`; evidence is explicitly not production sizing or competitive benchmarking.
 - [ ] EP-7: complete admin panel delivered and validated; panel is not an alternate object API.
-- [x] EP-8: ADR 0027 accepted for architecture only; reproducible SBOM/license/image-hardening/monitoring evidence and CI wiring validated without publication. OWASP vulnerability status remains unknown/error, and all cluster runtime behavior remains EP-10 `@absent`.
+- [x] EP-8: ADR 0027 accepted for architecture only; reproducible SBOM/license/image-hardening/monitoring evidence and CI wiring validated without publication. OWASP vulnerability status remains unknown/error. EP-10 runtime status is independently `@partial` and does not broaden EP-8 evidence.
 - [ ] EP-9 (optional): WebDAV adapter, if built, meets all binding constraints.
 - [ ] EP-10: cluster behavior (membership, quorum, failover, healing, rebalance) validated by multi-node e2e scenarios; no distributed claims beyond validated scope.
 - [ ] EP-11 (optional): SMB gateway, if built, meets all binding constraints including the internal-only gateway rule.
@@ -526,7 +538,7 @@ Market-window note (factual): MinIO removed features from its community console,
 | Expected outputs | MIT `LICENSE` file at the repository root; licensing ADR recording the owner decision; `docs/positioning.md` naming the four differentiators (YAML policy-driven storage classes, complete admin panel, WebDAV+SMB gateway combination, executable Gherkin requirements as living compliance evidence) vs MinIO/Ceph RGW/Garage/SeaweedFS plus the government/military positioning (self-contained, air-gapped, legacy protocol paths, PKI-suite integration); public roadmap derived from this plan. |
 | Acceptance gates | `LICENSE` present (closes the Section G stale link); ADR accepted; positioning stays factual — no FUD; roadmap makes no claims beyond this plan's honest statuses. |
 | Prerequisites | None — immediate. |
-| Status | `@partial` — MIT `LICENSE` at the repository root and licensing ADR (`docs/adr/0019-adopt-the-mit-license.md`, Accepted) delivered 2026-07-03; `docs/positioning.md` and `docs/roadmap.md` published 2026-07-03. |
+| Status | `@implemented-and-validated` for the declared documentation/governance scope — MIT `LICENSE`, accepted licensing ADR 0019, factual `docs/positioning.md`, and public `docs/roadmap.md` are present; links and status framing were reconciled on 2026-07-14. |
 
 ### KA-2 — Ecosystem Conformance
 
@@ -577,7 +589,7 @@ Market-window note (factual): MinIO removed features from its community console,
 | Key requirement IDs | REQ-PKG-* |
 | Acceptance gates | Self-contained artifact built by Maven and installable air-gapped; built-in admin-panel metrics view precedes external dashboards; CLI and Helm/operator items stay decision-gated backlog until demand evidence exists. |
 | Prerequisites | EP-5 (CI); the single-binary ADR can start earlier. |
-| Status | `@partial` for KA-5 overall. Native-image/Alpine packaging slice is `@implemented-and-validated` on 2026-07-10: `bootstrap-application` has Maven profiles `native` and `native-musl`, and `Dockerfile.native` builds a JVM-free Alpine runtime image while preserving Docker-driven docs/UI regeneration. Root JVM Docker packaging is also validated: the Dockerfile uses public ECR mirrored Maven/Temurin bases, copies the full `scripts/` gate set, avoids Maven fail-never mode, creates a writable `/app/data` owned by the non-root `magrathea` user, packages storage-engine YAML catalogs under `/app/config`, activates `storage-engine` for packaged single-node containers, exposes S3/Admin ports, and defines an Admin healthcheck. Validation: local toolchain aligned to Oracle GraalVM 25 native-image because Spring Boot 4 rejects Java 21 native images at startup; `mvn -Pnative -pl bootstrap-application -am -DskipTests native:compile` succeeds; `docker build --network=host -f Dockerfile.native -t magrathea-objectstorage:native .` succeeds; `docker build --network=host -f Dockerfile -t magrathea-objectstorage:jvm .` succeeds; both container paths have no Spring Security generated-password banner in build/runtime logs; root JVM runtime smoke validates `/admin/health`, `/admin/live`, `/admin/ready` ready status, selected storage-engine backend log, S3 ListBuckets XML, and bucket/object PUT/GET. Remaining KA-5 backlog: broader air-gapped install bundle, dashboards, own CLI, and Helm/operator decision-gated items. |
+| Status | `@partial` for KA-5 overall. Native-image/Alpine and root JVM Docker packaging slices are validated as previously recorded. `REQ-PKG-005` now also validates that bare and packaged single-node product runtimes share Storage Engine authority: bootstrap defaults to `storage-engine`, blank backend selection resolves to Storage Engine, and legacy in-memory repositories are isolated behind `legacy-in-memory-test`. The 2026-07-14 Docker context correction includes all 17 reactor modules; full JVM image build/runtime smoke and native reactor/deterministic packaging pass, while full native-image recompilation was not rerun for that context-only correction. Remaining KA-5 backlog: broader air-gapped install bundle, dashboards, own CLI, and Helm/operator decision-gated items. |
 
 ### KA-6 — Public Proof
 
@@ -595,14 +607,14 @@ Market-window note (factual): MinIO removed features from its community console,
 
 | Order | Phase | Start condition | Status |
 |---|---|---|---|
-| 1 | KA-1 Positioning & licensing | Immediate | `@partial` (LICENSE + ADR done 2026-07-03; positioning/roadmap published 2026-07-03) |
+| 1 | KA-1 Positioning & licensing | Immediate | `@implemented-and-validated` for the declared documentation/governance scope |
 | 2 | KA-2 Ecosystem conformance | After minimal EP-1 (SigV4) | `@absent` |
 | 3 | KA-3 Data-lake readiness & S3 Tables | After EP-1 + EP-3 | `@absent` |
 | 4 | KA-4 Eventing, tiering, multi-site, federation | After EP-1/EP-2/EP-4; multi-site after EP-10 | `@absent` |
 | 5 | KA-5 Distribution | After EP-5 (single-binary ADR may start earlier) | `@partial` (native/Alpine and root JVM Docker slices validated; broader air-gap/dashboard/CLI/Helm backlog remains) |
 | 6 | KA-6 Public proof | Last; after EP-6 + KA-2 | `@absent` |
 
-### Definition of Killer App (checklist — all unchecked)
+### Definition of Killer App (KA-1 complete; product capability criteria remain open)
 
 - [x] KA-1: MIT `LICENSE` and positioning published. (LICENSE + licensing ADR done 2026-07-03; positioning.md and roadmap.md published 2026-07-03.)
 - [ ] KA-2: s3-tests pass-rate published with honest known-failures.

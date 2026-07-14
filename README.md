@@ -6,7 +6,7 @@
 
 **Magrathea ObjectStore** is an AWS S3-compatible object store built with Spring Boot 4 WebFlux and Java 21. The public object API is the S3 REST API exposed by the pluggable `s3-reactive-api-adapter` module. In addition, `admin-api-adapter` exposes `/admin/**` endpoints for storage policy, device, and configuration management — these are internal/administrative APIs, separate from the S3 object API.
 
-> **Current cluster status:** EP-10 is **partial**. Fixed A/B/C consensus publication/failover and bounded current-generation whole-object repair are implemented and validated for `REQ-CLUSTER-001..005`, `008..013`, `019/020/021/022/023/025/026`. `REQ-CLUSTER-014`, broad healing `017`, and crash matrix `024` remain partial; the full seven-point real-filesystem/gRPC repair crash matrix, broad periodic anti-entropy, rebalance, orphan cleanup, multipart/conditional/versioned/EC transfer, dynamic membership, and broader partitions remain absent or unvalidated. No production-readiness or general distributed-support claim is made.
+> **Current cluster status:** EP-10 is **partial**. Fixed A/B/C consensus publication/failover and bounded current-generation whole-object repair are implemented and validated for `REQ-CLUSTER-001..005`, `008..013`, and `019..026`, including the seven-point real-filesystem/gRPC interruption scope in `024`. `REQ-CLUSTER-014` and broad healing `017` remain partial; `006/007/015/016/018` remain not implemented. General chaos, broad partition tolerance, rolling upgrade, dynamic membership, periodic anti-entropy, rebalance, orphan cleanup, broader transfer semantics, and production readiness remain outside the validated scope.
 
 **Architecture:** [ARC42 entry point](docs/arc42/arc42-template.adoc) · [C4 model](docs/c4/README.md) · [Executable requirements appendix](docs/arc42/generated/gherkin-requirements.adoc) · [Focused evidence](docs/test-report.md)
 
@@ -31,7 +31,7 @@
 - **Jackson 3 XML** — `tools.jackson.dataformat:jackson-dataformat-xml` with custom WebFlux encoder
 - **Pure domain** — no Spring, no JPA, no reactive types in `object-store-domain`
 - **In-memory infrastructure** — reactive in-memory bucket, object, and multipart repositories
-- **Testing** — JUnit, Cucumber, targeted AWS CLI compatibility; the Java 21 EP-10 real-process gate passes 14 scenarios / 188 steps for `001..005/019/020` (repair-only `019/020`: 4 / 80), repair control passes 22 / 210 for `021..026`, and data-plane regression passes, but full S3 and cluster capability parity is not complete; **JaCoCo is the current coverage baseline** (Clover/OpenClover is optional/legacy)
+- **Testing** — JUnit, Cucumber, targeted AWS CLI compatibility; the Java 21 EP-10 shared real-process gate passes 14 scenarios / 188 steps for `001..005/019/020` (repair-only `019/020`: 4 / 80). The 2026-07-14 focused `024` gate passes 7 / 168, repair control passes 22 / 294, and data-plane regression passes 4 / 40; full S3 and cluster capability parity is not complete. **JaCoCo is the current coverage baseline** (Clover/OpenClover is optional/legacy)
 
 ---
 
@@ -61,11 +61,11 @@ The Object Store repository implementations are selected by profile:
 
 | Profile | Backend | Module |
 |---|---|---|
-| `single-node` (default for unpackaged/dev runs) | In-memory repositories | `object-store-reactive-infrastructure` |
-| `storage-engine` | Single-node Storage Engine filesystem backend | `object-store-reactive-repository-storage-engine-infrastructure` |
+| `storage-engine` | **Default and only supported single-node product backend** | `object-store-reactive-repository-storage-engine-infrastructure` |
 | `storage-engine,cluster` | Bounded fixed A/B/C consensus and whole-object backend | Storage Engine adapter plus the four cluster modules above |
+| `legacy-in-memory-test` | Explicit test-only in-memory adapters; unsupported as a product backend and eligible for retirement | `object-store-reactive-infrastructure` |
 
-The packaged JVM and native container images activate `storage-engine` by default even for single-node deployments, and package the YAML storage-policy/device/disk-set catalogs under `/app/config`. They do not activate the cluster profile by default. The bare Spring Boot default remains `single-node` for development/test compatibility. The `cluster` profile is limited to the fixed first slice and requires explicit node/root/address/mTLS configuration; unsupported cluster operations fail rather than falling back to single-node semantics.
+The packaged JVM and native container images activate `storage-engine` by default and package the YAML storage-policy/device/disk-set catalogs under `/app/config`. Bare and packaged single-node product runs share the same Storage Engine default; blank backend selection also resolves to Storage Engine. Containers do not activate the cluster profile by default. The `cluster` profile is limited to the fixed first slice and requires explicit node/root/address/mTLS configuration; unsupported cluster operations fail rather than falling back to single-node semantics.
 The ACL translation layer lives in `object-store-reactive-repository-storage-engine-infrastructure`,
 which translates Object Store concepts into Storage Engine commands and delegates persistence
 to the Storage Engine bounded context.

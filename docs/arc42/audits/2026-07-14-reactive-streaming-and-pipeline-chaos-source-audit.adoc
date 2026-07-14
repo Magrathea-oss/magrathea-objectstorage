@@ -1,0 +1,332 @@
+= Reactive-Streaming and Deterministic Pipeline-Chaos Source Audit
+:toc:
+:toclevels: 3
+
+[NOTE]
+====
+*Status:* `implementation-informed`, point-in-time source audit; remediation is `planned / needs-validation`.
+
+*Reviewed:* 2026-07-14 against repository commit `2fa762c79e561dfae288836ae2c91ed005956fe6`.
+
+*Authority boundary:* this dated document is a bounded evidence satellite. The mutable architecture narrative and implementation status remain in link:../src/08_concepts.adoc#concept-reactive-payload-pipeline[ARC42 section 8], link:../src/10_quality_requirements.adoc#quality-reactive-pipeline[section 10], and link:../src/11_technical_risks.adoc#reactive-streaming-remediation-roadmap[section 11]. The deterministic fault-injection decision is link:../../adr/0030-deterministic-storage-pipeline-fault-injection.md[ADR 0030]. This audit is not a requirement, test result, or completion claim. Owner clarification on 2026-07-14 establishes Storage Engine as the default and only supported single-node product backend; source annotations at the reviewed commit that bound in-memory repositories to `single-node`/`default` were configuration contradictions, not product authority. The follow-up correction defaults bootstrap/backend status to Storage Engine, isolates those adapters behind `legacy-in-memory-test`, and validates `REQ-PKG-005`. ADR 0030 chaos engineering is sequenced last, after normal-path closure.
+====
+
+== Purpose and evidence boundary
+
+This audit records the source evidence used to shape the repository-wide reactive-streaming and deterministic pipeline-chaos roadmap. It distinguishes static occurrences from defects, preserves positive controls, and names exact remediation targets without claiming that implementation or validation already exists.
+
+The planner supplied the repository-wide inventory and severity ranking. This documentation slice spot-checked the named production ranges at the reviewed commit. Final documentation validation reproduced the tracked Java and production-marker counts below directly from Git; the planner's broader filesystem/channel marker definition and machine-readable result set were not supplied and remain reproducible-input debt. Line numbers are stable only for the reviewed commit.
+
+No Maven, Cucumber, WebTestClient, AWS CLI, load, leak-detection, cancellation, multi-node, or chaos-replay run was performed for this audit. Configuration arithmetic below is exposure analysis, not observed heap usage. A source occurrence can be safe, bounded, generated, control-plane-only, or unreachable; counts alone never establish a defect.
+
+== Inventory
+
+The reproducible source scope is the tracked repository, not host build output:
+
+[source,bash]
+----
+git ls-files '*.java' | wc -l
+git ls-files '*/src/main/**/*.java' | wc -l
+git ls-files '*/src/test/**/*.java' | wc -l
+mapfile -t MAIN_JAVA < <(git ls-files '*/src/main/**/*.java')
+rg -o -F 'byte[]' "${MAIN_JAVA[@]}" | wc -l
+rg -l -F 'byte[]' "${MAIN_JAVA[@]}" | wc -l
+rg -o '\bDataBuffer\b' "${MAIN_JAVA[@]}" | wc -l
+rg -l '\bDataBuffer\b' "${MAIN_JAVA[@]}" | wc -l
+rg -o '\.collectList\(\)' "${MAIN_JAVA[@]}" | wc -l
+rg -l '\.collectList\(\)' "${MAIN_JAVA[@]}" | wc -l
+rg -o 'DataBufferUtils\.join\(' "${MAIN_JAVA[@]}" | wc -l
+rg -o '\.(block|blockFirst|blockLast)\(' "${MAIN_JAVA[@]}" | wc -l
+rg -o '\.subscribe\(' "${MAIN_JAVA[@]}" | wc -l
+rg -l '\.subscribe\(' "${MAIN_JAVA[@]}" | wc -l
+----
+
+[cols="3,1,1,5",options="header"]
+|===
+|Static marker |Occurrences |Files |Interpretation boundary
+
+|Tracked Java inventory
+|703 files: 472 production main and 231 test
+|17 Maven reactor modules; 15 currently contain tracked main Java
+|Git-tracked source scope at the reviewed commit. Host `target/` output is excluded; a build-state-dependent `find` included 17 generated Java files and produced the earlier planner total of 720. Generated outputs and test fixtures are not production implementation defects.
+
+|`byte[]` declarations/usages in production main sources
+|180
+|46
+|Requires classification by representation and bound. Cryptographic digests, control-plane codecs, generated protobuf arrays, and bounded 64 KiB frames are not payload-streaming violations merely because they use arrays.
+
+|`DataBuffer` references in production main sources
+|119
+|26
+|Presence does not prove streaming, ownership correctness, or a byte budget.
+
+|Filesystem/channel markers in production main sources
+|286
+|39
+|Planner-reported marker set; its exact regex/result set was not supplied and is not presented as reproducible by the commands above. Presence does not prove reactive-thread blocking; call site, deferral, scheduler, queue, and lifecycle ownership determine the risk.
+
+|`collectList()`
+|16
+|14
+|Each call needs payload-versus-control-plane review. Two critical payload aggregations are identified below; the count is not sixteen defects.
+
+|`DataBufferUtils.join(...)`
+|0
+|0
+|Positive static control at the reviewed commit; not a whole-path streaming proof.
+
+|`.block()`, `.blockFirst()`, `.blockLast()`
+|0
+|0
+|Positive static control at the reviewed commit; synchronous work can still block without these calls.
+
+|Explicit `.subscribe(...)`
+|2
+|2
+|Located in `ClusterRepairScheduler.java:96` and `FileSystemRecoveryScanner.java:389`. These lifecycle-root subscriptions require an explicit ownership allow-list; their presence alone is not classified as a defect.
+|===
+
+== Severity-ranked findings
+
+=== F-01 — Signed secured payloads are fully aggregated
+
+*Severity:* *CRITICAL* +
+*Status:* `implementation-informed`; P0 remediation `planned / needs-validation`.
+
+*Source evidence:*
+
+- `s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/security/S3SigV4ServerAuthenticationConverter.java:95-107` collects every request `DataBuffer`, copies chunks into `ByteArrayOutputStream`, releases each consumed buffer, and returns one whole-body `byte[]`. Lines `46-61` calculate the hash and retain that array as an exchange attribute.
+- `s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/security/S3AuthenticatedRequestDecorationWebFilter.java:32-45` wraps the cached whole-body array as one replay buffer.
+- `s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/capacity/S3CapacityProperties.java:10-16` defaults to a 256 MiB single-PUT cap and sixteen concurrent requests; `S3CapacityWebFilter.java:42-43` allows the capacity filter to be disabled.
+- `s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/adapter/web/S3StreamingBody.java:21-33` limits element demand, not element bytes, and cannot bound one cached whole-body element.
+
+*Boundary:* `16 × 256 MiB = 4 GiB` is a configuration-derived concurrent retained-payload exposure before array growth/copy overhead, not a measured heap result. Capacity configuration can change, and not every request uses an exact signed payload hash. The converter does release the source buffers; the defect is whole-body retention/replay and the resulting invalid byte-boundedness claim, not an allegation that this exact loop leaks every buffer.
+
+*Required direction:* incrementally authenticate one subscription while preserving bounded replay/spooling semantics; make the secured-path byte and concurrency budget non-optional until that design exists. Do not treat count-only `limitRate` as a byte budget.
+
+=== F-02 — SSE-S3 aggregates PUT and performs blocking/copying work in the filter
+
+*Severity:* *CRITICAL* +
+*Status:* `implementation-informed`; P0/P2 remediation `planned / needs-validation`.
+
+*Source evidence:*
+
+- `s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/security/S3ServerSideEncryptionWebFilter.java:59-95` aggregates an entire PUT, passes whole-body plaintext to an array-based encryptor, retains the encrypted array for replay, and converts every GET buffer through an intermediate `byte[]` before decryption.
+- The same file at `112-127` synchronously creates directories and writes the encrypted inspection copy from the request flow.
+- The same file at `130-143` implements the PUT aggregation.
+
+*Boundary:* GET is copied per incoming buffer in this range; the audit does not claim that the entire GET is aggregated. PUT can hold plaintext, encrypted output, and aggregation/copy storage concurrently, but this audit did not measure the exact multiplier. The finding does not dispute the semantic SSE test history; it narrows the missing payload-streaming and blocking-thread qualities.
+
+*Required direction:* use framewise/incremental authenticated encryption with explicit representation checksums and ownership, stream any inspection output on a bounded blocking bulkhead, and retain no whole payload in a filter.
+
+=== F-03 — Legacy in-memory repository performs quadratic full-payload accumulation and is misbound to single-node/default
+
+*Severity:* *CRITICAL* +
+*Status:* `implementation-informed`; P0/P1 remediation `planned / needs-validation`.
+
+*Source evidence:*
+
+- `object-store-reactive-infrastructure/src/main/java/com/example/magrathea/reactive/infrastructure/adapter/persistence/InMemoryReactiveS3ObjectRepository.java:34-37` activates the repository under both `single-node` and `default` profiles.
+- The same file at `100-127` and `174-202` repeatedly allocates `acc.length + readableByteCount`, copies the complete accumulated prefix, and reads the next `DataBuffer` for two save variants.
+- Neither reduction range explicitly releases the consumed `DataBuffer`.
+
+*Boundary:* owner authority confirms this is not a supported single-node/default product backend. The reviewed `single-node`/`default` profile annotations and bootstrap default were corrected after the audit; the adapter now requires `legacy-in-memory-test`. Static source establishes allocation shape and missing explicit release only for this legacy adapter; it does not establish a Storage Engine production-path defect or an observed pooled-buffer leak.
+
+*Required direction:* default-backend isolation is complete under `REQ-PKG-005`. If the adapter remains for tests, hard-cap it and close ownership on success, error, cancellation, and discard; otherwise retire it.
+
+=== F-04 — Authentication, authorization, and audit perform blocking file I/O on reactive security paths
+
+*Severity:* *HIGH* +
+*Status:* `implementation-informed`; P0 remediation `planned / needs-validation`.
+
+*Source evidence:*
+
+- `s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/security/S3SigV4Verifier.java:79` resolves credentials synchronously per verification.
+- `S3CredentialStore.java:29-45,69-84` reloads configured/file credentials and opens/streams the credential file.
+- `S3SecurityAuthorizer.java:39-66` can request durable policy rules in both deny and allow branches; `DurableS3SecurityPolicyStore.java:21-31` opens and parses the policy file on each `rules()` call.
+- `S3ReactiveAuthorizationManager.java:30-60` invokes authorization and audit recording synchronously inside the reactive authorization chain.
+- `FileS3SecurityAuditSink.java:33-46,101-118` reads the complete audit file to find the previous hash, then opens, appends, and `force(true)` synchronously per event.
+
+*Boundary:* the files may be small in current fixtures, and synchronized methods serialize access; neither fact makes the calls non-blocking or bounds latency on a reactive security thread. This audit does not claim a measured event-loop stall duration.
+
+*Required direction:* publish immutable credential/policy snapshots from lifecycle-owned reloaders, and move serialized append/fsync and any reload work to finite dedicated executors with explicit saturation/failure policy and freshness evidence.
+
+=== F-05 — gRPC repair receive callback writes synchronously to disk
+
+*Severity:* *HIGH* +
+*Status:* `implementation-informed`; P0 remediation `planned / needs-validation`.
+
+*Source evidence:*
+
+- `cluster-data-grpc-infrastructure/src/main/java/com/example/magrathea/cluster/data/grpc/GrpcReplicaClient.java:73-74` disables automatic demand and calls `sink.accept(...)` directly in the response callback before requesting one more frame.
+- `cluster-data-grpc-infrastructure/src/main/java/com/example/magrathea/cluster/data/grpc/FileLocalArtifactStore.java:185-204` implements repair sink acceptance with synchronous `FileChannel.write` after bounds/offset checks; checksum update continues at line `211`.
+
+*Boundary:* manual one-message demand is a positive control and must be preserved. The issue is thread affinity: acceptance blocks the client callback/event-loop thread. The source proves the call chain, not observed disk latency.
+
+*Required direction:* hand each bounded frame to a finite, serialized per-transfer disk executor; request the next frame only after that executor has accepted/written the current frame. Preserve cancellation, offset order, checksum, deadline, and one-message demand.
+
+=== F-06 — Dedup permits an operationally unsafe one-gibibyte window
+
+*Severity:* *HIGH* +
+*Status:* `implementation-informed`; P1/P2 remediation `planned / needs-validation`.
+
+*Source evidence:*
+
+- `storage-engine-domain/src/main/java/com/example/magrathea/storageengine/domain/valueobject/DedupConfig.java:15-20` permits a chunk size up to 1,073,741,824 bytes.
+- `storage-engine-reactive-infrastructure/src/main/java/com/example/magrathea/storageengine/infrastructure/pipeline/FixedWindowDedupStep.java:116-155` allocates the complete configured window and uses `Arrays.copyOf(...)` for completed/final windows.
+
+*Boundary:* this aggregation is explicitly bounded and the default is 1 MiB; it is not mathematically unbounded. A permitted 1 GiB window plus copy is nevertheless outside a conservative payload-memory discipline and can defeat practical heap budgets.
+
+*Required direction:* set an operationally justified small maximum, account for the accumulator plus emitted copy in the byte budget, and reject unsafe configurations before payload processing.
+
+=== F-07 — Over-limit body path does not release the offending buffer
+
+*Severity:* *HIGH* +
+*Status:* `implementation-informed`; P0 remediation `planned / needs-validation`.
+
+*Source evidence:* `s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/capacity/S3CapacityWebFilter.java:91-103` owns the `DataBuffer` delivered to `handle`; when the cumulative byte count crosses the limit it emits an error without forwarding or explicitly releasing that offending buffer.
+
+*Boundary:* this is an ownership-path defect from static inspection. A runtime leak claim still requires pooled-buffer evidence because upstream/runtime discard behavior may vary; remediation must not rely on undocumented release behavior.
+
+*Required direction:* explicitly release the offending owned buffer and add discard/error/cancellation evidence under pooled buffers.
+
+=== F-08 — Cancellation/error cleanup can block terminal threads
+
+*Severity:* *MEDIUM-HIGH* +
+*Status:* `implementation-informed`; P0/P1 remediation `planned / needs-validation`.
+
+*Source evidence:*
+
+- `storage-engine-reactive-infrastructure/src/main/java/com/example/magrathea/storageengine/infrastructure/pipeline/FileSystemStorePort.java:175-205` can call synchronous uncommitted/final-file cleanup from `onErrorResume` and `doFinally`, including the cancellation path.
+- `s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/adapter/web/S3MultipartPartStore.java:64-69` calls synchronous temp deletion from error and terminal cancellation callbacks.
+
+*Boundary:* best-effort deletion does not establish a long stall in every filesystem. The architecture concern is that terminal callback thread affinity is unspecified and cleanup is lifecycle-significant.
+
+*Required direction:* preserve existing cancellation commit fencing, but enqueue idempotent cleanup on a lifecycle-owned bounded blocking scheduler and retain evidence until cleanup succeeds, is quarantined, or reaches a visible terminal failure.
+
+=== F-09 — ACL filesystem operations run inside reactive `flatMap` callbacks
+
+*Severity:* *MEDIUM-HIGH* +
+*Status:* `implementation-informed`; P0 remediation `planned / needs-validation`.
+
+*Source evidence:* `s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/adapter/web/S3ObjectMetadataHandler.java:46-80` calls `S3ObjectAclStore.find/save` inside reactive callbacks; `S3ObjectAclStore.java:37-75` synchronously creates directories and reads/writes `Properties` files.
+
+*Boundary:* this finding is about blocking placement, not ACL semantics or durability completeness.
+
+*Required direction:* expose an asynchronous ACL application port backed by a finite blocking bulkhead or a lifecycle-managed cache/store; do not wrap a blocking call in a reactive callback without isolation.
+
+=== F-10 — Bucket-policy body reduction has no explicit control-plane cap
+
+*Severity:* *MEDIUM* +
+*Status:* `implementation-informed`; P0 remediation `planned / needs-validation`.
+
+*Source evidence:* `s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/adapter/web/S3BucketConfigHandler.java:518-529` releases each buffer but reduces decoded text into an unbounded `StringBuilder`.
+
+*Boundary:* bucket policy is a small control-plane document rather than object payload. Whole-document decoding can be valid after a deliberately small byte cap; this is not a demand for streaming policy parsing.
+
+*Required direction:* enforce a small explicit byte limit before decoding/reduction and return the protocol-appropriate over-limit response.
+
+=== F-11 — `WriteGetObjectResponse` discards body buffers without an explicit release contract
+
+*Severity:* *MEDIUM* +
+*Status:* `needs-review`; P0 remediation `planned / needs-validation`.
+
+*Source evidence:* `s3-reactive-api-adapter/src/main/java/com/example/magrathea/s3api/adapter/web/S3ObjectOperationsHandler.java:516-528` consumes a body via `.then()` without a per-buffer release, forwarding contract, or `doOnDiscard` ownership rule.
+
+*Boundary:* framework/operator discard behavior must be verified for the concrete pooled implementation. The source is insufficient to claim an observed leak, but it is also insufficient to claim ownership closure.
+
+*Required direction:* define whether the route rejects, drains/releases, or semantically consumes the body, and validate success/error/cancellation with pooled buffers.
+
+=== F-12 — Erasure coding has a high transient heap multiplier
+
+*Severity:* *MEDIUM* +
+*Status:* `implementation-informed`; P1/P2 remediation `planned / needs-validation`.
+
+*Source evidence:*
+
+- `storage-engine-reactive-infrastructure/src/main/java/com/example/magrathea/storageengine/infrastructure/pipeline/FixedStripeErasureCodingStep.java:55-125` retains a full stripe, copies it, allocates every data shard, allocates every parity shard, and exposes those arrays until downstream consumption.
+- `storage-engine-domain/src/main/java/com/example/magrathea/storageengine/domain/valueobject/ErasureCodingConfig.java:3-14` permits `k + m <= 32` but defines no byte-budget coupling.
+
+*Boundary:* the implementation is stripe-bounded; the finding is transient amplification and CPU isolation, not unbounded whole-object aggregation. Exact peak retention depends on stripe/shard sizes and downstream demand and was not measured here.
+
+*Required direction:* define a formula-based stripe/shard byte budget, cap concurrency/prefetch, isolate encoding CPU from event-loop and filesystem executors, and stream/reuse bounded shards where safe.
+
+=== F-13 — Single-node read is bounded and single-pass, but online payload verification is not part of the stream contract
+
+*Severity:* *MEDIUM* architecture limitation +
+*Status:* `implementation-informed`, explicit limitation; any contract change is `planned / needs-review`.
+
+*Source evidence:*
+
+- `storage-engine-reactive-infrastructure/src/main/java/com/example/magrathea/storageengine/infrastructure/filesystem/FileSystemStorageNode.java:153-181` opens one input stream and emits bounded 64 KiB arrays under `Flux.using`; it does not aggregate the complete payload.
+- `storage-engine-reactive-application/src/main/java/com/example/magrathea/storageengine/application/pipeline/StorageContext.java:44` carries response content as `Optional<Flux<byte[]>>`.
+- `storage-engine-reactive-application/src/main/java/com/example/magrathea/storageengine/application/service/ReactiveStorageOrchestrator.java:179` exposes `Flux<byte[]>` from the application read contract.
+- `FileSystemStorageNode.streamFrom(...)` in the cited range does not calculate or compare the payload checksum while streaming; metadata checks are separate.
+
+*Boundary:* this is not a claim that EP-3 promised a full payload preflight. The established contract deliberately preserves one open/one payload read and avoids a second preflight read; committed checksum/ETag plus scrubbing address different integrity scopes. Bounded 64 KiB frames are not a payload-array violation.
+
+*Required direction:* retain one-open/single-pass GET. Make the online-integrity limitation explicit, migrate the transport-neutral application payload contract away from `Flux<byte[]>` without adding full aggregation, and decide separately whether incremental late-failure verification is worth the client-contract consequences.
+
+=== F-14 — Legacy full-array ports/adapters are removal candidates, not yet proven dead
+
+*Severity:* *LOW / cleanup* +
+*Status:* `needs-review`; P1 quarantine/removal `planned` after RefactorKit reference verification.
+
+*Candidate source types:*
+
+- `storage-engine-reactive-repository-application/src/main/java/com/example/magrathea/storageengine/application/port/DataTransformPort.java`
+- `storage-engine-reactive-repository-application/src/main/java/com/example/magrathea/storageengine/application/port/AlterationPort.java`
+- `storage-engine-reactive-repository-application/src/main/java/com/example/magrathea/storageengine/application/port/ChunkStorePort.java` (`store/read` array methods)
+- `storage-engine-reactive-infrastructure/src/main/java/com/example/magrathea/storageengine/infrastructure/filesystem/FileSystemDataTransformPort.java`
+- `storage-engine-reactive-infrastructure/src/main/java/com/example/magrathea/storageengine/infrastructure/filesystem/ZstdCompressionAdapter.java`
+- `storage-engine-reactive-infrastructure/src/main/java/com/example/magrathea/storageengine/infrastructure/filesystem/AesGcmEncryptionAdapter.java`
+- `storage-engine-reactive-infrastructure/src/main/java/com/example/magrathea/storageengine/infrastructure/filesystem/ReedSolomonECAdapter.java`
+- `storage-engine-reactive-infrastructure/src/main/java/com/example/magrathea/storageengine/infrastructure/chaos/FaultInjectingStorageCluster.java`
+
+*Boundary:* the planner audit reported these as apparently unreferenced by the current pipeline; this documentation slice did not run RefactorKit reference analysis and makes no safe-delete claim. `FaultInjectingStorageCluster` may also remain temporarily as explicitly exploratory scaffolding under ADR 0030.
+
+*Required direction:* verify definitions/references with RefactorKit, preserve required compatibility/migration evidence, then quarantine or safely remove only proven-dead full-array APIs. Do not include cryptographic digests, control-plane codecs, generated protobuf arrays, or bounded frames in a blanket `byte[]` ban.
+
+== Positive controls to preserve
+
+[cols="4,5",options="header"]
+|===
+|Control |Point-in-time source evidence and boundary
+
+|No production `DataBufferUtils.join` or Reactor `block*` calls
+|Planner inventory and a spot-check of production main sources found zero. Keep static guards, but do not infer absence of synchronous I/O from this alone.
+
+|Storage write pipeline accepts `Flux<DataBuffer>`
+|`StorageContext.java:30` and `ReactiveStorageOrchestrator.java:169`; preserve one subscription and explicit ownership while removing bypass aggregators.
+
+|Filesystem write streams and calculates incremental digest
+|`FileSystemStorePort.java:39,153-178,218-226` uses `DataBufferUtils.write`, incremental source digest, and a distinct persisted-byte verification. Preserve the distinction between source and persisted representations.
+
+|Cluster payload frames are bounded at 64 KiB
+|`GrpcReplicaServer.java:20,128` and `FileLocalArtifactStore.java:129,203`. Keep the bound while moving client repair writes off the callback thread.
+
+|gRPC server uses manual demand
+|`GrpcReplicaServer.java:72-76`; client receive also starts with one-message demand at `GrpcReplicaClient.java:73-74`. Preserve demand-after-acceptance semantics.
+
+|Cluster producer and server use dedicated platform executors
+|`GrpcReplicaClient.java:27,38` and `GrpcReplicaServer.java:46-54`. Preserve role isolation and add finite queue/saturation evidence; executor existence alone is not a complete bulkhead proof.
+
+|Current chunkers release consumed/discarded buffers
+|`FixedWindowDedupStep.java:81,124-143` and `FixedStripeErasureCodingStep.java:52,66-83` include discard release and `finally` release paths. Preserve them through P2 refactoring.
+
+|Single-node GET is bounded and one-open/single-pass
+|`FileSystemStorageNode.java:153-181` emits at most 64 KiB per array from one `Flux.using` resource. Preserve this while making the application contract and integrity limitation explicit.
+|===
+
+== Architecture implications
+
+The audit supports one coupled contract rather than independent local fixes:
+
+. Demand is element credit, not a byte budget; every payload representation needs a maximum element size plus finite prefetch, concurrency, queue, retry, and retained-residual counts.
+. Every pooled buffer has one current owner; every success, error, cancellation, discard, over-limit, and injected-fault path must transfer or release it exactly once.
+. Synchronous filesystem, crypto, policy reload, audit, and cleanup work belongs on finite role-specific bulkheads, never merely inside `Mono`/`Flux` syntax.
+. Source digest, transformed-representation digest, persisted-byte verification, published metadata, response-time verification, and at-rest scrub are distinct integrity claims.
+. Deterministic fault injection uses typed semantic points and stable operation coordinates under ADR 0030; fragmented percentage/random mechanisms cannot establish replayable evidence.
+. No fault may weaken `N=3/W=2`, create a false durable acknowledgement, publish a reference before quorum, put payload in Ratis, or make a partial artifact reachable.
+
+The deferred P0-P4 review sequence and exit criteria are maintained in link:../src/11_technical_risks.adoc#reactive-streaming-remediation-roadmap[ARC42 section 11]. It does not supersede active EP-10 implementation.

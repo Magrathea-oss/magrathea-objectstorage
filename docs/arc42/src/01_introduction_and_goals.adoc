@@ -5,14 +5,14 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 Magrathea ObjectStore implements an **AWS S3-compatible object storage** route surface built with Spring Boot 4 WebFlux and Java 21. It is evolving from a reference DDD/reactive implementation toward an enterprise-ready, market-leading S3-compatible object store (see `PLAN.md`, Enterprise Production Readiness Plan EP-0..EP-11 and Killer-App Track KA-1..KA-6).
 
-It provides an S3-compatible REST API for object CRUD, bucket configuration, and multipart upload, plus a separate internal/admin JSON API for operational configuration. Two persistence backends are selectable: an in-memory single-node backend (default) and a Storage Engine backend with filesystem-durable metadata and content. AWS CLI parity has improved for canonical object CRUD basics and metadata durability; full S3 scenario parity and production hardening (security, streaming completeness, space management, operability) are tracked as open Enterprise Production Readiness phases.
+It provides an S3-compatible REST API for object CRUD, bucket configuration, and multipart upload, plus a separate internal/admin JSON API for operational configuration. Storage Engine is the default and only supported single-node product backend, with filesystem-durable metadata and content. Legacy in-memory adapters are test/retirement scaffolding and must not be presented as a deployable single-node backend. AWS CLI parity has improved for canonical object CRUD basics and metadata durability; remaining semantic and production-hardening scope is tracked explicitly.
 
 === Goals
 
 * **S3 API compatibility**: map the in-scope AWS S3 REST API route surface and classify semantic implementation separately from route count.
 * **Reactive by design**: full WebFlux non-blocking I/O, `DataBuffer` streaming for binary content.
 * **Domain-Driven Design**: pure domain with zero framework dependencies, hexagonal architecture, explicit bounded contexts (Object Store, Storage Engine).
-* **Durability where selected**: the Storage Engine backend persists bucket registry, multipart upload state, per-object configuration, and bucket configuration families as crash-safe filesystem documents (temp-file + atomic-rename commits) that survive a full process restart.
+* **Durability by default**: the Storage Engine backend persists bucket registry, multipart upload state, per-object configuration, and bucket configuration families as crash-safe filesystem documents (temp-file + atomic-rename commits) that survive a full process restart.
 * **Testability**: domain/unit tests, WebTestClient Cucumber, targeted AWS CLI compatibility, explicit gap tags (`@implemented-and-validated`, `@implemented-not-e2e-validated`, `@partial`, `@config-only`, `@absent`, `@not-implemented`) when scenarios remain unsupported, and JaCoCo coverage reporting.
 * **Evidence-based completion**: every completion claim is backed by production code plus semantic tests; see `docs/test-report.md` for current validation evidence and the generated Gherkin requirements appendix for per-scenario status.
 

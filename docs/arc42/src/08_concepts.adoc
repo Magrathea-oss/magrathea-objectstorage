@@ -43,7 +43,7 @@ This concept does not extend single-node multipart/versioning/EC support into cl
 
 [NOTE]
 ====
-Status: *implementation-informed / bounded*. The concept applies only to a missing or corrupt target already named by the current consensus-committed `WHOLE_OBJECT` generation on fixed A/B/C. `REQ-CLUSTER-019/020/021/022/023/025/026` are implemented and validated; `REQ-CLUSTER-024` and broad `REQ-CLUSTER-017` remain partial.
+Status: *implementation-informed / bounded*. The concept applies only to a missing or corrupt target already named by the current consensus-committed `WHOLE_OBJECT` generation on fixed A/B/C. `REQ-CLUSTER-019..026`, including `024`, are implemented and validated; broad `REQ-CLUSTER-017` remains partial.
 ====
 
 ==== Planning, ownership, and execution
@@ -113,20 +113,90 @@ Known absence and discovered corruption have intentionally different request beh
 
 The implemented Ratis snapshot schema version 2 explicitly migrates reference-only version 1. Version 2 preserves existing membership/bucket/reference state plus every repair specification, lifecycle state, attempt/dedup history required for audit, owner/session/deadline, attempt number, claim generation, retry policy/eligibility, terminal reason, command timestamps, and last-applied term/index. Version 1 loads with an empty repair map and is written as version 2 at the next snapshot; unknown future versions fail closed. Object payloads and staging files are excluded.
 
-Snapshot/log replay and leader change preserve one logical job and its fences. Scheduler wake-up may reclaim only through a committed newer claim generation. `REQ-CLUSTER-026` validates migration/restoration, while `REQ-CLUSTER-024` remains partial: its seven interruption examples validate control persistence, fencing, and some scheduler reconciliation, but not the full real-filesystem and gRPC repair side effect at every crash point.
+Snapshot/log replay and leader change preserve one logical job and its fences. Scheduler wake-up may reclaim only through a committed newer claim generation. `REQ-CLUSTER-026` validates migration/restoration. On 2026-07-14, `REQ-CLUSTER-024` additionally passed all seven interruption examples with actual B-to-C grpc-java/mTLS reads, token-specific `FileLocalArtifactStore` staging/publication, filesystem byte/hash inspection, exact-target no-recopy reconciliation, stale-token fencing, interrupted version-2 snapshot installation recovered from the last valid snapshot plus log, committed completion with its reply withheld, and live A-to-C leadership transfer. B was independently crashed/restarted with distinct PIDs while retaining its original non-empty roots; A/C voters and source C remained in the parent Cucumber JVM. This is bounded repair evidence, not broad healing or general chaos.
 
 ==== Explicit deferrals
 
 Prepared-artifact intents, retirement tombstones, orphan cleanup, rebalance, broad periodic anti-entropy, adding an unacknowledged third placement, dynamic membership/node replacement, erasure coding, chunk repair, multipart, conditional/versioned operations, and broader/asymmetric partitions require separate requirements and decisions.
 
-=== Reactive Non-blocking I/O
+[[concept-reactive-payload-pipeline]]
+=== Repository-wide Reactive Payload Pipeline
 
-All HTTP request handling is reactive:
+[WARNING]
+====
+Status: *implementation-informed / non-conformant in identified paths*. The storage-engine write path has bounded streaming controls, but repository-wide payload streaming and non-blocking thread use are not established. The dated link:../audits/2026-07-14-reactive-streaming-and-pipeline-chaos-source-audit.adoc[source audit] is the bounded implementation-evidence satellite; this section is the central target contract and current status.
+====
 
-- RouterFunction instead of @Controller
-- Flux<DataBuffer> for binary upload/download (never byte[] in handlers)
-- Mono/Flux throughout the reactive application and infrastructure layers
-- Schedulers.boundedElastic() only for operations that consume the stream in memory
+The reactive contract couples demand, byte bounds, ownership, blocking isolation, integrity, and terminal cleanup. `request(n)` and `limitRate(n)` bound elements, not bytes. Every payload representation therefore needs a finite maximum frame size plus finite demand, prefetch, concurrency, queue, retry, and retained-residual counts. A whole request cached as one `DataBuffer` is one element and defeats count-only byte boundedness.
+
+The target payload discipline is:
+
+- HTTP and application payload paths carry bounded `Flux<DataBuffer>` or an equally explicit transport-neutral bounded-frame abstraction; they do not expose a complete payload as `byte[]`.
+- Full-payload `collectList`, array reduction, replay cache, or filter-level materialization is forbidden on payload-plane paths. Deliberately small control-plane documents may be materialized only behind an explicit byte cap.
+- Arrays remain valid for cryptographic digests, control-plane codecs, generated protobuf values, and bounded frames such as the current 64 KiB filesystem/gRPC blocks. A `byte[]` occurrence is not a defect without representation and bound analysis.
+- Each stage publishes a byte budget covering element size, upstream credit, operator prefetch, concurrent inner stages, scheduler queue, retained residual/composite state, transport in-flight frames, retries, and fault-induced queues.
+- The no-aggregation rule applies across authentication, encryption, default/development repositories, transforms, persistence, replica transfer, and response decoration; a streaming storage adapter cannot compensate for an earlier whole-body cache.
+
+At the 2026-07-14 review point, exact signed-payload authentication and SSE-S3 PUT contain complete-payload aggregation in source. Signed-body replay exposure is configuration arithmetic, not measured load evidence or a failed Storage Engine semantic gate; P0 must reproduce the risk in supported compositions before changing prior EP status. The in-memory repository also grows arrays by repeatedly copying the accumulated prefix, but owner authority confirms that Storage Engine is the single-node/default product backend. The in-memory adapter has now been isolated behind `legacy-in-memory-test`; it is not a production-default exception to EP-3 evidence and may be retired separately.
+
+The current single-node filesystem read remains a positive bounded control: `FileSystemStorageNode.streamFrom` opens once and emits at most 64 KiB per array without full aggregation. The application read contract nevertheless exposes `Flux<byte[]>` through `StorageContext` and `ReactiveStorageOrchestrator`; that boundary is planned for migration. Preserve one-open/single-pass GET while changing the contract.
+
+==== DataBuffer ownership and terminal behavior
+
+Every pooled `DataBuffer` has exactly one current owner. A stage must explicitly choose one disposition: transfer ownership downstream, consume and release, or retain with a corresponding later release. Success, error, cancellation, discard, over-limit rejection, ignored-body handling, and injected-fault paths must all terminate ownership exactly once.
+
+Current positive controls include `doOnDiscard(DataBuffer.class, DataBufferUtils::release)` and `finally` release paths in the fixed-window dedup and fixed-stripe EC steps. Current gaps include the over-limit branch in `S3CapacityWebFilter`, whole-array reductions in `InMemoryReactiveS3ObjectRepository`, and the unspecified ignored-body contract of `writeGetObjectResponse`. Runtime leak freedom remains `needs-validation`; static source inspection cannot prove pooled-buffer behavior.
+
+Cancellation is not rollback. Publication remains fenced against cancellation, while idempotent deletion/quarantine of unpublished state is lifecycle-owned asynchronous work. Filesystem cleanup must not run synchronously on an arbitrary Reactor terminal thread. Exactly one terminal outcome must stop demand/production, close channels, release owned/discarded buffers, prevent a false acknowledgement, and make unfinished cleanup visible.
+
+==== Blocking-work bulkheads
+
+Reactive syntax does not make synchronous work non-blocking. Credential/policy reload, tamper-evident audit append/fsync, ACL file access, encrypted inspection copies, filesystem cleanup, replica sink writes, and CPU-heavy transform/EC work must be deferred to finite role-specific executors or schedulers. Each bulkhead must define thread count, queue/task and queued-byte bounds, serialization key, saturation behavior, cancellation/lifecycle ownership, and evidence. `boundedElastic` or an executor name alone is not a complete bound.
+
+The current gRPC server manual demand and dedicated cluster producer/server platform executors are retained. The repair client currently writes each received frame synchronously from its gRPC callback. The planned correction preserves one-message demand, hands a frame to a bounded serialized disk executor, and requests the next frame only after local acceptance. Security file reload/audit and ACL operations similarly require lifecycle-owned snapshots or bounded blocking adapters rather than synchronous calls in reactive security/handler callbacks.
+
+==== Streaming integrity boundaries
+
+Integrity claims name the exact representation and boundary:
+
+- source-stream length/digest describes bytes observed during one subscription;
+- transform/ciphertext/shard digests describe their named output representation;
+- persisted-byte verification describes a complete reread of unpublished storage bytes;
+- committed metadata binds the published artifact to algorithm, representation, length, and digest;
+- response-time verification can fail only when mismatch becomes observable and may occur after response commitment; and
+- at-rest scrub detects later corruption and is not an every-GET preflight.
+
+`FileSystemStorePort` is a positive control: it streams with `DataBufferUtils.write`, calculates an incremental source digest, fsyncs the temporary artifact, and performs distinct persisted-byte verification before publication. Single-node GET deliberately remains one-open/single-pass and performs no complete payload preflight or second read. `FileSystemStorageNode.streamFrom` currently does not calculate/compare the payload checksum online; this is an explicit limitation, not a claim that EP-3 promised preflight. Any future incremental GET verification must preserve one pass and document the late-failure client contract.
+
+Dedup and EC are bounded but need operational budgets. A permitted 1 GiB dedup window plus copy is not an acceptable default production byte discipline even though it is finite. EC retains a stripe copy plus data/parity arrays and permits `k + m <= 32`; P2 must couple stripe size, shard count, downstream demand, and CPU concurrency to one explicit byte/CPU budget.
+
+[[concept-deterministic-storage-fault-injection]]
+=== Deterministic Storage-pipeline Fault Injection (ADR 0030)
+
+[NOTE]
+====
+Status: *accepted target architecture; planned / needs-validation*. No production implementation, Cucumber requirement, replay result, or fault-safety result is claimed. See link:../../adr/0030-deterministic-storage-pipeline-fault-injection.md[ADR 0030].
+====
+
+A transport-neutral application `StorageFaultInjectionPort` provides the sole deterministic decision boundary. Production composition uses a no-op default. The contract contains no `DataBuffer`, protobuf, gRPC, Ratis, `Path`, channel, HTTP, payload, key, credential, or secret type; owning adapters apply a typed decision to exclusively owned bytes or side effects.
+
+Plans use a versioned closed schema for semantic point, representation, selector, action, and outcome. Matching derives from stable plan/rule identity, operation identity, target, point, attempt/occurrence, absolute byte offset, and/or frame index. Every operation, evaluation, evidence, and fire count is finite. Unknown versions, stages, actions, combinations, selectors, or unbounded/overflowing parameters fail activation closed. Process-global randomness, percentages, and schedule-dependent shared seeded draws remain exploratory scaffolding and are not deterministic regression evidence.
+
+Version 1 initially permits only:
+
+- a bit flip after the selected source byte contributed to source checksum/length but before persistence or transform consumption;
+- corruption of one unpublished temporary-file byte after writing and before persisted-byte verification; and
+- mutation of one received replica-frame byte before sink digest/length update, staging, and verification.
+
+The typed catalog also defines before/after boundaries around checksum calculation, transforms, temp write, persisted verification, file and parent-directory fsync, atomic publication, replica send/receive/sink acceptance, durable-ack emission/acceptance, and Ratis reference proposal/commit. Catalog presence does not enable an action. Delay, cancellation, exception, short I/O, fsync failure, atomic-publication failure, acknowledgement failure, and Ratis failure remain deferred until a later contract version gives each finite, cancellation-aware, before/after semantics.
+
+Activation requires both an explicitly non-production fault-injection profile and a separate opt-in property. A production profile conflict, missing/mismatched node plan, malformed plan, or inability to retain required bounded evidence fails the experiment closed. Evidence includes schema/plan ID and hash, rule/decision ID, operation and opaque target identity, point, representation, occurrence/offset/frame, bounded fire count, fired/skipped reason, and typed outcome. It contains no payload excerpts, object keys, paths, headers, credentials, tokens, certificates, secrets, keys, or free-form exception messages.
+
+`FileSystemWriteFaultInjector`, `PropertyControlledFileSystemWriteFaultInjector`, `ReplicaTransferFaultPlan`, and the exploratory `FaultInjectingStorageCluster`/`ChaosStrategy` are planned to converge behind this port. No legacy mechanism may independently select or report a deterministic fault after migration.
+
+Faults never weaken the normal safety protocol: no degraded writes; fixed `N=3/W=2`; payload bytes outside Ratis; no durable acknowledgement for corrupt/unverified bytes; and no reference proposal before checksum-valid durable acknowledgements and current fencing/epoch checks. An injected terminal condition may leave only unreachable temporary or complete orphaned bytes allowed by the existing publication model; it must never expose a reachable partial artifact or manufacture a durable acknowledgement.
+
+This work is deferred behind active EP-10 normal-path completion and follows the P0-P4 sequence in link:11_technical_risks.adoc#reactive-streaming-remediation-roadmap[section 11] only when activated. It does not replace the EP roadmap. Deferred P0-P3 review supported normal Storage Engine paths; ADR 0030 chaos engineering begins only in final P4.
 
 === Domain Purity
 

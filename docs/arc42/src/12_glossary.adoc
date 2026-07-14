@@ -106,6 +106,33 @@ ifndef::imagesdir[:imagesdir: ../images]
 |S3ObjectContent
 |Domain interface: object read contract without reactive types
 
+|Bounded payload frame
+|One ordered payload element with an explicit maximum byte size and stable logical offset/sequence. Finite Reactive Streams demand bounds frame count only; a byte budget also needs the frame bound
+
+|Pipeline byte budget
+|Reviewed upper-bound formula covering frame size, demand/prefetch, concurrent stages, residual/cache state, queued tasks/bytes, transport/storage in-flight work, retries, and fault-induced retention for one configured concurrency envelope
+
+|DataBuffer ownership
+|Obligation for exactly one current owner to transfer, consume/release, or retain with a matched later release for every pooled buffer on success, error, cancellation, discard, rejection, ignored-body, and fault paths
+
+|Blocking-work bulkhead
+|Finite role-specific executor/scheduler boundary for filesystem, channel, crypto, reload, audit, cleanup, replica sink, or CPU-heavy work, including explicit thread, task/byte queue, serialization, saturation, cancellation, and lifecycle rules
+
+|Integrity representation
+|Named byte form covered by a length/checksum claim, such as source plaintext, transformed stored bytes, ciphertext, whole object, shard, or replica artifact. Source-stream, persisted-byte, committed-metadata, response-time, and scrub evidence are not interchangeable
+
+|StorageFaultInjectionPort
+|ADR 0030 transport-neutral application contract for deterministic storage-pipeline fault decisions and sanitized outcomes. Production uses a no-op default; implementation and validation are planned
+
+|Fault plan
+|Immutable, canonical, versioned ADR 0030 rule set with stable plan/hash/rule identity, operation and semantic-point selectors, logical occurrence/offset/frame coordinates, finite evaluation/fire/evidence budgets, and one permitted typed action per rule
+
+|Semantic injection point
+|Versioned typed before/after pipeline boundary whose name states exactly which checksum, transform, write, verification, fsync, publication, transfer, acknowledgement, or Ratis effect has or has not completed
+
+|Deterministic decision trace
+|Bounded payload/secret-free sequence of evaluated/fired/skipped fault decisions and typed outcomes keyed by plan hash, operation, point, logical coordinate, and fire ordinal. Wall-clock order and process-global random draws are not replay oracles
+
 |Cluster Node Runtime
 |Implementation-informed fixed-slice runtime instantiated as nodes A, B, and C. Each JVM co-locates one Ratis metadata voter and one independent whole-object replica server with separate stable-identity, Ratis, object, temporary, and runtime roots (ADR 0028)
 

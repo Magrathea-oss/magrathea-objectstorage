@@ -62,15 +62,15 @@ Implements the Command-Query Separation (CQS) pattern at the application layer. 
 - **Required Interface:** Reactive persistence implementations
 - **Technology:** Java 21, Mono/Flux, CQS pattern
 
-==== reactive-infrastructure (In-process reactive database — default backend)
+==== reactive-infrastructure (Legacy in-memory test/retirement adapters)
 
 **Blackbox Description:**
-Implements reactive in-memory repositories with ConcurrentHashMap using Mono/Flux. Not an external database — resets when the process stops. This is the **default** backend (`single-node` profile); it does not persist across restarts.
+Contains reactive `ConcurrentHashMap` repositories using Mono/Flux. They reset when the process stops and are not a supported single-node product backend. They are isolated behind the explicit `legacy-in-memory-test` profile and may be retired separately.
 
 - **Provided Interface:** InMemoryReactiveBucketRepository, InMemoryReactiveS3ObjectRepository, InMemoryReactiveMultipartUploadRepository
 - **Required Interface:** CQS repository interfaces
 - **Technology:** Java 21, ConcurrentHashMap, Reactor
-- **Tag:** Database
+- **Tag:** Legacy test adapter
 
 ==== object-store-reactive-repository-storage-engine-infrastructure (Durable storage-engine backend)
 
@@ -165,7 +165,7 @@ The PA-6 `DistributedPlacementPlanner`, `QuorumPolicy`, `AntiEntropyPlanner`, `R
 
 [NOTE]
 ====
-Status: *implementation-informed / bounded*. `REQ-CLUSTER-019/020/021/022/023/025/026` are implemented and validated. `REQ-CLUSTER-024` and broad `REQ-CLUSTER-017` remain partial; no production-readiness claim follows.
+Status: *implementation-informed / bounded*. `REQ-CLUSTER-019..026`, including `024`, are implemented and validated. Broad `REQ-CLUSTER-017` remains partial; no production-readiness claim follows.
 ====
 
 .Consensus-owned bounded repair components
@@ -195,7 +195,7 @@ PA-6 `AntiEntropyPlanner` remains pure planning policy; its `HealingTask` is nei
 .Deferred cluster capabilities — deliberately outside bounded repair
 image::../../c4/images/FutureClusterCapabilities.png[Deferred Cluster Capabilities, width=600]
 
-`REQ-CLUSTER-024` remains partial because the full seven-point real-filesystem/gRPC crash matrix was not executed. `REQ-CLUSTER-017` remains partial because prepared-artifact intents, orphan cleanup, rebalance, and broad periodic anti-entropy are absent. Clustered multipart, conditional/versioned and chunked writes, erasure coding, consensus-controlled dynamic membership and certificate lifecycle, rolling upgrades, and the broader partition suite remain not implemented or unvalidated.
+`REQ-CLUSTER-024` is implemented and validated for its bounded seven-point real-filesystem/gRPC interruption catalogue, including independent target-process restart, exact filesystem effects, snapshot/log recovery, fencing, and live leadership transfer. This adds no building block and does not broaden the repair target beyond the current committed generation. `REQ-CLUSTER-017` remains partial because prepared-artifact intents, orphan cleanup, rebalance, and broad periodic anti-entropy are absent. Clustered multipart, conditional/versioned and chunked writes, erasure coding, consensus-controlled dynamic membership and certificate lifecycle, rolling upgrades, general chaos, and the broader partition suite remain not implemented or unvalidated.
 
 === Level 2 — Component Diagram (s3-reactive-api-adapter)
 

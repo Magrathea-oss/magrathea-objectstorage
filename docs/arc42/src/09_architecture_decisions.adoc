@@ -123,5 +123,9 @@ All architectural decisions are documented as Architecture Decision Records (ADR
 
 |link:../../adr/0029-consensus-owned-durable-repair-for-current-whole-object-generation.md[0029]
 |Consensus-owned durable repair for the current whole-object generation
-|✅ Accepted — implementation-informed for bounded current-generation repair; `019/020/021/022/023/025/026` validated, `024` and broad `017` partial
+|✅ Accepted — implementation-informed for bounded current-generation repair; `019..026`, including `024`, validated; broad `017` remains partial
+
+|link:../../adr/0030-deterministic-storage-pipeline-fault-injection.md[0030]
+|Deterministic storage-pipeline fault injection
+|✅ Accepted target architecture — final P4 chaos work, deliberately deferred until normal Storage Engine pipeline closure; implementation and fault evidence planned / needs-validation
 |===
