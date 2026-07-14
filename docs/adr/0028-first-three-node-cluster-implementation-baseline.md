@@ -2,7 +2,7 @@
 
 Date: 2026-07-13
 
-Last evidence review: 2026-07-13
+Last evidence review: 2026-07-14
 
 ## Status
 
@@ -143,15 +143,26 @@ Evidence was checked on 2026-07-13 against the current requirement text, product
 
 These focused gates are the semantic basis for accepting this ADR's bounded baseline. Ordinary root Maven compilation, unit-test, dependency-convergence, layering, or reactor success is supporting integration evidence only: it does not substitute for these EP-10 gates and does not validate any later-slice capability.
 
+### 2026-07-14 REQ-CLUSTER-014 repository architecture evidence
+
+- `ReqCluster014ArchitectureContractCucumberTest` passed **1 scenario/17 steps** in the requirement's sole agreed validation mode. Its report is `s3-reactive-api-adapter/target/surefire-reports/TEST-com.example.magrathea.s3api.cucumber.ep10architecture.ReqCluster014ArchitectureContractCucumberTest.xml`. The repository-rooted gate inspected **17 reactor modules**, **87 direct non-test Maven dependencies** plus **2 profile dependency declarations**, and **473 tracked production Java sources** through JDK AST parsing; parsed **1 versioned proto3 contract**, `cluster-protocol/src/main/proto/magrathea/cluster/v1/replica_service.proto`; and successfully executed `scripts/check-module-layering.sh` from the repository root.
+- Under `target/ep10/req-cluster-014/architecture-contract-probes`, the gate passed **12 missing/empty/malformed** plus **4 supported POSIX unreadable** fail-closed probes with exact-path diagnostics and protected-input hash preservation.
+- Regression executions passed: coordination **7 scenarios/54 steps**, control **2/19**, data **4/40**, repair **22/294**, and EP-8 architecture **13/103**. The records are `target/agent-logs/req-cluster-014-existing-coordination.log`, `target/agent-logs/req-cluster-014-existing-control-mechanism.log`, `target/agent-logs/req-cluster-014-existing-data-mechanism.log`, `target/agent-logs/req-cluster-014-existing-repair-mechanism.log`, and `target/agent-logs/req-cluster-014-ep8-architecture-regression.log`. Source hygiene and generated appendix freshness also passed, as recorded in `target/agent-logs/req-cluster-014-source-hygiene.log` and `target/agent-logs/req-cluster-014-appendix-freshness.log`.
+- The non-publishing `ep10-bounded-cluster-evidence` CI job is wired to execute `ReqCluster014ArchitectureContractCucumberTest` and retain its reports and `target/ep10/req-cluster-014/` evidence, but that CI workflow has **not run**. This records wiring only, not CI execution evidence.
+
+This upgrades only the bounded status of `REQ-CLUSTER-014`: it is `@implemented-and-validated` for its internal repository-rooted architecture validation mode. The gate validates source and build boundaries, not S3 behavior, and neither WebTestClient nor AWS CLI validation is required or supplied for this internal Ability. It provides no runtime-side-effect, runtime cluster-behavior, broad-healing, or production-readiness evidence.
+
 ### Explicitly unaccepted EP-10 scope
 
-EP-10 remains partial. `REQ-CLUSTER-006` and `REQ-CLUSTER-007` are not implemented; `REQ-CLUSTER-014` is partial; and `REQ-CLUSTER-015` through `REQ-CLUSTER-018` are not implemented. Accordingly, multipart, conditional and versioned cluster writes, chunked-object transfer, erasure coding, dynamic membership and certificate lifecycle, rolling upgrades, healing, rebalance, automated orphan cleanup, and the broader partition/fault-injection suite remain absent or unvalidated. No evidence above supports a production-readiness or general distributed-storage claim.
+EP-10 remains partial. Broad `REQ-CLUSTER-017` remains `@partial`; `REQ-CLUSTER-006`, `REQ-CLUSTER-007`, `REQ-CLUSTER-015`, `REQ-CLUSTER-016`, and `REQ-CLUSTER-018` remain `@not-implemented`. The bounded architecture status of `REQ-CLUSTER-014` does not change those statuses. Accordingly, multipart, conditional and versioned cluster writes, chunked-object transfer, erasure coding, dynamic membership and certificate lifecycle, rolling upgrades, broad or periodic healing, rebalance, automated orphan cleanup, and the broader partition/fault-injection suite remain absent or unvalidated. ADR 0030 remains the accepted target architecture for the final P4 chaos work and is deliberately deferred; `REQ-CLUSTER-014` supplies none of its planned runtime or fault evidence. No evidence above supports a production-readiness or general distributed-storage claim.
 
 ## Related Requirements
 
 - `REQ-CLUSTER-001..005` — implemented and validated fixed-cluster S3 behavior.
 - `REQ-CLUSTER-008..013` — implemented and validated first-slice Ratis, direct-transfer, bounded-flow-control, failure, and mTLS mechanisms.
-- `REQ-CLUSTER-006..007`, `REQ-CLUSTER-014..018` — partial or not implemented as stated above.
+- `REQ-CLUSTER-014` — implemented and validated only for the repository-rooted internal architecture contract; not S3 or runtime cluster behavior.
+- `REQ-CLUSTER-017` — partial for broad healing, rebalance, anti-entropy, and cleanup scope.
+- `REQ-CLUSTER-006..007`, `REQ-CLUSTER-015..016`, and `REQ-CLUSTER-018` — not implemented.
 - PA-6 distributed placement and quorum policy requirements.
 
 ## Related ADRs
@@ -159,3 +170,4 @@ EP-10 remains partial. `REQ-CLUSTER-006` and `REQ-CLUSTER-007` are not implement
 - ADR 0014 — Storage Engine bounded context.
 - ADR 0025 — Conditional chunking and storage artifact taxonomy.
 - ADR 0027 — Authoritative cluster control plane and direct quorum data path.
+- ADR 0030 — Deterministic storage-pipeline fault injection; accepted as the final P4 target and deliberately deferred.

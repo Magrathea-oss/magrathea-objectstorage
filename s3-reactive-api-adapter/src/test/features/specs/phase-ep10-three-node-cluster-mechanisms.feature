@@ -7,8 +7,15 @@ Ability: Execute a bounded and durable fixed three-node control and replica mech
   This feature specifies internal mechanism evidence. It complements, but cannot replace, the shared S3
   Business Need in "requirements/phase-ep10-three-node-s3-cluster.feature". No gRPC or Ratis endpoint is a
   supported client endpoint. The implemented-and-validated mechanism scope includes the fixed first slice
-  covered by REQ-CLUSTER-008 through REQ-CLUSTER-013 and the bounded repair scopes covered by
-  REQ-CLUSTER-021 through REQ-CLUSTER-026. For REQ-CLUSTER-024 only, the focused internal Ability gate validates
+  covered by REQ-CLUSTER-008 through REQ-CLUSTER-013, the repository-rooted architecture contract covered by
+  REQ-CLUSTER-014, and the bounded repair scopes covered by REQ-CLUSTER-021 through REQ-CLUSTER-026. For
+  REQ-CLUSTER-014 only, the focused internal Ability gate parses Maven dependencies, tracked production Java
+  through JDK ASTs, and the versioned proto3 contract; executes "scripts/check-module-layering.sh"; and fails
+  closed for missing, unreadable, empty, or malformed inputs with exact paths and protected-input hash
+  preservation. This internal architecture validation mode is the requirement's only agreed mode;
+  REQ-CLUSTER-014 is not S3 behavior and does not require WebTestClient or AWS CLI validation. It proves source
+  and build boundaries without claiming runtime side effects or broad healing. For REQ-CLUSTER-024 only, the
+  focused internal Ability gate validates
   all seven named real-data-path interruption points with independent B-JVM crash and restart from real
   persisted Ratis voter state, actual grpc-java mTLS reads from source C, FileLocalArtifactStore staging,
   publication, and filesystem inspection, snapshot-write interruption, withheld completion replies,
@@ -129,17 +136,33 @@ Ability: Execute a bounded and durable fixed three-node control and replica mech
 
   Rule: Mechanism boundaries keep infrastructure out of policy and S3 concerns out of cluster protocols
 
-    @REQ-CLUSTER-014 @non-functional-requirement @architecture @boundary @pure-domain @internal-api @partial
-    Scenario: Cluster modules preserve the application protocol infrastructure and domain boundaries
-      Given the first-slice decomposition includes "storage-engine-cluster-application", "cluster-protocol", "cluster-control-ratis-infrastructure", and "cluster-data-grpc-infrastructure"
-      When dependency and protocol boundaries are inspected
-      Then "storage-engine-cluster-application" exposes transport-neutral cluster use cases and ports without Ratis, protobuf, generated-stub, or gRPC dependencies
-      And "cluster-protocol" contains versioned internal protobuf contracts without S3, Spring application, storage-policy, or domain decision logic
-      And Ratis types remain in "cluster-control-ratis-infrastructure"
-      And grpc-java and generated replica stubs remain in "cluster-data-grpc-infrastructure"
-      And Ratis, grpc-java, protobuf, Testcontainers, Spring, filesystem, certificate, retry, clock, and network types do not enter "storage-engine-domain"
-      And the existing object-store storage-engine adapter remains the only S3-to-storage-engine integration boundary
-      And existing PA-6 policy models remain partial planning support beyond these implemented first-slice network mechanisms
+    @REQ-CLUSTER-014 @non-functional-requirement @architecture @boundary @pure-domain @internal-api @implemented-and-validated
+    Scenario: Repository-rooted source inspection preserves cluster boundaries without claiming execution
+      Given validation mode "repository-rooted production Maven, Java package/import, protobuf, and layering-script inspection with isolated fail-closed probes" is selected for requirement "REQ-CLUSTER-014"
+      And root reactor model "pom.xml" and executable layering guard "scripts/check-module-layering.sh" are architecture-contract inputs
+      And the inspected production boundary evidence is:
+        | responsibility                              | module POM                                                               | production source or protocol path                                                                 |
+        | transport-neutral cluster application       | storage-engine-cluster-application/pom.xml                               | storage-engine-cluster-application/src/main/java                                                    |
+        | versioned internal cluster protocol         | cluster-protocol/pom.xml                                                  | cluster-protocol/src/main/proto/magrathea/cluster/v1/replica_service.proto                          |
+        | Ratis control infrastructure                | cluster-control-ratis-infrastructure/pom.xml                              | cluster-control-ratis-infrastructure/src/main/java                                                   |
+        | gRPC replica infrastructure                 | cluster-data-grpc-infrastructure/pom.xml                                  | cluster-data-grpc-infrastructure/src/main/java                                                       |
+        | pure PA-6 storage-engine domain             | storage-engine-domain/pom.xml                                             | storage-engine-domain/src/main/java                                                                 |
+        | Object Store to Storage Engine adapter      | object-store-reactive-repository-storage-engine-infrastructure/pom.xml    | object-store-reactive-repository-storage-engine-infrastructure/src/main/java                         |
+        | S3 API adapter                              | s3-reactive-api-adapter/pom.xml                                           | s3-reactive-api-adapter/src/main/java                                                               |
+      And isolated missing and malformed input probes use "target/ep10/req-cluster-014/architecture-contract-probes" without modifying tracked inputs
+      When the validation mode parses every module declared by "pom.xml", every non-test Maven dependency including profile-specific declarations, and every tracked production Java package, import, and referenced type across those modules
+      And it parses every protobuf declaration under "cluster-protocol/src/main/proto" and executes "scripts/check-module-layering.sh" from the repository root
+      Then "storage-engine-cluster-application" exposes only transport-neutral cluster use cases and ports, with no non-test dependency or production source reference to Ratis, protobuf, generated replica stubs, grpc-java, or infrastructure modules
+      And "cluster-protocol/src/main/proto/magrathea/cluster/v1/replica_service.proto" is a proto3 contract with protobuf package "magrathea.cluster.v1" and Java package "com.example.magrathea.cluster.protocol.v1"
+      And all "cluster-protocol" contracts are versioned internal node-to-node transport only, with no S3 or Spring API and no storage-policy, placement, quorum, anti-entropy, rebalance, or other domain decision logic
+      And Apache Ratis library package and type references rooted at "org.apache.ratis" occur only under "cluster-control-ratis-infrastructure/src/main/java"
+      And direct grpc-java and protobuf runtime package and type references rooted at "io.grpc" and "com.google.protobuf", and generated replica-stub references rooted at "com.example.magrathea.cluster.protocol.v1", occur only under "cluster-data-grpc-infrastructure/src/main/java"
+      And "storage-engine-domain" has no non-test dependency or production package, import, or type reference to Ratis, grpc-java, protobuf, Testcontainers, Spring, filesystem I/O, certificate, retry-runtime, Clock, or network APIs
+      And only production sources beneath "object-store-reactive-repository-storage-engine-infrastructure/src/main/java" bridge Object Store repository ports to "com.example.magrathea.storageengine.cluster.application"
+      And "s3-reactive-api-adapter/pom.xml" has no non-test dependency on "storage-engine-cluster-application" or any "cluster-*" module, while "s3-reactive-api-adapter/src/main/java" has no cluster package import
+      And PA-6 "DistributedPlacementPlanner", "AntiEntropyPlanner", and "RebalancePlanner" beneath "storage-engine-domain/src/main/java/com/example/magrathea/storageengine/domain/distributed" remain side-effect-free planning models whose plans, findings, moves, and dry runs are never reported as copied, repaired, rebalanced, or reclaimed data
+      And a missing, unreadable, empty, or unparseable contract input makes validation fail with its exact repository path instead of treating absent dependencies, declarations, imports, or types as compliant
+      But this architecture evidence does not claim broad or periodic anti-entropy, rebalance execution, orphan cleanup, or production readiness
 
   Rule: Consensus owns one deterministic repair job for one current replica obligation
 

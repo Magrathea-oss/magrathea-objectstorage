@@ -52,10 +52,10 @@ This chapter is the central mutable architecture risk and remediation-status sou
 |EP-6 (`@implemented-and-validated` safety envelope; KA-6 remains pending)
 
 |8
-|**Distributed evidence is limited to fixed A/B/C and bounded repair** — real consensus, whole-object `N=3/W=2` replication, failover/restart, and current-generation repair are validated only for `001..005/008..013/019..026`, including bounded `024`; `014/017` remain partial, while multipart/conditional/versioned/EC transfer, dynamic membership, broad anti-entropy/rebalance/cleanup, general chaos, rolling upgrades, and broader partitions remain absent or unvalidated.
-|Consumers may overgeneralize one-coordinator-stop or bounded repair evidence into HA, broad S3 clustering, broad healing, or distributed production readiness.
-|Keep EP-10 `@partial`; name the exact validated and partial requirement boundaries and prohibit broader claims until each later capability has semantic and fault evidence.
-|EP-10 (`@partial`, bounded fixed-cluster repair validated; broader distributed readiness not claimed)
+|**Distributed evidence is bounded and validation-mode specific** — real runtime consensus, whole-object `N=3/W=2` replication, failover/restart, and current-generation repair are validated only for `001..005/008..013/019..026`, including bounded `024`. `REQ-CLUSTER-014` is separately validated only as a repository-rooted source/build architecture contract; broad `017` remains partial, while multipart/conditional/versioned/EC transfer, dynamic membership, broad anti-entropy/rebalance/cleanup, general chaos, rolling upgrades, and broader partitions remain absent or unvalidated.
+|Consumers may overgeneralize one-coordinator-stop or bounded repair evidence into HA, or overread the `014` architecture gate as executed side effects, broad S3 clustering, broad healing, or distributed production readiness.
+|Keep EP-10 `@partial`; report runtime and architecture-only modes separately, name the exact validated and partial requirement boundaries, and prohibit broader claims until each later capability has semantic and fault evidence.
+|EP-10 (`@partial`; fixed-cluster runtime and bounded repair validated; `014` architecture-only; broader distributed readiness not claimed)
 
 |9
 |**Product-shell boundary regression** — ADR 0026 separation and REQ-ADMIN-032 task-group composition are implemented and validated, but future extensions could reintroduce Object Storage routes, endpoint knowledge, or models into the reusable shell.

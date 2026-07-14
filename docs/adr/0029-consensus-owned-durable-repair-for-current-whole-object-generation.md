@@ -6,7 +6,7 @@ Date: 2026-07-13
 
 Accepted — bounded architectural decision; implementation evidence is current through 2026-07-14 for the EP-10 current-generation whole-object repair slice.
 
-The exact status is deliberately narrower than broad healing. `REQ-CLUSTER-019` through `REQ-CLUSTER-026`, including `REQ-CLUSTER-024`, are `@implemented-and-validated`. Broad `REQ-CLUSTER-017` remains `@partial`: bounded current-generation repair exists, while broad or periodic anti-entropy execution, rebalance, and automated orphan cleanup remain absent. `REQ-CLUSTER-014` remains `@partial`; `REQ-CLUSTER-006`, `REQ-CLUSTER-007`, `REQ-CLUSTER-015`, `REQ-CLUSTER-016`, and `REQ-CLUSTER-018` remain `@not-implemented`. This acceptance is not a production-readiness or general distributed-support claim.
+The exact status is deliberately narrower than broad healing. `REQ-CLUSTER-019` through `REQ-CLUSTER-026`, including `REQ-CLUSTER-024`, are `@implemented-and-validated`. Broad `REQ-CLUSTER-017` remains `@partial`: bounded current-generation repair exists, while broad or periodic anti-entropy execution, rebalance, and automated orphan cleanup remain absent. `REQ-CLUSTER-014` is `@implemented-and-validated` only for its repository-rooted internal source/build architecture mode (**1 scenario / 17 steps**). Its validation comes from that separate architecture gate, not from ADR 0029 repair tests, and does not broaden this ADR's repair evidence, S3 behavior, runtime side effects, broad healing, or production readiness. `REQ-CLUSTER-006`, `REQ-CLUSTER-007`, `REQ-CLUSTER-015`, `REQ-CLUSTER-016`, and `REQ-CLUSTER-018` remain `@not-implemented`. This acceptance is not a production-readiness or general distributed-support claim.
 
 ## Context
 
@@ -252,7 +252,7 @@ This is bounded evidence only. It is not evidence of general chaos, broad partit
 ## Related Requirements
 
 - `REQ-CLUSTER-006`, `REQ-CLUSTER-007`, `REQ-CLUSTER-015`, `REQ-CLUSTER-016`, and `REQ-CLUSTER-018` — remain `@not-implemented`; this ADR does not upgrade them.
-- `REQ-CLUSTER-014` — remains `@partial`; this bounded repair evidence does not broaden it.
+- `REQ-CLUSTER-014` — `@implemented-and-validated` only for its repository-rooted internal source/build architecture mode (**1 scenario / 17 steps**); its separate architecture gate, not ADR 0029 repair tests, supplies that bounded validation and does not broaden this ADR's repair evidence, S3 behavior, runtime side effects, broad healing, or production readiness.
 - `REQ-CLUSTER-017` — remains `@partial`: bounded current-generation repair exists, while broad or periodic anti-entropy execution, rebalance, and automated orphan cleanup remain absent.
 - `REQ-DIST-004-A..C` — PA-6 modeled missing/corrupt-replica findings and healing plans; planning evidence only.
 - `REQ-UPLOAD-006` — committed integrity metadata and single-pass GET corruption detection.

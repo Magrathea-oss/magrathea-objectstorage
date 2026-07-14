@@ -39,6 +39,19 @@ Ratis control and replica data use different internal servers, ports, executors,
 
 This concept does not extend single-node multipart/versioning/EC support into cluster mode. Dynamic membership, clustered multipart, conditional/versioned and chunked writes, erasure coding, broad periodic anti-entropy, rebalance, orphan cleanup, rolling upgrades, and broader partition behavior remain future work. Bounded current-generation repair is documented separately below.
 
+=== Repository-rooted Cluster Architecture Contract (`REQ-CLUSTER-014`)
+
+[NOTE]
+====
+Status: *implementation-informed / implemented-and-validated for the sole internal architecture mode*. This is not S3 behavior and supplies no runtime-side-effect or broad-healing evidence.
+====
+
+The contract treats repository inputs as fail-closed architecture evidence. It parses the root reactor and every module's direct non-test dependencies, including profile declarations; parses every tracked production Java package, import, and referenced type with the JDK AST; parses every versioned cluster proto3 contract; executes `scripts/check-module-layering.sh` from the repository root; and checks the Object Store-to-Storage Engine ACL, S3 adapter, cluster application, protocol, Ratis, gRPC, and pure-domain boundaries. Isolated missing, unreadable, empty, and malformed probes must name the exact path and preserve hashes of protected inputs.
+
+On 2026-07-14, `ReqCluster014ArchitectureContractCucumberTest` passed 1 scenario / 17 steps over 17 reactor modules, 87 direct non-test dependencies plus 2 profile declarations, 473 tracked production Java sources, one versioned proto3 contract, 12 missing/empty/malformed probes, and 4 supported POSIX unreadable probes. Coordination 7/54, control 2/19, data 4/40, repair 22/294, EP-8 architecture 13/103, source hygiene, and appendix freshness regressions passed. CI is wired but has not run.
+
+The contract verifies structure, not execution. In particular, PA-6 anti-entropy findings, rebalance moves, and dry runs remain planning output; they are not copied, repaired, rebalanced, or reclaimed data. Broad `REQ-CLUSTER-017` remains partial, and no `017` sub-capability is implemented by this gate.
+
 === Consensus-owned Durable Current-generation Repair (accepted ADR 0029)
 
 [NOTE]

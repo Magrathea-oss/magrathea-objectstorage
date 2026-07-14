@@ -119,7 +119,7 @@ All architectural decisions are documented as Architecture Decision Records (ADR
 
 |link:../../adr/0028-first-three-node-cluster-implementation-baseline.md[0028]
 |First three-node cluster implementation baseline
-|✅ Accepted — implementation-informed for the bounded fixed A/B/C slice; EP-10 remains partial
+|✅ Accepted — implementation-informed for bounded fixed A/B/C; 2026-07-14 `REQ-CLUSTER-014` internal architecture contract validated; EP-10 remains partial
 
 |link:../../adr/0029-consensus-owned-durable-repair-for-current-whole-object-generation.md[0029]
 |Consensus-owned durable repair for the current whole-object generation

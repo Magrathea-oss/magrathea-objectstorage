@@ -326,7 +326,7 @@ jobs:
             mvn -B --no-transfer-progress -Pep10-cluster-tests \
               -pl cluster-control-ratis-infrastructure,cluster-data-grpc-infrastructure,s3-reactive-api-adapter -am \
               -Dsurefire.failIfNoSpecifiedTests=false \
-              -Dtest=PhaseEp10ControlPlaneCucumberTest,PhaseEp10ControlPlaneTlsCucumberTest,PhaseEp10RepairControlCucumberTest,ReqCluster024CucumberTest,PhaseEp10DataPlaneCucumberTest,PhaseEp10ClusterCoordinationCucumberTest test \
+              -Dtest=PhaseEp10ControlPlaneCucumberTest,PhaseEp10ControlPlaneTlsCucumberTest,PhaseEp10RepairControlCucumberTest,ReqCluster024CucumberTest,PhaseEp10DataPlaneCucumberTest,ReqCluster014ArchitectureContractCucumberTest,PhaseEp10ClusterCoordinationCucumberTest test \
             2>&1 | tee target/ci-ep10/req-cluster-008-013-021-026-focused-mechanisms.log
           focused_status=${PIPESTATUS[0]}
           set -e
@@ -356,6 +356,7 @@ jobs:
           name: ep10-bounded-cluster-evidence-${{ github.run_id }}
           path: |
             target/ci-ep10/*.log
+            target/ep10/req-cluster-014/
             bootstrap-application/target/cucumber-json/ep10-*.json
             bootstrap-application/target/surefire-reports/*PhaseEp10CreateBucketRealProcessCucumberTest*
             bootstrap-application/target/ep10/evidence/
@@ -370,6 +371,8 @@ jobs:
             cluster-data-grpc-infrastructure/target/cucumber-json/ep10-*.json
             cluster-data-grpc-infrastructure/target/surefire-reports/*PhaseEp10DataPlaneCucumberTest*
             s3-reactive-api-adapter/target/cucumber-json/ep10-*.json
+            s3-reactive-api-adapter/target/cucumber-json/req-cluster-014-architecture-contract.json
+            s3-reactive-api-adapter/target/surefire-reports/*ReqCluster014ArchitectureContractCucumberTest*
             s3-reactive-api-adapter/target/surefire-reports/*PhaseEp10ClusterCoordinationCucumberTest*
           if-no-files-found: warn
           retention-days: 30
