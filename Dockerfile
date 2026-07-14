@@ -30,6 +30,10 @@ COPY pom.xml .
 # All module POMs
 COPY object-store-domain/pom.xml ./object-store-domain/
 COPY storage-engine-domain/pom.xml ./storage-engine-domain/
+COPY cluster-protocol/pom.xml ./cluster-protocol/
+COPY storage-engine-cluster-application/pom.xml ./storage-engine-cluster-application/
+COPY cluster-control-ratis-infrastructure/pom.xml ./cluster-control-ratis-infrastructure/
+COPY cluster-data-grpc-infrastructure/pom.xml ./cluster-data-grpc-infrastructure/
 COPY storage-engine-reactive-repository-application/pom.xml ./storage-engine-reactive-repository-application/
 COPY storage-engine-reactive-application/pom.xml ./storage-engine-reactive-application/
 COPY storage-engine-reactive-infrastructure/pom.xml ./storage-engine-reactive-infrastructure/
@@ -65,6 +69,10 @@ COPY magrathea-ui ./magrathea-ui/
 COPY admin-api-adapter/src ./admin-api-adapter/src/
 COPY object-store-domain/src ./object-store-domain/src/
 COPY storage-engine-domain/src ./storage-engine-domain/src/
+COPY cluster-protocol/src ./cluster-protocol/src/
+COPY storage-engine-cluster-application/src ./storage-engine-cluster-application/src/
+COPY cluster-control-ratis-infrastructure/src ./cluster-control-ratis-infrastructure/src/
+COPY cluster-data-grpc-infrastructure/src ./cluster-data-grpc-infrastructure/src/
 COPY storage-engine-reactive-repository-application/src ./storage-engine-reactive-repository-application/src/
 COPY storage-engine-reactive-application/src ./storage-engine-reactive-application/src/
 COPY storage-engine-reactive-infrastructure/src ./storage-engine-reactive-infrastructure/src/
