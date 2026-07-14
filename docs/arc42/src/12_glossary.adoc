@@ -137,7 +137,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 |Implementation-informed fixed-slice runtime instantiated as nodes A, B, and C. Each JVM co-locates one Ratis metadata voter and one independent whole-object replica server with separate stable-identity, Ratis, object, temporary, and runtime roots (ADR 0028)
 
 |Cluster Control Plane
-|Internal Apache Ratis role that orders bucket and object-reference generations in the implemented fixed slice. ADR 0027's wider membership, topology/policy epoch, fencing/tombstone, and durable-job authority remains future scope
+|Internal Apache Ratis role that orders bucket/object-reference generations and bounded repair lifecycle in the implemented fixed slice and serves read-only canonical pages of current references. ADR 0027's wider membership, topology/policy epoch, fencing/tombstone, and durable-job authority remains future scope
 
 |Cluster Data Plane
 |Internal grpc-java role that directly transfers checksum-valid immutable whole-object replicas between A/B/C for fixed `N=3/W=2`; it is not an external object API. Chunked, multipart, and EC transfer remain unimplemented cluster capabilities
@@ -160,11 +160,20 @@ ifndef::imagesdir[:imagesdir: ../images]
 |Object-reference generation
 |Consensus-committed record naming verified immutable replicas for one object generation. In the fixed slice it is proposed only after `W=2` checksum-valid durable acknowledgements and is the authoritative basis for reads
 
+|Current-reference page
+|ADR 0031 bounded read-only Ratis result containing only current object-reference generations in canonical bucket/object-key order. Its size is caller-bounded with hard maximum 256; it is one applied-state read, not part of a frozen multi-page snapshot
+
+|Exclusive discovery cursor
+|Process-local ADR 0031 identity of the last reference in a completed page. The next query begins strictly after it; it advances only after page inspection/ensures, resets at terminal, and restarts from the first page after scheduler reconstruction. It is never consensus/log/snapshot state
+
+|Periodic current-reference anti-entropy
+|Implemented fixed A/B/C process-local scheduler that serially pages current references, probes only obligations naming the local node, and delegates missing/corrupt targets to ADR 0029's consensus-owned fenced repair path. It is not wider healing/topology coverage, rebalance, cleanup, PA-6 planner execution, or production readiness
+
 |Replica observation
 |ADR 0029 repair term: point-in-time evidence that a replica named by the current reference is missing, unavailable, corrupt, or checksum-valid. An observation is not durable work ownership or completion
 
 |Repair finding / plan
-|Deterministic PA-6 policy output derived from observations. `AntiEntropyFinding`, `HealingPlan`, and `HealingTask` remain planning values; application and consensus responsibilities are separate
+|Deterministic PA-6 policy output derived from observations. `AntiEntropyFinding`, `HealingPlan`, and `HealingTask` remain planning values; ADR 0031 discovery does not execute or count them, and application/consensus responsibilities remain separate
 
 |Repair job
 |Implemented consensus-owned immutable specification for restoring one target already promised by the current committed whole-object generation. Its semantic key is `(REPAIR, bucket, objectKey, referenceGeneration, artifactId, targetNodeId)`; candidate source is not identity

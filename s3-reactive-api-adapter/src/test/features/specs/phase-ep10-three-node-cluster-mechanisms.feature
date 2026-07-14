@@ -8,7 +8,8 @@ Ability: Execute a bounded and durable fixed three-node control and replica mech
   Business Need in "requirements/phase-ep10-three-node-s3-cluster.feature". No gRPC or Ratis endpoint is a
   supported client endpoint. The implemented-and-validated mechanism scope includes the fixed first slice
   covered by REQ-CLUSTER-008 through REQ-CLUSTER-013, the repository-rooted architecture contract covered by
-  REQ-CLUSTER-014, and the bounded repair scopes covered by REQ-CLUSTER-021 through REQ-CLUSTER-026. For
+  REQ-CLUSTER-014, the bounded repair scopes covered by REQ-CLUSTER-021 through REQ-CLUSTER-026, and bounded
+  periodic current-reference anti-entropy covered by REQ-CLUSTER-027. For
   REQ-CLUSTER-014 only, the focused internal Ability gate parses Maven dependencies, tracked production Java
   through JDK ASTs, and the versioned proto3 contract; executes "scripts/check-module-layering.sh"; and fails
   closed for missing, unreadable, empty, or malformed inputs with exact paths and protected-input hash
@@ -21,9 +22,9 @@ Ability: Execute a bounded and durable fixed three-node control and replica mech
   publication, and filesystem inspection, snapshot-write interruption, withheld completion replies,
   exact-target no-recopy reconciliation, stale-token fencing, and live A-to-C leader transfer. That internal
   Ability validation mode is the requirement's only agreed mode; REQ-CLUSTER-024 is not S3 behavior and does
-  not require WebTestClient or AWS CLI validation. This bounded repair evidence does not mark the whole EP-10
-  mechanism backlog complete and excludes orphan cleanup, rebalance, broad or periodic anti-entropy, dynamic
-  membership, and erasure coding.
+  not require WebTestClient or AWS CLI validation. These bounded repair and discovery gates do not mark the
+  whole EP-10 mechanism backlog complete and exclude orphan cleanup, rebalance, anti-entropy beyond fixed A/B/C
+  current-reference obligations, dynamic membership, and erasure coding.
 
   Fixed node configuration:
     | node | stable UUID                          | Ratis address   | replica address | identity root                              | Ratis root                           | object root                            | temporary root                          | runtime root                          |
@@ -323,13 +324,60 @@ Ability: Execute a bounded and durable fixed three-node control and replica mech
       And protobuf and Ratis rolling-upgrade compatibility, leader transfer during upgrade, and mixed-version operation are "not implemented"
       And edits to seeds, address changes, health suspicion, or certificate replacement cannot be presented as those capabilities
 
+    @REQ-CLUSTER-027 @functional-requirement @non-functional-requirement @healing @anti-entropy @periodic @durability @backpressure @restart-safety @consensus @grpc @mtls @filesystem @implemented-and-validated
+    Scenario: Bounded periodic discovery repairs only damaged current replicas named for each fixed node
+      Given validation mode "fixed A/B/C Ratis current-reference paging with real filesystem targets, actual grpc-java UUID-bound mTLS repair, consensus and filesystem inspection, and query, probe, repair, page, overlap, and replica-read counters" is selected for requirement "REQ-CLUSTER-027"
+      And fixture "s3-reactive-api-adapter/src/test/resources/fixtures/upload/large-object.bin" has length 134 and SHA-256 "46918899a9ddbe1d1c2f1613416501b3e8d7cdbc2a63a78298d0cc3ee388e800"
+      And current consensus contains these "WHOLE_OBJECT" ObjectReferenceGeneration records in canonical bucket, object-key, and generation order:
+        | bucket                      | key                                                   | generation | artifact                                      | named replicas | B target beneath target/ep10/three-node/node-b/objects                                                |
+        | ep10-anti-entropy-archive   | evidence/2026/anti-entropy/corrupt-on-b.bin           | 7          | whole-ae-corrupt-7f351d76-50d8-4f48-9b86-001 | A,B,C          | corrupt whole-ae-corrupt-7f351d76-50d8-4f48-9b86-001.artifact                                         |
+        | ep10-anti-entropy-archive   | evidence/2026/anti-entropy/exact-on-b.bin             | 3          | whole-ae-exact-7f351d76-50d8-4f48-9b86-002   | A,B,C          | exact whole-ae-exact-7f351d76-50d8-4f48-9b86-002.artifact                                             |
+        | ep10-anti-entropy-archive   | evidence/2026/anti-entropy/missing-on-b.bin           | 11         | whole-ae-missing-7f351d76-50d8-4f48-9b86-003 | A,B,C          | absent whole-ae-missing-7f351d76-50d8-4f48-9b86-003.artifact                                          |
+        | ep10-anti-entropy-archive   | evidence/2026/anti-entropy/not-named-on-b.bin         | 5          | whole-ae-other-7f351d76-50d8-4f48-9b86-004   | A,C            | unprobed whole-ae-other-7f351d76-50d8-4f48-9b86-004.artifact                                          |
+      And each named source artifact under "target/ep10/three-node/node-a/objects" or "target/ep10/three-node/node-c/objects" is independently equal to that fixture
+      And the consensus page limit is 2, the inter-page operator is concat-style serial continuation, and one node may own at most one active discovery page and one bounded repair execution
+      When the focused periodic anti-entropy gate executes bounded cycles
+      Then Ratis exposes only current ObjectReferenceGeneration records as bounded pages in that canonical order
+      And each non-terminal page has an exclusive cursor equal to its last record and the next page contains only records strictly after that cursor
+      And invalid page limits and cursors, malformed query or page encodings, trailing input, and decoded pages above hard limit 256 fail closed
+      And no page exceeds limit 2, no cycle materializes all references, and page, probe, ensure, and repair counters show no overlapping page or target processing
+      And periodic cycles on fixed nodes A, B, and C inspect only current references whose named replica UUID set contains that local node
+      And B never probes or repairs "whole-ae-other-7f351d76-50d8-4f48-9b86-004.artifact" because its current reference does not name B
+      And each local named target is probed for existence and, when present, verified against the committed length 134 and committed SHA-256 before repair is considered
+      And every local filesystem probe executes on Reactor boundedElastic rather than a caller or event-loop thread
+      And closing B's process-local discovery scheduler while a bounded page response is delayed cancels that active cycle and leaves no active page or target probe
+      And the missing and corrupt B obligations each durably ensure exactly one existing canonical consensus-owned repair job bound to bucket, key, generation, artifact, and B UUID "22222222-2222-4222-8222-222222222222"
+      And duplicate observations do not create another job, transition, claim, or publication
+      And existing exact-current claim and publication fences execute each required repair from a different verified named replica over an actual grpc-java RPC with UUID-bound mutual TLS
+      And the repaired B targets are byte-for-byte equal to the fixture while the already exact B target causes zero repair ensures, claims, replica-read RPCs, or replacement publications
+
+    @REQ-CLUSTER-027 @functional-requirement @non-functional-requirement @healing @anti-entropy @periodic @durability @backpressure @restart-safety @consensus @observability @failure-handling @implemented-and-validated
+    Scenario: Cursor recovery failures and reference races remain bounded safe and retryable across cycles
+      Given validation mode "fixed A/B/C Ratis current-reference paging with real filesystem targets, actual grpc-java UUID-bound mTLS repair, consensus and filesystem inspection, and query, probe, repair, page, overlap, and replica-read counters" is selected for requirement "REQ-CLUSTER-027"
+      And a process-local exclusive cursor starts before the first canonical current reference with configured page limit 2
+      And later cycles inject one bounded current-reference query failure, one local target probe failure, one repair ensure failure, and one fenced repair execution failure
+      And two current generation 7 obligations for bucket "ep10-anti-entropy-archive" race independently: key "evidence/2026/anti-entropy/ensure-reference-race.bin" changes to generation 8 before a stale ensure, while key "evidence/2026/anti-entropy/publication-reference-race.bin" changes to generation 8 at typed gate "BEFORE_TARGET_PUBLICATION" after transfer and before the final exact-current recheck and target publication
+      When the focused periodic anti-entropy gate executes bounded cycles
+      Then the process-local cursor advances only after every record in a page has completed inspection and any required durable ensure
+      And a query, probe, or ensure failure leaves that page cursor unadvanced, increments a labeled failure counter without logging object bytes or credentials, and is retried by a later periodic cycle
+      And a fenced repair execution failure remains explicit committed retryable repair state and is retried by existing repair execution rather than counted as discovery success
+      And after a terminal page the next periodic cycle resets to the first page instead of polling forever after the terminal cursor
+      And after B's process-local discovery and repair schedulers are closed and reconstructed in the same JVM, B begins discovery at the first page without persisting or trusting its prior process-local cursor
+      And repeated first-page discovery after B scheduler reconstruction deduplicates through the canonical consensus-owned repair identity and command results
+      And the distinct generation 7 work changed before ensure or at "BEFORE_TARGET_PUBLICATION" is rejected or made "OBSOLETE", and the publication-race target remains absent until current work repairs it
+      And a later cycle discovers both generation 8 references and ensures their distinct canonical obligations without rewriting either current reference
+      And after B's process-local schedulers are closed their inspection reports no active discovery page, target probe, or repair scan
+      And inspection exposes cycle, page, record, exact-target, missing-target, corrupt-target, query-failure, probe-failure, ensure-failure, repair-failure, retry, cursor-reset, stale-reference, deduplication, overlap, and grpc replica-read counters
+      And PA-6 AntiEntropyPlanner findings or plans remain planner output and are never treated as an ensure, claim, transfer, publication, repair success, or execution counter
+      But this bounded gate excludes rebalance, orphan cleanup, dynamic membership, broad partitions, erasure coding, chunks, multipart, versioning, production scale or readiness, and ADR 0030 general chaos
+
     @REQ-CLUSTER-017 @functional-requirement @non-functional-requirement @healing @rebalance @orphan-cleanup @later-slice @partial
     Scenario: Bounded current-generation repair does not imply broad healing rebalance or cleanup
       Given PA-6 can model healing and rebalance plans without executing their data side effects
-      And REQ-CLUSTER-019, REQ-CLUSTER-020, REQ-CLUSTER-021, REQ-CLUSTER-022, REQ-CLUSTER-023, REQ-CLUSTER-024, REQ-CLUSTER-025, and REQ-CLUSTER-026 are "implemented-and-validated" within their bounded repair scopes
+      And REQ-CLUSTER-019, REQ-CLUSTER-020, REQ-CLUSTER-021, REQ-CLUSTER-022, REQ-CLUSTER-023, REQ-CLUSTER-024, REQ-CLUSTER-025, REQ-CLUSTER-026, and REQ-CLUSTER-027 are "implemented-and-validated" within their bounded repair and discovery scopes
       When cluster execution status is reported against production behavior and semantic validation
-      Then bounded current-generation whole-object repair is "implemented-and-validated" only within those narrower requirement scopes
-      But REQ-CLUSTER-017 remains "partial" because broad or periodic anti-entropy execution, rebalance execution, and automated orphan cleanup remain "absent"
+      Then bounded current-generation whole-object repair and bounded periodic current-generation fixed A/B/C anti-entropy are "implemented-and-validated" only within those narrower requirement scopes
+      But REQ-CLUSTER-017 remains "partial" because rebalance execution, automated orphan cleanup, and wider healing or topology coverage remain "absent"
       And no planner result, dry run, job schema, route, or in-memory scheduler is reported as copied, repaired, rebalanced, or reclaimed data
 
     @REQ-CLUSTER-018 @functional-requirement @non-functional-requirement @partition @fault-injection @later-slice @not-implemented

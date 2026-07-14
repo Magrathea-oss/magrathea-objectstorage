@@ -29,6 +29,11 @@ ifndef::imagesdir[:imagesdir: ../images]
 |Restore only a missing or corrupt whole-object target named by the current committed reference, with consensus-owned lifecycle and single-pass GET semantics
 |`REQ-CLUSTER-019..026`, including bounded seven-point real-filesystem/gRPC interruption evidence for `024`, implemented and validated; broad `017` partial
 
+|Reliability / Consistency / Observability
+|Bounded periodic current-reference anti-entropy
+|Serially page only current references, probe only the fixed local node's named obligations, and delegate missing/corrupt targets to the existing fenced repair path without durable cursor or payload in Ratis
+|`REQ-CLUSTER-027` implemented and validated by 2 scenarios / 36 steps; rebalance, automated orphan cleanup, wider healing/topologies, ADR 0030 chaos, and production readiness excluded
+
 |Performance / Reliability
 |Repository-wide bounded reactive payload processing
 |Bounded frames, explicit pooled-buffer ownership, finite byte budgets, and role-specific blocking/CPU bulkheads from HTTP ingress through security, transforms, persistence, replication, and response egress
@@ -178,7 +183,7 @@ P1 must freeze numeric frame, queue, concurrency, scheduler, and memory-budget v
 - **Context:** The fixed profile uses Ratis control, separate grpc-java replica transfer, stable UUIDs, 64 KiB maximum payload frames, and test-local mTLS fixtures. Repository-rooted architecture inputs comprise all reactor/module POMs, tracked production Java sources, versioned cluster proto3 contracts, and the executable layering guard.
 - **Stimulus:** Start/restart fixed voters, transfer a multi-frame object under slow demand, cancel or expire transfer, attempt an invalid peer, evaluate publication ordering across modules, or inspect every declared source/build boundary while probing missing, unreadable, empty, and malformed inputs.
 - **Response:** Persisted fixed state recovers; flow control remains finite; cancellation/deadline releases resources without durable acknowledgement; both internal transports reject unauthenticated or identity-mismatched peers; S3 remains the only external object API. Architecture validation parses dependencies and Java/protobuf structure, executes the layering guard, and fails closed with exact paths while preserving protected-input hashes.
-- **Historical metric (2026-07-13):** Focused real Ratis, gRPC, TLS, and cross-module Cucumber reports for `REQ-CLUSTER-008..013` pass. Clustered multipart, conditional/versioned or chunked writes, erasure coding, dynamic membership/PKI lifecycle, healing/rebalance/orphan cleanup, rolling upgrades, and broader partitions remain not implemented or unvalidated (`006/007`, `015..018`).
+- **Historical metric (2026-07-13):** Focused real Ratis, gRPC, TLS, and cross-module Cucumber reports for `REQ-CLUSTER-008..013` pass. At that evidence point, clustered multipart, conditional/versioned or chunked writes, erasure coding, dynamic membership/PKI lifecycle, healing/rebalance/orphan cleanup, rolling upgrades, and broader partitions remained not implemented or unvalidated (`006/007`, `015..018`). Bounded periodic discovery is separately validated later under `027`; the other listed gaps remain.
 - **Focused architecture metric (2026-07-14):** `ReqCluster014ArchitectureContractCucumberTest` passed 1 scenario / 17 steps. It parsed 17 reactor modules, 87 direct non-test Maven dependencies plus 2 profile declarations, 473 tracked production Java sources with JDK AST parsing, and one versioned proto3 contract; executed `scripts/check-module-layering.sh`; and passed 12 missing/empty/malformed plus 4 supported POSIX unreadable probes. Coordination 7/54, control 2/19, data 4/40, repair 22/294, EP-8 architecture 13/103, source hygiene, and appendix freshness regressions passed. CI is wired but has not run.
 - **Limitation:** `REQ-CLUSTER-014` is not S3 behavior and provides no runtime-side-effect, broad-healing, or production-readiness evidence. Broad `017` remains partial; `006/007/015/016/018` remain not implemented.
 
@@ -223,7 +228,16 @@ P1 must freeze numeric frame, queue, concurrency, scheduler, and memory-budget v
 - **Response:** Version 1 deterministically initializes an empty job map and next writes version 2; version 2 preserves job specification, lifecycle, attempts/dedup history, claim/session/retry fields, terminal reasons, and last-applied metadata; unknown future versions fail closed without discarding work. Payload bytes never enter snapshots.
 - **Metric (2026-07-13):** `REQ-CLUSTER-026` passes in the focused 22-scenario / 210-step repair-control gate, including stale-token rejection after restore.
 
-These scenarios deliberately exclude prepared-artifact intents, orphan cleanup, rebalance, broad periodic anti-entropy, dynamic membership, erasure coding, multipart, and broader partitions. Broad `REQ-CLUSTER-017` remains partial, and no production-readiness claim follows.
+These request/repair-triggered scenarios deliberately exclude prepared-artifact intents, orphan cleanup, rebalance, periodic discovery, dynamic membership, erasure coding, multipart, and broader partitions. Periodic discovery has the separate bounded quality scenario below; broad `REQ-CLUSTER-017` remains partial, and no production-readiness claim follows.
+
+==== Scenario 18a — Bounded Periodic Current-reference Discovery (`REQ-CLUSTER-027`)
+
+- **Status:** `implementation-informed`, `@implemented-and-validated` for exactly two fixed A/B/C scenarios; EP-10 and broad `017` remain partial.
+- **Context:** Ratis contains current whole-object references in canonical namespace order, each naming a subset of stable A/B/C UUIDs; local targets may be exact, missing, or corrupt.
+- **Stimulus:** A process-local scheduler executes bounded periodic cycles, then encounters query/probe/ensure/repair failures, current-reference races, terminal-page reset, shutdown, and scheduler reconstruction.
+- **Response:** Each read-only page is finite and cursor-exclusive; records and named local targets are processed serially; only named obligations are probed on `boundedElastic`; exact targets cause no repair; missing/corrupt targets durably ensure the existing canonical consensus job and use its fenced UUID-bound mTLS repair/publication path. Query/probe/ensure failure leaves the cursor unadvanced; repair failure stays explicit consensus retry state; terminal and reconstructed schedulers restart from the first page; stale generation work cannot publish.
+- **Metric (2026-07-14):** `ReqCluster027CucumberTest` passes **2 scenarios / 36 steps** with real three-voter Ratis, real filesystem targets, actual grpc-java UUID-bound mTLS repair, and page/probe/ensure/repair/overlap/replica-read counters. Existing regressions in the implementation validation set pass: `ReqCluster024CucumberTest` 7 / 168, repair control 22 / 294, and data plane 4 / 40.
+- **Limitations:** The cursor is process-local rather than consensus state; pages are not one frozen multi-page snapshot; payload is absent from Ratis; PA-6 planner output is not execution. No rebalance, automated orphan cleanup, wider healing/topologies, production scale/readiness, or ADR 0030 general chaos is claimed.
 
 ==== Scenario 19 — Pooled-buffer Ownership Under Every Terminal Path
 

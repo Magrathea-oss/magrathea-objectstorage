@@ -111,6 +111,10 @@ final class ClusterControlStateMachine extends BaseStateMachine {
         if (command instanceof ControlPlaneCodec.QueryBuckets) {
             return "OK\tL\t" + ControlPlaneCodec.encodeBuckets(List.copyOf(buckets.values()));
         }
+        if (command instanceof ControlPlaneCodec.QueryReferences query) {
+            return "OK\tP\t" + ControlPlaneCodec.encodeReferencePage(
+                    currentReferencePage(query.query()));
+        }
         if (command instanceof ControlPlaneCodec.QueryRepair query) {
             MutableRepairJob job = repairJobs.get(query.jobId());
             return job == null ? error(ControlPlaneException.Code.NOT_FOUND, "repair job not found")
@@ -122,6 +126,21 @@ final class ClusterControlStateMachine extends BaseStateMachine {
             return "OK\tX\t" + ControlPlaneCodec.encodeRepairJobs(jobs);
         }
         return error(ControlPlaneException.Code.INTERNAL_FAILURE, "write submitted as query");
+    }
+
+    private ReferencePage currentReferencePage(ReferencePageQuery query) {
+        NavigableMap<String, ObjectReferenceGeneration> remaining = query.exclusiveAfter() == null
+                ? references
+                : references.tailMap(query.exclusiveAfter().namespaceKey(), false);
+        Iterator<ObjectReferenceGeneration> iterator = remaining.values().iterator();
+        List<ObjectReferenceGeneration> page = new ArrayList<>(query.limit());
+        while (iterator.hasNext() && page.size() < query.limit()) {
+            page.add(iterator.next());
+        }
+        boolean terminal = !iterator.hasNext();
+        ReferencePageQuery.Cursor cursor = page.isEmpty() ? null
+                : ReferencePageQuery.Cursor.after(page.get(page.size() - 1));
+        return new ReferencePage(page, cursor, terminal);
     }
 
     @Override

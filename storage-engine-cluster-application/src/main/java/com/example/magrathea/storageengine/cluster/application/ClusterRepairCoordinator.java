@@ -59,6 +59,12 @@ public final class ClusterRepairCoordinator {
     }
 
     public Mono<RepairJobId> ensure(ObjectReferenceGeneration reference, String reason) {
+        return ensureDetailed(reference, reason).map(EnsureOutcome::jobId);
+    }
+
+    /** Preserves the committed ensure result for bounded discovery observability. */
+    public Mono<EnsureOutcome> ensureDetailed(
+            ObjectReferenceGeneration reference, String reason) {
         RepairSpecification specification = new RepairSpecification(reference.bucket(),
                 reference.objectKey(), reference.generation(), reference.artifactId(), localNode,
                 reference.length(), reference.sha256(), reference.topologyEpoch(),
@@ -69,8 +75,7 @@ public final class ClusterRepairCoordinator {
                 specification, clock.instant(), sourceHint);
         return controlPlane.ensureRepair(command).flatMap(result -> {
             if (!result.accepted()) {
-                return Mono.error(new IllegalStateException(
-                        "repair ensure rejected: " + result.code() + " " + result.reason()));
+                return Mono.error(new RepairEnsureRejected(result.code(), result.reason()));
             }
             metrics.ensured();
             return controlPlane.repairJob(specification.jobId()).flatMap(job -> {
@@ -82,7 +87,7 @@ public final class ClusterRepairCoordinator {
                         sourceHint);
                 return controlPlane.reevaluateRepair(reevaluate)
                         .then(controlPlane.repairJob(specification.jobId()));
-            }).map(RepairJob::jobId);
+            }).map(job -> new EnsureOutcome(job.jobId(), result.code()));
         });
     }
 
@@ -92,5 +97,29 @@ public final class ClusterRepairCoordinator {
 
     private static String commandId(String action) {
         return "repair-" + action + "-" + UUID.randomUUID();
+    }
+
+    public record EnsureOutcome(RepairJobId jobId, RepairCommandResult.Code code) {
+        public EnsureOutcome {
+            Objects.requireNonNull(jobId, "jobId");
+            Objects.requireNonNull(code, "code");
+        }
+
+        public boolean deduplicated() {
+            return code == RepairCommandResult.Code.NO_CHANGE;
+        }
+    }
+
+    public static final class RepairEnsureRejected extends IllegalStateException {
+        private final RepairCommandResult.Code code;
+
+        private RepairEnsureRejected(RepairCommandResult.Code code, String reason) {
+            super("repair ensure rejected: " + code + " " + reason);
+            this.code = Objects.requireNonNull(code, "code");
+        }
+
+        public RepairCommandResult.Code code() {
+            return code;
+        }
     }
 }

@@ -19,6 +19,12 @@ public interface ClusterControlPlanePort {
 
     Mono<ObjectReferenceGeneration> objectReference(String bucket, String objectKey);
 
+    /** Bounded read-only page of current references in canonical namespace-key order. */
+    default Mono<ReferencePage> currentReferences(ReferencePageQuery query) {
+        return Mono.error(new UnsupportedOperationException(
+                "current-reference paging is not implemented"));
+    }
+
     /** Ensures one canonical job after consensus validates the exact current reference and target. */
     default Mono<RepairCommandResult> ensureRepair(RepairCommands.Ensure command) {
         return Mono.error(new UnsupportedOperationException("repair control is not implemented"));

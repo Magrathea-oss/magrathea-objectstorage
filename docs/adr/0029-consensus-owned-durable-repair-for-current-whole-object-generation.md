@@ -6,7 +6,7 @@ Date: 2026-07-13
 
 Accepted — bounded architectural decision; implementation evidence is current through 2026-07-14 for the EP-10 current-generation whole-object repair slice.
 
-The exact status is deliberately narrower than broad healing. `REQ-CLUSTER-019` through `REQ-CLUSTER-026`, including `REQ-CLUSTER-024`, are `@implemented-and-validated`. Broad `REQ-CLUSTER-017` remains `@partial`: bounded current-generation repair exists, while broad or periodic anti-entropy execution, rebalance, and automated orphan cleanup remain absent. `REQ-CLUSTER-014` is `@implemented-and-validated` only for its repository-rooted internal source/build architecture mode (**1 scenario / 17 steps**). Its validation comes from that separate architecture gate, not from ADR 0029 repair tests, and does not broaden this ADR's repair evidence, S3 behavior, runtime side effects, broad healing, or production readiness. `REQ-CLUSTER-006`, `REQ-CLUSTER-007`, `REQ-CLUSTER-015`, `REQ-CLUSTER-016`, and `REQ-CLUSTER-018` remain `@not-implemented`. This acceptance is not a production-readiness or general distributed-support claim.
+The exact status is deliberately narrower than broad healing. `REQ-CLUSTER-019` through `REQ-CLUSTER-026`, including `REQ-CLUSTER-024`, are `@implemented-and-validated`. Subsequent ADR 0031 makes `REQ-CLUSTER-027` `@implemented-and-validated` for bounded periodic current-reference discovery on fixed A/B/C, while broad `REQ-CLUSTER-017` remains `@partial` because wider healing/topology coverage, rebalance, and automated orphan cleanup remain absent. That separate discovery decision reuses but does not rewrite ADR 0029's repair authority, identity, fencing, or data path. `REQ-CLUSTER-014` is `@implemented-and-validated` only for its repository-rooted internal source/build architecture mode (**1 scenario / 17 steps**). Its validation comes from that separate architecture gate, not from ADR 0029 repair tests, and does not broaden this ADR's repair evidence, S3 behavior, runtime side effects, broad healing, or production readiness. `REQ-CLUSTER-006`, `REQ-CLUSTER-007`, `REQ-CLUSTER-015`, `REQ-CLUSTER-016`, and `REQ-CLUSTER-018` remain `@not-implemented`. This acceptance is not a production-readiness or general distributed-support claim.
 
 ## Context
 
@@ -35,7 +35,7 @@ The executable requirements separate:
 - a shared S3 `Business Need` for missing-local fallback and for the fail-current-request/repair-later behavior after single-pass corruption detection, reused by WebTestClient and AWS CLI validation where both modes apply; and
 - internal `Ability` scenarios for deduplication, lifecycle transitions, fencing, direct verified transfer, snapshot migration, crash/restart recovery, and leader-change idempotence.
 
-`REQ-CLUSTER-017` is the broad capability statement and remains `@partial`: bounded current-generation repair is `@implemented-and-validated` under `REQ-CLUSTER-019` through `REQ-CLUSTER-026`, including the seven-point `REQ-CLUSTER-024` interruption catalogue, while broad or periodic anti-entropy, rebalance, and automated orphan cleanup remain absent. Planner unit tests, route presence, job records without execution, or status-only checks cannot upgrade repair status.
+`REQ-CLUSTER-017` is the broad capability statement and remains `@partial`: bounded current-generation repair is `@implemented-and-validated` under `REQ-CLUSTER-019` through `REQ-CLUSTER-026`, including the seven-point `REQ-CLUSTER-024` interruption catalogue. ADR 0031 separately validates bounded periodic current-reference discovery under `REQ-CLUSTER-027`; wider healing/topology coverage, rebalance, and automated orphan cleanup remain absent. Planner unit tests, route presence, job records without execution, or status-only checks cannot upgrade repair status.
 
 ### PA-6 planning and execution boundary
 
@@ -169,7 +169,7 @@ This ADR does not decide or authorize:
 - prepared-artifact intents or retirement tombstones;
 - orphan cleanup, legacy artifact sweeping, or superseded-generation garbage collection;
 - rebalance or `RebalancePlanner` execution;
-- broad periodic anti-entropy scans or production-scale scheduling/fairness;
+- anti-entropy beyond bounded fixed A/B/C current-reference scans, including production-scale scheduling/fairness;
 - adding an unacknowledged third placement or changing a reference's replica set;
 - dynamic membership, node replacement, or broader node-incarnation policy;
 - erasure coding, shards, chunk repair, multipart, conditional writes, or S3 versioning; or
@@ -187,7 +187,7 @@ Those capabilities require separate requirements and decisions. This repair slic
 - Missing-local GET can incur a full verified remote transfer before response latency. Corrupt-local GET intentionally fails the current request; availability improves only for a later request after repair.
 - `BLOCKED` makes unrecoverable or exhausted work visible instead of retrying forever or copying unverified bytes.
 - Deferring cleanup means a narrow race with generation change can leave unreachable exact artifacts. They are non-authoritative and must remain until a separately fenced cleanup design exists.
-- `REQ-CLUSTER-017` is upgraded only to `@partial` by bounded implementation and semantic evidence under `REQ-CLUSTER-019` through `REQ-CLUSTER-026`; the deferred broad healing, rebalance, and cleanup scope remains absent.
+- `REQ-CLUSTER-017` remains only `@partial`: this ADR's bounded repair under `REQ-CLUSTER-019` through `REQ-CLUSTER-026` and ADR 0031's bounded periodic current-reference discovery under `REQ-CLUSTER-027` leave wider healing/topologies, rebalance, and cleanup absent.
 
 ## Alternatives Considered
 
@@ -225,7 +225,7 @@ Not selected. Safe orphan cleanup requires publication intents and irreversible 
 
 ### Run broad periodic anti-entropy or rebalance with the same worker
 
-Not selected. Broad discovery, fairness, topology movement, and placement changes add separate policy and operational risks. This slice consumes bounded missing/corrupt evidence only for an already promised target.
+Not selected by this repair decision. Broad discovery, fairness, topology movement, and placement changes add separate policy and operational risks. This slice consumes bounded missing/corrupt evidence only for an already promised target. ADR 0031 later accepts only bounded periodic current-reference discovery on fixed A/B/C and delegates every repair to this ADR; it still excludes broader discovery/topologies, rebalance, and cleanup.
 
 ## Evidence
 
@@ -253,7 +253,8 @@ This is bounded evidence only. It is not evidence of general chaos, broad partit
 
 - `REQ-CLUSTER-006`, `REQ-CLUSTER-007`, `REQ-CLUSTER-015`, `REQ-CLUSTER-016`, and `REQ-CLUSTER-018` — remain `@not-implemented`; this ADR does not upgrade them.
 - `REQ-CLUSTER-014` — `@implemented-and-validated` only for its repository-rooted internal source/build architecture mode (**1 scenario / 17 steps**); its separate architecture gate, not ADR 0029 repair tests, supplies that bounded validation and does not broaden this ADR's repair evidence, S3 behavior, runtime side effects, broad healing, or production readiness.
-- `REQ-CLUSTER-017` — remains `@partial`: bounded current-generation repair exists, while broad or periodic anti-entropy execution, rebalance, and automated orphan cleanup remain absent.
+- `REQ-CLUSTER-017` — remains `@partial`: bounded current-generation repair and ADR 0031's bounded periodic current-generation fixed A/B/C discovery exist, while wider healing/topology coverage, rebalance, and automated orphan cleanup remain absent.
+- `REQ-CLUSTER-027` — separately `@implemented-and-validated` under ADR 0031; it reuses this ADR's canonical job, fencing, retry, and data path without changing this decision.
 - `REQ-DIST-004-A..C` — PA-6 modeled missing/corrupt-replica findings and healing plans; planning evidence only.
 - `REQ-UPLOAD-006` — committed integrity metadata and single-pass GET corruption detection.
 - `REQ-CLUSTER-019` and `REQ-CLUSTER-020` — implemented-and-validated S3 repair Business Need scenarios for real-process WebTestClient and AWS CLI modes.
@@ -266,3 +267,4 @@ This is bounded evidence only. It is not evidence of general chaos, broad partit
 - ADR 0025 — Conditional chunking and storage-artifact taxonomy.
 - ADR 0027 — Authoritative cluster control plane and direct quorum data path.
 - ADR 0028 — First three-node cluster implementation baseline.
+- ADR 0031 — Bounded periodic current-reference anti-entropy.

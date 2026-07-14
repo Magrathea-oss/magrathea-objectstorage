@@ -143,7 +143,13 @@ public final class ClusterRepairWorker {
                         .subscribeOn(Schedulers.boundedElastic()),
                 sink -> {
                     metrics.fetched();
+                    RepairExecutionGate.Observation beforePublication =
+                            new RepairExecutionGate.Observation(specification.jobId(),
+                                    claim.claimGeneration(), specification.length());
                     return Mono.fromCompletionStage(replicaReads.fetch(source, request, sink))
+                            .then(executionGate.await(
+                                    RepairExecutionGate.Checkpoint.BEFORE_TARGET_PUBLICATION,
+                                    beforePublication))
                             .then(exactCurrent(specification))
                             .then(Mono.fromCallable(sink::publishVerified)
                                     .subscribeOn(Schedulers.boundedElastic()))

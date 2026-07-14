@@ -326,8 +326,8 @@ jobs:
             mvn -B --no-transfer-progress -Pep10-cluster-tests \
               -pl cluster-control-ratis-infrastructure,cluster-data-grpc-infrastructure,s3-reactive-api-adapter -am \
               -Dsurefire.failIfNoSpecifiedTests=false \
-              -Dtest=PhaseEp10ControlPlaneCucumberTest,PhaseEp10ControlPlaneTlsCucumberTest,PhaseEp10RepairControlCucumberTest,ReqCluster024CucumberTest,PhaseEp10DataPlaneCucumberTest,ReqCluster014ArchitectureContractCucumberTest,PhaseEp10ClusterCoordinationCucumberTest test \
-            2>&1 | tee target/ci-ep10/req-cluster-008-013-021-026-focused-mechanisms.log
+              -Dtest=PhaseEp10ControlPlaneCucumberTest,PhaseEp10ControlPlaneTlsCucumberTest,PhaseEp10RepairControlCucumberTest,ReqCluster024CucumberTest,ReqCluster027CucumberTest,PhaseEp10DataPlaneCucumberTest,ReqCluster014ArchitectureContractCucumberTest,PhaseEp10ClusterCoordinationCucumberTest test \
+            2>&1 | tee target/ci-ep10/req-cluster-008-014-021-027-focused-mechanisms.log
           focused_status=${PIPESTATUS[0]}
           set -e
           cleanup_ep10_jvms
@@ -363,10 +363,12 @@ jobs:
             bootstrap-application/target/ep10/three-node/*.log
             cluster-control-ratis-infrastructure/target/cucumber-json/ep10-*.json
             cluster-control-ratis-infrastructure/target/cucumber-json/req-cluster-024.json
+            cluster-control-ratis-infrastructure/target/cucumber-json/req-cluster-027.json
             cluster-control-ratis-infrastructure/target/surefire-reports/*PhaseEp10ControlPlaneCucumberTest*
             cluster-control-ratis-infrastructure/target/surefire-reports/*PhaseEp10ControlPlaneTlsCucumberTest*
             cluster-control-ratis-infrastructure/target/surefire-reports/*PhaseEp10RepairControlCucumberTest*
             cluster-control-ratis-infrastructure/target/surefire-reports/*ReqCluster024CucumberTest*
+            cluster-control-ratis-infrastructure/target/surefire-reports/*ReqCluster027CucumberTest*
             cluster-control-ratis-infrastructure/target/ep10/three-node/
             cluster-data-grpc-infrastructure/target/cucumber-json/ep10-*.json
             cluster-data-grpc-infrastructure/target/surefire-reports/*PhaseEp10DataPlaneCucumberTest*

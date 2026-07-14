@@ -37,7 +37,7 @@ Publication is ordered in two stages: direct data transfer first, authoritative 
 
 Ratis control and replica data use different internal servers, ports, executors, bounds, metrics, and lifecycle ownership. Both use mTLS bound to the expected stable node identity. The grpc-java bridge limits payload frames to 64 KiB and explicitly bounds demand, queues, in-flight frames, deadlines, idle timeout, retries, and terminal cleanup. Test-local certificates establish exercised peer authentication only; production enrollment, custody, rotation, revocation, expiry handling, and recovery remain absent.
 
-This concept does not extend single-node multipart/versioning/EC support into cluster mode. Dynamic membership, clustered multipart, conditional/versioned and chunked writes, erasure coding, broad periodic anti-entropy, rebalance, orphan cleanup, rolling upgrades, and broader partition behavior remain future work. Bounded current-generation repair is documented separately below.
+This concept does not extend single-node multipart/versioning/EC support into cluster mode. Dynamic membership, clustered multipart, conditional/versioned and chunked writes, erasure coding, rebalance, orphan cleanup, rolling upgrades, and broader partition behavior remain future work. Bounded current-generation repair and bounded periodic current-reference discovery are documented separately below; wider anti-entropy/healing topologies remain absent.
 
 === Repository-rooted Cluster Architecture Contract (`REQ-CLUSTER-014`)
 
@@ -130,7 +130,32 @@ Snapshot/log replay and leader change preserve one logical job and its fences. S
 
 ==== Explicit deferrals
 
-Prepared-artifact intents, retirement tombstones, orphan cleanup, rebalance, broad periodic anti-entropy, adding an unacknowledged third placement, dynamic membership/node replacement, erasure coding, chunk repair, multipart, conditional/versioned operations, and broader/asymmetric partitions require separate requirements and decisions.
+Prepared-artifact intents, retirement tombstones, orphan cleanup, rebalance, anti-entropy beyond bounded fixed A/B/C current-reference obligations, adding an unacknowledged third placement, dynamic membership/node replacement, erasure coding, chunk repair, multipart, conditional/versioned operations, and broader/asymmetric partitions require separate requirements and decisions.
+
+=== Bounded Periodic Current-reference Anti-entropy (accepted ADR 0031)
+
+[NOTE]
+====
+Status: *implementation-informed / bounded*. `REQ-CLUSTER-027` is `@implemented-and-validated` for exactly 2 scenarios / 36 steps. Broad `REQ-CLUSTER-017` and EP-10 remain partial.
+====
+
+==== Canonical pages and process-local cursor
+
+Ratis exposes a read-only `ReferencePage` of only current `ObjectReferenceGeneration` records in canonical bucket/object-key order. The positive caller limit is capped at 256; malformed/trailing encodings, oversized pages, inconsistent last-record cursors, and non-terminal empty pages fail closed. The returned cursor is exclusive and identifies the last record. A page sequence reads applied current state; it is not one frozen consensus snapshot.
+
+`ClusterAntiEntropyScheduler` stores that cursor only in process memory. It advances after every page record and required durable ensure completes, remains unchanged on query/probe/ensure failure, resets after a terminal page, and starts before the first page when the scheduler is reconstructed. Repeated first-page work is expected and deduplicates through ADR 0029. No cursor enters the control log or snapshot.
+
+==== Named-obligation inspection and serial bounds
+
+Each fixed node inspects only current references naming its stable UUID. It serially probes one local target at a time for existence, committed length, and SHA-256 on `boundedElastic`. Exact targets cause no repair operation. Missing/corrupt targets delegate to the existing repair coordinator, consensus lifecycle, claim/session fences, retry scheduler, UUID-bound mTLS replica data path, and fsync/atomic publication rules. The discovery cycle owns at most one page and one target probe; overlap is counted and rejected rather than silently widening concurrency.
+
+==== Failure, lifecycle, observability, and authority
+
+Query, probe, or ensure failure aborts the page without cursor progress and is retried by a later periodic cycle. Repair failure remains committed retryable/blocked repair state and is not counted as discovery success. Current-reference races are rejected during ensure or by the existing pre-publication/current-success fences; later cycles discover a new generation under a distinct canonical job. Closing the scheduler cancels delayed work and leaves no active page or target probe.
+
+Process-local status exposes bounded cycle/page/record, exact/missing/corrupt, query/probe/ensure/repair failure, retry, reset, stale, deduplication, overlap, active, and closed counters/flags without payloads, cursor values, or credentials. These values are observability, not durable authority.
+
+PA-6 `AntiEntropyPlanner` findings/plans remain pure planner output and are never execution evidence. Object payloads remain outside Ratis. This concept adds no rebalance, automated orphan cleanup, reference rewriting, wider topology/healing, production-scale fairness/capacity, ADR 0030 general chaos, or production-readiness claim. See link:../../adr/0031-bounded-periodic-current-reference-anti-entropy.md[ADR 0031].
 
 [[concept-reactive-payload-pipeline]]
 === Repository-wide Reactive Payload Pipeline
@@ -548,12 +573,12 @@ AWS CLI v2 does NOT send `Content-Type` by default unless `--content-type` is ex
 
 [NOTE]
 ====
-Status: *planned / not implemented beyond the bounded ADR 0028 and ADR 0029 slices*. The implemented identity, transport, publication, and current-generation repair subsets are documented above; this section records only the remaining target.
+Status: *planned / not implemented beyond the bounded ADR 0028, ADR 0029, and ADR 0031 slices*. The implemented identity, transport, publication, current-generation repair, and fixed A/B/C periodic current-reference discovery subsets are documented above; this section records only the remaining target.
 ====
 
 **Membership and authority.** Consensus-controlled admission, catch-up, promotion, demotion, replacement, removal, topology/policy epochs, fencing, tombstones, wider namespace/configuration generations, and durable jobs beyond bounded repair remain future work. Health suspicion must not become membership mutation.
 
-**Transfer and reads.** Chunked, multipart, conditional/versioned, and EC transfer/reconstruction are not implemented in cluster mode. Bounded current-generation whole-object repair is implemented under ADR 0029; broad periodic anti-entropy, rebalance, and automated orphan cleanup remain absent rather than inferred from that repair or from `N=3/W=2` replication.
+**Transfer and reads.** Chunked, multipart, conditional/versioned, and EC transfer/reconstruction are not implemented in cluster mode. Bounded current-generation whole-object repair is implemented under ADR 0029, and bounded periodic inspection of fixed A/B/C current named obligations is implemented under ADR 0031. Wider anti-entropy/healing topologies, rebalance, and automated orphan cleanup remain absent rather than inferred from those slices or from `N=3/W=2` replication.
 
 **Operations and security.** Production certificate enrollment/rotation/revocation/recovery, rolling and mixed-version upgrades, broader partition handling, online multi-node backup/DR, and deployment hardening require separate evidence. Test-local mTLS and one-coordinator-stop validation do not satisfy these obligations.
 

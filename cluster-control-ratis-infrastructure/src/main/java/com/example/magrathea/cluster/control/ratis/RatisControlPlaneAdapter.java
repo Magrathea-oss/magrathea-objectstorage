@@ -47,6 +47,10 @@ public final class RatisControlPlaneAdapter implements ClusterControlPlanePort {
     @Override public Mono<ObjectReferenceGeneration> objectReference(String bucket, String objectKey) {
         return query(ControlPlaneCodec.queryReference(bucket, objectKey)).map(this::referenceResult);
     }
+    @Override public Mono<ReferencePage> currentReferences(ReferencePageQuery pageQuery) {
+        return query(ControlPlaneCodec.queryReferences(pageQuery)).map(result ->
+                ControlPlaneCodec.decodeReferencePage(success(result, "P")));
+    }
     @Override public Mono<RepairCommandResult> ensureRepair(RepairCommands.Ensure command) { return repair(command); }
     @Override public Mono<RepairCommandResult> claimRepair(RepairCommands.Claim command) { return repair(command); }
     @Override public Mono<RepairCommandResult> renewRepair(RepairCommands.Renew command) { return repair(command); }

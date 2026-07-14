@@ -19,7 +19,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 === Summary
 
 * Feature files scanned: 34
-* Scenarios discovered: 527
+* Scenarios discovered: 529
 * Protocol-smoke scenarios: 122
 
 ==== Status tag counts
@@ -29,7 +29,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |Tag |Scenario count
 |`@absent` |3
 |`@config-only` |69
-|`@implemented-and-validated` |235
+|`@implemented-and-validated` |237
 |`@implemented-not-e2e-validated` |22
 |`@not-implemented` |11
 |`@partial` |5
@@ -67,7 +67,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |`@tracing-inspection-required` |2
 |`@visual-regression-required` |1
 |`@webclient-required` |307
-|`unknown/not-tagged` |110
+|`unknown/not-tagged` |112
 |===
 
 ==== Classification tag counts
@@ -75,8 +75,8 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 [cols="1,1",options="header"]
 |===
 |Tag |Scenario count
-|`@functional-requirement` |277
-|`@non-functional-requirement` |190
+|`@functional-requirement` |279
+|`@non-functional-requirement` |192
 |`unknown/not-tagged` |205
 |===
 
@@ -14853,7 +14853,8 @@ This feature specifies internal mechanism evidence. It complements, but cannot r
 Business Need in "requirements/phase-ep10-three-node-s3-cluster.feature". No gRPC or Ratis endpoint is a
 supported client endpoint. The implemented-and-validated mechanism scope includes the fixed first slice
 covered by REQ-CLUSTER-008 through REQ-CLUSTER-013, the repository-rooted architecture contract covered by
-REQ-CLUSTER-014, and the bounded repair scopes covered by REQ-CLUSTER-021 through REQ-CLUSTER-026. For
+REQ-CLUSTER-014, the bounded repair scopes covered by REQ-CLUSTER-021 through REQ-CLUSTER-026, and bounded
+periodic current-reference anti-entropy covered by REQ-CLUSTER-027. For
 REQ-CLUSTER-014 only, the focused internal Ability gate parses Maven dependencies, tracked production Java
 through JDK ASTs, and the versioned proto3 contract; executes "scripts/check-module-layering.sh"; and fails
 closed for missing, unreadable, empty, or malformed inputs with exact paths and protected-input hash
@@ -14866,9 +14867,9 @@ persisted Ratis voter state, actual grpc-java mTLS reads from source C, FileLoca
 publication, and filesystem inspection, snapshot-write interruption, withheld completion replies,
 exact-target no-recopy reconciliation, stale-token fencing, and live A-to-C leader transfer. That internal
 Ability validation mode is the requirement's only agreed mode; REQ-CLUSTER-024 is not S3 behavior and does
-not require WebTestClient or AWS CLI validation. This bounded repair evidence does not mark the whole EP-10
-mechanism backlog complete and excludes orphan cleanup, rebalance, broad or periodic anti-entropy, dynamic
-membership, and erasure coding.
+not require WebTestClient or AWS CLI validation. These bounded repair and discovery gates do not mark the
+whole EP-10 mechanism backlog complete and exclude orphan cleanup, rebalance, anti-entropy beyond fixed A/B/C
+current-reference obligations, dynamic membership, and erasure coding.
 Fixed node configuration:
 | node | stable UUID                          | Ratis address   | replica address | identity root                              | Ratis root                           | object root                            | temporary root                          | runtime root                          |
 | A    | 11111111-1111-4111-8111-111111111111 | 127.0.0.1:19801 | 127.0.0.1:19901 | target/ep10/three-node/node-a/identity     | target/ep10/three-node/node-a/ratis | target/ep10/three-node/node-a/objects | target/ep10/three-node/node-a/temporary | target/ep10/three-node/node-a/runtime |
@@ -14886,7 +14887,7 @@ generated as 196625 bytes where byte at zero-based offset i is i modulo 251. Its
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:41`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:42`
 |Rule |Fixed bootstrap creates three stable voters without pretending to support membership changes
 |Requirement ID(s) |`REQ-CLUSTER-008`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -14918,7 +14919,7 @@ generated as 196625 bytes where byte at zero-based offset i is i modulo 251. Its
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:55`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:56`
 |Rule |The control log orders references while direct transfer owns data volume
 |Requirement ID(s) |`REQ-CLUSTER-009`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -14953,7 +14954,7 @@ generated as 196625 bytes where byte at zero-based offset i is i modulo 251. Its
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:70`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:71`
 |Rule |The control log orders references while direct transfer owns data volume
 |Requirement ID(s) |`REQ-CLUSTER-010`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -14995,7 +14996,7 @@ generated as 196625 bytes where byte at zero-based offset i is i modulo 251. Its
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:91`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:92`
 |Rule |Direct replica streaming has finite demand and prompt terminal cleanup
 |Requirement ID(s) |`REQ-CLUSTER-011`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -15030,7 +15031,7 @@ generated as 196625 bytes where byte at zero-based offset i is i modulo 251. Its
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:106`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:107`
 |Rule |Direct replica streaming has finite demand and prompt terminal cleanup
 |Requirement ID(s) |`REQ-CLUSTER-012`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -15070,7 +15071,7 @@ generated as 196625 bytes where byte at zero-based offset i is i modulo 251. Its
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:125`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:126`
 |Rule |Cluster transports are mutually authenticated internal infrastructure
 |Requirement ID(s) |`REQ-CLUSTER-013`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -15103,7 +15104,7 @@ generated as 196625 bytes where byte at zero-based offset i is i modulo 251. Its
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:140`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:141`
 |Rule |Mechanism boundaries keep infrastructure out of policy and S3 concerns out of cluster protocols
 |Requirement ID(s) |`REQ-CLUSTER-014`
 |Classification |`@non-functional-requirement`
@@ -15143,7 +15144,7 @@ generated as 196625 bytes where byte at zero-based offset i is i modulo 251. Its
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:170`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:171`
 |Rule |Consensus owns one deterministic repair job for one current replica obligation
 |Requirement ID(s) |`REQ-CLUSTER-021`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -15177,7 +15178,7 @@ generated as 196625 bytes where byte at zero-based offset i is i modulo 251. Its
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:186`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:187`
 |Rule |The repair lifecycle is explicit deterministic consensus state
 |Requirement ID(s) |`REQ-CLUSTER-022`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -15222,7 +15223,7 @@ generated as 196625 bytes where byte at zero-based offset i is i modulo 251. Its
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:210`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:211`
 |Rule |Claim generation and process session jointly reject stale workers
 |Requirement ID(s) |`REQ-CLUSTER-023`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -15258,7 +15259,7 @@ generated as 196625 bytes where byte at zero-based offset i is i modulo 251. Its
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:228`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:229`
 |Rule |Repair remains idempotent across worker crashes process restarts snapshots and leader changes
 |Requirement ID(s) |`REQ-CLUSTER-024`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -15318,7 +15319,7 @@ generated as 196625 bytes where byte at zero-based offset i is i modulo 251. Its
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:267`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:268`
 |Rule |A repair job cannot outlive the exact current-reference obligation
 |Requirement ID(s) |`REQ-CLUSTER-025`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -15359,7 +15360,7 @@ generated as 196625 bytes where byte at zero-based offset i is i modulo 251. Its
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:287`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:288`
 |Rule |Snapshot version 2 recovers repair state and safely migrates version 1
 |Requirement ID(s) |`REQ-CLUSTER-026`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -15394,7 +15395,7 @@ generated as 196625 bytes where byte at zero-based offset i is i modulo 251. Its
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:311`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:312`
 |Rule |Capabilities beyond the first fixed three-node slice remain explicit backlog
 |Requirement ID(s) |`REQ-CLUSTER-015`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -15421,7 +15422,7 @@ generated as 196625 bytes where byte at zero-based offset i is i modulo 251. Its
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:318`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:319`
 |Rule |Capabilities beyond the first fixed three-node slice remain explicit backlog
 |Requirement ID(s) |`REQ-CLUSTER-016`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -15443,6 +15444,86 @@ generated as 196625 bytes where byte at zero-based offset i is i modulo 251. Its
   And edits to seeds, address changes, health suspicion, or certificate replacement cannot be presented as those capabilities
 ----
 
+===== REQ-CLUSTER-027
+
+====== Scenario: Bounded periodic discovery repairs only damaged current replicas named for each fixed node
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:328`
+|Rule |Capabilities beyond the first fixed three-node slice remain explicit backlog
+|Requirement ID(s) |`REQ-CLUSTER-027`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@spec`, `@phase-ep10`, `@cluster`, `@multi-node`, `@internal-api`, `@healing`, `@anti-entropy`, `@periodic`, `@durability`, `@backpressure`, `@restart-safety`, `@consensus`, `@grpc`, `@mtls`, `@filesystem`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-ep10`, `@cluster`, `@multi-node`, `@internal-api`, `@REQ-CLUSTER-027`, `@functional-requirement`, `@non-functional-requirement`, `@healing`, `@anti-entropy`, `@periodic`, `@durability`, `@backpressure`, `@restart-safety`, `@consensus`, `@grpc`, `@mtls`, `@filesystem`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given validation mode "fixed A/B/C Ratis current-reference paging with real filesystem targets, actual grpc-java UUID-bound mTLS repair, consensus and filesystem inspection, and query, probe, repair, page, overlap, and replica-read counters" is selected for requirement "REQ-CLUSTER-027"
+  And fixture "s3-reactive-api-adapter/src/test/resources/fixtures/upload/large-object.bin" has length 134 and SHA-256 "46918899a9ddbe1d1c2f1613416501b3e8d7cdbc2a63a78298d0cc3ee388e800"
+  And current consensus contains these "WHOLE_OBJECT" ObjectReferenceGeneration records in canonical bucket, object-key, and generation order:
+  And each named source artifact under "target/ep10/three-node/node-a/objects" or "target/ep10/three-node/node-c/objects" is independently equal to that fixture
+  And the consensus page limit is 2, the inter-page operator is concat-style serial continuation, and one node may own at most one active discovery page and one bounded repair execution
+  When the focused periodic anti-entropy gate executes bounded cycles
+  Then Ratis exposes only current ObjectReferenceGeneration records as bounded pages in that canonical order
+  And each non-terminal page has an exclusive cursor equal to its last record and the next page contains only records strictly after that cursor
+  And invalid page limits and cursors, malformed query or page encodings, trailing input, and decoded pages above hard limit 256 fail closed
+  And no page exceeds limit 2, no cycle materializes all references, and page, probe, ensure, and repair counters show no overlapping page or target processing
+  And periodic cycles on fixed nodes A, B, and C inspect only current references whose named replica UUID set contains that local node
+  And B never probes or repairs "whole-ae-other-7f351d76-50d8-4f48-9b86-004.artifact" because its current reference does not name B
+  And each local named target is probed for existence and, when present, verified against the committed length 134 and committed SHA-256 before repair is considered
+  And every local filesystem probe executes on Reactor boundedElastic rather than a caller or event-loop thread
+  And closing B's process-local discovery scheduler while a bounded page response is delayed cancels that active cycle and leaves no active page or target probe
+  And the missing and corrupt B obligations each durably ensure exactly one existing canonical consensus-owned repair job bound to bucket, key, generation, artifact, and B UUID "22222222-2222-4222-8222-222222222222"
+  And duplicate observations do not create another job, transition, claim, or publication
+  And existing exact-current claim and publication fences execute each required repair from a different verified named replica over an actual grpc-java RPC with UUID-bound mutual TLS
+  And the repaired B targets are byte-for-byte equal to the fixture while the already exact B target causes zero repair ensures, claims, replica-read RPCs, or replacement publications
+----
+
+====== Scenario: Cursor recovery failures and reference races remain bounded safe and retryable across cycles
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:355`
+|Rule |Capabilities beyond the first fixed three-node slice remain explicit backlog
+|Requirement ID(s) |`REQ-CLUSTER-027`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@spec`, `@phase-ep10`, `@cluster`, `@multi-node`, `@internal-api`, `@healing`, `@anti-entropy`, `@periodic`, `@durability`, `@backpressure`, `@restart-safety`, `@consensus`, `@observability`, `@failure-handling`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-ep10`, `@cluster`, `@multi-node`, `@internal-api`, `@REQ-CLUSTER-027`, `@functional-requirement`, `@non-functional-requirement`, `@healing`, `@anti-entropy`, `@periodic`, `@durability`, `@backpressure`, `@restart-safety`, `@consensus`, `@observability`, `@failure-handling`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given validation mode "fixed A/B/C Ratis current-reference paging with real filesystem targets, actual grpc-java UUID-bound mTLS repair, consensus and filesystem inspection, and query, probe, repair, page, overlap, and replica-read counters" is selected for requirement "REQ-CLUSTER-027"
+  And a process-local exclusive cursor starts before the first canonical current reference with configured page limit 2
+  And later cycles inject one bounded current-reference query failure, one local target probe failure, one repair ensure failure, and one fenced repair execution failure
+  And two current generation 7 obligations for bucket "ep10-anti-entropy-archive" race independently: key "evidence/2026/anti-entropy/ensure-reference-race.bin" changes to generation 8 before a stale ensure, while key "evidence/2026/anti-entropy/publication-reference-race.bin" changes to generation 8 at typed gate "BEFORE_TARGET_PUBLICATION" after transfer and before the final exact-current recheck and target publication
+  When the focused periodic anti-entropy gate executes bounded cycles
+  Then the process-local cursor advances only after every record in a page has completed inspection and any required durable ensure
+  And a query, probe, or ensure failure leaves that page cursor unadvanced, increments a labeled failure counter without logging object bytes or credentials, and is retried by a later periodic cycle
+  And a fenced repair execution failure remains explicit committed retryable repair state and is retried by existing repair execution rather than counted as discovery success
+  And after a terminal page the next periodic cycle resets to the first page instead of polling forever after the terminal cursor
+  And after B's process-local discovery and repair schedulers are closed and reconstructed in the same JVM, B begins discovery at the first page without persisting or trusting its prior process-local cursor
+  And repeated first-page discovery after B scheduler reconstruction deduplicates through the canonical consensus-owned repair identity and command results
+  And the distinct generation 7 work changed before ensure or at "BEFORE_TARGET_PUBLICATION" is rejected or made "OBSOLETE", and the publication-race target remains absent until current work repairs it
+  And a later cycle discovers both generation 8 references and ensures their distinct canonical obligations without rewriting either current reference
+  And after B's process-local schedulers are closed their inspection reports no active discovery page, target probe, or repair scan
+  And inspection exposes cycle, page, record, exact-target, missing-target, corrupt-target, query-failure, probe-failure, ensure-failure, repair-failure, retry, cursor-reset, stale-reference, deduplication, overlap, and grpc replica-read counters
+  And PA-6 AntiEntropyPlanner findings or plans remain planner output and are never treated as an ensure, claim, transfer, publication, repair success, or execution counter
+  But this bounded gate excludes rebalance, orphan cleanup, dynamic membership, broad partitions, erasure coding, chunks, multipart, versioning, production scale or readiness, and ADR 0030 general chaos
+----
+
 ===== REQ-CLUSTER-017
 
 ====== Scenario: Bounded current-generation repair does not imply broad healing rebalance or cleanup
@@ -15450,7 +15531,7 @@ generated as 196625 bytes where byte at zero-based offset i is i modulo 251. Its
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:327`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:375`
 |Rule |Capabilities beyond the first fixed three-node slice remain explicit backlog
 |Requirement ID(s) |`REQ-CLUSTER-017`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -15465,10 +15546,10 @@ generated as 196625 bytes where byte at zero-based offset i is i modulo 251. Its
 [source,gherkin]
 ----
   Given PA-6 can model healing and rebalance plans without executing their data side effects
-  And REQ-CLUSTER-019, REQ-CLUSTER-020, REQ-CLUSTER-021, REQ-CLUSTER-022, REQ-CLUSTER-023, REQ-CLUSTER-024, REQ-CLUSTER-025, and REQ-CLUSTER-026 are "implemented-and-validated" within their bounded repair scopes
+  And REQ-CLUSTER-019, REQ-CLUSTER-020, REQ-CLUSTER-021, REQ-CLUSTER-022, REQ-CLUSTER-023, REQ-CLUSTER-024, REQ-CLUSTER-025, REQ-CLUSTER-026, and REQ-CLUSTER-027 are "implemented-and-validated" within their bounded repair and discovery scopes
   When cluster execution status is reported against production behavior and semantic validation
-  Then bounded current-generation whole-object repair is "implemented-and-validated" only within those narrower requirement scopes
-  But REQ-CLUSTER-017 remains "partial" because broad or periodic anti-entropy execution, rebalance execution, and automated orphan cleanup remain "absent"
+  Then bounded current-generation whole-object repair and bounded periodic current-generation fixed A/B/C anti-entropy are "implemented-and-validated" only within those narrower requirement scopes
+  But REQ-CLUSTER-017 remains "partial" because rebalance execution, automated orphan cleanup, and wider healing or topology coverage remain "absent"
   And no planner result, dry run, job schema, route, or in-memory scheduler is reported as copied, repaired, rebalanced, or reclaimed data
 ----
 
@@ -15479,7 +15560,7 @@ generated as 196625 bytes where byte at zero-based offset i is i modulo 251. Its
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:336`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:384`
 |Rule |Capabilities beyond the first fixed three-node slice remain explicit backlog
 |Requirement ID(s) |`REQ-CLUSTER-018`
 |Classification |`@functional-requirement`, `@non-functional-requirement`

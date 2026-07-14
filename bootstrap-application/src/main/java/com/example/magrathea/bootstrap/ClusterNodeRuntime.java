@@ -8,6 +8,7 @@ import com.example.magrathea.cluster.data.grpc.GrpcReplicaServer;
 import com.example.magrathea.cluster.data.grpc.ReplicaTlsConfig;
 import com.example.magrathea.cluster.data.grpc.ReplicaTransferFaultPlan;
 import com.example.magrathea.cluster.data.grpc.ReplicaTransferMetrics;
+import com.example.magrathea.storageengine.cluster.application.ClusterAntiEntropyScheduler;
 import com.example.magrathea.storageengine.cluster.application.ClusterControlPlanePort;
 import com.example.magrathea.storageengine.cluster.application.ClusterMember;
 import com.example.magrathea.storageengine.cluster.application.ClusterRepairCoordinator;
@@ -18,6 +19,7 @@ import com.example.magrathea.storageengine.cluster.application.ClusterWriteCoord
 import com.example.magrathea.storageengine.cluster.application.LocalArtifactPort;
 import com.example.magrathea.storageengine.cluster.application.MembershipSnapshot;
 import com.example.magrathea.storageengine.cluster.application.NodeIdentity;
+import com.example.magrathea.storageengine.cluster.application.ReferencePageQuery;
 import com.example.magrathea.storageengine.cluster.application.ReferencePublicationBarrier;
 import com.example.magrathea.storageengine.cluster.application.RepairExecutionGate;
 import com.example.magrathea.storageengine.cluster.application.ReplicaReadPort;
@@ -59,6 +61,7 @@ public final class ClusterNodeRuntime implements SmartLifecycle, AutoCloseable {
     private final ClusterRepairMetrics repairMetrics;
     private final ClusterRepairScheduler repairScheduler;
     private final ClusterRepairCoordinator repairCoordinator;
+    private final ClusterAntiEntropyScheduler antiEntropyScheduler;
     private volatile GrpcReplicaServer dataServer;
     private volatile boolean running;
 
@@ -149,6 +152,15 @@ public final class ClusterNodeRuntime implements SmartLifecycle, AutoCloseable {
                 Clock.systemUTC(), Duration.ofMillis(250));
         this.repairCoordinator = new ClusterRepairCoordinator(localIdentity, controlPlane, artifacts,
                 repairScheduler, repairMetrics, Clock.systemUTC());
+        ClusterProfileProperties.AntiEntropy antiEntropy = Objects.requireNonNull(
+                properties.getAntiEntropy(), "antiEntropy");
+        Duration antiEntropyInterval = positive(
+                antiEntropy.getInterval(), "anti-entropy interval");
+        int antiEntropyPageSize = antiEntropy.getPageSize();
+        new ReferencePageQuery(null, antiEntropyPageSize);
+        this.antiEntropyScheduler = new ClusterAntiEntropyScheduler(localIdentity, controlPlane,
+                artifacts, repairCoordinator, repairScheduler, antiEntropyInterval,
+                antiEntropyPageSize, () -> repairScheduler.status().scanFailures());
     }
 
     public NodeIdentity localIdentity() { return localIdentity; }
@@ -159,6 +171,9 @@ public final class ClusterNodeRuntime implements SmartLifecycle, AutoCloseable {
     public ClusterRepairCoordinator repairCoordinator() { return repairCoordinator; }
     public ClusterRepairMetrics repairMetrics() { return repairMetrics; }
     public ClusterRepairScheduler.Status repairSchedulerStatus() { return repairScheduler.status(); }
+    public ClusterAntiEntropyScheduler.Status antiEntropyStatus() {
+        return antiEntropyScheduler.status();
+    }
     public String processSession() { return processSession; }
     public long publishedOpenCount(String artifactId) { return artifacts.publishedOpenCount(artifactId); }
 
@@ -172,8 +187,10 @@ public final class ClusterNodeRuntime implements SmartLifecycle, AutoCloseable {
                     new ReplicaTransferMetrics(),
                     properties.getDeadlines().getSlowReplicaAcceptance(), transferFaultPlan).start();
             repairScheduler.start();
+            antiEntropyScheduler.start();
             running = true;
         } catch (IOException | RuntimeException failure) {
+            antiEntropyScheduler.close();
             repairScheduler.close();
             if (dataServer != null) dataServer.close();
             dataServer = null;
@@ -205,6 +222,7 @@ public final class ClusterNodeRuntime implements SmartLifecycle, AutoCloseable {
     public synchronized void stop() {
         if (!running && dataServer == null) return;
         running = false;
+        antiEntropyScheduler.close();
         repairScheduler.close();
         if (dataServer != null) dataServer.close();
         dataServer = null;

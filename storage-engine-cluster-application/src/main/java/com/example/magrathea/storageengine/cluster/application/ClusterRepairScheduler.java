@@ -86,6 +86,11 @@ public final class ClusterRepairScheduler implements ClusterRepairWorkerPort, Au
                 .filter(job -> job.specification().target().equals(localNode))
                 .take(MAXIMUM_JOBS_PER_SCAN)
                 .concatMap(job -> worker.claimAndRepair(job.jobId())
+                        .doOnNext(result -> {
+                            if (result.state() == RepairState.RETRY_WAIT) {
+                                recordFailure("WORKER");
+                            }
+                        })
                         .onErrorResume(failure -> {
                             recordFailure("WORKER");
                             return Mono.empty();

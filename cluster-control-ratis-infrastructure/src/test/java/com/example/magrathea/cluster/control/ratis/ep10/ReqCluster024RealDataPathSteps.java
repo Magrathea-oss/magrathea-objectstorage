@@ -771,6 +771,7 @@ public final class ReqCluster024RealDataPathSteps {
                         RepairExecutionGate.Checkpoint.BEFORE_CLAIM_PROPOSED,
                         RepairExecutionGate.Checkpoint.CLAIM_COMMITTED_BEFORE_TRANSFER,
                         RepairExecutionGate.Checkpoint.PAYLOAD_BYTES_STAGED,
+                        RepairExecutionGate.Checkpoint.BEFORE_TARGET_PUBLICATION,
                         RepairExecutionGate.Checkpoint.TARGET_DURABLY_PUBLISHED_BEFORE_COMPLETION,
                         RepairExecutionGate.Checkpoint
                                 .COMPLETION_COMMITTED_BEFORE_ACKNOWLEDGEMENT)

@@ -6,7 +6,7 @@
 
 **Magrathea ObjectStore** is an AWS S3-compatible object store built with Spring Boot 4 WebFlux and Java 21. The public object API is the S3 REST API exposed by the pluggable `s3-reactive-api-adapter` module. In addition, `admin-api-adapter` exposes `/admin/**` endpoints for storage policy, device, and configuration management — these are internal/administrative APIs, separate from the S3 object API.
 
-> **Current cluster status:** EP-10 is **partial**. Fixed A/B/C consensus publication/failover and bounded current-generation whole-object repair are implemented and validated for `REQ-CLUSTER-001..005`, `008..013`, and `019..026`, including the seven-point real-filesystem/gRPC interruption scope in `024`. `REQ-CLUSTER-014` is separately implemented and validated only as an internal repository-rooted source/build architecture contract; it is not S3 behavior and proves no runtime side effect. Broad healing `017` remains partial; `006/007/015/016/018` remain not implemented. General chaos, broad partition tolerance, rolling upgrade, dynamic membership, periodic anti-entropy, rebalance, orphan cleanup, broader transfer semantics, and production readiness remain outside the validated scope.
+> **Current cluster status:** EP-10 is **partial**. Fixed A/B/C consensus publication/failover, bounded current-generation whole-object repair, and bounded periodic current-reference anti-entropy are implemented and validated for `REQ-CLUSTER-001..005`, `008..013`, and `019..027`; focused `027` evidence is **2 scenarios / 36 steps**, and `024` retains its seven-point real-filesystem/gRPC interruption scope. `REQ-CLUSTER-014` is separately implemented and validated only as an internal repository-rooted source/build architecture contract; it is not S3 behavior and proves no runtime side effect. Broad `017` remains partial because rebalance, automated orphan cleanup, and wider healing/topology coverage remain absent; `006/007/015/016/018` remain not implemented. General chaos, broad partition tolerance, rolling upgrade, dynamic membership, broader transfer semantics, and production readiness remain outside the validated scope.
 
 **Architecture:** [ARC42 entry point](docs/arc42/arc42-template.adoc) · [C4 model](docs/c4/README.md) · [Executable requirements appendix](docs/arc42/generated/gherkin-requirements.adoc) · [Focused evidence](docs/test-report.md)
 
@@ -31,7 +31,7 @@
 - **Jackson 3 XML** — `tools.jackson.dataformat:jackson-dataformat-xml` with custom WebFlux encoder
 - **Pure domain** — no Spring, no JPA, no reactive types in `object-store-domain`
 - **In-memory infrastructure** — reactive in-memory bucket, object, and multipart repositories
-- **Testing** — JUnit, Cucumber, targeted AWS CLI compatibility; the Java 21 EP-10 shared real-process gate passes 14 scenarios / 188 steps for `001..005/019/020` (repair-only `019/020`: 4 / 80). The 2026-07-14 focused `024` gate passes 7 / 168, repair control passes 22 / 294, and data-plane regression passes 4 / 40; full S3 and cluster capability parity is not complete. **JaCoCo is the current coverage baseline** (Clover/OpenClover is optional/legacy)
+- **Testing** — JUnit, Cucumber, targeted AWS CLI compatibility; the Java 21 EP-10 shared real-process gate passes 14 scenarios / 188 steps for `001..005/019/020` (repair-only `019/020`: 4 / 80). The 2026-07-14 focused `024` gate passes 7 / 168, focused periodic current-reference `027` passes **2 / 36**, repair control passes 22 / 294, and data-plane regression passes 4 / 40; full S3 and cluster capability parity is not complete. **JaCoCo is the current coverage baseline** (Clover/OpenClover is optional/legacy)
 
 ---
 
@@ -46,9 +46,9 @@
 | `object-store-reactive-application` | Reactive application services and DTOs | Native Mono/Flux service APIs |
 | `object-store-reactive-infrastructure` | Reactive in-memory repository implementations | No HTTP API, no S3 router |
 | `object-store-reactive-repository-storage-engine-infrastructure` | Anti-Corruption Layer + adapter: Object Store → Storage Engine | Implements repository interfaces using single-node Storage Engine or bounded cluster repositories |
-| `storage-engine-cluster-application` | Transport-neutral cluster application layer | Fixed-slice control/data ports, `N=3/W=2` whole-object coordination, and bounded repair coordinator/scheduler/worker; no Ratis/gRPC dependencies |
+| `storage-engine-cluster-application` | Transport-neutral cluster application layer | Fixed-slice control/data ports, `N=3/W=2` whole-object coordination, bounded repair, and process-local bounded periodic current-reference discovery; no Ratis/gRPC dependencies |
 | `cluster-protocol` | Internal versioned protobuf contracts | No S3 API or domain policy |
-| `cluster-control-ratis-infrastructure` | Fixed-cluster control infrastructure | Ratis voter/state machine, persisted version-2 repair lifecycle and snapshot migration, fixed bootstrap, control mTLS |
+| `cluster-control-ratis-infrastructure` | Fixed-cluster control infrastructure | Ratis voter/state machine, canonical bounded read-only current-reference pages, persisted version-2 repair lifecycle and snapshot migration, fixed bootstrap, control mTLS |
 | `cluster-data-grpc-infrastructure` | Direct replica transport infrastructure | grpc-java bounded write/read/repair transfer, checksums, deadlines/cancellation, replica mTLS |
 | `storage-engine-domain` | Storage Engine domain model (pure) | Policy, workflow, device, trace, manifest — zero framework dependencies |
 | `storage-engine-reactive-application` | Storage Engine reactive orchestration | Ports, Chunker, ReactiveStorageOrchestrator |
@@ -219,7 +219,7 @@ aws --endpoint-url http://localhost:8080 s3api get-object --bucket test-bucket -
 
 Consolidated Markdown report: [`docs/test-report.md`](docs/test-report.md)
 
-The EP-10 semantic claim comes from its focused shared real-process WebTestClient/AWS CLI gates and focused Ratis/gRPC/cross-module runners documented there. An ordinary root `mvn test` pass is supporting integration evidence only and must not be substituted for the 14-scenario / 188-step shared result, 4-scenario / 80-step repair-only result, or 22-scenario / 210-step repair-control result, nor used to upgrade later EP-10 scope. The current dirty-working-tree root pass is likewise not acceptance supply-chain evidence: `REQ-SUPPLY-001` remains implemented-not-e2e-validated until a clean-revision application SBOM/license/image packet covers all four cluster modules.
+The EP-10 semantic claim comes from its focused shared real-process WebTestClient/AWS CLI gates and focused Ratis/gRPC/cross-module runners documented there. An ordinary root `mvn test` pass is supporting integration evidence only and must not be substituted for the 14-scenario / 188-step shared result, 4-scenario / 80-step repair-only result, 7-scenario / 168-step `024` result, 2-scenario / 36-step `027` result, or 22-scenario / 294-step current repair-control regression, nor used to upgrade later EP-10 scope. The current dirty-working-tree root pass is likewise not acceptance supply-chain evidence: `REQ-SUPPLY-001` remains implemented-not-e2e-validated until a clean-revision application SBOM/license/image packet covers all four cluster modules.
 
 ### Requirements appendix generation
 

@@ -17,6 +17,7 @@ public class ClusterProfileProperties {
     private Roots roots = new Roots();
     private Tls tls = new Tls();
     private Deadlines deadlines = new Deadlines();
+    private AntiEntropy antiEntropy = new AntiEntropy();
 
     public String getNodeId() { return nodeId; }
     public void setNodeId(String nodeId) { this.nodeId = nodeId; }
@@ -32,6 +33,8 @@ public class ClusterProfileProperties {
     public void setTls(Tls tls) { this.tls = tls; }
     public Deadlines getDeadlines() { return deadlines; }
     public void setDeadlines(Deadlines deadlines) { this.deadlines = deadlines; }
+    public AntiEntropy getAntiEntropy() { return antiEntropy; }
+    public void setAntiEntropy(AntiEntropy antiEntropy) { this.antiEntropy = antiEntropy; }
 
     public static class Peer {
         private String name;
@@ -92,6 +95,16 @@ public class ClusterProfileProperties {
         public void setPrivateKey(Path privateKey) { this.privateKey = privateKey; }
         public Path getTrustCertificate() { return trustCertificate; }
         public void setTrustCertificate(Path trustCertificate) { this.trustCertificate = trustCertificate; }
+    }
+
+    public static class AntiEntropy {
+        private Duration interval = Duration.ofSeconds(30);
+        private int pageSize = 16;
+
+        public Duration getInterval() { return interval; }
+        public void setInterval(Duration interval) { this.interval = interval; }
+        public int getPageSize() { return pageSize; }
+        public void setPageSize(int pageSize) { this.pageSize = pageSize; }
     }
 
     public static class Deadlines {

@@ -6,7 +6,7 @@ Date: 2026-07-13
 
 Accepted — architectural authority for the cluster control/data-plane split, approved by the product owner for EP-8 EARLY and implementation-informed by the bounded EP-10 slices.
 
-The repository now implements the fixed A/B/C Ratis and direct whole-object baseline from ADR 0028 plus the bounded current-generation repair refinement in ADR 0029. This does not complete ADR 0027's wider target: dynamic membership, broader namespace/topology lifecycle, clustered multipart/conditional/versioned/chunked or erasure-coded data paths, broad periodic anti-entropy, rebalance, orphan cleanup, rolling upgrades, broader partitions, and production deployment proof remain absent or unvalidated. EP-8 supply-chain status is tracked separately. No production-readiness or general distributed-support claim follows.
+The repository now implements the fixed A/B/C Ratis and direct whole-object baseline from ADR 0028, the bounded current-generation repair refinement in ADR 0029, and bounded periodic current-reference discovery under ADR 0031. This does not complete ADR 0027's wider target: dynamic membership, broader namespace/topology lifecycle, clustered multipart/conditional/versioned/chunked or erasure-coded data paths, anti-entropy beyond fixed A/B/C current-reference obligations, rebalance, orphan cleanup, rolling upgrades, broader partitions, and production deployment proof remain absent or unvalidated. EP-8 supply-chain status is tracked separately. No production-readiness or general distributed-support claim follows.
 
 ## Context
 
@@ -129,7 +129,7 @@ At acceptance time, CycloneDX generation, SPDX normalization, CI wiring, and exp
 - Topology catalogs become richer and require migration/validation of existing YAML. PA-6 policy semantics remain reusable instead of being replaced by transport or consensus code.
 - Ratis reduces the need to implement Raft directly but introduces library fit, lifecycle, storage, upgrade, and reactive-integration risks that must pass the spike and fault-injection gates.
 - Direct data transfer avoids routing large payloads through the leader, while requiring idempotent staging, orphan cleanup, checksummed acknowledgements, and careful coordinator failover.
-- The bounded ADR 0028/0029 implementation evidence upgrades only their exact fixed-cluster requirements. EP-10 remains partial, current complete-reactor supply-chain evidence remains separately qualified, and production readiness remains unclaimed pending the wider membership, fault, upgrade, operation, and artifact-validation evidence.
+- The bounded ADR 0028/0029/0031 implementation evidence upgrades only their exact fixed-cluster requirements. EP-10 remains partial, current complete-reactor supply-chain evidence remains separately qualified, and production readiness remains unclaimed pending the wider membership, healing/topology, rebalance, cleanup, fault, upgrade, operation, and artifact-validation evidence.
 
 ## Alternatives Considered
 
@@ -169,20 +169,21 @@ Rejected by default because availability would be purchased with an acknowledged
 
 Architecture inputs observed before this decision include:
 
-- At decision time, `PLAN.md` classified PA-6 as modeled and unit-validated but not distributed-production-ready and EP-8/EP-10 implementation as absent; that is historical context superseded for bounded slices by ADRs 0028/0029 and current evidence documents.
+- At decision time, `PLAN.md` classified PA-6 as modeled and unit-validated but not distributed-production-ready and EP-8/EP-10 implementation as absent; that is historical context superseded for bounded slices by ADRs 0028/0029/0031 and current evidence documents.
 - `storage-engine-domain/src/main/java/com/example/magrathea/storageengine/domain/distributed/` contains pure placement, quorum, anti-entropy, rebalance, and readiness models. `DistributedReadinessReporter` explicitly retains missing networked-membership, real-replication-execution, and multi-node-e2e capabilities.
 - `storage-engine-domain/src/main/java/com/example/magrathea/storageengine/domain/valueobject/FailureDomain.java` currently models only rack, host, and disk levels; the YAML device/disk-set catalogs do not yet express the complete concrete parent-linked cluster topology.
 - `pom.xml` and `scripts/run-dependency-check.sh` contain the existing opt-in OWASP Dependency-Check monitoring/fail-closed configuration and machine-readable analysis path.
 - `Dockerfile` runs the JVM image as the `magrathea` user, and `scripts/validate-jvm-container-replacement.sh` checks non-root execution for the existing single-node replacement scenario.
 - Domain research observation: `/home/paperboy/.llm-wiki/wiki/sources/obs-2026-07-12-ep-8-authoritative-cluster-and-supply-chain-research-complet.md`.
 
-These were the original decision inputs. Subsequent ADR 0028 evidence implements the fixed A/B/C Ratis/direct whole-object baseline, and ADR 0029 evidence implements bounded current-generation repair. They still do not prove the expanded topology, dynamic membership, wider data semantics, broad anti-entropy/rebalance/cleanup, production cluster operation, or a current complete-reactor SBOM/license/hardening packet.
+These were the original decision inputs. Subsequent ADR 0028 evidence implements the fixed A/B/C Ratis/direct whole-object baseline, ADR 0029 evidence implements bounded current-generation repair, and ADR 0031 evidence implements bounded periodic current-reference discovery for fixed A/B/C. They still do not prove expanded topology, dynamic membership, wider data semantics, anti-entropy beyond current named obligations, rebalance, cleanup, production cluster operation, or a current complete-reactor SBOM/license/hardening packet.
 
 ## Related Requirements
 
 - PA-6 `REQ-DIST-001..006`: modeled distributed placement, quorum, healing, rebalance, and readiness policy.
 - Planned EP-8 `REQ-HA-*` and `REQ-SUPPLY-*`: architecture and supply-chain evidence.
-- EP-10 `REQ-CLUSTER-*`: bounded `001..005`, `008..013`, `019..023`, `025`, and `026` are implemented and validated; `014`, `017`, and `024` are partial; the remaining wider transfer, lifecycle, healing, rebalance, cleanup, and failure semantics retain their explicit absent/not-implemented status.
+- EP-10 `REQ-CLUSTER-*`: bounded `001..005`, `008..014`, and `019..027`, including `024` and `027`, are implemented and validated; broad `017` remains partial; `006/007/015/016/018` remain not implemented.
 - ADR 0014: Storage Engine bounded context.
 - ADR 0019: MIT license and dependency-license compatibility obligation.
 - ADR 0025: conditional chunking and immutable storage-artifact taxonomy.
+- ADR 0031: bounded periodic current-reference anti-entropy; accepted without broadening this ADR's wider target or production-readiness status.

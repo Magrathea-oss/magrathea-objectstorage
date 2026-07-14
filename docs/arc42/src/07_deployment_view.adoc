@@ -119,10 +119,10 @@ CI runs the architecture contract and application evidence job on ordinary workf
 Status: *implementation-informed / partial*. The fixed real-process A/B/C runtime and acceptance topology are validated for the first slice only. This is not a production deployment recommendation or a complete EP-10 deployment.
 ====
 
-.Fixed three-node runtime with bounded repair
-image::../../c4/images/FixedThreeNodeRuntimeDeployment.png[Fixed Three-Node Runtime Deployment with Bounded Repair, width=600]
+.Fixed three-node runtime with bounded repair and discovery
+image::../../c4/images/FixedThreeNodeRuntimeDeployment.png[Fixed Three-Node Runtime Deployment with Bounded Repair and Discovery, width=600]
 
-The diagram shows the implemented fixed-node deployment boundary and accepted ADR 0029 repair responsibilities. The cluster profile starts fixed nodes A, B, and C as separate JVMs. Each JVM co-locates one Ratis voter, one whole-object replica server, and process-local repair coordination/worker execution, and owns distinct persisted identity, Ratis log/snapshot, object, temporary, and runtime roots. Control and data services have separate ports and lifecycle ownership. The implemented version baseline is Ratis 3.2.2/`ratis-grpc`, grpc-java 1.82.2/`grpc-netty-shaded`, and protobuf 3.25.8.
+The diagram shows the implemented fixed-node deployment boundary and accepted ADR 0029 repair responsibilities; ADR 0031 adds process-local bounded current-reference discovery inside the same deployment nodes. The cluster profile starts fixed nodes A, B, and C as separate JVMs. Each JVM co-locates one Ratis voter, one whole-object replica server, process-local repair coordination/worker execution, and one process-local anti-entropy scheduler, and owns distinct persisted identity, Ratis log/snapshot, object, temporary, and runtime roots. Control and data services have separate ports and lifecycle ownership. The implemented version baseline is Ratis 3.2.2/`ratis-grpc`, grpc-java 1.82.2/`grpc-netty-shaded`, and protobuf 3.25.8.
 
 A static manifest is identical on A/B/C and contains their stable UUIDs plus control/data addresses. It bootstraps exactly one three-voter group and does not overwrite recovered non-empty consensus or identity state; reordered seeds are restart-tested. It cannot add, promote, demote, replace, or remove nodes. Health suspicion, timeout, address edits, or seed order are not membership transitions.
 
@@ -135,7 +135,7 @@ The focused S3 acceptance gate starts three Java 21 child JVM processes with sep
 
 Test-local certificate generation proves only that mTLS was exercised in this environment. The Testcontainers 2.0.2 dependency remains pinned but is not the process isolation used by this real-process S3 gate. Ordinary root Maven results remain supporting integration evidence and must not be reported as the focused EP-10 acceptance result.
 
-The implemented runtime covers unconditional `CreateBucket`, whole-object `PUT`/`GET`, and bounded repair of a missing or corrupt target already named by the current reference. Clustered multipart, conditional/versioned or chunked writes, erasure coding, dynamic membership, certificate lifecycle, broad periodic anti-entropy, rebalance, orphan cleanup, rolling upgrade, online multi-node backup/DR, and broader partition behavior remain not implemented or unvalidated. No production distributed-cluster claim is made.
+The implemented runtime covers unconditional `CreateBucket`, whole-object `PUT`/`GET`, bounded repair of a missing or corrupt target already named by the current reference, and bounded periodic inspection of fixed A/B/C current named obligations. Clustered multipart, conditional/versioned or chunked writes, erasure coding, dynamic membership, certificate lifecycle, wider anti-entropy/healing topologies, rebalance, orphan cleanup, rolling upgrade, online multi-node backup/DR, and broader partition behavior remain not implemented or unvalidated. No production distributed-cluster claim is made.
 
 ==== Implemented bounded repair deployment (accepted ADR 0029)
 
@@ -147,7 +147,15 @@ The scheduler is not authority and carries no durable work: startup or committed
 
 The focused 2026-07-14 `REQ-CLUSTER-024` deployment harness passed 7 scenarios / 168 steps. B alone runs as an independently crashable/restarted JVM with distinct PIDs and its original non-empty identity, Ratis, and filesystem roots. The A/C voters and source-C real grpc-java server remain in the parent Cucumber JVM. This is a test deployment boundary for bounded interruption evidence; it does not establish production failure-domain placement, scheduling capacity, general chaos, rolling upgrade, dynamic membership, broad healing, cleanup, or broader partition tolerance.
 
-Prepared-artifact intents and orphan cleanup, rebalance, broad periodic anti-entropy, dynamic membership, erasure coding, multipart, and broader partition handling remain outside the deployment change.
+==== Implemented bounded periodic discovery deployment (accepted ADR 0031)
+
+Status: *implementation-informed / bounded*. `REQ-CLUSTER-027` passes 2 scenarios / 36 steps; broad `REQ-CLUSTER-017` and EP-10 remain partial.
+
+ADR 0031 adds no deployment node, port, public API, or alternate data path. `ClusterNodeRuntime` owns one `ClusterAntiEntropyScheduler` beside the existing repair scheduler/worker in each fixed node. The Ratis voter serves bounded read-only canonical current-reference pages over the existing mTLS control path; the exclusive cursor remains process-local, resets after a terminal page, and starts from the first page after scheduler reconstruction. Named local targets are probed serially, and missing/corrupt targets reuse the existing consensus job and UUID-bound mTLS replica path.
+
+The focused gate uses real three-voter Ratis, real filesystem targets, and actual grpc-java repair transfer, but it is bounded mechanism evidence rather than a production deployment qualification. It supplies no fleet sizing, scheduling fairness, topology expansion, operational PKI, rolling upgrade, backup/DR, or broad partition result.
+
+Prepared-artifact intents and orphan cleanup, rebalance, wider anti-entropy/healing topologies, dynamic membership, erasure coding, multipart, ADR 0030 general chaos, and broader partition handling remain outside the deployment change.
 
 === Production Deployment (Future)
 
@@ -161,7 +169,7 @@ The current single-process deployment is intentionally monolithic for single-nod
 * EP-6 (Performance & Capacity): implemented and validated for the `0.1.x` single-node safety envelope. S3 routes enforce 256 MiB single/assembled object limits, 64 MiB multipart parts, finite timeout, 16 active requests, 64 TCP connections, and a 100 requests/s token bucket with burst 200. Mandatory 45-second CI load and weekly/manual 15-minute soak run eight deterministic workers under `-Xmx256m`, produce machine-readable evidence, and assert bounded heap, checksums, and idle resources. These gates are not production sizing or competitive benchmarks.
 * EP-7 (Complete Admin Panel): `REQ-ADMIN-001..031` UI/contracts and reproducible packaging are implemented and validated. The phase remains partial because credential/tenant administration and real recovery/GC/scrub/audit/metrics/traces providers are absent; provider routes return truthful HTTP 503 not-configured responses.
 * EP-8 (Cluster Architecture ADR & Supply Chain): accepted architecture wiring and the explicitly validated evidence guards remain implementation-informed. Current complete-reactor `REQ-SUPPLY-001` is `@implemented-not-e2e-validated` because the historical clean-revision SBOM/license/image packet predates the four cluster modules; its hashes remain historical only. No publication occurred, and OWASP vulnerability status remains unknown/error.
-* EP-10 (S3 Cluster, multi-node): `@partial`. Fixed A/B/C is implementation-informed and validated for `REQ-CLUSTER-001..005`, `008..013`, and `019..026`, including bounded `024`. `REQ-CLUSTER-014` is separately implemented and validated only for its internal repository-rooted source/build architecture mode; broad `017` remains partial, while `006/007`, `015/016`, and `018` remain not implemented. Broader transfer semantics, dynamic membership, broad anti-entropy/rebalance/cleanup, general chaos, rolling upgrades, and broader partitions remain open.
+* EP-10 (S3 Cluster, multi-node): `@partial`. Fixed A/B/C is implementation-informed and validated for `REQ-CLUSTER-001..005`, `008..013`, and `019..027`, including bounded `024` repair interruption and `027` periodic current-reference discovery. `REQ-CLUSTER-014` is separately implemented and validated only for its internal repository-rooted source/build architecture mode; broad `017` remains partial, while `006/007`, `015/016`, and `018` remain not implemented. Broader transfer semantics, dynamic membership, wider healing/topologies, rebalance, cleanup, ADR 0030 general chaos, rolling upgrades, and broader partitions remain open.
 
 `REQ-CLUSTER-014` introduces no deployment node or runtime flow. Its 2026-07-14 focused gate passed 1 scenario / 17 steps, and its non-publishing CI execution is wired but has not run; neither fact provides S3, runtime-side-effect, clustered-deployment, or production-readiness evidence.
 

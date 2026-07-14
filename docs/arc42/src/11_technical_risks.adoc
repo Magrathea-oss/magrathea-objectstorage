@@ -52,10 +52,10 @@ This chapter is the central mutable architecture risk and remediation-status sou
 |EP-6 (`@implemented-and-validated` safety envelope; KA-6 remains pending)
 
 |8
-|**Distributed evidence is bounded and validation-mode specific** — real runtime consensus, whole-object `N=3/W=2` replication, failover/restart, and current-generation repair are validated only for `001..005/008..013/019..026`, including bounded `024`. `REQ-CLUSTER-014` is separately validated only as a repository-rooted source/build architecture contract; broad `017` remains partial, while multipart/conditional/versioned/EC transfer, dynamic membership, broad anti-entropy/rebalance/cleanup, general chaos, rolling upgrades, and broader partitions remain absent or unvalidated.
+|**Distributed evidence is bounded and validation-mode specific** — real runtime consensus, whole-object `N=3/W=2` replication, failover/restart, current-generation repair, and periodic current-reference discovery are validated only for `001..005/008..013/019..027`, including bounded `024` and `027`. `REQ-CLUSTER-014` is separately validated only as a repository-rooted source/build architecture contract; broad `017` remains partial, while multipart/conditional/versioned/EC transfer, dynamic membership, wider healing/topologies, rebalance/cleanup, ADR 0030 general chaos, rolling upgrades, and broader partitions remain absent or unvalidated.
 |Consumers may overgeneralize one-coordinator-stop or bounded repair evidence into HA, or overread the `014` architecture gate as executed side effects, broad S3 clustering, broad healing, or distributed production readiness.
 |Keep EP-10 `@partial`; report runtime and architecture-only modes separately, name the exact validated and partial requirement boundaries, and prohibit broader claims until each later capability has semantic and fault evidence.
-|EP-10 (`@partial`; fixed-cluster runtime and bounded repair validated; `014` architecture-only; broader distributed readiness not claimed)
+|EP-10 (`@partial`; fixed-cluster runtime plus bounded repair/current-reference discovery validated; `014` architecture-only; broader distributed readiness not claimed)
 
 |9
 |**Product-shell boundary regression** — ADR 0026 separation and REQ-ADMIN-032 task-group composition are implemented and validated, but future extensions could reintroduce Object Storage routes, endpoint knowledge, or models into the reusable shell.
@@ -130,10 +130,10 @@ This chapter is the central mutable architecture risk and remediation-status sou
 |EP-10 first slice (`implementation-informed`); production PKI (`blocked`, owner/review point: security and operations)
 
 |21
-|**Bounded repair can be overread as broad healing** — accepted ADR 0029 and the implementation restore one missing/corrupt target named by the current reference, but broad `REQ-CLUSTER-017` remains partial and does not include periodic anti-entropy, rebalance, or orphan cleanup.
-|Operators could treat a planner result or process-local scheduler as durable ownership, infer fleet-wide discovery/cleanup behavior, or mistake bounded repair for production readiness.
-|Keep consensus as job/lifecycle authority and scheduler signals message-free; report bounded implemented-and-validated `019..026`, including `024`, separately from partial broad `017`; retain prepared-artifact intents, orphan cleanup, rebalance, broad anti-entropy, dynamic membership, EC, multipart, and partitions as explicit exclusions.
-|EP-10 repair (`implementation-informed`, bounded); broad healing/cleanup (`partial/absent`; owners: cluster implementation and operations)
+|**Bounded repair and periodic discovery can be overread as broad healing** — accepted ADRs 0029/0031 restore and periodically inspect only current whole-object targets already named on fixed A/B/C. The discovery cursor is process-local, pages are not one frozen scan, and a failed page intentionally blocks cursor progress. Broad `REQ-CLUSTER-017` remains partial and does not include wider healing/topologies, rebalance, or orphan cleanup.
+|Operators could treat a PA-6 planner result or cursor/counter as durable ownership, infer exactly-once or fleet-scale discovery/cleanup, overlook page starvation/fairness and repeated-scan cost, or mistake bounded repair/discovery for production readiness.
+|Keep consensus as job/lifecycle authority and the cursor process-local; report bounded implemented-and-validated `019..027`, including `024/027`, separately from partial broad `017`; retain non-snapshot paging, failed-page retry, serial bounds, restart-from-first, and message-free counters. Require separate requirement-first rebalance and fenced-cleanup slices; keep wider topology, dynamic membership, EC, multipart, partitions, ADR 0030 chaos, scaling, and readiness explicit exclusions.
+|EP-10 repair/discovery (`implementation-informed`, bounded); wider healing/rebalance/cleanup (`partial/absent`; owners: cluster implementation and operations)
 
 |22
 |**Single-pass corrupt GET has a late-failure client contract** — corruption may be detected after response headers or bytes are emitted, so the server cannot safely replace the stream with a remote replica or necessarily send a fresh S3 XML error body.
@@ -148,9 +148,9 @@ This chapter is the central mutable architecture risk and remediation-status sou
 |EP-10 bounded repair (`implementation-informed`; `needs-review`; owners: Ratis adapter and operations); `REQ-CLUSTER-024` is implemented-and-validated, but retention/compaction remains open
 
 |24
-|**Current-generation races and unavailable sources can leave repair blocked or unreachable exact bytes** — the reference can change during transfer, or every named source can be missing/corrupt/unavailable.
+|**Current-generation races and unavailable sources can leave repair blocked or unreachable exact bytes** — the reference can change during discovery/transfer, or every named source can be missing/corrupt/unavailable. `REQ-CLUSTER-027` now exercises stale ensure and pre-publication races, but not every wider topology/concurrency interleaving.
 |An old artifact might be durably published but non-authoritative, while endless retry or copying an unverified source would threaten integrity and capacity.
-|Retain implemented currentness checks before source selection, publication, and success; keep changed work terminal `OBSOLETE`, finite retries, visible `BLOCKED`, and integrity alerts. Never return/copy unverified bytes. Leave resulting unreachable artifacts in place until separately fenced orphan cleanup is decided.
+|Retain implemented currentness checks before ensure, source selection, publication, and success; keep changed work terminal `OBSOLETE`, finite retries, visible `BLOCKED`, and integrity alerts. Never return/copy unverified bytes. Leave resulting unreachable artifacts in place until separately fenced orphan cleanup is decided.
 |EP-10 bounded repair (`implementation-informed`; owner: cluster application/operations); orphan cleanup (`absent/deferred`, separate ADR required)
 
 |25

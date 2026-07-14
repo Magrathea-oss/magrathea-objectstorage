@@ -18,6 +18,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class PhaseEp8ArchitectureContractSteps {
     private static final String ADR_PATH = "docs/adr/0027-authoritative-cluster-control-plane-and-direct-quorum-data-path.md";
     private static final String IMPLEMENTATION_ADR_PATH = "docs/adr/0028-first-three-node-cluster-implementation-baseline.md";
+    private static final String ANTI_ENTROPY_ADR_PATH =
+            "docs/adr/0031-bounded-periodic-current-reference-anti-entropy.md";
     private static final List<String> CLUSTER_MODULES = List.of(
             "cluster-protocol",
             "storage-engine-cluster-application",
@@ -42,6 +44,7 @@ public class PhaseEp8ArchitectureContractSteps {
 
     private String adr;
     private String implementationAdr;
+    private String antiEntropyAdr;
     private String arc42;
     private String c4;
     private String testReport;
@@ -51,6 +54,7 @@ public class PhaseEp8ArchitectureContractSteps {
     public void reset() {
         adr = null;
         implementationAdr = null;
+        antiEntropyAdr = null;
         arc42 = null;
         c4 = null;
         testReport = null;
@@ -75,9 +79,16 @@ public class PhaseEp8ArchitectureContractSteps {
         assertThat(adr).contains(
                 "## Status",
                 "Accepted — architectural authority for the cluster control/data-plane split, approved by the product owner for EP-8 EARLY and implementation-informed by the bounded EP-10 slices.",
-                "fixed A/B/C Ratis and direct whole-object baseline from ADR 0028 plus the bounded current-generation repair refinement in ADR 0029",
+                "fixed A/B/C Ratis and direct whole-object baseline from ADR 0028, the bounded current-generation repair refinement in ADR 0029, and bounded periodic current-reference discovery under ADR 0031",
+                "anti-entropy beyond fixed A/B/C current-reference obligations",
                 "This does not complete ADR 0027's wider target",
                 "No production-readiness or general distributed-support claim follows");
+        assertThat(antiEntropyAdr).contains(
+                "Accepted — implementation-informed for the bounded fixed A/B/C current-reference discovery scope in `REQ-CLUSTER-027`.",
+                "Both `REQ-CLUSTER-027` scenarios are `@implemented-and-validated`",
+                "2 scenarios / 36 steps",
+                "Broad `REQ-CLUSTER-017` remains `@partial`",
+                "production readiness remain absent or unvalidated");
     }
 
     @Then("it selects internal protobuf gRPC over HTTP\\/{int} with mutual TLS and bounded Reactor bridges")
@@ -125,8 +136,8 @@ public class PhaseEp8ArchitectureContractSteps {
     public void ep10OwnsExecution() {
         assertThat(adr).contains(
                 "EP-10 must execute", "multi-node validation", "fault-injection gates",
-                "fixed A/B/C Ratis and direct whole-object baseline from ADR 0028 plus the bounded current-generation repair refinement in ADR 0029",
-                "The bounded ADR 0028/0029 implementation evidence upgrades only their exact fixed-cluster requirements",
+                "fixed A/B/C Ratis and direct whole-object baseline from ADR 0028, the bounded current-generation repair refinement in ADR 0029, and bounded periodic current-reference discovery under ADR 0031",
+                "The bounded ADR 0028/0029/0031 implementation evidence upgrades only their exact fixed-cluster requirements",
                 "EP-10 remains partial");
         assertThat(implementationAdr).contains(
                 "Accepted — implementation-informed baseline for the bounded first fixed three-node EP-10 slice",
@@ -135,14 +146,27 @@ public class PhaseEp8ArchitectureContractSteps {
                 "This upgrades only the bounded status of `REQ-CLUSTER-014`: it is `@implemented-and-validated` for its internal repository-rooted architecture validation mode.",
                 "The gate validates source and build boundaries, not S3 behavior",
                 "It provides no runtime-side-effect, runtime cluster-behavior, broad-healing, or production-readiness evidence.",
+                "ADR 0031 separately makes `REQ-CLUSTER-027` implemented-and-validated for bounded periodic current-reference inspection and repair on fixed A/B/C",
+                "anti-entropy beyond current named A/B/C obligations",
                 "EP-10 remains partial. Broad `REQ-CLUSTER-017` remains `@partial`; `REQ-CLUSTER-006`, `REQ-CLUSTER-007`, `REQ-CLUSTER-015`, `REQ-CLUSTER-016`, and `REQ-CLUSTER-018` remain `@not-implemented`.",
                 "ADR 0030 remains the accepted target architecture for the final P4 chaos work and is deliberately deferred",
                 "No evidence above supports a production-readiness or general distributed-storage claim");
+        assertThat(antiEntropyAdr).contains(
+                "# ADR 0031 — Bounded periodic current-reference anti-entropy",
+                "Accepted — implementation-informed for the bounded fixed A/B/C current-reference discovery scope in `REQ-CLUSTER-027`.",
+                "Both `REQ-CLUSTER-027` scenarios are `@implemented-and-validated`; the focused `ReqCluster027CucumberTest` passes **2 scenarios / 36 steps**.",
+                "The cursor is query input only. It is never appended to the Ratis log",
+                "PA-6 `AntiEntropyPlanner` execution or planner-derived completion evidence",
+                "ADR 0030 deterministic storage-pipeline fault injection or general chaos",
+                "distributed production readiness");
         assertThat(arc42).contains(
-                "EP-10 (S3 Cluster, multi-node): `@partial`. Fixed A/B/C is implementation-informed and validated for `REQ-CLUSTER-001..005`, `008..013`, and `019..026`, including bounded `024`. `REQ-CLUSTER-014` is separately implemented and validated only for its internal repository-rooted source/build architecture mode; broad `017` remains partial, while `006/007`, `015/016`, and `018` remain not implemented. Broader transfer semantics, dynamic membership, broad anti-entropy/rebalance/cleanup, general chaos, rolling upgrades, and broader partitions remain open.",
+                "EP-10 (S3 Cluster, multi-node): `@partial`. Fixed A/B/C is implementation-informed and validated for `REQ-CLUSTER-001..005`, `008..013`, and `019..027`, including bounded `024` repair interruption and `027` periodic current-reference discovery. `REQ-CLUSTER-014` is separately implemented and validated only for its internal repository-rooted source/build architecture mode; broad `017` remains partial, while `006/007`, `015/016`, and `018` remain not implemented. Broader transfer semantics, dynamic membership, wider healing/topologies, rebalance, cleanup, ADR 0030 general chaos, rolling upgrades, and broader partitions remain open.",
                 "On 2026-07-14, the separate `ReqCluster014ArchitectureContractCucumberTest` passed 1 scenario / 17 steps in `REQ-CLUSTER-014`'s sole internal validation mode.",
                 "This validates source and build boundaries only; it is not S3 behavior and proves no runtime side effect.",
                 "Status: *implementation-informed / bounded*. `REQ-CLUSTER-019..026`, including `024`, are `@implemented-and-validated`; `REQ-CLUSTER-014` is separately `@implemented-and-validated` only for its internal repository architecture mode. Broad `REQ-CLUSTER-017` remains `@partial`, and `006/007/015/016/018` remain `@not-implemented`. No production-readiness, S3 behavior, runtime-side-effect, or broad healing claim follows from `014`.",
+                "Status: *implementation-informed / bounded*. Both `REQ-CLUSTER-027` scenarios are `@implemented-and-validated`; the focused gate passes 2 scenarios / 36 steps. Broad `REQ-CLUSTER-017` and EP-10 remain partial.",
+                "The cursor is never consensus state",
+                "This strategy makes no PA-6 `AntiEntropyPlanner` execution claim",
                 "Status: *accepted target architecture; planned / needs-validation*. No production implementation, Cucumber requirement, replay result, or fault-safety result is claimed.",
                 "This work is deferred behind active EP-10 normal-path completion",
                 "ADR 0030 chaos engineering begins only in final P4.",
@@ -159,8 +183,13 @@ public class PhaseEp8ArchitectureContractSteps {
                 "Focused `REQ-CLUSTER-014` architecture completion evidence (2026-07-14)",
                 "`ReqCluster014ArchitectureContractCucumberTest` passed **1 scenario / 17 steps** in the requirement's sole agreed internal validation mode.",
                 "`REQ-CLUSTER-014` is now `@implemented-and-validated` only for this repository-rooted source/build architecture contract; it is not S3 behavior and proves no runtime side effect, broad healing, or production readiness.",
+                "Focused `REQ-CLUSTER-027` periodic current-reference anti-entropy evidence (2026-07-14)",
+                "`ReqCluster027CucumberTest` passed exactly **2 scenarios / 36 steps**.",
+                "Both `REQ-CLUSTER-027` scenarios are `@implemented-and-validated`; broad `017` remains partial because rebalance, automated orphan cleanup, and wider healing/topology coverage remain absent.",
+                "The non-publishing EP-10 CI job is wired to run/upload this focused JSON and Surefire evidence, but **CI has not run**.",
+                "The cursor is process-local, pages are not one frozen scan, payload remains outside Ratis, PA-6 plans remain planner output, and no production scale/readiness or ADR 0030 general chaos is claimed.",
                 "EP-10 and broad `017` remain partial; `006/007/015/016/018` remain not implemented.",
-                "Exact status is represented from source tags: `014` and `019..026`, including `024`, are implemented-and-validated, while broad `017` remains partial; `006/007/015/016/018` remain not implemented.");
+                "Exact status is represented from source tags: `014` and `019..027`, including `024/027`, are implemented-and-validated, while broad `017` remains partial; `006/007/015/016/018` remain not implemented.");
     }
 
     @Given("ADR 0027 defines the planned gRPC surface for membership, control coordination, artifact transfer, verification, health evidence, and durable recovery-job execution")
@@ -436,6 +465,7 @@ public class PhaseEp8ArchitectureContractSteps {
     private void loadArchitectureDocuments() throws IOException {
         if (adr == null) adr = Ep8EvidenceSupport.read(ADR_PATH);
         if (implementationAdr == null) implementationAdr = Ep8EvidenceSupport.read(IMPLEMENTATION_ADR_PATH);
+        if (antiEntropyAdr == null) antiEntropyAdr = Ep8EvidenceSupport.read(ANTI_ENTROPY_ADR_PATH);
         if (arc42 == null) arc42 = Ep8EvidenceSupport.read("docs/arc42/src/02_architecture_constraints.adoc")
                 + Ep8EvidenceSupport.read("docs/arc42/src/04_solution_strategy.adoc")
                 + Ep8EvidenceSupport.read("docs/arc42/src/05_building_block_view.adoc")

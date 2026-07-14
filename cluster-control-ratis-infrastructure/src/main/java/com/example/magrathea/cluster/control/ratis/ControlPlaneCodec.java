@@ -34,6 +34,15 @@ final class ControlPlaneCodec {
     static byte[] queryBucket(String bucket) { return write(out -> { out.writeByte(12); out.writeUTF(bucket); }); }
     static byte[] queryReference(String bucket, String key) { return write(out -> { out.writeByte(13); out.writeUTF(bucket); out.writeUTF(key); }); }
     static byte[] queryBuckets() { return new byte[]{14}; }
+    static byte[] queryReferences(ReferencePageQuery query) {
+        if (query == null) throw new IllegalArgumentException("reference page query is required");
+        return write(out -> {
+            out.writeByte(15);
+            out.writeBoolean(query.exclusiveAfter() != null);
+            if (query.exclusiveAfter() != null) writeCursor(out, query.exclusiveAfter());
+            out.writeInt(query.limit());
+        });
+    }
 
     static byte[] repair(RepairCommands.Command command) {
         return write(out -> {
@@ -97,8 +106,10 @@ final class ControlPlaneCodec {
     }
 
     static Command readCommand(byte[] bytes) {
+        if (bytes == null) throw new IllegalArgumentException("control command is required");
         try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes))) {
-            int type = in.readUnsignedByte();
+            try {
+                int type = in.readUnsignedByte();
             if (type == 1) return new CreateBucket(in.readUTF());
             if (type == 2) {
                 String bucket = in.readUTF(), key = in.readUTF(); long prior = in.readLong();
@@ -115,6 +126,10 @@ final class ControlPlaneCodec {
             if (type == 12) return new QueryBucket(in.readUTF());
             if (type == 13) return new QueryReference(in.readUTF(), in.readUTF());
             if (type == 14) return new QueryBuckets();
+            if (type == 15) {
+                ReferencePageQuery.Cursor cursor = in.readBoolean() ? readCursor(in) : null;
+                return new QueryReferences(new ReferencePageQuery(cursor, in.readInt()));
+            }
             if (type >= 21 && type <= 28) {
                 requireRepairVersion(in);
                 String commandId = in.readUTF(); RepairJobId jobId = new RepairJobId(in.readUTF()); Instant at = readInstant(in);
@@ -147,8 +162,15 @@ final class ControlPlaneCodec {
                 for (int i = 0; i < count; i++) states.add(RepairState.valueOf(in.readUTF()));
                 return new QueryRepairs(new RepairJobQuery(states, readNullableInstant(in)));
             }
-            throw new IOException("unknown command " + type);
-        } catch (IOException e) { throw new IllegalArgumentException("invalid control command", e); }
+                throw new IOException("unknown command " + type);
+            } finally {
+                if (in.available() != 0) {
+                    throw new IOException("trailing control command data");
+                }
+            }
+        } catch (IOException | IllegalArgumentException failure) {
+            throw new IllegalArgumentException("invalid control command", failure);
+        }
     }
 
     static byte[] result(String value) { return value.getBytes(StandardCharsets.UTF_8); }
@@ -175,6 +197,36 @@ final class ControlPlaneCodec {
                 ? decodeMetadata(f[10]) : ClusterObjectMetadata.EMPTY;
         return new ObjectReferenceGeneration(f[0], f[1], Long.parseLong(f[2]), f[3], f[4],
                 Long.parseLong(f[5]), f[6], f[7], f[8], replicas, metadata);
+    }
+
+    static String encodeReferencePage(ReferencePage page) {
+        return encodeBinary(out -> {
+            out.writeInt(page.references().size());
+            for (ObjectReferenceGeneration reference : page.references()) {
+                out.writeUTF(encode(reference));
+            }
+            out.writeBoolean(page.terminal());
+            out.writeBoolean(page.nextExclusiveCursor() != null);
+            if (page.nextExclusiveCursor() != null) {
+                writeCursor(out, page.nextExclusiveCursor());
+            }
+        });
+    }
+
+    static ReferencePage decodeReferencePage(String encoded) {
+        return decodeBinary(encoded, in -> {
+            int count = readCount(in, "reference page");
+            if (count > ReferencePageQuery.MAXIMUM_LIMIT) {
+                throw new IOException("reference page exceeds hard limit");
+            }
+            List<ObjectReferenceGeneration> references = new ArrayList<>();
+            for (int index = 0; index < count; index++) {
+                references.add(decodeReference(in.readUTF()));
+            }
+            boolean terminal = in.readBoolean();
+            ReferencePageQuery.Cursor cursor = in.readBoolean() ? readCursor(in) : null;
+            return new ReferencePage(references, cursor, terminal);
+        });
     }
 
     static String encode(RepairCommandResult result) { return encodeBinary(out -> writeRepairResult(out, result)); }
@@ -274,6 +326,17 @@ final class ControlPlaneCodec {
         out.writeUTF(command.commandId()); out.writeUTF(command.jobId().value()); writeInstant(out, command.occurredAt());
     }
 
+    private static void writeCursor(
+            DataOutputStream out, ReferencePageQuery.Cursor cursor) throws IOException {
+        out.writeUTF(cursor.bucket());
+        out.writeUTF(cursor.objectKey());
+        out.writeLong(cursor.generation());
+    }
+
+    private static ReferencePageQuery.Cursor readCursor(DataInputStream in) throws IOException {
+        return new ReferencePageQuery.Cursor(in.readUTF(), in.readUTF(), in.readLong());
+    }
+
     private static void writeFence(DataOutputStream out, long generation, NodeIdentity owner, String session) throws IOException {
         out.writeLong(generation); out.writeUTF(owner.toString()); out.writeUTF(session);
     }
@@ -350,8 +413,8 @@ final class ControlPlaneCodec {
     }
     @FunctionalInterface private interface IoWriter { void write(DataOutputStream out) throws IOException; }
     @FunctionalInterface private interface IoReader<T> { T read(DataInputStream in) throws IOException; }
-    sealed interface Command permits CreateBucket, Publish, QueryMembership, QueryBucket, QueryReference, QueryBuckets,
-            RepairWrite, QueryRepair, QueryRepairs {}
+    sealed interface Command permits CreateBucket, Publish, QueryMembership, QueryBucket,
+            QueryReference, QueryBuckets, QueryReferences, RepairWrite, QueryRepair, QueryRepairs {}
     record CreateBucket(String bucket) implements Command {}
     record Publish(String bucket, String key, long priorGeneration, String operationId, String artifactId, long length,
                    String sha256, String topologyEpoch, String policyEpoch, List<NodeIdentity> replicas,
@@ -362,6 +425,7 @@ final class ControlPlaneCodec {
     record QueryBucket(String bucket) implements Command {}
     record QueryReference(String bucket, String key) implements Command {}
     record QueryBuckets() implements Command {}
+    record QueryReferences(ReferencePageQuery query) implements Command {}
     record RepairWrite(RepairCommands.Command command) implements Command {}
     record QueryRepair(RepairJobId jobId) implements Command {}
     record QueryRepairs(RepairJobQuery query) implements Command {}

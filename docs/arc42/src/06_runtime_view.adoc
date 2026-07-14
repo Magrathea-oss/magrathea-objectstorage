@@ -210,7 +210,7 @@ image::../../c4/images/ClusterCompleteRestartRuntime.png[Cluster Complete Restar
 3. Each node recovers its stable UUID; seed order does not rewrite persisted three-voter state or committed generations.
 4. A `GetObject` through B returns the original exact bytes, length, SHA-256, and ETag.
 
-The shared Java 21 real-process gate now passes `REQ-CLUSTER-001..005`, `019`, and `020` in both WebTestClient and AWS CLI modes (14 scenarios, 188 steps); its repair-only `019/020` run passes 4 scenarios / 80 steps. Focused Ratis/gRPC/cross-module scenarios pass for `REQ-CLUSTER-008..013`, and repair-control `021..026` passes 22 scenarios / 210 steps. Root Maven success is only supporting integration evidence. These results do not cover clustered multipart, conditional/versioned writes, erasure coding, dynamic membership, broad periodic anti-entropy, rebalance, orphan cleanup, rolling upgrades, or the broader partition suite.
+The shared Java 21 real-process gate now passes `REQ-CLUSTER-001..005`, `019`, and `020` in both WebTestClient and AWS CLI modes (14 scenarios, 188 steps); its repair-only `019/020` run passes 4 scenarios / 80 steps. Focused Ratis/gRPC/cross-module scenarios pass for `REQ-CLUSTER-008..013`, and the historical repair-control `021..026` result passes 22 scenarios / 210 steps. Root Maven success is only supporting integration evidence. Those results do not cover clustered multipart, conditional/versioned writes, erasure coding, dynamic membership, rebalance, orphan cleanup, rolling upgrades, or the broader partition suite; bounded periodic current-reference discovery is separately evidenced by `REQ-CLUSTER-027` below.
 
 === Scenario 6h — Missing-local Repair Before GET Response (accepted ADR 0029)
 
@@ -265,7 +265,24 @@ image::../../c4/images/RepairRestartRetryRuntime.png[Repair Restart Retry Runtim
 4. The `g2` worker rechecks that the bound generation remains current. If the target is already exact and durable, it treats that as idempotent success; otherwise it retries bounded verified transfer.
 5. Completion for `g2` may commit. A late `g1` renew/fail/succeed command is rejected with no state effect. If the reference changed, the old job becomes terminal `OBSOLETE` and is never rewritten to the newer generation.
 
-Prepared-artifact intents, orphan cleanup, rebalance, broad periodic anti-entropy, dynamic membership, erasure coding, multipart, and broader partition handling are outside all three implemented bounded flows. Broad `REQ-CLUSTER-017` therefore remains partial.
+Prepared-artifact intents, orphan cleanup, rebalance, periodic discovery, dynamic membership, erasure coding, multipart, and broader partition handling are outside these three request/repair-triggered flows. Bounded periodic current-reference discovery is the separate flow below; broad `REQ-CLUSTER-017` remains partial.
+
+=== Scenario 6k — Bounded Periodic Current-reference Discovery and Repair (accepted ADR 0031)
+
+[NOTE]
+====
+Status: *implementation-informed / implemented-and-validated for bounded `REQ-CLUSTER-027`*. The focused 2026-07-14 gate passes 2 scenarios / 36 steps. No rebalance, automated orphan cleanup, wider healing/topology, ADR 0030 general-chaos, scale, or production-readiness behavior is implied.
+====
+
+1. `ClusterNodeRuntime` starts one process-local discovery scheduler for each fixed node. A cycle issues one bounded read-only Ratis query using its current exclusive cursor; the state machine returns only current references in canonical bucket/object-key order.
+2. The scheduler serially considers page records and ignores any reference whose replica UUID set does not name that local node. For a named obligation, a `boundedElastic` filesystem probe verifies existence and committed length/SHA-256.
+3. An exact target completes inspection without repair work. A missing or corrupt target delegates a durable ensure to ADR 0029's canonical consensus job, then signals the existing bounded repair scheduler. PA-6 plans do not count as execution.
+4. Existing repair claim generation/process-session fencing selects a different named verified source, transfers over grpc-java with UUID-bound mTLS, rechecks the current generation before publication, and publishes only exact fsynced bytes. Payload never enters Ratis and discovery never rewrites the reference.
+5. Only after every page record and required durable ensure completes does the cursor advance to the page's exclusive last-record cursor. Query/probe/ensure failure leaves it unadvanced for a later cycle. Repair execution failure remains explicit consensus retry state rather than discovery success.
+6. A terminal page resets the next cycle to the first page. Closing and reconstructing the process-local scheduler also begins at the first page; repeated observations deduplicate through the consensus repair identity. Shutdown cancels active delayed discovery and leaves no active page/target probe.
+7. Process-local counters expose cycles, pages, records, target states, failure stages, repair failures, retries, resets, stale references, deduplication, overlap, and replica reads without payloads or credentials.
+
+This is an eventually repeated sequence of bounded current-state pages, not a frozen consensus snapshot spanning the sweep. The cursor is neither logged nor snapshotted. Broad `REQ-CLUSTER-017` remains partial because wider healing/topologies, rebalance, and automated orphan cleanup remain absent.
 
 === Scenario 7 — Reactive Chain Pattern
 
