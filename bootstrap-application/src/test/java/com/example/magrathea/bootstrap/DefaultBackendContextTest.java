@@ -1,6 +1,7 @@
 package com.example.magrathea.bootstrap;
 
 import com.example.magrathea.bootstrap.ObjectStoreBackendStatus.Backend;
+import com.example.magrathea.objectstore.domain.aggregate.S3Object;
 import com.example.magrathea.objectstore.domain.valueobject.ObjectKey;
 import com.example.magrathea.objectstore.reactive.repository.application.BucketCommandRepository;
 import com.example.magrathea.objectstore.reactive.repository.application.BucketQueryRepository;
@@ -33,9 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(properties = {
     "admin.server.port=0",
-    "storage.engine.policies.dir=/definitely/missing/policies",
-    "storage.engine.devices.dir=/definitely/missing/devices",
-    "storage.engine.disksets.dir=/definitely/missing/disksets"
+    "storage.engine.filesystem.root=target/default-backend-context"
 })
 class DefaultBackendContextTest {
 
@@ -55,31 +54,31 @@ class DefaultBackendContextTest {
     private S3ObjectQueryRepository objectQueryRepository;
 
     @Test
-    void defaultContextActivatesOnlyInMemoryRepositories() {
-        assertThat(environment.getActiveProfiles()).doesNotContain("storage-engine");
-        assertThat(environment.getDefaultProfiles()).contains("single-node");
-        assertThat(backendStatus.backend()).isEqualTo(Backend.IN_MEMORY);
+    void defaultContextActivatesOnlyStorageEngineRepositories() {
+        assertThat(environment.getDefaultProfiles()).contains("storage-engine");
+        assertThat(backendStatus.backend()).isEqualTo(Backend.STORAGE_ENGINE);
 
-        assertSingleBean(S3ObjectCommandRepository.class, InMemoryReactiveS3ObjectRepository.class);
-        assertSingleBean(S3ObjectQueryRepository.class, InMemoryReactiveS3ObjectRepository.class);
-        assertSingleBean(BucketCommandRepository.class, InMemoryReactiveBucketRepository.class);
-        assertSingleBean(BucketQueryRepository.class, InMemoryReactiveBucketRepository.class);
-        assertSingleBean(MultipartUploadCommandRepository.class, InMemoryReactiveMultipartUploadRepository.class);
-        assertSingleBean(MultipartUploadQueryRepository.class, InMemoryReactiveMultipartUploadRepository.class);
+        assertSingleBean(S3ObjectCommandRepository.class, StorageEngineReactiveS3ObjectRepository.class);
+        assertSingleBean(S3ObjectQueryRepository.class, StorageEngineReactiveS3ObjectRepository.class);
+        assertSingleBean(BucketCommandRepository.class, StorageEngineReactiveBucketRepository.class);
+        assertSingleBean(BucketQueryRepository.class, StorageEngineReactiveBucketRepository.class);
+        assertSingleBean(MultipartUploadCommandRepository.class, StorageEngineReactiveMultipartUploadRepository.class);
+        assertSingleBean(MultipartUploadQueryRepository.class, StorageEngineReactiveMultipartUploadRepository.class);
+        assertThat(context.getBeansOfType(ObjectStoreToStorageEngineTranslator.class)).hasSize(1);
 
-        assertNoBeans(StorageEngineReactiveS3ObjectRepository.class);
-        assertNoBeans(StorageEngineReactiveBucketRepository.class);
-        assertNoBeans(StorageEngineReactiveMultipartUploadRepository.class);
-        assertNoBeans(ObjectStoreToStorageEngineTranslator.class);
+        assertNoBeans(InMemoryReactiveS3ObjectRepository.class);
+        assertNoBeans(InMemoryReactiveBucketRepository.class);
+        assertNoBeans(InMemoryReactiveMultipartUploadRepository.class);
     }
 
     @Test
-    void defaultRepositorySmokeUsesInMemoryBackendEvenWhenExternalStorageEngineDirsAreMissing() {
+    void defaultRepositorySmokeUsesDurableStorageEngineBackend() {
         ObjectKey key = ObjectKey.of("default-smoke-bucket", "hello.txt");
         Flux<DataBuffer> content = Flux.just(
             new DefaultDataBufferFactory().wrap("hello-default".getBytes(StandardCharsets.UTF_8)));
 
-        assertThat(objectCommandRepository.saveWithContent(key, content, "STANDARD").block()).isNotNull();
+        var pendingObject = S3Object.createPending(key, "STANDARD", Map.of(), null);
+        assertThat(objectCommandRepository.saveWithContent(pendingObject, content, "STANDARD").block()).isNotNull();
 
         String readContent = objectQueryRepository.getContent(key)
             .map(buffer -> {

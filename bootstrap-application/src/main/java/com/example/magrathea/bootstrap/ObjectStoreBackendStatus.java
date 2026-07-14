@@ -27,7 +27,7 @@ public record ObjectStoreBackendStatus(Backend backend) {
 
         public static Backend fromProperty(String value) {
             if (value == null || value.isBlank()) {
-                return IN_MEMORY;
+                return STORAGE_ENGINE;
             }
             String normalized = value.trim().toLowerCase();
             return switch (normalized) {

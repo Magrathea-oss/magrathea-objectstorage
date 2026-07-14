@@ -16,9 +16,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-/** In-memory multipart-upload repository active only in the {@code single-node} (default) profile. */
+/** Legacy in-memory multipart repository available only to explicitly isolated tests. */
 @Repository
-@Profile({"single-node", "default"})
+@Profile("legacy-in-memory-test")
 public class InMemoryReactiveMultipartUploadRepository implements MultipartUploadCommandRepository, MultipartUploadQueryRepository {
 
     private final Map<UploadId, MultipartUpload> store = new ConcurrentHashMap<>();

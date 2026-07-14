@@ -28,9 +28,9 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-/** In-memory S3 object repository active only in the {@code single-node} (default) profile. */
+/** Legacy in-memory S3 object repository available only to explicitly isolated tests. */
 @Repository
-@Profile({"single-node", "default"})
+@Profile("legacy-in-memory-test")
 public class InMemoryReactiveS3ObjectRepository implements S3ObjectCommandRepository, S3ObjectQueryRepository {
 
     private final Map<String, S3Object> storeByObjectKey = new ConcurrentHashMap<>();

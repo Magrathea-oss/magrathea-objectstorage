@@ -19,8 +19,8 @@ import org.springframework.context.annotation.ComponentScan;
  *   <li>{@code com.example.magrathea.storageengine} — storage-engine domain, application, and infrastructure</li>
  *   <li>{@code com.example.magrathea.admin} — admin API router and handlers</li>
  * </ul>
- * Profile {@code storage-engine} activates storage-engine backend beans.
- * Profile {@code single-node} (default) activates in-memory backend beans.
+ * Profile {@code storage-engine} is the default and only supported single-node backend.
+ * Legacy in-memory adapters require the explicit {@code legacy-in-memory-test} profile.
  */
 @SpringBootApplication(excludeName = {
     "org.springframework.boot.security.autoconfigure.ReactiveUserDetailsServiceAutoConfiguration",

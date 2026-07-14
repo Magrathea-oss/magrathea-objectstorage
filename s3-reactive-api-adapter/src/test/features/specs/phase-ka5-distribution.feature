@@ -27,6 +27,17 @@ Ability: Native-image distribution packaging
       And the final runtime image activates the storage-engine backend for single-node container deployments
       And runtime smoke validation confirms S3 ListBuckets XML and JSON plus bucket/object PUT/GET work without native reflection errors
 
+  Rule: Every single-node product launch uses the durable Storage Engine backend
+
+    @REQ-PKG-005 @default-backend @storage-engine @durability @implemented-and-validated
+    Scenario: Bare and packaged single-node runtimes default to Storage Engine
+      Given the bootstrap backend selection sources define the single-node product default
+      When maintainers run the validation mode "static default-backend composition inspection"
+      Then the bootstrap default Spring profile is "storage-engine"
+      And an unspecified backend property resolves to "storage-engine"
+      And production in-memory repositories are not activated by profiles "single-node" or "default"
+      And packaged JVM and native runtimes activate the same "storage-engine" backend
+
   Rule: JVM Docker and CI packaging gates must avoid masked failures
 
     @REQ-PKG-003 @docker @jvm-runtime @root-dockerfile @implemented-and-validated

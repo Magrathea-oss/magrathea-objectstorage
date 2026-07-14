@@ -16,9 +16,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-/** In-memory bucket repository active only in the {@code single-node} (default) profile. */
+/** Legacy in-memory bucket repository available only to explicitly isolated tests. */
 @Repository
-@Profile({"single-node", "default"})
+@Profile("legacy-in-memory-test")
 public class InMemoryReactiveBucketRepository implements BucketCommandRepository, BucketQueryRepository {
 
     private final Map<Bucket.Id, Bucket> store = new ConcurrentHashMap<>();

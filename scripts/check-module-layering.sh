@@ -192,17 +192,17 @@ check_source_contains() {
   fi
 }
 
-# Explicitly activating "storage-engine,cluster" suppresses the single-node default profile.
-# Keep in-memory repositories opt-in only to single-node/default so that profile combination
-# cannot create competing repository beans before cluster bean composition is introduced.
+# Storage Engine is authoritative for default and explicit single-node product runtimes.
+# Legacy in-memory repositories are isolated behind a test-only profile so they cannot
+# compete with durable repository beans or silently create a non-durable deployment.
 check_source_contains \
   bootstrap-application/src/main/resources/application.properties \
-  'spring.profiles.default=single-node'
+  'spring.profiles.default=storage-engine'
 for in_memory_repo in \
   object-store-reactive-infrastructure/src/main/java/com/example/magrathea/reactive/infrastructure/adapter/persistence/InMemoryReactiveS3ObjectRepository.java \
   object-store-reactive-infrastructure/src/main/java/com/example/magrathea/reactive/infrastructure/adapter/persistence/InMemoryReactiveBucketRepository.java \
   object-store-reactive-infrastructure/src/main/java/com/example/magrathea/reactive/infrastructure/adapter/persistence/InMemoryReactiveMultipartUploadRepository.java; do
-  check_source_contains "$in_memory_repo" '@Profile({"single-node", "default"})'
+  check_source_contains "$in_memory_repo" '@Profile("legacy-in-memory-test")'
 done
 
 for storage_engine_repo in \

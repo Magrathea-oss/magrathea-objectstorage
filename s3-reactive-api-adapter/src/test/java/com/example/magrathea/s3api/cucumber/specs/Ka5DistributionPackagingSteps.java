@@ -50,6 +50,19 @@ public class Ka5DistributionPackagingSteps {
         assertTrue(pom.contains("native-maven-plugin"), "Native profile should configure native-maven-plugin");
     }
 
+    @Given("the bootstrap backend selection sources define the single-node product default")
+    public void bootstrapBackendSelectionSourcesDefineDefault() {
+        for (String relativePath : new String[] {
+            "bootstrap-application/src/main/resources/application.properties",
+            "bootstrap-application/src/main/java/com/example/magrathea/bootstrap/ObjectStoreBackendStatus.java",
+            "object-store-reactive-infrastructure/src/main/java/com/example/magrathea/reactive/infrastructure/adapter/persistence/InMemoryReactiveBucketRepository.java",
+            "object-store-reactive-infrastructure/src/main/java/com/example/magrathea/reactive/infrastructure/adapter/persistence/InMemoryReactiveS3ObjectRepository.java",
+            "object-store-reactive-infrastructure/src/main/java/com/example/magrathea/reactive/infrastructure/adapter/persistence/InMemoryReactiveMultipartUploadRepository.java"
+        }) {
+            assertTrue(Files.isRegularFile(root.resolve(relativePath)), "Missing backend selection source " + relativePath);
+        }
+    }
+
     @Given("the native Docker build starts from a GraalVM 25 native-image builder with musl support")
     public void nativeDockerBuildStartsFromGraalVm25MuslBuilder() throws IOException {
         var dockerfile = readRelative("Dockerfile.native");
@@ -101,6 +114,53 @@ public class Ka5DistributionPackagingSteps {
         var dockerfile = readRelative("Dockerfile.native");
         assertTrue(dockerfile.contains("-P" + profiles) || dockerfile.contains("-P" + profiles.replace(",", ",")),
             "Native Docker build should compile with profiles " + profiles);
+    }
+
+    @Then("the bootstrap default Spring profile is {string}")
+    public void bootstrapDefaultSpringProfileIs(String profile) throws IOException {
+        assertValidationMode("static default-backend composition inspection");
+        assertTrue(readRelative("bootstrap-application/src/main/resources/application.properties")
+                .contains("spring.profiles.default=" + profile),
+            "Bootstrap default profile should be " + profile);
+    }
+
+    @Then("an unspecified backend property resolves to {string}")
+    public void unspecifiedBackendPropertyResolvesTo(String backend) throws IOException {
+        var status = readRelative(
+            "bootstrap-application/src/main/java/com/example/magrathea/bootstrap/ObjectStoreBackendStatus.java");
+        assertTrue(status.contains("if (value == null || value.isBlank()) {\n                return STORAGE_ENGINE;"),
+            "Blank backend selection should resolve to " + backend);
+    }
+
+    @Then("production in-memory repositories are not activated by profiles {string} or {string}")
+    public void productionInMemoryRepositoriesAreNotActivatedByProfiles(String first, String second)
+            throws IOException {
+        for (String repository : new String[] {
+            "InMemoryReactiveBucketRepository.java",
+            "InMemoryReactiveS3ObjectRepository.java",
+            "InMemoryReactiveMultipartUploadRepository.java"
+        }) {
+            var source = readRelative(
+                "object-store-reactive-infrastructure/src/main/java/com/example/magrathea/reactive/infrastructure/adapter/persistence/"
+                    + repository);
+            assertFalse(source.contains("@Profile(\"" + first + "\")")
+                    || source.contains("@Profile({\"" + first)
+                    || source.contains("\"" + second + "\"}"),
+                repository + " must not activate for product default profiles");
+            assertTrue(source.contains("@Profile(\"legacy-in-memory-test\")"),
+                repository + " should be isolated behind the explicit legacy test profile");
+        }
+    }
+
+    @Then("packaged JVM and native runtimes activate the same {string} backend")
+    public void packagedRuntimesActivateSameBackend(String backend) throws IOException {
+        for (String dockerfile : new String[] {"Dockerfile", "Dockerfile.native"}) {
+            var source = readRelative(dockerfile);
+            assertTrue(source.contains("SPRING_PROFILES_ACTIVE=" + backend),
+                dockerfile + " should activate " + backend);
+            assertTrue(source.contains("MAGRATHEA_OBJECT_STORE_BACKEND=" + backend),
+                dockerfile + " should declare " + backend);
+        }
     }
 
     @Then("Spring Boot AOT processing prepares the bootstrap application classes for native-image compilation")

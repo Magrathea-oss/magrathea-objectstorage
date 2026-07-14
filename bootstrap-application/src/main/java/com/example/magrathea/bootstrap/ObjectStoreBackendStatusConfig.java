@@ -9,8 +9,7 @@ import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
-
-import java.util.Arrays;
+import org.springframework.core.env.Profiles;
 
 /**
  * Exposes and logs the selected object-store backend.
@@ -25,7 +24,7 @@ public class ObjectStoreBackendStatusConfig {
             Environment environment,
             @Value("${magrathea.object-store.backend:}") String configuredBackend) {
         Backend propertyBackend = Backend.fromProperty(configuredBackend);
-        boolean storageEngineProfileActive = Arrays.asList(environment.getActiveProfiles()).contains("storage-engine");
+        boolean storageEngineProfileActive = environment.acceptsProfiles(Profiles.of("storage-engine"));
         Backend selectedBackend = storageEngineProfileActive ? Backend.STORAGE_ENGINE : propertyBackend;
 
         boolean explicitProperty = configuredBackend != null && !configuredBackend.isBlank();
