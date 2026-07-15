@@ -108,7 +108,7 @@ Business Need: EP-7 Object Storage administration through the Magrathea Product 
         """
         {
           "storageClassId": "ARCHIVE_EC",
-          "erasureCoding": { "dataBlocks": 8, "parityBlocks": 4 },
+          "erasureCoding": { "dataBlocks": 4, "parityBlocks": 2 },
           "replication": { "factor": 1 }
         }
         """

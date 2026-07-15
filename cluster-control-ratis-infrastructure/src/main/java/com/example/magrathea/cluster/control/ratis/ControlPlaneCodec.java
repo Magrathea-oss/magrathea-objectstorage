@@ -30,6 +30,18 @@ final class ControlPlaneCodec {
         writeMetadata(out, p.metadata());
     });
     }
+    static byte[] publishEc(EcPublicationProposal proposal) {
+        EcPublicationProposal p = EcReferencePublicationService.validate(proposal);
+        return write(out -> {
+            out.writeByte(3); out.writeUTF(p.bucket()); out.writeUTF(p.objectKey());
+            out.writeLong(p.priorGeneration()); out.writeUTF(p.operationId());
+            out.writeLong(p.objectLength()); out.writeUTF(p.objectSha256());
+            out.writeUTF(p.topologyEpoch()); out.writeUTF(p.policyEpoch());
+            out.writeInt(p.shards().size());
+            for (EcShardReference shard : p.shards()) writeEcShard(out, shard);
+            writeMetadata(out, p.metadata());
+        });
+    }
     static byte[] queryMembership() { return new byte[]{11}; }
     static byte[] queryBucket(String bucket) { return write(out -> { out.writeByte(12); out.writeUTF(bucket); }); }
     static byte[] queryReference(String bucket, String key) { return write(out -> { out.writeByte(13); out.writeUTF(bucket); out.writeUTF(key); }); }
@@ -122,6 +134,15 @@ final class ControlPlaneCodec {
                 return new Publish(bucket, key, prior, operation, artifact, length, sha,
                         topology, policy, replicas, metadata);
             }
+            if (type == 3) {
+                String bucket = in.readUTF(), key = in.readUTF(); long prior = in.readLong();
+                String operation = in.readUTF(); long objectLength = in.readLong();
+                String objectSha = in.readUTF(), topology = in.readUTF(), policy = in.readUTF();
+                int count = readCount(in, "EC shard"); List<EcShardReference> shards = new ArrayList<>();
+                for (int index = 0; index < count; index++) shards.add(readEcShard(in));
+                return new PublishEc(bucket, key, prior, operation, objectLength, objectSha,
+                        topology, policy, shards, readMetadata(in));
+            }
             if (type == 11) return new QueryMembership();
             if (type == 12) return new QueryBucket(in.readUTF());
             if (type == 13) return new QueryReference(in.readUTF(), in.readUTF());
@@ -188,15 +209,48 @@ final class ControlPlaneCodec {
         return String.join("\t", r.bucket(), r.objectKey(), Long.toString(r.generation()), r.operationId(), r.artifactId(),
                 Long.toString(r.length()), r.sha256(), r.topologyEpoch(), r.policyEpoch(),
                 r.replicas().stream().sorted().map(NodeIdentity::toString).reduce((a,b) -> a + "," + b).orElse(""),
-                encodeMetadata(r.metadata()));
+                encodeMetadata(r.metadata()), r.storageLayout().name(), encodeEcShards(r.ecShards()));
     }
     static ObjectReferenceGeneration decodeReference(String value) {
         String[] f = value.split("\\t", -1);
         List<NodeIdentity> replicas = f[9].isEmpty() ? List.of() : java.util.Arrays.stream(f[9].split(",")).map(NodeIdentity::parse).toList();
         ClusterObjectMetadata metadata = f.length > 10
                 ? decodeMetadata(f[10]) : ClusterObjectMetadata.EMPTY;
+        ClusterStorageLayout layout = f.length > 11
+                ? ClusterStorageLayout.valueOf(f[11]) : ClusterStorageLayout.WHOLE_OBJECT_REPLICATED;
+        List<EcShardReference> ecShards = f.length > 12 ? decodeEcShards(f[12]) : List.of();
         return new ObjectReferenceGeneration(f[0], f[1], Long.parseLong(f[2]), f[3], f[4],
-                Long.parseLong(f[5]), f[6], f[7], f[8], replicas, metadata);
+                Long.parseLong(f[5]), f[6], f[7], f[8], replicas, metadata, layout, ecShards);
+    }
+
+    private static String encodeEcShards(List<EcShardReference> shards) {
+        return encodeBinary(out -> {
+            out.writeInt(shards.size());
+            for (EcShardReference shard : shards) writeEcShard(out, shard);
+        });
+    }
+
+    private static List<EcShardReference> decodeEcShards(String encoded) {
+        return decodeBinary(encoded, in -> {
+            int count = readCount(in, "EC shard reference");
+            List<EcShardReference> shards = new ArrayList<>();
+            for (int index = 0; index < count; index++) shards.add(readEcShard(in));
+            return List.copyOf(shards);
+        });
+    }
+
+    private static void writeEcShard(DataOutputStream out, EcShardReference shard) throws IOException {
+        out.writeLong(shard.stripeIndex()); out.writeInt(shard.shardIndex());
+        out.writeBoolean(shard.parity()); out.writeLong(shard.stripeLogicalLength());
+        out.writeLong(shard.logicalDataLength()); out.writeUTF(shard.artifactId());
+        out.writeLong(shard.storedLength()); out.writeUTF(shard.sha256());
+        out.writeUTF(shard.location().toString());
+    }
+
+    private static EcShardReference readEcShard(DataInputStream in) throws IOException {
+        return new EcShardReference(in.readLong(), in.readInt(), in.readBoolean(),
+                in.readLong(), in.readLong(), in.readUTF(), in.readLong(), in.readUTF(),
+                NodeIdentity.parse(in.readUTF()));
     }
 
     static String encodeReferencePage(ReferencePage page) {
@@ -413,13 +467,19 @@ final class ControlPlaneCodec {
     }
     @FunctionalInterface private interface IoWriter { void write(DataOutputStream out) throws IOException; }
     @FunctionalInterface private interface IoReader<T> { T read(DataInputStream in) throws IOException; }
-    sealed interface Command permits CreateBucket, Publish, QueryMembership, QueryBucket,
+    sealed interface Command permits CreateBucket, Publish, PublishEc, QueryMembership, QueryBucket,
             QueryReference, QueryBuckets, QueryReferences, RepairWrite, QueryRepair, QueryRepairs {}
     record CreateBucket(String bucket) implements Command {}
     record Publish(String bucket, String key, long priorGeneration, String operationId, String artifactId, long length,
                    String sha256, String topologyEpoch, String policyEpoch, List<NodeIdentity> replicas,
                    ClusterObjectMetadata metadata) implements Command {
         Publish { replicas = replicas.stream().distinct().sorted(Comparator.naturalOrder()).toList(); }
+    }
+    record PublishEc(
+            String bucket, String key, long priorGeneration, String operationId,
+            long objectLength, String objectSha256, String topologyEpoch, String policyEpoch,
+            List<EcShardReference> shards, ClusterObjectMetadata metadata) implements Command {
+        PublishEc { shards = shards.stream().sorted().toList(); }
     }
     record QueryMembership() implements Command {}
     record QueryBucket(String bucket) implements Command {}

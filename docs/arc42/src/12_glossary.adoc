@@ -130,8 +130,11 @@ ifndef::imagesdir[:imagesdir: ../images]
 |Bounded Local EC Reconstruction
 |Accepted ADR 0032 application/infrastructure boundary that reconstructs one EC 4+2 stripe from exactly four checksum-valid committed survivor snapshots. It verifies regenerated output, retains at most one 4 MiB stripe plus six 1 MiB shard buffers and fixed workspace, and uses one worker with queue capacity 16. It returns output snapshots only and cannot locate/publish shards, scan, repair, rebalance, clean up, or inject faults
 
+|Fixed Distributed EC 4+2
+|Accepted ADR 0033 internal mechanism that maps six schema-3 shards across fixed A/B/C as A=`0,3`, B=`1,4`, C=`2,5`, requires all six exact durable acknowledgements, and publishes one fenced `EC_4_2` Ratis reference without payload bytes. It does not imply clustered S3 EC reads, repair, rebalance, cleanup, or parameterized EC
+
 |StorageFaultInjectionPort
-|ADR 0030 transport-neutral application contract for deterministic storage-pipeline fault decisions and sanitized outcomes. Production uses a no-op default. After distributed EC transfer, only the bounded kernel and committed-shard subset may precede EC self-healing; generalized chaos remains final. Implementation and validation are planned
+|ADR 0030 transport-neutral application contract for deterministic storage-pipeline fault decisions and sanitized outcomes. Production uses a no-op default. Fixed distributed EC 4+2 now satisfies the prerequisite for the bounded kernel and committed-shard subset to precede EC self-healing; generalized chaos remains final. Implementation and validation are planned
 
 |Fault plan
 |Immutable, canonical, versioned ADR 0030 rule set with stable plan/hash/rule identity, operation and semantic-point selectors, finite coordinates and evaluation/fire/evidence budgets, and one permitted typed action per rule. The early EC subset binds exact schema-3 manifest/generation, stripe/shard/artifact, location, length, and SHA-256 facts rather than paths or wildcards
@@ -143,13 +146,13 @@ ifndef::imagesdir[:imagesdir: ../images]
 |Bounded payload/secret-free sequence of evaluated/fired/skipped fault decisions and typed outcomes keyed by plan hash, operation, point, logical coordinate, and fire ordinal. Wall-clock order and process-global random draws are not replay oracles
 
 |Cluster Node Runtime
-|Implementation-informed fixed-slice runtime instantiated as nodes A, B, and C. Each JVM co-locates one Ratis metadata voter and one independent whole-object replica server with separate stable-identity, Ratis, object, temporary, and runtime roots (ADR 0028)
+|Implementation-informed fixed-slice runtime instantiated as nodes A, B, and C. Each JVM co-locates one Ratis metadata voter and one replica/shard server with separate stable-identity, Ratis, object, temporary, and runtime roots; node A also composes the bounded EC coordinator for the validated internal mechanism (ADRs 0028/0033)
 
 |Cluster Control Plane
-|Internal Apache Ratis role that orders bucket/object-reference generations and bounded repair lifecycle in the implemented fixed slice and serves read-only canonical pages of current references. ADR 0027's wider membership, topology/policy epoch, fencing/tombstone, and durable-job authority remains future scope
+|Internal Apache Ratis role that orders bucket/object-reference generations including fixed `EC_4_2`, bounded whole-object repair lifecycle, and read-only canonical pages of current references. Payload bytes remain outside consensus. ADR 0027's wider membership lifecycle, fencing/tombstone, and additional durable-job authority remain future scope
 
 |Cluster Data Plane
-|Internal grpc-java role that directly transfers checksum-valid immutable whole-object replicas between A/B/C for fixed `N=3/W=2`; it is not an external object API. Whole-object replication remains valid below the arranged distributed-EC minimum. Chunked, multipart, and EC placement/transfer remain unimplemented cluster capabilities; local ADR 0032 decoding is not data-plane evidence
+|Internal grpc-java role that directly transfers checksum-valid immutable whole-object replicas and fixed EC 4+2 shards between A/B/C; it is not an external object API. Whole-object replication remains valid below the arranged EC minimum. Chunked/multipart cluster transfer, clustered S3 EC reads, EC healing, and parameterized EC remain unimplemented
 
 |Node UUID
 |Stable persisted identifier recovered from a node's identity root. The validated fixed slice preserves it across complete JVM restart and seed reordering; it must not be cloned into concurrent live nodes
@@ -224,7 +227,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 |Minimum number of selected targets that must durably acknowledge checksum-valid immutable data before reference publication; the implemented fixed whole-object slice uses `W=2` of `N=3`
 
 |Valid-data read quorum
-|Number of checksum/length-valid sources required after committed generation resolution. Fixed failover and ADR 0029 repair validate exact whole-object replicas. Local ADR 0032 EC 4+2 reconstruction requires exactly four checksum-valid committed survivor snapshots; distributed placement/transfer, consensus-owned self-healing, and broader read policies remain future work
+|Number of checksum/length-valid sources required after committed generation resolution. Fixed failover and ADR 0029 repair validate exact whole-object replicas. ADR 0032 EC 4+2 reconstruction requires exactly four checksum-valid committed survivor snapshots; ADR 0033 publication nevertheless requires all six durable shard acknowledgements. Clustered S3 survivor collection and consensus-owned EC self-healing remain future work
 
 |Degraded write
 |A write acknowledged below its declared placement/durability threshold. The fixed EP-10 slice rejects publication below `W=2` or without control quorum

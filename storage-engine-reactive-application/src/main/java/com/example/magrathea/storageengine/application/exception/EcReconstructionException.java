@@ -6,6 +6,7 @@ public final class EcReconstructionException extends RuntimeException {
     public enum Reason {
         UNSUPPORTED_SCHEMA,
         AMBIGUOUS_LAYOUT,
+        UNSUPPORTED_GEOMETRY,
         INCONSISTENT_METADATA,
         INVALID_SURVIVOR_SET,
         INSUFFICIENT_SURVIVORS,

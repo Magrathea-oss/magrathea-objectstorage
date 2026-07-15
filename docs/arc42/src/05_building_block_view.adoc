@@ -118,7 +118,7 @@ The current static distribution is generated and handed to `bootstrap-applicatio
 ==== storage-engine-reactive-application and storage-engine-reactive-infrastructure
 
 **Blackbox Description:**
-`storage-engine-reactive-application` owns reactive orchestration ports such as the chunker, storage policy catalog, `ReactiveStorageOrchestrator`, and the transport-neutral `BoundedEcReconstructionPort`. `storage-engine-reactive-infrastructure` provides YAML-backed catalogs, filesystem persistence, physical EC encoding, and the stateless local reconstruction adapter. Local runtime read/write, physical EC shards, schema-3 reconstruction facts, and output-only decoding are validated; distributed shard placement/transfer remains pending.
+`storage-engine-reactive-application` owns reactive orchestration ports such as the chunker, storage policy catalog, `ReactiveStorageOrchestrator`, and the transport-neutral `BoundedEcReconstructionPort`. `storage-engine-reactive-infrastructure` provides YAML-backed catalogs, filesystem persistence, physical EC encoding, and the stateless local reconstruction adapter. Local runtime read/write, physical EC shards, schema-3 reconstruction facts, and output-only decoding are validated. Fixed A/B/C EC 4+2 placement/transfer is separately implemented in the cluster application/data/control modules; clustered S3 EC reads remain pending.
 
 `MINIO_STANDARD` maps to S3 storage class `STANDARD`, disables deduplication, enables erasure coding as `4 data / 2 parity`, uses replication factor `1`, disables compression, and leaves encryption disabled by default.
 
@@ -150,7 +150,36 @@ Status: *implementation-informed / bounded*. `REQ-PIPELINE-017` passes 5 scenari
 |Dedicated Spring-owned Reactor scheduler with one worker and queue capacity 16; keeps GF(256) work off the caller thread and is disposed with the context.
 |===
 
-The decoder owns at most one 4 MiB logical stripe, six 1 MiB shard buffers, and fixed matrix/index workspace, with zero earlier-stripe or whole-object retention. Immutable request/result snapshots are reported separately. No shard replacement, scanner/daemon, distributed transfer, Ratis job, rebalance, cleanup, or fault-injection component is introduced.
+The decoder owns at most one 4 MiB logical stripe, six 1 MiB shard buffers, and fixed matrix/index workspace, with zero earlier-stripe or whole-object retention. Immutable request/result snapshots are reported separately. No shard replacement, scanner/daemon, Ratis repair job, rebalance, cleanup, or fault-injection component is introduced by this local boundary.
+
+==== Fixed distributed EC 4+2 components (accepted ADR 0033)
+
+[NOTE]
+====
+Status: *implementation-informed / bounded*. `REQ-CLUSTER-015` passes 5 scenarios / 40 steps in real Ratis, grpc-java/mTLS, restart, and filesystem modes.
+====
+
+[cols="3,5",options="header"]
+|===
+|Component |Implemented responsibility
+
+|`PreparedEcObject`, `PreparedEcShard`, `EcShardReference`
+|Transport-neutral one-stripe fixed EC 4+2 schema-3 input and authoritative shard/location facts. Other geometries are rejected by configuration and reconstruction boundaries.
+
+|`FixedEc42Placement`
+|Assign two shards per arranged failure domain: A=`0,3`, B=`1,4`, C=`2,5`.
+
+|`ClusterEcWriteCoordinator`
+|Incrementally verifies prepared shard/object integrity, transfers four remote shards with bounded concurrency, collects six exact acknowledgements, revalidates membership, and delegates publication.
+
+|`EcReferencePublicationService` and `compareAndPublishEc`
+|Reject incomplete/conflicting evidence before command creation and commit one fenced `EC_4_2` reference through Ratis.
+
+|Ratis `PublishEc` command/reference codec
+|Persist object facts and six schema-3 shard locations without payload bytes; retain snapshot-v2 backward compatibility and restart recovery.
+|===
+
+These components do not implement clustered S3 EC reads, repair/self-healing, rebalance, cleanup, dynamic membership, or parameterized EC.
 
 === Implemented Fixed Three-Node First Slice (ADRs 0027 and 0028)
 
@@ -234,7 +263,7 @@ The cursor is absent from consensus/log/snapshot state, page sequences are not c
 .Deferred cluster capabilities — deliberately outside bounded repair and discovery
 image::../../c4/images/FutureClusterCapabilities.png[Deferred Cluster Capabilities, width=600]
 
-`REQ-CLUSTER-024` is implemented and validated for its bounded seven-point real-filesystem/gRPC interruption catalogue, including independent target-process restart, exact filesystem effects, snapshot/log recovery, fencing, and live leadership transfer. `REQ-CLUSTER-027` separately validates bounded periodic current-reference discovery and existing repair execution on fixed A/B/C. Neither broadens the repair target beyond the current committed generation. `REQ-CLUSTER-017` remains partial because prepared-artifact intents, automated orphan cleanup, rebalance, and wider healing/topology coverage are absent. Local output-only EC decoding exists under ADR 0032, but clustered multipart, conditional/versioned and chunked writes, distributed shard placement/transfer (`REQ-CLUSTER-015`), EC self-healing, consensus-controlled dynamic membership/certificate lifecycle, rolling upgrades, ADR 0030 faults, and broader partitions remain unimplemented or unvalidated.
+`REQ-CLUSTER-024` is implemented and validated for its bounded seven-point real-filesystem/gRPC interruption catalogue, including independent target-process restart, exact filesystem effects, snapshot/log recovery, fencing, and live leadership transfer. `REQ-CLUSTER-027` separately validates bounded periodic current-reference discovery and existing repair execution on fixed A/B/C. Neither broadens the repair target beyond the current committed generation. `REQ-CLUSTER-017` remains partial because prepared-artifact intents, automated orphan cleanup, rebalance, and wider healing/topology coverage are absent. Local output-only EC decoding exists under ADR 0032, but clustered multipart, conditional/versioned and chunked writes, clustered S3 EC reads, EC self-healing, parameterized EC, consensus-controlled dynamic membership/certificate lifecycle, rolling upgrades, ADR 0030 faults, and broader partitions remain unimplemented or unvalidated.
 
 The ordered next building blocks are distributed shard placement/transfer, the planned bounded ADR 0030 committed-shard test kernel/actions, consensus-owned EC self-healing, shard rebalance, and fenced cleanup; generalized chaos is last. Whole-object replication remains available below the arranged EC minimum, while inter-cluster/NAS-backed replication remains later and NAS-dependent.
 

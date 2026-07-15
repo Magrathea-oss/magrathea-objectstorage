@@ -135,5 +135,9 @@ All architectural decisions are documented as Architecture Decision Records (ADR
 
 |link:../../adr/0032-bounded-local-erasure-coded-reconstruction.md[0032]
 |Bounded local erasure-coded reconstruction
-|✅ Accepted — implementation-informed for local output-only `REQ-PIPELINE-017` (5 scenarios / 46 steps; all 15 four-of-six combinations); cluster `015` remains not implemented
+|✅ Accepted — implementation-informed for local output-only `REQ-PIPELINE-017` (5 scenarios / 46 steps; all 15 four-of-six combinations); fixed cluster placement follows in ADR 0033
+
+|link:../../adr/0033-fixed-distributed-ec-4-2-placement-and-transfer.md[0033]
+|Fixed distributed EC 4+2 placement and transfer
+|✅ Accepted — implementation-informed for bounded internal `REQ-CLUSTER-015` (5 scenarios / 40 steps); clustered S3 EC reads, self-healing, parameterized EC, rebalance, and cleanup remain absent
 |===

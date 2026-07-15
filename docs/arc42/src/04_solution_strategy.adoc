@@ -84,7 +84,20 @@ New reconstructable EC writes use manifest schema 3. Each typed data/parity shar
 
 `BoundedEcReconstructionPort` accepts committed facts and caller-resolved checksum-valid bytes for exactly one stripe. The stateless `BoundedEcReconstructionAdapter` validates metadata/survivors, performs GF(256) work on an injected one-worker/16-queue scheduler, verifies every regenerated shard against committed length/SHA-256, and returns only a verified logical stripe plus regenerated-shard output. Decoder-owned retention is at most one 4 MiB stripe, six 1 MiB buffers, and fixed matrix/index workspace; earlier-stripe and whole-object retention remain zero.
 
-The decoder has no repository or publication capability. It neither replaces a shard nor creates a scanner/daemon, cluster transfer, Ratis repair job, rebalance, cleanup, or fault. Distributed EC placement/transfer under `REQ-CLUSTER-015` remains the next unimplemented prerequisite. See link:../../adr/0032-bounded-local-erasure-coded-reconstruction.md[ADR 0032].
+The decoder has no repository or publication capability. It neither replaces a shard nor creates a scanner/daemon, cluster transfer, Ratis repair job, rebalance, cleanup, or fault. Fixed distributed placement/transfer is a separate subsequent mechanism under ADR 0033. See link:../../adr/0032-bounded-local-erasure-coded-reconstruction.md[ADR 0032].
+
+=== Fixed Distributed EC 4+2 Placement and Transfer (accepted ADR 0033)
+
+[NOTE]
+====
+Status: *implementation-informed / implemented-and-validated for bounded internal `REQ-CLUSTER-015`*. The focused gate passes 5 scenarios / 40 steps. Clustered S3 EC reads and self-healing remain absent.
+====
+
+EC configuration is deliberately fixed to 4+2 until a later parameterized codec/placement decision. For the one-stripe bounded publication, committed A/B/C membership assigns A=`0,3`, B=`1,4`, and C=`2,5`; one node loss therefore leaves four authoritative shard identities. `ClusterEcWriteCoordinator` incrementally verifies local shard and object checksums, transfers four remote shards over bounded grpc-java/mTLS streams, and requires six exact durable acknowledgements before publication.
+
+Ratis commits one `EC_4_2` reference containing object facts and all schema-3 shard locations only after current-generation and epoch validation. Payload remains outside Ratis, and snapshot-v2 restart restores the same reference. Missing, checksum-conflicting, or stale evidence publishes nothing and never falls back to whole-object replication or a reduced shard set.
+
+This is an internal placement/transfer/publication mechanism, not clustered S3 read integration, survivor collection, shard repair, monitoring, rebalance, cleanup, dynamic membership, or generalized chaos. See link:../../adr/0033-fixed-distributed-ec-4-2-placement-and-transfer.md[ADR 0033].
 
 === Handler Minimal Pattern
 
@@ -134,7 +147,7 @@ The existing Object Store-to-Storage Engine adapter remains the only S3 integrat
 
 [NOTE]
 ====
-Status: *implementation-informed / bounded*. `REQ-CLUSTER-019..026`, including `024`, are `@implemented-and-validated`; `REQ-CLUSTER-014` is separately `@implemented-and-validated` only for its internal repository architecture mode. Broad `REQ-CLUSTER-017` remains `@partial`, and `006/007/015/016/018` remain `@not-implemented`. No production-readiness, S3 behavior, runtime-side-effect, or broad healing claim follows from `014`.
+Status: *implementation-informed / bounded*. `REQ-CLUSTER-019..026`, including `024`, are `@implemented-and-validated`; `REQ-CLUSTER-014` is separately `@implemented-and-validated` only for its internal repository architecture mode. Broad `REQ-CLUSTER-017` remains `@partial`; fixed internal EC 4+2 `015` is separately validated under ADR 0033, while `006/007/016/018` remain `@not-implemented`. No production-readiness, S3 behavior, runtime-side-effect, or broad healing claim follows from `014`.
 ====
 
 The bounded EP-10 strategy restores only an obligation already present in the current consensus-committed `ObjectReferenceGeneration`: a named target whose exact `WHOLE_OBJECT` artifact is missing or corrupt. It neither changes placement nor publishes a new generation. Application code maps still-applicable evidence into one deterministic repair job; Ratis owns `READY`, `CLAIMED`, `RETRY_WAIT`, `SUCCEEDED`, `BLOCKED`, and `OBSOLETE` lifecycle facts; and an application worker performs direct verified transfer and crash-safe target publication outside consensus.

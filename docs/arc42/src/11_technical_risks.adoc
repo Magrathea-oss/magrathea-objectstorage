@@ -52,10 +52,10 @@ This chapter is the central mutable architecture risk and remediation-status sou
 |EP-6 (`@implemented-and-validated` safety envelope; KA-6 remains pending)
 
 |8
-|**Distributed evidence is bounded and validation-mode specific** — real runtime consensus, whole-object `N=3/W=2` replication, failover/restart, current-generation repair, and periodic current-reference discovery are validated only for `001..005/008..013/019..027`, including bounded `024/027`. `REQ-CLUSTER-014` is separately architecture-only. Local pipeline `017` validates output-only EC decoding, not distributed behavior; cluster `015`, broad cluster `017`, multipart/conditional/versioned transfer, dynamic membership, EC self-healing, rebalance/cleanup, ADR 0030 faults, upgrades, and broader partitions remain absent or unvalidated.
+|**Distributed evidence is bounded and validation-mode specific** — real runtime consensus, whole-object `N=3/W=2` replication, failover/restart, current-generation repair, periodic discovery, and fixed internal EC 4+2 placement/transfer are validated for bounded scopes. `REQ-CLUSTER-014` is architecture-only and `015` does not include clustered S3 EC reads. Broad cluster `017`, multipart/conditional/versioned transfer, dynamic membership, EC self-healing, parameterized EC, rebalance/cleanup, ADR 0030 faults, upgrades, and broader partitions remain absent or unvalidated.
 |Consumers may overgeneralize one-coordinator-stop, bounded repair, or local decoder evidence into HA, distributed EC, self-healing, or production readiness.
-|Keep EP-10 `@partial`; report local pipeline, runtime cluster, and architecture-only modes separately. Execute the ordered requirement-first sequence—distributed EC transfer, bounded committed-shard fault tooling, self-healing, rebalance, cleanup—before broader claims; generalized chaos remains final.
-|EP-10 (`@partial`; local decoder validated separately; cluster `015` not implemented; broader distributed readiness not claimed)
+|Keep EP-10 `@partial`; report local pipeline, fixed EC transfer/publication, runtime S3 cluster, and architecture-only modes separately. Execute the remaining requirement-first sequence—bounded committed-shard fault tooling, EC read/self-healing integration, rebalance, cleanup—before broader claims; parameterized EC remains later and generalized chaos final.
+|EP-10 (`@partial`; local decoder and fixed internal cluster `015` validated separately; broader distributed readiness not claimed)
 
 |9
 |**Product-shell boundary regression** — ADR 0026 separation and REQ-ADMIN-032 task-group composition are implemented and validated, but future extensions could reintroduce Object Storage routes, endpoint knowledge, or models into the reusable shell.
@@ -132,7 +132,7 @@ This chapter is the central mutable architecture risk and remediation-status sou
 |21
 |**Bounded repair and periodic discovery can be overread as broad healing** — accepted ADRs 0029/0031 restore and periodically inspect only current whole-object targets already named on fixed A/B/C. The discovery cursor is process-local, pages are not one frozen scan, and a failed page intentionally blocks cursor progress. Broad `REQ-CLUSTER-017` remains partial and does not include wider healing/topologies, rebalance, or orphan cleanup.
 |Operators could treat a PA-6 planner result or cursor/counter as durable ownership, infer exactly-once or fleet-scale discovery/cleanup, overlook page starvation/fairness and repeated-scan cost, or mistake bounded repair/discovery for production readiness.
-|Keep consensus as job/lifecycle authority and the cursor process-local; report bounded implemented-and-validated `019..027` separately from partial broad cluster `017`. Local pipeline `017` is output-only. Require distributed EC placement/transfer before bounded committed-shard fault tooling and consensus-owned EC self-healing, then separate shard rebalance and fenced cleanup; keep generalized chaos, wider topology, dynamic membership, multipart, partitions, scaling, and readiness explicit exclusions.
+|Keep consensus as job/lifecycle authority and the cursor process-local; report bounded implemented-and-validated `019..027` separately from partial broad cluster `017`. Local pipeline `017` is output-only, while fixed internal EC placement/transfer `015` is a separate bounded mechanism. Proceed with committed-shard fault tooling and consensus-owned EC self-healing/read integration, then separate shard rebalance and fenced cleanup; keep generalized chaos, parameterized EC, wider topology, dynamic membership, multipart, partitions, scaling, and readiness explicit exclusions.
 |EP-10 repair/discovery (`implementation-informed`, bounded); wider healing/rebalance/cleanup (`partial/absent`; owners: cluster implementation and operations)
 
 |22
@@ -166,15 +166,15 @@ This chapter is the central mutable architecture risk and remediation-status sou
 |Reactive-streaming roadmap P0/P1/P3 (`implementation-informed`; owners: security, S3 metadata, storage lifecycle, operations)
 
 |27
-|**General dedup/EC policy ranges remain operationally unsafe even though the local EC 4+2 decoder is bounded** — dedup permits a 1 GiB copied window and wider EC allows `k + m <= 32`. ADR 0032 proves only one decoder invocation: one 4 MiB stripe, at most six 1 MiB shard buffers, fixed matrices, one worker, and 16 queued tasks.
-|Other valid configurations, encoder/downstream concurrency, or future distributed repair can still cause severe heap/CPU/network pressure; local 5-scenario/46-step evidence is not a fleet capacity result.
+|**General dedup and future parameterized-EC policy ranges remain operationally unsafe even though fixed EC 4+2 is bounded** — dedup permits a 1 GiB copied window, while production EC now rejects every geometry except 4+2. ADRs 0032/0033 prove only fixed local decoding and bounded A/B/C transfer/publication.
+|Future parameterized configurations, encoder/downstream concurrency, queued request bytes, clustered reads, or distributed repair can still cause severe heap/CPU/network pressure; focused 5-scenario/46-step and 5-scenario/39-step evidence is not a fleet capacity result.
 |Preserve the validated decoder bound and scheduler gate. P1/P2 must still freeze formula-based general limits and lower unsafe maxima; P3 validates configured worst cases and saturation. Distributed self-healing adds independent CPU/memory/network concurrency bounds.
-|ADR 0032 local decoder (`implemented-and-validated`); wider reactive-streaming/distributed EC budgets (`needs-validation`)
+|ADRs 0032/0033 fixed EC 4+2 (`implemented-and-validated` for bounded modes); parameterized/reactive/distributed-repair budgets (`needs-validation`)
 
 |28
 |**Current pipeline-chaos mechanisms are fragmented and not replayable** — existing filesystem, replica, and broad random mechanisms use different contracts; percentage/random timing is unsuitable for regression evidence.
 |EC self-healing cannot prove exact committed-shard loss/corruption without deterministic tooling, while an overbroad early chaos framework could destabilize unfinished normal paths.
-|After distributed EC placement/transfer, implement only ADR 0030's no-op-default plan/evidence kernel and exact schema-3 committed-shard unavailable/corruption actions with finite one-stripe blast radius, quarantine/restoration, dual non-production activation, fail-closed plans, and redacted outcomes. Use it solely for self-healing gates. Defer every generalized action/chaos mode until final P4; keep probabilistic mode exploratory or retire it.
+|Now that fixed distributed EC 4+2 placement/transfer is validated, implement only ADR 0030's no-op-default plan/evidence kernel and exact schema-3 committed-shard unavailable/corruption actions with finite one-stripe blast radius, quarantine/restoration, dual non-production activation, fail-closed plans, and redacted outcomes. Use it solely for self-healing gates. Defer every generalized action/chaos mode until final P4; keep probabilistic mode exploratory or retire it.
 |ADR 0030 (`accepted amended sequence`; early EC subset planned / needs-validation; generalized chaos final)
 
 |29
@@ -195,7 +195,7 @@ This chapter is the central mutable architecture risk and remediation-status sou
 
 [NOTE]
 ====
-Status: *needs-validation with one owner-approved early exception*. EP-10 remains active and the source-review sequence does not replace the EP roadmap or revoke scoped evidence. After distributed EC placement/transfer, the bounded ADR 0030 kernel plus exact committed-shard actions may enter solely to validate EC self-healing. Shared requirements must precede implementation. Every generalized chaos capability remains final.
+Status: *needs-validation with one owner-approved early exception*. EP-10 remains active and the source-review sequence does not replace the EP roadmap or revoke scoped evidence. Fixed EC 4+2 distributed placement/transfer now satisfies the prerequisite for the bounded ADR 0030 kernel plus exact committed-shard actions, which may enter solely to validate EC self-healing. Shared requirements must precede implementation. Every generalized chaos capability remains final.
 ====
 
 P0-P3 remain the normal reactive-streaming review path and may be activated as their owning requirements demand. The early EC fault subset is a narrow test-tooling dependency, not permission to bypass normal-path resource/ownership gates or broaden object sizes, concurrency, transform widths, fault actions, or support claims.
@@ -224,7 +224,7 @@ P0-P3 remain the normal reactive-streaming review path and may be activated as t
 
 |EC-FI
 |Provide only deterministic committed-shard test support before EC self-healing
-|After `REQ-CLUSTER-015` distributed placement/transfer, write/refresh the internal Ability requirements and implement the no-op-default plan/evidence kernel plus `MAKE_COMMITTED_EC_SHARD_UNAVAILABLE` and `CORRUPT_COMMITTED_EC_SHARD_BYTE`. Bind exact schema-3 identity, prohibit raw paths/metadata mutation, enforce recoverable `m` or explicit one-stripe `EXPECT_BLOCKED` `m+1` blast radius, quarantine/restore idempotently, and redact evidence. This subset is not contingent on unrelated P0-P2 closure, but it must satisfy its own finite resource and ownership gates.
+|With fixed `REQ-CLUSTER-015` placement/transfer validated, write/refresh the internal Ability requirements and implement the no-op-default plan/evidence kernel plus `MAKE_COMMITTED_EC_SHARD_UNAVAILABLE` and `CORRUPT_COMMITTED_EC_SHARD_BYTE`. Bind exact schema-3 identity, prohibit raw paths/metadata mutation, enforce recoverable `m` or explicit one-stripe `EXPECT_BLOCKED` `m+1` blast radius, quarantine/restore idempotently, and redact evidence. This subset is not contingent on unrelated P0-P2 closure, but it must satisfy its own finite resource and ownership gates.
 |No-op equivalence and dual activation pass; plans/replay/target resolution fail closed; exact faults are detected; teardown restores pristine state; evidence is finite and payload/secret-free. The tooling supplies no scanner, job, transfer, publication, rebalance, cleanup, or generalized-chaos behavior.
 |`accepted early subset / planned / needs-validation`. Owners: storage/cluster application, EC infrastructure, requirements/evidence.
 
@@ -247,7 +247,7 @@ P0-P3 remain the normal reactive-streaming review path and may be activated as t
 - The owner-confirmed single-node/default backend is Storage Engine. Legacy in-memory adapters are test/retirement scope, not an alternate product backend.
 - P1 static counts cannot close a semantic risk; they prevent regression and define the finite budget that P3 must measure.
 - P2 must preserve the positive controls: no production `DataBufferUtils.join`/`block*`, one-open/single-pass GET, `DataBufferUtils.write` plus incremental digest/persisted verification, 64 KiB cluster frames, manual gRPC demand, dedicated executors, and chunker discard release.
-- EC-FI may begin only after distributed EC placement/transfer and may support only the dedicated self-healing acceptance gates; its evidence proves test tooling, not repair ownership, publication, or self-healing.
+- EC-FI's distributed-placement prerequisite is now satisfied by fixed `REQ-CLUSTER-015`; it may support only the dedicated self-healing acceptance gates; its evidence proves test tooling, not repair ownership, publication, or self-healing.
 - P3 closes the wider normal path before generalized deterministic chaos begins; it does not pull EC-FI into unrelated paths.
 - P4 deterministic hook evidence cannot substitute for realistic filesystem/network/process fault evidence, and exploratory random chaos cannot substitute for replay evidence.
 - A phase closes only on the exact implementation and validation evidence in its exit criteria. Unknown, skipped, stale, or runner-missing evidence remains `needs-validation`; no test result is inferred from this plan.

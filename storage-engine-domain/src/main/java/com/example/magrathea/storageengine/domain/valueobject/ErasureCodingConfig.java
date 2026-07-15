@@ -1,18 +1,15 @@
 package com.example.magrathea.storageengine.domain.valueobject;
 
 public record ErasureCodingConfig(int dataBlocks, int parityBlocks) {
-    static final int MAX_TOTAL_BLOCKS = 32;
+    public static final int FIXED_DATA_BLOCKS = 4;
+    public static final int FIXED_PARITY_BLOCKS = 2;
+    public static final int FIXED_TOTAL_BLOCKS = FIXED_DATA_BLOCKS + FIXED_PARITY_BLOCKS;
 
     public ErasureCodingConfig {
-        if (dataBlocks < 2) {
-            throw new IllegalArgumentException("dataBlocks (k) must be >= 2: " + dataBlocks);
-        }
-        if (parityBlocks < 1) {
-            throw new IllegalArgumentException("parityBlocks (m) must be >= 1: " + parityBlocks);
-        }
-        if (dataBlocks + parityBlocks > MAX_TOTAL_BLOCKS) {
+        if (dataBlocks != FIXED_DATA_BLOCKS || parityBlocks != FIXED_PARITY_BLOCKS) {
             throw new IllegalArgumentException(
-                    "k + m must be <= " + MAX_TOTAL_BLOCKS + ": " + (dataBlocks + parityBlocks));
+                    "only fixed EC 4+2 is supported before parameterized EC validation: k="
+                            + dataBlocks + ", m=" + parityBlocks);
         }
     }
 

@@ -19,7 +19,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 === Summary
 
 * Feature files scanned: 34
-* Scenarios discovered: 534
+* Scenarios discovered: 536
 * Protocol-smoke scenarios: 122
 
 ==== Status tag counts
@@ -29,9 +29,9 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |Tag |Scenario count
 |`@absent` |3
 |`@config-only` |69
-|`@implemented-and-validated` |242
+|`@implemented-and-validated` |245
 |`@implemented-not-e2e-validated` |22
-|`@not-implemented` |11
+|`@not-implemented` |10
 |`@partial` |5
 |`@placeholder` |9
 |`unknown/not-tagged` |178
@@ -51,7 +51,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |`@docker-build-required` |1
 |`@docker-release-required` |1
 |`@docker-required` |1
-|`@filesystem-inspection-required` |2
+|`@filesystem-inspection-required` |3
 |`@frontend-contract-required` |5
 |`@frontend-e2e-required` |19
 |`@full-process-restart-required` |1
@@ -67,7 +67,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |`@tracing-inspection-required` |2
 |`@visual-regression-required` |1
 |`@webclient-required` |307
-|`unknown/not-tagged` |112
+|`unknown/not-tagged` |113
 |===
 
 ==== Classification tag counts
@@ -75,8 +75,8 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 [cols="1,1",options="header"]
 |===
 |Tag |Scenario count
-|`@functional-requirement` |284
-|`@non-functional-requirement` |197
+|`@functional-requirement` |286
+|`@non-functional-requirement` |199
 |`unknown/not-tagged` |205
 |===
 
@@ -4193,7 +4193,7 @@ request path, response, and audit evidence for a diagnostic request.
 ----
         {
           "storageClassId": "ARCHIVE_EC",
-          "erasureCoding": { "dataBlocks": 8, "parityBlocks": 4 },
+          "erasureCoding": { "dataBlocks": 4, "parityBlocks": 2 },
           "replication": { "factor": 1 }
         }
 ----
@@ -4240,7 +4240,7 @@ request path, response, and audit evidence for a diagnostic request.
 ----
         {
           "storageClassId": "ARCHIVE_EC",
-          "erasureCoding": { "dataBlocks": 8, "parityBlocks": 4 },
+          "erasureCoding": { "dataBlocks": 4, "parityBlocks": 2 },
           "replication": { "factor": 1 }
         }
 ----
@@ -4280,7 +4280,7 @@ request path, response, and audit evidence for a diagnostic request.
 ----
         {
           "storageClassId": "ARCHIVE_EC",
-          "erasureCoding": { "dataBlocks": 8, "parityBlocks": 4 },
+          "erasureCoding": { "dataBlocks": 4, "parityBlocks": 2 },
           "replication": { "factor": 1 }
         }
 ----
@@ -13224,7 +13224,7 @@ claim any daemon, filesystem, cluster, Ratis, rebalance, cleanup, or chaos behav
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:283`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:284`
 |Rule |Local EC reconstruction is explicit, bounded, and fail-closed
 |Requirement ID(s) |`REQ-PIPELINE-017`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -13265,7 +13265,7 @@ claim any daemon, filesystem, cluster, Ratis, rebalance, cleanup, or chaos behav
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:308`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:309`
 |Rule |Write objects pass through explicit stages in a deterministic order
 |Requirement ID(s) |`REQ-PIPELINE-001`
 |Classification |`@functional-requirement`
@@ -13324,7 +13324,7 @@ order. Later stages MUST NOT run before earlier required stages have succeeded.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:349`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:350`
 |Rule |Dedup chunk persistence preserves backpressure and bounded memory
 |Requirement ID(s) |`REQ-PIPELINE-002`
 |Classification |`@non-functional-requirement`
@@ -13384,7 +13384,7 @@ production object-content paths. This rule does not authorize chunking plain upl
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:385`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:386`
 |Rule |Upload ETag computation and dedup windowing preserve streaming request-body paths
 |Requirement ID(s) |`REQ-PIPELINE-007`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -13426,7 +13426,7 @@ materializing the complete FileUnit.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:397`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:398`
 |Rule |Upload ETag computation and dedup windowing preserve streaming request-body paths
 |Requirement ID(s) |`REQ-PIPELINE-008`
 |Classification |`@non-functional-requirement`
@@ -13467,7 +13467,7 @@ materializing the complete FileUnit.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:414`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:415`
 |Rule |Read objects stream chunks in manifest order without aggregating the object
 |Requirement ID(s) |`REQ-PIPELINE-009`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -13504,7 +13504,7 @@ before response streaming begins.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:423`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:424`
 |Rule |Read objects stream chunks in manifest order without aggregating the object
 |Requirement ID(s) |`REQ-PIPELINE-010`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -13544,7 +13544,7 @@ before response streaming begins.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:435`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:436`
 |Rule |Read objects stream chunks in manifest order without aggregating the object
 |Requirement ID(s) |`REQ-PIPELINE-003`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -13594,7 +13594,7 @@ before response streaming begins.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:470`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:471`
 |Rule |HTTP reads validate metadata and stream persisted bytes once
 |Requirement ID(s) |`REQ-PIPELINE-003`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -13647,7 +13647,7 @@ Periodic at-rest detection and repair belongs to EP-4 scrubbing.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:504`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:505`
 |Rule |Multipart part persistence streams upload and copy inputs without complete-part aggregation
 |Requirement ID(s) |`REQ-PIPELINE-011`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -13687,7 +13687,7 @@ without loading each part file as one byte array.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:516`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:517`
 |Rule |Multipart part persistence streams upload and copy inputs without complete-part aggregation
 |Requirement ID(s) |`REQ-PIPELINE-012`
 |Classification |`@non-functional-requirement`
@@ -13728,7 +13728,7 @@ without loading each part file as one byte array.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:535`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:536`
 |Rule |Existing S3 streaming boundaries apply a finite runtime demand window
 |Requirement ID(s) |`REQ-PIPELINE-013`
 |Classification |`@non-functional-requirement`
@@ -13768,7 +13768,7 @@ boundary does not validate stage ordering, manifest publication, or StorageEvent
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:552`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:553`
 |Rule |Stage failures propagate deterministically and clean up completed resources
 |Requirement ID(s) |`REQ-PIPELINE-004`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -13826,7 +13826,7 @@ a deterministic S3 error without publishing a readable object.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:581`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:582`
 |Rule |Stage failures propagate deterministically and clean up completed resources
 |Requirement ID(s) |`REQ-PIPELINE-004`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -13867,7 +13867,7 @@ a deterministic S3 error without publishing a readable object.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:600`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:601`
 |Rule |Cancellation before publication cleans up pipeline-owned resources
 |Requirement ID(s) |`REQ-PIPELINE-005`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -13928,7 +13928,7 @@ unpublished chunks or temporary files, and leave no readable object behind.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:635`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:636`
 |Rule |Each pipeline stage emits independent typed instrumentation events
 |Requirement ID(s) |`REQ-PIPELINE-006`
 |Classification |`@non-functional-requirement`
@@ -15072,7 +15072,7 @@ exact-target no-recopy reconciliation, stale-token fencing, and live A-to-C lead
 Ability validation mode is the requirement's only agreed mode; REQ-CLUSTER-024 is not S3 behavior and does
 not require WebTestClient or AWS CLI validation. These bounded repair and discovery gates do not mark the
 whole EP-10 mechanism backlog complete and exclude orphan cleanup, rebalance, anti-entropy beyond fixed A/B/C
-current-reference obligations, dynamic membership, and erasure coding.
+current-reference obligations, dynamic membership, EC S3 reads, EC self-healing, and parameterized erasure coding.
 Fixed node configuration:
 | node | stable UUID                          | Ratis address   | replica address | identity root                              | Ratis root                           | object root                            | temporary root                          | runtime root                          |
 | A    | 11111111-1111-4111-8111-111111111111 | 127.0.0.1:19801 | 127.0.0.1:19901 | target/ep10/three-node/node-a/identity     | target/ep10/three-node/node-a/ratis | target/ep10/three-node/node-a/objects | target/ep10/three-node/node-a/temporary | target/ep10/three-node/node-a/runtime |
@@ -15593,7 +15593,7 @@ generated as 196625 bytes where byte at zero-based offset i is i modulo 251. Its
 
 ===== REQ-CLUSTER-015
 
-====== Scenario: Erasure-coded shard transfer and reconstruction are not implemented by replicated whole-object transfer
+====== Scenario: Fixed EC 4+2 placement survives loss of any one arranged node
 
 [cols="1h,3",options="header"]
 |===
@@ -15602,21 +15602,96 @@ generated as 196625 bytes where byte at zero-based offset i is i modulo 251. Its
 |Rule |Capabilities beyond the first fixed three-node slice remain explicit backlog
 |Requirement ID(s) |`REQ-CLUSTER-015`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
-|Capability area tags |`@spec`, `@phase-ep10`, `@cluster`, `@multi-node`, `@internal-api`, `@erasure-coding`, `@direct-transfer`, `@later-slice`
+|Capability area tags |`@spec`, `@phase-ep10`, `@cluster`, `@multi-node`, `@internal-api`, `@erasure-coding`, `@direct-transfer`, `@placement`, `@integrity`, `@failure-domain`
 |Validation mode tags |unknown/not-tagged
-|Declared/validated status |`@not-implemented`
+|Declared/validated status |`@implemented-and-validated`
 |Protocol smoke |`no`
-|All tags |`@spec`, `@phase-ep10`, `@cluster`, `@multi-node`, `@internal-api`, `@REQ-CLUSTER-015`, `@functional-requirement`, `@non-functional-requirement`, `@erasure-coding`, `@direct-transfer`, `@later-slice`, `@not-implemented`
+|All tags |`@spec`, `@phase-ep10`, `@cluster`, `@multi-node`, `@internal-api`, `@REQ-CLUSTER-015`, `@functional-requirement`, `@non-functional-requirement`, `@erasure-coding`, `@direct-transfer`, `@placement`, `@integrity`, `@failure-domain`, `@implemented-and-validated`
 |===
 
 .Gherkin steps
 [source,gherkin]
 ----
-  Given the first slice transfers whole-object replicas using N=3/W=2
-  When cluster capability status is reported
-  Then EC encoding, data and parity shard transfer, policy-specific acknowledgement thresholds, and reconstruction are "not implemented"
-  And no N=3/W=2 replica result is cited as EC evidence
+  Given validation mode "fixed A/B/C EC 4+2 placement with real gRPC/mTLS transfer, Ratis publication, restart, and filesystem inspection" is selected for requirement "REQ-CLUSTER-015"
+  And the only supported erasure-coding geometry is four 1 MiB data shards plus two 1 MiB parity shards per 4 MiB logical stripe
+  And committed membership arranges A, B, and C as three distinct failure domains under topology epoch "topology-1" and policy epoch "policy-1"
+  When the transport-neutral distributed EC coordinator plans schema-3 stripe 0
+  Then shard indices 0 and 3 are assigned to A, 1 and 4 to B, and 2 and 5 to C
+  And each node owns exactly two unique shard obligations in its own failure domain
+  And removing A, B, or C independently leaves exactly four committed shard identities sufficient for local EC 4+2 reconstruction
+  And the placement result contains no whole-object replica fallback or second external object API
 ----
+
+====== Scenario: Six verified shard acknowledgements precede one authoritative EC reference
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:323`
+|Rule |Capabilities beyond the first fixed three-node slice remain explicit backlog
+|Requirement ID(s) |`REQ-CLUSTER-015`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@spec`, `@phase-ep10`, `@cluster`, `@multi-node`, `@internal-api`, `@erasure-coding`, `@direct-transfer`, `@grpc`, `@mtls`, `@consensus`, `@durability`, `@integrity`, `@restart-safety`
+|Validation mode tags |`@filesystem-inspection-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-ep10`, `@cluster`, `@multi-node`, `@internal-api`, `@REQ-CLUSTER-015`, `@functional-requirement`, `@non-functional-requirement`, `@erasure-coding`, `@direct-transfer`, `@grpc`, `@mtls`, `@consensus`, `@durability`, `@integrity`, `@restart-safety`, `@filesystem-inspection-required`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given validation mode "fixed A/B/C EC 4+2 placement with real gRPC/mTLS transfer, Ratis publication, restart, and filesystem inspection" is selected for requirement "REQ-CLUSTER-015"
+  And coordinator A owns six locally prepared schema-3 shard artifacts for deterministic fixture "target/ep10/fixtures/ec-4-2-stripe.bin"
+  And the bounded publication contains exactly one stripe and six shard obligations
+  And B and C expose internal replica-data services authenticated by UUID-bound certificates under "target/ep10/pki/nodes/B" and "target/ep10/pki/nodes/C"
+  When A distributes stripe 0 according to the committed placement and requests publication for bucket "ep10-ec-archive" and key "evidence/2026/distributed-ec-4-2.bin"
+  Then A retains checksum-valid shard indices 0 and 3, B durably receives 1 and 4, and C durably receives 2 and 5
+  And every remote shard uses a real readiness-gated grpc-java stream with frames no larger than 65536 bytes and mutual TLS identity validation
+  And exactly six unique acknowledgements bind operation, artifact, shard location, stored length, SHA-256, topology epoch, and policy epoch
+  And Ratis commits generation 1 only after all six acknowledgements and revalidated membership fencing
+  And the authoritative reference records layout "EC_4_2", exact object length and SHA-256, and all six schema-3 shard facts with transport-neutral node locations
+  And object or shard payload bytes are absent from the Ratis log and snapshot
+  When all three voters restart from their original non-empty identity and Ratis roots
+  Then the same generation 1 EC reference and all six shard locations are recovered exactly
+  But this evidence does not claim S3 read integration, shard repair or replacement, a scanner or daemon, rebalance, cleanup, dynamic membership, or generalized chaos
+----
+
+====== Scenario Outline: Incomplete or stale shard evidence cannot publish an EC generation
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:340`
+|Rule |Capabilities beyond the first fixed three-node slice remain explicit backlog
+|Requirement ID(s) |`REQ-CLUSTER-015`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@spec`, `@phase-ep10`, `@cluster`, `@multi-node`, `@internal-api`, `@erasure-coding`, `@consistency`, `@failure-handling`, `@no-degraded-writes`
+|Validation mode tags |unknown/not-tagged
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-ep10`, `@cluster`, `@multi-node`, `@internal-api`, `@REQ-CLUSTER-015`, `@functional-requirement`, `@non-functional-requirement`, `@erasure-coding`, `@consistency`, `@failure-handling`, `@no-degraded-writes`, `@implemented-and-validated`
+|===
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given validation mode "fixed A/B/C EC 4+2 placement with real gRPC/mTLS transfer, Ratis publication, restart, and filesystem inspection" is selected for requirement "REQ-CLUSTER-015"
+  And a clean fixed A/B/C EC 4+2 publication attempt has failure condition "<failure>"
+  When the distributed EC coordinator evaluates authoritative publication
+  Then no EC object-reference generation is committed
+  And no whole-object fallback, reduced-shard publication, or successful external signal is permitted
+  And any transferred shard remains unreachable non-authoritative data for later fenced cleanup
+----
+
+.Examples
+[cols="1",options="header"]
+|===
+| failure
+| one of the six durable shard acknowledgements is absent
+| one shard acknowledgement has a different stored SHA-256
+| topology epoch changes after transfer and before publication
+|===
 
 ===== REQ-CLUSTER-016
 
@@ -15625,7 +15700,7 @@ generated as 196625 bytes where byte at zero-based offset i is i modulo 251. Its
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:319`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:355`
 |Rule |Capabilities beyond the first fixed three-node slice remain explicit backlog
 |Requirement ID(s) |`REQ-CLUSTER-016`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -15654,7 +15729,7 @@ generated as 196625 bytes where byte at zero-based offset i is i modulo 251. Its
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:328`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:364`
 |Rule |Capabilities beyond the first fixed three-node slice remain explicit backlog
 |Requirement ID(s) |`REQ-CLUSTER-027`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -15694,7 +15769,7 @@ generated as 196625 bytes where byte at zero-based offset i is i modulo 251. Its
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:355`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:391`
 |Rule |Capabilities beyond the first fixed three-node slice remain explicit backlog
 |Requirement ID(s) |`REQ-CLUSTER-027`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -15734,7 +15809,7 @@ generated as 196625 bytes where byte at zero-based offset i is i modulo 251. Its
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:375`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:411`
 |Rule |Capabilities beyond the first fixed three-node slice remain explicit backlog
 |Requirement ID(s) |`REQ-CLUSTER-017`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -15763,7 +15838,7 @@ generated as 196625 bytes where byte at zero-based offset i is i modulo 251. Its
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:384`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-ep10-three-node-cluster-mechanisms.feature:420`
 |Rule |Capabilities beyond the first fixed three-node slice remain explicit backlog
 |Requirement ID(s) |`REQ-CLUSTER-018`
 |Classification |`@functional-requirement`, `@non-functional-requirement`

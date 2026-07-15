@@ -146,11 +146,11 @@ public class PhaseEp8ArchitectureContractSteps {
                 "This upgrades only the bounded status of `REQ-CLUSTER-014`: it is `@implemented-and-validated` for its internal repository-rooted architecture validation mode.",
                 "The gate validates source and build boundaries, not S3 behavior",
                 "It provides no runtime-side-effect, runtime cluster-behavior, broad-healing, or production-readiness evidence.",
-                "ADR 0031 separately makes `REQ-CLUSTER-027` implemented-and-validated for bounded periodic current-reference inspection and repair on fixed A/B/C",
+                "ADR 0031 separately validates `REQ-CLUSTER-027`",
                 "anti-entropy beyond current named A/B/C obligations",
-                "EP-10 remains partial. Broad `REQ-CLUSTER-017` remains `@partial`; `REQ-CLUSTER-006`, `REQ-CLUSTER-007`, `REQ-CLUSTER-015`, `REQ-CLUSTER-016`, and `REQ-CLUSTER-018` remain `@not-implemented`.",
-                "ADR 0032 makes only local output-only EC reconstruction implemented-and-validated",
-                "The next priority is distributed shard placement and direct transfer under `REQ-CLUSTER-015`",
+                "EP-10 remains partial. Broad `REQ-CLUSTER-017` remains `@partial`; `REQ-CLUSTER-006`, `REQ-CLUSTER-007`, `REQ-CLUSTER-016`, and `REQ-CLUSTER-018` remain `@not-implemented`.",
+                "ADR 0032 validates local output-only EC reconstruction",
+                "Subsequent ADR 0033 completed fixed shard placement and direct transfer under `REQ-CLUSTER-015`",
                 "generalized chaos remains final",
                 "No evidence above supports a production-readiness or general distributed-storage claim");
         assertThat(antiEntropyAdr).contains(
@@ -162,21 +162,21 @@ public class PhaseEp8ArchitectureContractSteps {
                 "ADR 0030 deterministic storage-pipeline fault injection or general chaos",
                 "distributed production readiness");
         assertThat(arc42).contains(
-                "EP-10 (S3 Cluster, multi-node): `@partial`. Fixed A/B/C is implementation-informed and validated for `REQ-CLUSTER-001..005`, `008..014`, and `019..027`, with `014` architecture-only. Local pipeline `017` is not cluster evidence; cluster `015` remains not implemented and broad cluster `017` remains partial.",
-                "The sequence is distributed EC placement/transfer, bounded ADR 0030 committed-shard test tooling, EC self-healing, shard rebalance, and cleanup; generalized chaos remains final.",
+                "EP-10 (S3 Cluster, multi-node): `@partial`. Fixed A/B/C is implementation-informed and validated for `REQ-CLUSTER-001..005`, `008..015`, and `019..027`, with `014` architecture-only and `015` internal fixed EC placement/transfer only.",
+                "The sequence is bounded ADR 0030 committed-shard test tooling, EC self-healing/read integration, shard rebalance, and cleanup; parameterized EC remains later and generalized chaos final.",
                 "On 2026-07-14, the separate `ReqCluster014ArchitectureContractCucumberTest` passed 1 scenario / 17 steps in `REQ-CLUSTER-014`'s sole internal validation mode.",
                 "This validates source and build boundaries only; it is not S3 behavior and proves no runtime side effect.",
-                "Status: *implementation-informed / bounded*. `REQ-CLUSTER-019..026`, including `024`, are `@implemented-and-validated`; `REQ-CLUSTER-014` is separately `@implemented-and-validated` only for its internal repository architecture mode. Broad `REQ-CLUSTER-017` remains `@partial`, and `006/007/015/016/018` remain `@not-implemented`. No production-readiness, S3 behavior, runtime-side-effect, or broad healing claim follows from `014`.",
+                "Status: *implementation-informed / bounded*. `REQ-CLUSTER-019..026`, including `024`, are `@implemented-and-validated`; `REQ-CLUSTER-014` is separately `@implemented-and-validated` only for its internal repository architecture mode. Broad `REQ-CLUSTER-017` remains `@partial`; fixed internal EC 4+2 `015` is separately validated under ADR 0033, while `006/007/016/018` remain `@not-implemented`. No production-readiness, S3 behavior, runtime-side-effect, or broad healing claim follows from `014`.",
                 "Status: *implementation-informed / bounded*. Both `REQ-CLUSTER-027` scenarios are `@implemented-and-validated`; the focused gate passes 2 scenarios / 36 steps. Broad `REQ-CLUSTER-017` and EP-10 remain partial.",
                 "The cursor is never consensus state",
                 "This strategy makes no PA-6 `AntiEntropyPlanner` execution claim",
                 "Status: *accepted target architecture and amended sequencing; planned / needs-validation*. No production fault implementation, Cucumber fault requirement, replay result, committed-shard action, or fault-safety result is claimed.",
-                "The owner-selected sequence is distributed EC placement/transfer, the bounded kernel/committed-shard subset, EC self-healing, shard rebalance, and fenced cleanup.",
+                "The owner-selected sequence has completed fixed distributed EC 4+2 placement/transfer; next are the bounded kernel/committed-shard subset, EC self-healing/read integration, shard rebalance, and fenced cleanup.",
                 "Generalized ADR 0030 actions and realistic chaos remain final",
                 "All five `REQ-PIPELINE-017` scenarios are `@implemented-and-validated`; the focused gate passes 5 scenarios / 46 steps and all 15 four-of-six EC 4+2 survivor combinations.",
                 "No production distributed-cluster claim follows from the bounded first slice; see `PLAN.md` for current status per phase.");
         assertThat(testReport).contains(
-                "The opt-in EP-10 14-scenario / 188-step shared gate, 4-scenario / 80-step repair-only run, and focused mechanism/repair-control gates remain separate and are not folded into these totals",
+                "Opt-in EP-10 real-process acceptance, focused EP-8 supply-chain, and Docker-required `REQ-OPS-023/025` modes were not activated; their separately reported evidence is not replaced by these totals.",
                 "These hashes remain historical evidence only: the production reactor now composes `cluster-protocol`, `storage-engine-cluster-application`, `cluster-control-ratis-infrastructure`, and `cluster-data-grpc-infrastructure`, and no new clean-revision application SBOM/license/image packet was generated after that expansion.",
                 "Therefore current complete-reactor `REQ-SUPPLY-001` is `@implemented-not-e2e-validated`; the other EP-8 requirement statuses and their explicit limitations remain unchanged.",
                 "Historical EP-10 bounded fixed-cluster and current-generation repair evidence (2026-07-13)",
@@ -196,8 +196,9 @@ public class PhaseEp8ArchitectureContractSteps {
                 "`ReqPipeline017EcReconstructionCucumberTest` passed exactly **5 scenarios / 46 steps**.",
                 "all 15 four-of-six survivor combinations",
                 "This is local output-only evidence",
-                "`REQ-CLUSTER-015` remains not implemented and EP-10 remains partial.",
-                "Exact status is represented from source tags: local pipeline `REQ-PIPELINE-017` is implemented-and-validated, while cluster `REQ-CLUSTER-015` remains not implemented, broad cluster `REQ-CLUSTER-017` and EP-10 remain partial, and `006/007/016/018` remain not implemented.");
+                "Focused `REQ-CLUSTER-015` fixed distributed EC 4+2 evidence (2026-07-14)",
+                "`ReqCluster015DistributedEcCucumberTest` passed exactly **5 scenarios / 40 steps**.",
+                "Exact status is represented from source tags: local pipeline `REQ-PIPELINE-017` is implemented-and-validated, while fixed cluster `REQ-CLUSTER-015` is implemented-and-validated for its bounded internal mechanism, broad cluster `REQ-CLUSTER-017` and EP-10 remain partial, and `006/007/016/018` remain not implemented.");
     }
 
     @Given("ADR 0027 defines the planned gRPC surface for membership, control coordination, artifact transfer, verification, health evidence, and durable recovery-job execution")

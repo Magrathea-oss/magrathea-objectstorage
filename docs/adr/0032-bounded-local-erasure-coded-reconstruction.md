@@ -6,7 +6,7 @@ Date: 2026-07-14
 
 Accepted — implementation-informed for the local output-only reconstruction scope in `REQ-PIPELINE-017`.
 
-All five `REQ-PIPELINE-017` scenarios are `@implemented-and-validated`; the focused `ReqPipeline017EcReconstructionCucumberTest` passes **5 scenarios / 46 steps**. This decision establishes a transport-neutral decoder for one committed EC stripe and schema-3 reconstruction metadata. It does not implement or validate repair publication, a scanner or self-healing daemon, distributed shard placement or transfer, Ratis repair ownership, rebalance, orphan cleanup, ADR 0030 fault injection, or generalized chaos. `REQ-CLUSTER-015` remains `@not-implemented`, and EP-10 remains `@partial`.
+All five `REQ-PIPELINE-017` scenarios are `@implemented-and-validated`; the focused `ReqPipeline017EcReconstructionCucumberTest` passes **5 scenarios / 46 steps**. This decision establishes a transport-neutral decoder for one committed EC stripe and schema-3 reconstruction metadata. It does not itself implement repair publication, a scanner or self-healing daemon, distributed shard placement or transfer, Ratis repair ownership, rebalance, orphan cleanup, ADR 0030 fault injection, or generalized chaos. Subsequent ADR 0033 implements fixed A/B/C EC 4+2 placement/transfer under `REQ-CLUSTER-015`; EP-10 remains `@partial`.
 
 ## Context
 
@@ -87,7 +87,7 @@ Those effects require separate requirement-first application and infrastructure 
 
 The owner-selected EP-10 continuation is:
 
-1. implement authoritative distributed EC shard placement and direct transfer under `REQ-CLUSTER-015`;
+1. implement authoritative fixed EC 4+2 shard placement and direct transfer under `REQ-CLUSTER-015` (completed by ADR 0033);
 2. introduce the bounded ADR 0030 plan/evidence kernel and only the committed-shard unavailable/corruption actions needed for deterministic EC self-healing tests;
 3. implement EC monitoring and self-healing with process-local detection but consensus-owned repair jobs, claims, retries, fencing, and results;
 4. implement shard rebalance as a separate placement-changing slice;
@@ -146,7 +146,7 @@ The focused CI job is wired as a non-publishing evidence gate, but CI execution 
 - `REQ-PIPELINE-017` — implemented and validated for exactly the five local bounded reconstruction scenarios.
 - `REQ-PIPELINE-014` — existing whole-object storage-unit behavior; unchanged.
 - `REQ-PIPELINE-015` — existing local physical EC 4+2 shard persistence/readback; unchanged.
-- `REQ-CLUSTER-015` — distributed EC shard placement and direct transfer; remains not implemented.
+- `REQ-CLUSTER-015` — fixed A/B/C EC 4+2 shard placement and direct transfer; subsequently implemented and validated by ADR 0033.
 - `REQ-CLUSTER-017` — broad healing remains partial.
 
 ## Related ADRs
@@ -157,3 +157,4 @@ The focused CI job is wired as a non-publishing evidence gate, but CI execution 
 - ADR 0029 — Consensus-owned durable repair for the current whole-object generation.
 - ADR 0030 — Deterministic storage-pipeline fault injection, amended to permit a planned early bounded committed-shard test subset while retaining generalized chaos as final work.
 - ADR 0031 — Bounded periodic current-reference anti-entropy for existing whole-object obligations.
+- ADR 0033 — Fixed distributed EC 4+2 placement and transfer.

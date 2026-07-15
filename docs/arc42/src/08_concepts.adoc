@@ -166,11 +166,26 @@ Status: *implementation-informed / bounded*. All five `REQ-PIPELINE-017` scenari
 
 Schema 3 makes reconstruction identity explicit. Each committed EC data/parity reference binds stripe index, shard index, `k`, `m`, parity role, stripe logical length, per-data-shard original length, stored length, lowercase SHA-256, and ordered transport-neutral node/device locations. The local gate uses identity `node-001` and inspects chunk-id files separately; it never stores a filesystem path as location authority. Schemas 0/1/2 keep their read compatibility paths, while ambiguous schema-2 EC metadata is rejected for reconstruction without ordinal inference.
 
-`BoundedEcReconstructionPort` is an application boundary for one stripe. The caller supplies committed descriptors, exactly `k` checksum-valid survivor snapshots, and one or two unavailable indexes. The stateless adapter validates every fact and survivor, uses the shared GF(256) codec, verifies regenerated length/SHA-256, and returns only verified logical-stripe and regenerated-shard snapshots plus workspace measurements. Invalid schema, duplicate/out-of-range indexes, inconsistent metadata, wrong lengths/checksums, or fewer than `k` valid survivors fail closed.
+`BoundedEcReconstructionPort` is an application boundary for one stripe. The caller supplies committed descriptors, exactly `k` checksum-valid survivor snapshots, and one or two unavailable indexes. The stateless adapter validates every fact and survivor, uses the shared GF(256) codec, verifies regenerated length/SHA-256, and returns only verified logical-stripe and regenerated-shard snapshots plus workspace measurements. Invalid schema, duplicate/out-of-range indexes, inconsistent metadata, wrong lengths/checksums, fewer than `k` valid survivors, or any geometry other than fixed EC 4+2 fail closed.
 
 Decoder-owned retention is object-size independent: at most one 4 MiB stripe, six 1 MiB shard buffers, and fixed matrix/index workspace; earlier-stripe and whole-object retention are zero. Immutable request/result boundary snapshots are measured separately. Spring injects one dedicated worker with a 16-task queue so GF(256) execution leaves the Reactor caller thread.
 
-The port cannot publish, replace, or locate a shard and has no repository/filesystem dependency. It creates no scanner/daemon, transfer, Ratis repair lifecycle, rebalance, cleanup, or fault. Distributed shard placement/transfer (`REQ-CLUSTER-015`) remains not implemented. See link:../../adr/0032-bounded-local-erasure-coded-reconstruction.md[ADR 0032].
+The port cannot publish, replace, or locate a shard and has no repository/filesystem dependency. It creates no scanner/daemon, transfer, Ratis repair lifecycle, rebalance, cleanup, or fault. Fixed distributed placement/transfer is a separate subsequent boundary. See link:../../adr/0032-bounded-local-erasure-coded-reconstruction.md[ADR 0032].
+
+=== Fixed Distributed EC 4+2 Placement and Authority (accepted ADR 0033)
+
+[NOTE]
+====
+Status: *implementation-informed / bounded*. `REQ-CLUSTER-015` passes 5 scenarios / 40 steps with real fixed A/B/C Ratis, grpc-java/mTLS, filesystem, and restart evidence.
+====
+
+The only supported geometry is EC 4+2, and one publication is capped at exactly one stripe and six obligations. `FixedEc42Placement` maps every stripe by shard index modulo the three sorted committed stable identities: A=`0,3`, B=`1,4`, C=`2,5`. Exactly two obligations reside in each failure domain, so one node loss leaves four authoritative identities.
+
+`ClusterEcWriteCoordinator` consumes already encoded local artifacts, incrementally verifies each shard and the logical object SHA-256, opens at most two remote transfers concurrently, and collects six exact durable acknowledgements. `EcReferencePublicationService` and the Ratis state machine independently reject incomplete, conflicting, non-member, non-deterministic, stale-generation, stale-topology, or stale-policy facts. Successful consensus state is an `EC_4_2` object reference with schema-3 shard facts and transport-neutral locations; payload never enters Ratis.
+
+All six acknowledgements are mandatory even though four shards are sufficient for reconstruction. This prevents a new generation from being published already degraded. Source copies on A that are not named by the authoritative layout remain non-authoritative and require later fenced cleanup.
+
+This concept does not yet provide clustered S3 EC reads, survivor collection, shard repair/replacement, self-healing, rebalance, cleanup, dynamic membership, or parameterized EC. See link:../../adr/0033-fixed-distributed-ec-4-2-placement-and-transfer.md[ADR 0033].
 
 [[concept-reactive-payload-pipeline]]
 === Repository-wide Reactive Payload Pipeline
@@ -221,7 +236,7 @@ Integrity claims name the exact representation and boundary:
 
 `FileSystemStorePort` is a positive control: it streams with `DataBufferUtils.write`, calculates an incremental source digest, fsyncs the temporary artifact, and performs distinct persisted-byte verification before publication. Single-node GET deliberately remains one-open/single-pass and performs no complete payload preflight or second read. `FileSystemStorageNode.streamFrom` currently does not calculate/compare the payload checksum online; this is an explicit limitation, not a claim that EP-3 promised preflight. Any future incremental GET verification must preserve one pass and document the late-failure client contract.
 
-Dedup and general EC policy ranges still need operational budgets. A permitted 1 GiB dedup window plus copy is not an acceptable default production byte discipline even though it is finite. ADR 0032 now validates the local EC 4+2 decoder's one-stripe/six-shard workspace and one-worker/16-queue scheduling, but wider `k + m <= 32`, encoding/downstream concurrency, and distributed repair still require coupled byte/CPU/network budgets.
+Dedup and future parameterized EC still need operational budgets. A permitted 1 GiB dedup window plus copy is not an acceptable default production byte discipline even though it is finite. ADRs 0032/0033 validate only fixed EC 4+2 local decoding and bounded A/B/C transfer; arbitrary `k/m`, encoding/downstream concurrency, queued request bytes, clustered reads, and distributed repair still require coupled byte/CPU/network budgets.
 
 [[concept-deterministic-storage-fault-injection]]
 === Deterministic Storage-pipeline Fault Injection (ADR 0030)
@@ -241,7 +256,7 @@ Version 1 initially permits only:
 - corruption of one unpublished temporary-file byte after writing and before persisted-byte verification; and
 - mutation of one received replica-frame byte before sink digest/length update, staging, and verification.
 
-After distributed EC placement/transfer exists, a planned version 2 may add only `MAKE_COMMITTED_EC_SHARD_UNAVAILABLE` and `CORRUPT_COMMITTED_EC_SHARD_BYTE` at `AFTER_EC_MANIFEST_COMMIT_BEFORE_SHARD_HEALTH_PROBE`. Targets bind an exact schema-3 manifest/generation, stripe/shard/artifact identity, transport-neutral location, length, and SHA-256—not a raw path or wildcard. The adapter preserves a pristine copy, uses experiment-owned quarantine or one bounded XOR mutation, fsyncs the effect, restores idempotently during teardown, and emits closed redacted outcomes.
+Now that fixed distributed EC 4+2 placement/transfer exists, a planned version 2 may add only `MAKE_COMMITTED_EC_SHARD_UNAVAILABLE` and `CORRUPT_COMMITTED_EC_SHARD_BYTE` at `AFTER_EC_MANIFEST_COMMIT_BEFORE_SHARD_HEALTH_PROBE`. Targets bind an exact schema-3 manifest/generation, stripe/shard/artifact identity, transport-neutral location, length, and SHA-256—not a raw path or wildcard. The adapter preserves a pristine copy, uses experiment-owned quarantine or one bounded XOR mutation, fsyncs the effect, restores idempotently during teardown, and emits closed redacted outcomes.
 
 The normal blast radius is at most `m` targets in one stripe. An explicit one-stripe `EXPECT_BLOCKED` experiment may select exactly `m+1` only to prove insufficient-survivor behavior and may publish no repair. Metadata/reference mutation, unrelated targets, path escape, unbounded selection, and production activation fail closed.
 
@@ -253,7 +268,7 @@ Activation requires both an explicitly non-production fault-injection profile an
 
 Faults never weaken the normal safety protocol: no degraded writes; fixed `N=3/W=2`; payload bytes outside Ratis; no durable acknowledgement for corrupt/unverified bytes; and no reference proposal before checksum-valid durable acknowledgements and current fencing/epoch checks. An injected terminal condition may leave only unreachable temporary or complete orphaned bytes allowed by the existing publication model; it must never expose a reachable partial artifact or manufacture a durable acknowledgement.
 
-The owner-selected sequence is distributed EC placement/transfer, the bounded kernel/committed-shard subset, EC self-healing, shard rebalance, and fenced cleanup. Generalized ADR 0030 actions and realistic chaos remain final after normal-path semantic/resource closure. The early subset is test tooling only and cannot substitute for self-healing behavior or broader P3/P4 evidence.
+The owner-selected sequence has completed fixed distributed EC 4+2 placement/transfer; next are the bounded kernel/committed-shard subset, EC self-healing/read integration, shard rebalance, and fenced cleanup. Generalized ADR 0030 actions and realistic chaos remain final after normal-path semantic/resource closure. The early subset is test tooling only and cannot substitute for self-healing behavior or broader P3/P4 evidence.
 
 === Domain Purity
 
@@ -597,7 +612,7 @@ Status: *planned / not implemented beyond bounded ADR 0028/0029/0031 cluster sli
 
 **Membership and authority.** Consensus-controlled admission, catch-up, promotion, demotion, replacement, removal, topology/policy epochs, fencing, tombstones, wider namespace/configuration generations, and durable jobs beyond bounded repair remain future work. Health suspicion must not become membership mutation.
 
-**Transfer and reads.** Local output-only EC reconstruction is implemented under ADR 0032, but chunked, multipart, conditional/versioned, and distributed EC placement/transfer/self-healing are not implemented in cluster mode. The next order is distributed shard placement/transfer, bounded committed-shard fault tooling, consensus-owned EC self-healing, shard rebalance, and fenced cleanup; generalized chaos remains final. Bounded whole-object repair/discovery remain under ADR 0029/0031, and whole-object replication stays valid below the arranged EC minimum. Inter-cluster/NAS-backed replication remains later and NAS-dependent.
+**Transfer and reads.** Local output-only EC reconstruction is implemented under ADR 0032, and fixed A/B/C EC 4+2 placement/transfer/publication is implemented under ADR 0033. Clustered S3 EC reads, self-healing, parameterized EC, and chunked/multipart/conditional/versioned cluster writes remain absent. The next order is bounded committed-shard fault tooling, consensus-owned EC self-healing/read integration, shard rebalance, and fenced cleanup; generalized chaos remains final. Bounded whole-object repair/discovery remain under ADR 0029/0031, and whole-object replication stays valid below the arranged EC minimum. Inter-cluster/NAS-backed replication remains later and NAS-dependent.
 
 **Operations and security.** Production certificate enrollment/rotation/revocation/recovery, rolling and mixed-version upgrades, broader partition handling, online multi-node backup/DR, and deployment hardening require separate evidence. Test-local mTLS and one-coordinator-stop validation do not satisfy these obligations.
 

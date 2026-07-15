@@ -121,7 +121,10 @@ public final class ClusterAntiEntropyScheduler implements AutoCloseable {
     }
 
     private Mono<Void> inspectIfNamed(ObjectReferenceGeneration reference) {
-        if (!reference.replicas().contains(localNode)) return Mono.empty();
+        // EC shard monitoring and repair have their own later consensus-owned requirement slice.
+        if (reference.erasureCoded() || !reference.replicas().contains(localNode)) {
+            return Mono.empty();
+        }
         return Mono.defer(() -> {
             if (!targetActive.compareAndSet(false, true)) {
                 overlaps.incrementAndGet();

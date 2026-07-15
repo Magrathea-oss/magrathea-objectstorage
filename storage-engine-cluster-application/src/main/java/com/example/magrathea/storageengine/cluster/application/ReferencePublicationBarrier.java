@@ -12,6 +12,11 @@ import reactor.core.publisher.Mono;
 public interface ReferencePublicationBarrier {
     Mono<Void> await(PublicationProposal proposal);
 
+    /** Separate bounded observation point for complete EC shard evidence. */
+    default Mono<Void> awaitEc(EcPublicationProposal proposal) {
+        return Mono.empty();
+    }
+
     static ReferencePublicationBarrier none() {
         return ignored -> Mono.empty();
     }

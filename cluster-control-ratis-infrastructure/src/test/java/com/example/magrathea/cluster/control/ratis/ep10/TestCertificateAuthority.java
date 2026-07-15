@@ -7,14 +7,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 /** Test-only OpenSSL fixture generator; production Ratis configuration only consumes mounted files. */
-final class TestCertificateAuthority {
+public final class TestCertificateAuthority {
     private final Path root;
 
-    TestCertificateAuthority(Path root) {
+    public TestCertificateAuthority(Path root) {
         this.root = root;
     }
 
-    Material create(String name, NodeIdentity identity) throws Exception {
+    public Material create(String name, NodeIdentity identity) throws Exception {
         Path ca = root.resolve("ca");
         Files.createDirectories(ca);
         Path caKey = ca.resolve("ca.key");
@@ -48,5 +48,5 @@ final class TestCertificateAuthority {
         }
     }
 
-    record Material(Path certificate, Path key, Path ca) { }
+    public record Material(Path certificate, Path key, Path ca) { }
 }

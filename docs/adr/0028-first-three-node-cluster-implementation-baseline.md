@@ -154,9 +154,9 @@ This upgrades only the bounded status of `REQ-CLUSTER-014`: it is `@implemented-
 
 ### Explicitly unaccepted EP-10 scope
 
-EP-10 remains partial. Broad `REQ-CLUSTER-017` remains `@partial`; `REQ-CLUSTER-006`, `REQ-CLUSTER-007`, `REQ-CLUSTER-015`, `REQ-CLUSTER-016`, and `REQ-CLUSTER-018` remain `@not-implemented`. The bounded architecture status of `REQ-CLUSTER-014` does not change those statuses. ADR 0031 separately makes `REQ-CLUSTER-027` implemented-and-validated for bounded periodic current-reference inspection and repair on fixed A/B/C; ADR 0032 makes only local output-only EC reconstruction implemented-and-validated. Neither broadens this ADR's cluster baseline. Accordingly, multipart, conditional and versioned cluster writes, chunked-object transfer, distributed erasure coding, dynamic membership and certificate lifecycle, rolling upgrades, anti-entropy beyond current named A/B/C obligations, rebalance, automated orphan cleanup, and the broader partition/fault-injection suite remain absent or unvalidated.
+EP-10 remains partial. Broad `REQ-CLUSTER-017` remains `@partial`; `REQ-CLUSTER-006`, `REQ-CLUSTER-007`, `REQ-CLUSTER-016`, and `REQ-CLUSTER-018` remain `@not-implemented`. The bounded architecture status of `REQ-CLUSTER-014` does not broaden this baseline. ADR 0031 separately validates `REQ-CLUSTER-027`; ADR 0032 validates local output-only EC reconstruction; subsequent ADR 0033 validates fixed internal A/B/C EC 4+2 placement/transfer under `REQ-CLUSTER-015`. Accordingly, multipart, conditional and versioned cluster writes, chunked-object transfer, clustered S3 EC reads, EC self-healing, parameterized EC, dynamic membership and certificate lifecycle, rolling upgrades, anti-entropy beyond current named A/B/C obligations, rebalance, automated orphan cleanup, and the broader partition/fault-injection suite remain absent or unvalidated.
 
-The next priority is distributed shard placement and direct transfer under `REQ-CLUSTER-015`, followed by the planned early bounded ADR 0030 kernel/committed-shard test subset, EC self-healing, shard rebalance, and fenced cleanup; generalized chaos remains final. Existing whole-object `N=3/W=2` replication remains valid for deployments below the arranged EC minimum and is not removed by that priority. Inter-cluster/NAS-backed replication remains later and NAS-dependent. `REQ-CLUSTER-014`, `REQ-CLUSTER-027`, and local `REQ-PIPELINE-017` supply none of the planned ADR 0030 fault evidence. No evidence above supports a production-readiness or general distributed-storage claim.
+Subsequent ADR 0033 completed fixed shard placement and direct transfer under `REQ-CLUSTER-015`; the next priority is the planned early bounded ADR 0030 kernel/committed-shard test subset, followed by EC self-healing/read integration, shard rebalance, and fenced cleanup; generalized chaos remains final. Existing whole-object `N=3/W=2` replication remains valid for deployments below the arranged EC minimum and is not removed by that priority. Inter-cluster/NAS-backed replication remains later and NAS-dependent. `REQ-CLUSTER-014`, `REQ-CLUSTER-027`, and local `REQ-PIPELINE-017` supply none of the planned ADR 0030 fault evidence. No evidence above supports a production-readiness or general distributed-storage claim.
 
 ## Related Requirements
 
@@ -165,7 +165,8 @@ The next priority is distributed shard placement and direct transfer under `REQ-
 - `REQ-CLUSTER-014` — implemented and validated only for the repository-rooted internal architecture contract; not S3 or runtime cluster behavior.
 - `REQ-CLUSTER-017` — partial: bounded periodic current-generation fixed A/B/C anti-entropy is implemented under `REQ-CLUSTER-027`, while wider healing/topologies, rebalance, and cleanup remain absent.
 - `REQ-CLUSTER-027` — implemented and validated under ADR 0031 as a separate bounded current-reference discovery refinement; it does not rewrite this baseline.
-- `REQ-CLUSTER-006..007`, `REQ-CLUSTER-015..016`, and `REQ-CLUSTER-018` — not implemented.
+- `REQ-CLUSTER-006..007`, `REQ-CLUSTER-016`, and `REQ-CLUSTER-018` — not implemented.
+- `REQ-CLUSTER-015` — subsequently implemented and validated for fixed internal EC 4+2 by ADR 0033.
 - PA-6 distributed placement and quorum policy requirements.
 
 ## Related ADRs

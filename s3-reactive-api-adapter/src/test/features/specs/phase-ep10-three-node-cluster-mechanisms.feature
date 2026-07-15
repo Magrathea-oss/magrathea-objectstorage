@@ -24,7 +24,7 @@ Ability: Execute a bounded and durable fixed three-node control and replica mech
   Ability validation mode is the requirement's only agreed mode; REQ-CLUSTER-024 is not S3 behavior and does
   not require WebTestClient or AWS CLI validation. These bounded repair and discovery gates do not mark the
   whole EP-10 mechanism backlog complete and exclude orphan cleanup, rebalance, anti-entropy beyond fixed A/B/C
-  current-reference obligations, dynamic membership, and erasure coding.
+  current-reference obligations, dynamic membership, EC S3 reads, EC self-healing, and parameterized erasure coding.
 
   Fixed node configuration:
     | node | stable UUID                          | Ratis address   | replica address | identity root                              | Ratis root                           | object root                            | temporary root                          | runtime root                          |
@@ -308,12 +308,48 @@ Ability: Execute a bounded and durable fixed three-node control and replica mech
 
   Rule: Capabilities beyond the first fixed three-node slice remain explicit backlog
 
-    @REQ-CLUSTER-015 @functional-requirement @non-functional-requirement @erasure-coding @direct-transfer @later-slice @not-implemented
-    Scenario: Erasure-coded shard transfer and reconstruction are not implemented by replicated whole-object transfer
-      Given the first slice transfers whole-object replicas using N=3/W=2
-      When cluster capability status is reported
-      Then EC encoding, data and parity shard transfer, policy-specific acknowledgement thresholds, and reconstruction are "not implemented"
-      And no N=3/W=2 replica result is cited as EC evidence
+    @REQ-CLUSTER-015 @functional-requirement @non-functional-requirement @erasure-coding @direct-transfer @placement @integrity @failure-domain @implemented-and-validated
+    Scenario: Fixed EC 4+2 placement survives loss of any one arranged node
+      Given validation mode "fixed A/B/C EC 4+2 placement with real gRPC/mTLS transfer, Ratis publication, restart, and filesystem inspection" is selected for requirement "REQ-CLUSTER-015"
+      And the only supported erasure-coding geometry is four 1 MiB data shards plus two 1 MiB parity shards per 4 MiB logical stripe
+      And committed membership arranges A, B, and C as three distinct failure domains under topology epoch "topology-1" and policy epoch "policy-1"
+      When the transport-neutral distributed EC coordinator plans schema-3 stripe 0
+      Then shard indices 0 and 3 are assigned to A, 1 and 4 to B, and 2 and 5 to C
+      And each node owns exactly two unique shard obligations in its own failure domain
+      And removing A, B, or C independently leaves exactly four committed shard identities sufficient for local EC 4+2 reconstruction
+      And the placement result contains no whole-object replica fallback or second external object API
+
+    @REQ-CLUSTER-015 @functional-requirement @non-functional-requirement @erasure-coding @direct-transfer @grpc @mtls @consensus @durability @integrity @restart-safety @filesystem-inspection-required @implemented-and-validated
+    Scenario: Six verified shard acknowledgements precede one authoritative EC reference
+      Given validation mode "fixed A/B/C EC 4+2 placement with real gRPC/mTLS transfer, Ratis publication, restart, and filesystem inspection" is selected for requirement "REQ-CLUSTER-015"
+      And coordinator A owns six locally prepared schema-3 shard artifacts for deterministic fixture "target/ep10/fixtures/ec-4-2-stripe.bin"
+      And the bounded publication contains exactly one stripe and six shard obligations
+      And B and C expose internal replica-data services authenticated by UUID-bound certificates under "target/ep10/pki/nodes/B" and "target/ep10/pki/nodes/C"
+      When A distributes stripe 0 according to the committed placement and requests publication for bucket "ep10-ec-archive" and key "evidence/2026/distributed-ec-4-2.bin"
+      Then A retains checksum-valid shard indices 0 and 3, B durably receives 1 and 4, and C durably receives 2 and 5
+      And every remote shard uses a real readiness-gated grpc-java stream with frames no larger than 65536 bytes and mutual TLS identity validation
+      And exactly six unique acknowledgements bind operation, artifact, shard location, stored length, SHA-256, topology epoch, and policy epoch
+      And Ratis commits generation 1 only after all six acknowledgements and revalidated membership fencing
+      And the authoritative reference records layout "EC_4_2", exact object length and SHA-256, and all six schema-3 shard facts with transport-neutral node locations
+      And object or shard payload bytes are absent from the Ratis log and snapshot
+      When all three voters restart from their original non-empty identity and Ratis roots
+      Then the same generation 1 EC reference and all six shard locations are recovered exactly
+      But this evidence does not claim S3 read integration, shard repair or replacement, a scanner or daemon, rebalance, cleanup, dynamic membership, or generalized chaos
+
+    @REQ-CLUSTER-015 @functional-requirement @non-functional-requirement @erasure-coding @consistency @failure-handling @no-degraded-writes @implemented-and-validated
+    Scenario Outline: Incomplete or stale shard evidence cannot publish an EC generation
+      Given validation mode "fixed A/B/C EC 4+2 placement with real gRPC/mTLS transfer, Ratis publication, restart, and filesystem inspection" is selected for requirement "REQ-CLUSTER-015"
+      And a clean fixed A/B/C EC 4+2 publication attempt has failure condition "<failure>"
+      When the distributed EC coordinator evaluates authoritative publication
+      Then no EC object-reference generation is committed
+      And no whole-object fallback, reduced-shard publication, or successful external signal is permitted
+      And any transferred shard remains unreachable non-authoritative data for later fenced cleanup
+
+      Examples:
+        | failure |
+        | one of the six durable shard acknowledgements is absent |
+        | one shard acknowledgement has a different stored SHA-256 |
+        | topology epoch changes after transfer and before publication |
 
     @REQ-CLUSTER-016 @functional-requirement @non-functional-requirement @membership @certificate-rotation @rolling-upgrade @later-slice @not-implemented
     Scenario: Dynamic lifecycle operations remain outside fixed bootstrap

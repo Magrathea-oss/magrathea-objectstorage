@@ -159,6 +159,21 @@ Status: *implementation-informed / implemented-and-validated for local `REQ-PIPE
 5. It reconstructs the requested data/parity shards, verifies every regenerated length/SHA-256 against the committed schema-3 facts, and emits the exact logical stripe length without final-stripe padding.
 6. The result contains only verified local stripe/regenerated-shard snapshots and workspace measurements. No filesystem replacement, manifest/reference/location write, scanner/daemon, cluster transfer, Ratis job, rebalance, cleanup, or fault action occurs.
 
+=== Scenario 6c.2 — Fixed Distributed EC 4+2 Publication (accepted ADR 0033)
+
+[NOTE]
+====
+Status: *implementation-informed / implemented-and-validated for internal `REQ-CLUSTER-015`*. The focused gate passes 5 scenarios / 40 steps. Clustered S3 EC reads and healing are not implied.
+====
+
+1. Coordinator A receives six already durable schema-3 EC 4+2 shards and incrementally verifies each shard plus the logical object SHA-256.
+2. Committed fixed membership supplies three distinct failure domains. Deterministic placement assigns A=`0,3`, B=`1,4`, and C=`2,5`.
+3. A verifies its two authoritative local shards and opens four readiness-gated grpc-java/mTLS streams to B/C. Receivers verify, fsync, and atomically publish each immutable shard before acknowledging it.
+4. `EcReferencePublicationService` accepts exactly one matching durable acknowledgement for every shard; missing, conflicting, or stale evidence fails without a command.
+5. Membership and epochs are revalidated. Ratis independently validates the complete fixed layout and commits one `EC_4_2` reference containing object facts and six transport-neutral shard locations.
+6. Payload remains outside the Ratis command/log/snapshot. Complete voter restart recovers the same generation and locations.
+7. Clustered S3 read selection/reconstruction, replacement publication, self-healing, rebalance, cleanup, dynamic membership, and parameterized EC remain later flows.
+
 === Scenario 6d — Fixed-Cluster CreateBucket (ADR 0028)
 
 [NOTE]
@@ -224,7 +239,7 @@ image::../../c4/images/ClusterCompleteRestartRuntime.png[Cluster Complete Restar
 3. Each node recovers its stable UUID; seed order does not rewrite persisted three-voter state or committed generations.
 4. A `GetObject` through B returns the original exact bytes, length, SHA-256, and ETag.
 
-The shared Java 21 real-process gate now passes `REQ-CLUSTER-001..005`, `019`, and `020` in both WebTestClient and AWS CLI modes (14 scenarios, 188 steps); its repair-only `019/020` run passes 4 scenarios / 80 steps. Focused Ratis/gRPC/cross-module scenarios pass for `REQ-CLUSTER-008..013`, and the historical repair-control `021..026` result passes 22 scenarios / 210 steps. Root Maven success is only supporting integration evidence. Those results do not cover clustered multipart, conditional/versioned writes, distributed erasure coding, dynamic membership, rebalance, orphan cleanup, rolling upgrades, or the broader partition suite; bounded periodic current-reference discovery is separately evidenced by `REQ-CLUSTER-027` below. Local output-only reconstruction under ADR 0032 does not change those cluster exclusions.
+The shared Java 21 real-process gate now passes `REQ-CLUSTER-001..005`, `019`, and `020` in both WebTestClient and AWS CLI modes (14 scenarios, 188 steps); its repair-only `019/020` run passes 4 scenarios / 80 steps. Focused Ratis/gRPC/cross-module scenarios pass for `REQ-CLUSTER-008..013`, and the historical repair-control `021..026` result passes 22 scenarios / 210 steps. Root Maven success is only supporting integration evidence. Those whole-object results do not cover clustered multipart, conditional/versioned writes, clustered S3 EC reads, EC self-healing, dynamic membership, rebalance, orphan cleanup, rolling upgrades, or the broader partition suite; bounded periodic discovery is separately evidenced by `REQ-CLUSTER-027`, and fixed internal EC 4+2 placement/transfer by `REQ-CLUSTER-015`. Local output-only reconstruction under ADR 0032 remains separate evidence.
 
 === Scenario 6h — Missing-local Repair Before GET Response (accepted ADR 0029)
 

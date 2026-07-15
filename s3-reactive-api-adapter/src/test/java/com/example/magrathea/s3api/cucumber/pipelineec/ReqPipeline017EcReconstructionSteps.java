@@ -177,7 +177,7 @@ public final class ReqPipeline017EcReconstructionSteps {
         require(names.equals(Set.of(
                         "fewer than k valid survivors", "duplicate shard index",
                         "out-of-range shard index", "inconsistent k and m",
-                        "inconsistent stripe metadata", "wrong shard size",
+                        "unsupported EC geometry", "inconsistent stripe metadata", "wrong shard size",
                         "wrong shard checksum", "unsupported future schema")),
                 "fail-closed request table is incomplete");
         acceptance().declareInvalidRequests(table.asMaps());

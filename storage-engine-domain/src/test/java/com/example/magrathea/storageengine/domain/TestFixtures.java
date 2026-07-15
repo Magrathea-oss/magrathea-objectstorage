@@ -113,7 +113,7 @@ public final class TestFixtures {
     }
 
     public static ErasureCodingConfig anErasureCodingConfig() {
-        return ErasureCodingConfig.of(6, 3);
+        return ErasureCodingConfig.of(4, 2);
     }
 
     public static ReplicationConfig aReplicationConfig() {

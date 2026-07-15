@@ -44,6 +44,9 @@ public final class RatisControlPlaneAdapter implements ClusterControlPlanePort {
     @Override public Mono<ObjectReferenceGeneration> compareAndPublish(PublicationProposal proposal) {
         return Mono.defer(() -> write(ControlPlaneCodec.publish(proposal)).map(this::referenceResult));
     }
+    @Override public Mono<ObjectReferenceGeneration> compareAndPublishEc(EcPublicationProposal proposal) {
+        return Mono.defer(() -> write(ControlPlaneCodec.publishEc(proposal)).map(this::referenceResult));
+    }
     @Override public Mono<ObjectReferenceGeneration> objectReference(String bucket, String objectKey) {
         return query(ControlPlaneCodec.queryReference(bucket, objectKey)).map(this::referenceResult);
     }

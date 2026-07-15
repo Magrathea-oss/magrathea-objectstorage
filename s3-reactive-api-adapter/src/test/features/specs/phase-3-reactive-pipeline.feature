@@ -271,6 +271,7 @@ Ability: Phase 3 staged reactive read and write pipeline
         | duplicate shard index            | survivor indices are 0,1,1,4                                          |
         | out-of-range shard index         | survivor indices include 6 for EC 4+2                                 |
         | inconsistent k and m             | one artifact declares k=4,m=3 while the stripe declares k=4,m=2        |
+        | unsupported EC geometry          | every artifact consistently declares a geometry other than fixed EC 4+2 |
         | inconsistent stripe metadata     | one survivor declares a different stripe index or logical data length   |
         | wrong shard size                 | one survivor stored length differs from the committed schema-3 length   |
         | wrong shard checksum             | one survivor SHA-256 differs from the committed schema-3 checksum       |

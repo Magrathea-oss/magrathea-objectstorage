@@ -6,7 +6,7 @@ Date: 2026-07-14
 
 Accepted — implementation-informed for the bounded fixed A/B/C current-reference discovery scope in `REQ-CLUSTER-027`.
 
-Both `REQ-CLUSTER-027` scenarios are `@implemented-and-validated`; the focused `ReqCluster027CucumberTest` passes **2 scenarios / 36 steps**. Broad `REQ-CLUSTER-017` remains `@partial`: this decision implements periodic inspection and repair only for current whole-object replica obligations already named on fixed A/B/C. Rebalance, automated orphan cleanup, wider healing/topology coverage, dynamic membership, erasure coding, broader partitions, production scale, and production readiness remain absent or unvalidated. `REQ-CLUSTER-006`, `REQ-CLUSTER-007`, `REQ-CLUSTER-015`, `REQ-CLUSTER-016`, and `REQ-CLUSTER-018` remain `@not-implemented`.
+Both `REQ-CLUSTER-027` scenarios are `@implemented-and-validated`; the focused `ReqCluster027CucumberTest` passes **2 scenarios / 36 steps**. Broad `REQ-CLUSTER-017` remains `@partial`: this decision implements periodic inspection and repair only for current whole-object replica obligations already named on fixed A/B/C. Rebalance, automated orphan cleanup, wider healing/topology coverage, dynamic membership, erasure coding, broader partitions, production scale, and production readiness remain absent or unvalidated. At this ADR's acceptance checkpoint, `REQ-CLUSTER-006`, `REQ-CLUSTER-007`, `REQ-CLUSTER-015`, `REQ-CLUSTER-016`, and `REQ-CLUSTER-018` were `@not-implemented`; subsequent ADR 0033 upgrades only fixed internal EC 4+2 `REQ-CLUSTER-015`.
 
 ## Context
 
@@ -152,7 +152,8 @@ Ordinary root Maven success is supporting integration evidence only. None of thi
 - `REQ-CLUSTER-027` — `@implemented-and-validated` for the two bounded fixed A/B/C current-reference discovery scenarios.
 - `REQ-CLUSTER-017` — remains `@partial`; bounded periodic current-generation fixed A/B/C anti-entropy is implemented, while rebalance, automated orphan cleanup, and wider healing/topology coverage remain absent.
 - `REQ-CLUSTER-019..026` — existing implemented-and-validated current-generation repair and fencing requirements reused by this decision.
-- `REQ-CLUSTER-006/007/015/016/018` — remain `@not-implemented`.
+- `REQ-CLUSTER-006/007/016/018` — remain `@not-implemented`.
+- `REQ-CLUSTER-015` — subsequently implemented and validated for fixed internal EC 4+2 by ADR 0033.
 - `REQ-DIST-004` — PA-6 modeled anti-entropy findings/plans remain domain planning evidence only.
 
 ## Related ADRs

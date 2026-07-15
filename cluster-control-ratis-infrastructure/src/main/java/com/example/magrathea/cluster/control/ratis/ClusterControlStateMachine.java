@@ -86,6 +86,48 @@ final class ClusterControlStateMachine extends BaseStateMachine {
             obsoleteSupersededJobs(next, "publish:" + publish.operationId(), publish.metadata().createdAt());
             return "OK\tR\t" + ControlPlaneCodec.encode(next);
         }
+        if (command instanceof ControlPlaneCodec.PublishEc publish) {
+            String key = publish.bucket() + "\u0000" + publish.key();
+            ObjectReferenceGeneration current = references.get(key);
+            long actual = current == null ? 0 : current.generation();
+            if (publish.priorGeneration() != actual) {
+                return error(ControlPlaneException.Code.STALE_GENERATION, "expected " + actual);
+            }
+            if (!membership.topologyEpoch().equals(publish.topologyEpoch())) {
+                return error(ControlPlaneException.Code.STALE_TOPOLOGY_EPOCH, "topology epoch changed");
+            }
+            if (!membership.policyEpoch().equals(publish.policyEpoch())) {
+                return error(ControlPlaneException.Code.STALE_POLICY_EPOCH, "policy epoch changed");
+            }
+            EcPublicationProposal proposal = new EcPublicationProposal(
+                    publish.bucket(), publish.key(), publish.priorGeneration(),
+                    publish.operationId(), publish.objectLength(), publish.objectSha256(),
+                    publish.topologyEpoch(), publish.policyEpoch(), publish.shards(),
+                    List.of(), publish.metadata());
+            try {
+                EcReferencePublicationService.validateLayout(proposal);
+            } catch (ControlPlaneException invalid) {
+                return error(invalid.code(), invalid.getMessage());
+            }
+            List<NodeIdentity> arranged = membership.voterIdentities().stream().sorted().toList();
+            boolean validLocations = arranged.size() == 3
+                    && publish.shards().stream().allMatch(shard ->
+                            membership.voterIdentities().contains(shard.location())
+                                    && shard.location().equals(
+                                            arranged.get(shard.shardIndex() % arranged.size())));
+            if (!validLocations) {
+                return error(ControlPlaneException.Code.INVALID_ACKNOWLEDGEMENT,
+                        "EC shard locations do not match fixed A/B/C placement");
+            }
+            ObjectReferenceGeneration next = ObjectReferenceGeneration.ec42(
+                    publish.bucket(), publish.key(), actual + 1, publish.operationId(),
+                    publish.objectLength(), publish.objectSha256(), publish.topologyEpoch(),
+                    publish.policyEpoch(), publish.shards(), publish.metadata());
+            references.put(key, next);
+            obsoleteSupersededJobs(next, "publish-ec:" + publish.operationId(),
+                    publish.metadata().createdAt());
+            return "OK\tR\t" + ControlPlaneCodec.encode(next);
+        }
         if (command instanceof ControlPlaneCodec.RepairWrite repair) {
             return "OK\tJ\t" + ControlPlaneCodec.encode(applyRepair(repair.command()));
         }

@@ -8,7 +8,7 @@ Amended: 2026-07-14
 
 Accepted — the requesting user explicitly selected this target architecture and amended its sequencing on 2026-07-14.
 
-Acceptance records the architectural decision only. Production implementation, shared executable fault requirements, Cucumber fault coverage, and semantic fault validation remain planned and need validation. The amendment splits delivery into two scopes: after distributed EC shard placement/transfer exists, an early bounded no-op-default plan/evidence kernel plus exact committed-shard unavailable/corruption actions may be implemented to support EC self-healing acceptance; generalized pipeline/cluster chaos remains final, after normal-path closure and its semantic/load/leak/cancellation gates. No fault-injection implementation, regression evidence, self-healing completion, or production-readiness claim follows from this status.
+Acceptance records the architectural decision only. Production implementation, shared executable fault requirements, Cucumber fault coverage, and semantic fault validation remain planned and need validation. The amendment splits delivery into two scopes: now that ADR 0033 validates fixed distributed EC 4+2 shard placement/transfer, an early bounded no-op-default plan/evidence kernel plus exact committed-shard unavailable/corruption actions may be implemented to support EC self-healing acceptance; generalized pipeline/cluster chaos remains final, after normal-path closure and its semantic/load/leak/cancellation gates. No fault-injection implementation, regression evidence, self-healing completion, or production-readiness claim follows from this status.
 
 ## Context
 
@@ -88,7 +88,7 @@ These version-1 actions inject corrupt data only before the relevant publication
 
 ### Planned early committed-EC-shard extension
 
-EC self-healing needs a later at-rest boundary that version 1 deliberately cannot express. After `REQ-CLUSTER-015` supplies authoritative distributed shard placement and direct transfer, a planned schema version `2` may add only these two action combinations before EC self-healing is implemented:
+EC self-healing needs a later at-rest boundary that version 1 deliberately cannot express. With `REQ-CLUSTER-015` now supplying authoritative fixed EC 4+2 shard placement and direct transfer, a planned schema version `2` may add only these two action combinations before EC self-healing is implemented:
 
 | Action | Allowed semantic point | Exact semantics |
 |---|---|---|

@@ -17,6 +17,12 @@ public interface ClusterControlPlanePort {
 
     Mono<ObjectReferenceGeneration> compareAndPublish(PublicationProposal proposal);
 
+    /** Publishes one complete fixed EC 4+2 layout after exact shard evidence validation. */
+    default Mono<ObjectReferenceGeneration> compareAndPublishEc(EcPublicationProposal proposal) {
+        return Mono.error(new UnsupportedOperationException(
+                "distributed EC publication is not implemented"));
+    }
+
     Mono<ObjectReferenceGeneration> objectReference(String bucket, String objectKey);
 
     /** Bounded read-only page of current references in canonical namespace-key order. */

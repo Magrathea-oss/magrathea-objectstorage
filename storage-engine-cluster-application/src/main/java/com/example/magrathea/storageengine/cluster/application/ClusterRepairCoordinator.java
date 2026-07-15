@@ -36,6 +36,10 @@ public final class ClusterRepairCoordinator {
     }
 
     public Mono<Boolean> localArtifactExists(ObjectReferenceGeneration reference) {
+        if (reference.erasureCoded()) {
+            return Mono.error(new UnsupportedOperationException(
+                    "distributed EC S3 reads and shard repair are not implemented by REQ-CLUSTER-015"));
+        }
         return Mono.fromCallable(() -> localArtifacts.publishedExists(reference.artifactId()))
                 .subscribeOn(Schedulers.boundedElastic());
     }
@@ -65,6 +69,10 @@ public final class ClusterRepairCoordinator {
     /** Preserves the committed ensure result for bounded discovery observability. */
     public Mono<EnsureOutcome> ensureDetailed(
             ObjectReferenceGeneration reference, String reason) {
+        if (reference.erasureCoded()) {
+            return Mono.error(new UnsupportedOperationException(
+                    "EC shard repair requires the later consensus-owned self-healing slice"));
+        }
         RepairSpecification specification = new RepairSpecification(reference.bucket(),
                 reference.objectKey(), reference.generation(), reference.artifactId(), localNode,
                 reference.length(), reference.sha256(), reference.topologyEpoch(),

@@ -246,6 +246,7 @@ final class ReqPipeline017EcReconstructionAcceptance {
                 "duplicate shard index",
                 "out-of-range shard index",
                 "inconsistent k and m",
+                "unsupported EC geometry",
                 "inconsistent stripe metadata",
                 "wrong shard size",
                 "wrong shard checksum",
@@ -489,8 +490,10 @@ final class ReqPipeline017EcReconstructionAcceptance {
     }
 
     void assertInvalidRequestsFailClosed() {
-        assertThat(invalidFailures).hasSize(8)
+        assertThat(invalidFailures).hasSize(9)
                 .allSatisfy(error -> assertThat(error).isInstanceOf(EcReconstructionException.class));
+        assertThat(((EcReconstructionException) invalidFailures.get(4)).reason())
+                .isEqualTo(EcReconstructionException.Reason.UNSUPPORTED_GEOMETRY);
         assertThat(invalidFailures.stream()
                 .map(error -> ((EcReconstructionException) error).reason())
                 .collect(Collectors.toSet()))
@@ -704,6 +707,15 @@ final class ReqPipeline017EcReconstructionAcceptance {
                 new EcShardLayout(0, 1, 4, 3, false, STRIPE_SIZE)));
         failures.add(captureFailure(request(
                 3, 0, inconsistentKm, List.of(0, 1, 2, 3), Set.of(5))));
+
+        List<StorageArtifactReferenceDescriptor> unsupportedGeometry = List.of(
+                withLayout(stripe.get(0), new EcShardLayout(0, 0, 3, 2, false, 3L * SHARD_SIZE)),
+                withLayout(stripe.get(1), new EcShardLayout(0, 1, 3, 2, false, 3L * SHARD_SIZE)),
+                withLayout(stripe.get(2), new EcShardLayout(0, 2, 3, 2, false, 3L * SHARD_SIZE)),
+                withLayout(stripe.get(4), new EcShardLayout(0, 3, 3, 2, true, 3L * SHARD_SIZE)),
+                withLayout(stripe.get(5), new EcShardLayout(0, 4, 3, 2, true, 3L * SHARD_SIZE)));
+        failures.add(captureFailure(request(
+                3, 0, unsupportedGeometry, List.of(0, 1, 2), Set.of(4))));
 
         List<StorageArtifactReferenceDescriptor> inconsistentStripe = new ArrayList<>(stripe);
         inconsistentStripe.set(1, withLayout(stripe.get(1),

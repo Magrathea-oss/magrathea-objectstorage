@@ -10,6 +10,7 @@ public record EcShardLayout(
 
     /** Fixed shard size for the currently supported EC stripe geometry. */
     public static final long SHARD_SIZE_BYTES = 1024L * 1024;
+    private static final int MAX_METADATA_BLOCKS = 32;
 
     public EcShardLayout {
         if (stripeIndex < 0) {
@@ -23,9 +24,9 @@ public record EcShardLayout(
         }
 
         long totalBlocks = (long) dataBlocks + parityBlocks;
-        if (totalBlocks > ErasureCodingConfig.MAX_TOTAL_BLOCKS) {
+        if (totalBlocks > MAX_METADATA_BLOCKS) {
             throw new IllegalArgumentException(
-                    "k + m must be <= " + ErasureCodingConfig.MAX_TOTAL_BLOCKS + ": " + totalBlocks);
+                    "k + m metadata must be <= " + MAX_METADATA_BLOCKS + ": " + totalBlocks);
         }
         if (shardIndex < 0 || shardIndex >= totalBlocks) {
             throw new IllegalArgumentException(

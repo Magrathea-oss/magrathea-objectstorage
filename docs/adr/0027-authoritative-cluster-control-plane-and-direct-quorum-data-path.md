@@ -182,7 +182,7 @@ These were the original decision inputs. Subsequent ADR 0028 evidence implements
 
 - PA-6 `REQ-DIST-001..006`: modeled distributed placement, quorum, healing, rebalance, and readiness policy.
 - Planned EP-8 `REQ-HA-*` and `REQ-SUPPLY-*`: architecture and supply-chain evidence.
-- EP-10 `REQ-CLUSTER-*`: bounded `001..005`, `008..014`, and `019..027`, including `024` and `027`, are implemented and validated; broad `017` remains partial; `006/007/015/016/018` remain not implemented.
+- EP-10 `REQ-CLUSTER-*`: bounded `001..005`, `008..015`, and `019..027`, including `024` and `027`, are implemented and validated in their explicit modes; `014` is architecture-only and subsequent ADR 0033 bounds `015` to fixed internal EC 4+2 placement/transfer. Broad `017` remains partial; `006/007/016/018` remain not implemented.
 - ADR 0014: Storage Engine bounded context.
 - ADR 0019: MIT license and dependency-license compatibility obligation.
 - ADR 0025: conditional chunking and immutable storage-artifact taxonomy.

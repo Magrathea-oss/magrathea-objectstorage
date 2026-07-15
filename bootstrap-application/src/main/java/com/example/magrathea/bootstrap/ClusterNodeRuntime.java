@@ -10,10 +10,13 @@ import com.example.magrathea.cluster.data.grpc.ReplicaTransferFaultPlan;
 import com.example.magrathea.cluster.data.grpc.ReplicaTransferMetrics;
 import com.example.magrathea.storageengine.cluster.application.ClusterAntiEntropyScheduler;
 import com.example.magrathea.storageengine.cluster.application.ClusterControlPlanePort;
+import com.example.magrathea.storageengine.cluster.application.ClusterEcWriteCoordinator;
 import com.example.magrathea.storageengine.cluster.application.ClusterMember;
 import com.example.magrathea.storageengine.cluster.application.ClusterRepairCoordinator;
 import com.example.magrathea.storageengine.cluster.application.ClusterRepairMetrics;
 import com.example.magrathea.storageengine.cluster.application.ClusterRepairScheduler;
+import com.example.magrathea.storageengine.cluster.application.EcReferencePublicationService;
+import com.example.magrathea.storageengine.cluster.application.FixedEc42Placement;
 import com.example.magrathea.storageengine.cluster.application.ClusterRepairWorker;
 import com.example.magrathea.storageengine.cluster.application.ClusterWriteCoordinator;
 import com.example.magrathea.storageengine.cluster.application.LocalArtifactPort;
@@ -57,6 +60,7 @@ public final class ClusterNodeRuntime implements SmartLifecycle, AutoCloseable {
     private final ReplicaTransferPort transfers;
     private final ReplicaReadPort reads;
     private final ClusterWriteCoordinator coordinator;
+    private final ClusterEcWriteCoordinator ecCoordinator;
     private final String processSession;
     private final ClusterRepairMetrics repairMetrics;
     private final ClusterRepairScheduler repairScheduler;
@@ -137,10 +141,18 @@ public final class ClusterNodeRuntime implements SmartLifecycle, AutoCloseable {
         };
         this.reads = (source, request, sink) ->
                 client(source.identity()).read(request, sink);
+        Duration transferDeadline = positive(
+                properties.getDeadlines().getTransfer(), "transfer deadline");
         this.coordinator = new ClusterWriteCoordinator(
                 localIdentity, controlPlane, artifacts, transfers,
-                positive(properties.getDeadlines().getTransfer(), "transfer deadline"),
+                transferDeadline,
                 Objects.requireNonNull(publicationBarrier, "publicationBarrier"));
+        this.ecCoordinator = new ClusterEcWriteCoordinator(
+                localIdentity, controlPlane, artifacts, transfers,
+                new FixedEc42Placement(),
+                new EcReferencePublicationService(controlPlane),
+                publicationBarrier,
+                transferDeadline);
         Duration readDeadline = positive(properties.getDeadlines().getRead(), "read deadline");
         this.processSession = UUID.randomUUID().toString();
         this.repairMetrics = new ClusterRepairMetrics();
@@ -168,6 +180,7 @@ public final class ClusterNodeRuntime implements SmartLifecycle, AutoCloseable {
     public ClusterControlPlanePort controlPlane() { return controlPlane; }
     public ReplicaReadPort reads() { return reads; }
     public ClusterWriteCoordinator coordinator() { return coordinator; }
+    public ClusterEcWriteCoordinator ecCoordinator() { return ecCoordinator; }
     public ClusterRepairCoordinator repairCoordinator() { return repairCoordinator; }
     public ClusterRepairMetrics repairMetrics() { return repairMetrics; }
     public ClusterRepairScheduler.Status repairSchedulerStatus() { return repairScheduler.status(); }

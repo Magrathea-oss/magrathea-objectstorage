@@ -193,7 +193,7 @@ class YamlStoragePolicyCatalogTest {
 
         assertThatThrownBy(() -> new YamlStoragePolicyCatalog(dir))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("dataBlocks (k) must be >= 2");
+                .hasMessageContaining("only fixed EC 4+2 is supported");
     }
 
     @Test

@@ -6,6 +6,7 @@ import com.example.magrathea.storageengine.application.pipeline.BoundedEcReconst
 import com.example.magrathea.storageengine.domain.valueobject.ChecksumAlgorithm;
 import com.example.magrathea.storageengine.domain.valueobject.ContentHash;
 import com.example.magrathea.storageengine.domain.valueobject.EcShardLayout;
+import com.example.magrathea.storageengine.domain.valueobject.ErasureCodingConfig;
 import com.example.magrathea.storageengine.domain.valueobject.StorageArtifactKind;
 import com.example.magrathea.storageengine.domain.valueobject.StorageArtifactReferenceDescriptor;
 import reactor.core.publisher.Mono;
@@ -190,6 +191,12 @@ public final class BoundedEcReconstructionAdapter implements BoundedEcReconstruc
                         "Schema-3 EC artifact is missing explicit reconstruction layout"));
         int dataBlocks = firstLayout.dataBlocks();
         int parityBlocks = firstLayout.parityBlocks();
+        if (dataBlocks != ErasureCodingConfig.FIXED_DATA_BLOCKS
+                || parityBlocks != ErasureCodingConfig.FIXED_PARITY_BLOCKS) {
+            throw rejected(Reason.UNSUPPORTED_GEOMETRY,
+                    "Only fixed EC 4+2 reconstruction is supported; received k="
+                            + dataBlocks + ", m=" + parityBlocks);
+        }
         int totalBlocks = dataBlocks + parityBlocks;
         long logicalLength = firstLayout.stripeLogicalLength();
         if (request.stripeArtifacts().size() != totalBlocks) {
