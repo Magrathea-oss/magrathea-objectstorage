@@ -145,6 +145,20 @@ As of the EP-2 metadata durability work, every family below is a value object on
 
 **Unavailable-provider flow:** UI → typed Admin client → operational report route → optional provider port. If no provider is configured, the route returns HTTP 503 `report-provider-not-configured` with `availability: not-configured`, and the UI renders an unavailable state without fabricated records.
 
+=== Scenario 6c.1 — Bounded Local EC Reconstruction (accepted ADR 0032)
+
+[NOTE]
+====
+Status: *implementation-informed / implemented-and-validated for local `REQ-PIPELINE-017`*. The focused gate passes 5 scenarios / 46 steps and all 15 four-of-six EC 4+2 survivor combinations. No repair publication or distributed behavior is implied.
+====
+
+1. A prior local EC write commits schema-3 metadata for one stripe's six artifacts, including explicit stripe/shard/k/m/parity/logical-length/stored-length/SHA-256/transport-neutral-location facts.
+2. The caller resolves exactly four checksum-valid survivor bytes from those committed locations and identifies one or two unavailable indexes. Filesystem paths are not passed as location authority.
+3. `BoundedEcReconstructionPort` validates schema/layout completeness and survivor uniqueness, range, committed length, and SHA-256. Ambiguous schema-2 EC, contradictory metadata, fewer than `k` valid survivors, and unknown schemas fail closed.
+4. The adapter moves GF(256) work from the Reactor caller onto the injected one-worker/16-queue scheduler and owns only one stripe, at most six shard buffers, and fixed matrix/index workspace.
+5. It reconstructs the requested data/parity shards, verifies every regenerated length/SHA-256 against the committed schema-3 facts, and emits the exact logical stripe length without final-stripe padding.
+6. The result contains only verified local stripe/regenerated-shard snapshots and workspace measurements. No filesystem replacement, manifest/reference/location write, scanner/daemon, cluster transfer, Ratis job, rebalance, cleanup, or fault action occurs.
+
 === Scenario 6d — Fixed-Cluster CreateBucket (ADR 0028)
 
 [NOTE]
@@ -210,7 +224,7 @@ image::../../c4/images/ClusterCompleteRestartRuntime.png[Cluster Complete Restar
 3. Each node recovers its stable UUID; seed order does not rewrite persisted three-voter state or committed generations.
 4. A `GetObject` through B returns the original exact bytes, length, SHA-256, and ETag.
 
-The shared Java 21 real-process gate now passes `REQ-CLUSTER-001..005`, `019`, and `020` in both WebTestClient and AWS CLI modes (14 scenarios, 188 steps); its repair-only `019/020` run passes 4 scenarios / 80 steps. Focused Ratis/gRPC/cross-module scenarios pass for `REQ-CLUSTER-008..013`, and the historical repair-control `021..026` result passes 22 scenarios / 210 steps. Root Maven success is only supporting integration evidence. Those results do not cover clustered multipart, conditional/versioned writes, erasure coding, dynamic membership, rebalance, orphan cleanup, rolling upgrades, or the broader partition suite; bounded periodic current-reference discovery is separately evidenced by `REQ-CLUSTER-027` below.
+The shared Java 21 real-process gate now passes `REQ-CLUSTER-001..005`, `019`, and `020` in both WebTestClient and AWS CLI modes (14 scenarios, 188 steps); its repair-only `019/020` run passes 4 scenarios / 80 steps. Focused Ratis/gRPC/cross-module scenarios pass for `REQ-CLUSTER-008..013`, and the historical repair-control `021..026` result passes 22 scenarios / 210 steps. Root Maven success is only supporting integration evidence. Those results do not cover clustered multipart, conditional/versioned writes, distributed erasure coding, dynamic membership, rebalance, orphan cleanup, rolling upgrades, or the broader partition suite; bounded periodic current-reference discovery is separately evidenced by `REQ-CLUSTER-027` below. Local output-only reconstruction under ADR 0032 does not change those cluster exclusions.
 
 === Scenario 6h — Missing-local Repair Before GET Response (accepted ADR 0029)
 
@@ -265,7 +279,7 @@ image::../../c4/images/RepairRestartRetryRuntime.png[Repair Restart Retry Runtim
 4. The `g2` worker rechecks that the bound generation remains current. If the target is already exact and durable, it treats that as idempotent success; otherwise it retries bounded verified transfer.
 5. Completion for `g2` may commit. A late `g1` renew/fail/succeed command is rejected with no state effect. If the reference changed, the old job becomes terminal `OBSOLETE` and is never rewritten to the newer generation.
 
-Prepared-artifact intents, orphan cleanup, rebalance, periodic discovery, dynamic membership, erasure coding, multipart, and broader partition handling are outside these three request/repair-triggered flows. Bounded periodic current-reference discovery is the separate flow below; broad `REQ-CLUSTER-017` remains partial.
+Prepared-artifact intents, orphan cleanup, rebalance, periodic discovery, dynamic membership, distributed erasure coding, multipart, and broader partition handling are outside these three request/repair-triggered flows. Bounded periodic current-reference discovery is the separate flow below; broad `REQ-CLUSTER-017` remains partial.
 
 === Scenario 6k — Bounded Periodic Current-reference Discovery and Repair (accepted ADR 0031)
 

@@ -12,7 +12,7 @@ Acceptance is limited to the evidenced A/B/C topology: one Ratis voter and one r
 
 ## Context
 
-ADR 0027 accepts an authoritative consensus control plane, direct quorum data transfer, consensus-selected object-reference generations, `N=3, W=2` replication without degraded writes, and internal mTLS-protected protobuf gRPC. The implemented first EP-10 slice applies those decisions through a concrete, deliberately narrow fixed topology without implying support for the full planned cluster lifecycle. Subsequent ADR 0029 repair and ADR 0031 periodic current-reference discovery reuse this baseline without rewriting its fixed-bootstrap, publication, transport, or acceptance decisions.
+ADR 0027 accepts an authoritative consensus control plane, direct quorum data transfer, consensus-selected object-reference generations, `N=3, W=2` replication without degraded writes, and internal mTLS-protected protobuf gRPC. The implemented first EP-10 slice applies those decisions through a concrete, deliberately narrow fixed topology without implying support for the full planned cluster lifecycle. Subsequent ADR 0029 repair and ADR 0031 periodic current-reference discovery reuse this baseline without rewriting its fixed-bootstrap, publication, transport, or acceptance decisions. ADR 0032 separately validates a local output-only EC decoder; it does not add cluster shard placement, transfer, repair publication, or a daemon to this baseline.
 
 The existing PA-6 models in `storage-engine-domain` are deterministic policy and domain logic. They are not network, consensus, or persistence implementations. The existing object-store storage-engine adapter is the integration boundary through which S3 behavior reaches the storage engine. Adding cluster infrastructure must not create another public object API, move S3 concerns into an internal protocol, or contaminate the pure domain with Ratis, gRPC, protobuf, Spring, filesystem, or lifecycle types.
 
@@ -154,7 +154,9 @@ This upgrades only the bounded status of `REQ-CLUSTER-014`: it is `@implemented-
 
 ### Explicitly unaccepted EP-10 scope
 
-EP-10 remains partial. Broad `REQ-CLUSTER-017` remains `@partial`; `REQ-CLUSTER-006`, `REQ-CLUSTER-007`, `REQ-CLUSTER-015`, `REQ-CLUSTER-016`, and `REQ-CLUSTER-018` remain `@not-implemented`. The bounded architecture status of `REQ-CLUSTER-014` does not change those statuses. ADR 0031 separately makes `REQ-CLUSTER-027` implemented-and-validated for bounded periodic current-reference inspection and repair on fixed A/B/C; it does not broaden this ADR's baseline. Accordingly, multipart, conditional and versioned cluster writes, chunked-object transfer, erasure coding, dynamic membership and certificate lifecycle, rolling upgrades, anti-entropy beyond current named A/B/C obligations, rebalance, automated orphan cleanup, and the broader partition/fault-injection suite remain absent or unvalidated. ADR 0030 remains the accepted target architecture for the final P4 chaos work and is deliberately deferred; `REQ-CLUSTER-014` and `REQ-CLUSTER-027` supply none of its planned general-chaos evidence. No evidence above supports a production-readiness or general distributed-storage claim.
+EP-10 remains partial. Broad `REQ-CLUSTER-017` remains `@partial`; `REQ-CLUSTER-006`, `REQ-CLUSTER-007`, `REQ-CLUSTER-015`, `REQ-CLUSTER-016`, and `REQ-CLUSTER-018` remain `@not-implemented`. The bounded architecture status of `REQ-CLUSTER-014` does not change those statuses. ADR 0031 separately makes `REQ-CLUSTER-027` implemented-and-validated for bounded periodic current-reference inspection and repair on fixed A/B/C; ADR 0032 makes only local output-only EC reconstruction implemented-and-validated. Neither broadens this ADR's cluster baseline. Accordingly, multipart, conditional and versioned cluster writes, chunked-object transfer, distributed erasure coding, dynamic membership and certificate lifecycle, rolling upgrades, anti-entropy beyond current named A/B/C obligations, rebalance, automated orphan cleanup, and the broader partition/fault-injection suite remain absent or unvalidated.
+
+The next priority is distributed shard placement and direct transfer under `REQ-CLUSTER-015`, followed by the planned early bounded ADR 0030 kernel/committed-shard test subset, EC self-healing, shard rebalance, and fenced cleanup; generalized chaos remains final. Existing whole-object `N=3/W=2` replication remains valid for deployments below the arranged EC minimum and is not removed by that priority. Inter-cluster/NAS-backed replication remains later and NAS-dependent. `REQ-CLUSTER-014`, `REQ-CLUSTER-027`, and local `REQ-PIPELINE-017` supply none of the planned ADR 0030 fault evidence. No evidence above supports a production-readiness or general distributed-storage claim.
 
 ## Related Requirements
 
@@ -172,5 +174,6 @@ EP-10 remains partial. Broad `REQ-CLUSTER-017` remains `@partial`; `REQ-CLUSTER-
 - ADR 0025 — Conditional chunking and storage artifact taxonomy.
 - ADR 0027 — Authoritative cluster control plane and direct quorum data path.
 - ADR 0029 — Consensus-owned durable repair for the current whole-object generation.
-- ADR 0030 — Deterministic storage-pipeline fault injection; accepted as the final P4 target and deliberately deferred.
+- ADR 0030 — Deterministic storage-pipeline fault injection; an early bounded committed-shard test subset is planned before EC self-healing, while generalized chaos remains final.
 - ADR 0031 — Bounded periodic current-reference anti-entropy.
+- ADR 0032 — Bounded local erasure-coded reconstruction.

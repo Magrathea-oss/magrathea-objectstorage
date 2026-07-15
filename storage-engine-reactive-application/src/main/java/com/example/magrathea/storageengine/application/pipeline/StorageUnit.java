@@ -78,7 +78,11 @@ public sealed interface StorageUnit {
         }
     }
 
-    /** One physical data or parity shard produced from a bounded EC stripe. */
+    /**
+     * One physical data or parity shard produced from a bounded EC stripe.
+     * Stripe/shard geometry is carried explicitly so persistence never infers layout
+     * from pipeline emission order.
+     */
     record ECShardUnit(
         Flux<DataBuffer> data,
         StorageUnitInfo info,
@@ -87,12 +91,31 @@ public sealed interface StorageUnit {
         boolean parity,
         long logicalSize,
         int dataBlocks,
-        int parityBlocks
+        int parityBlocks,
+        long stripeLogicalLength
     ) implements StorageUnit {
+
+        /**
+         * Compatibility constructor for historical callers without stripe layout.
+         * Persistence rejects the sentinel rather than inferring the missing value.
+         */
+        public ECShardUnit(
+                Flux<DataBuffer> data,
+                StorageUnitInfo info,
+                int stripeIndex,
+                int shardIndex,
+                boolean parity,
+                long logicalSize,
+                int dataBlocks,
+                int parityBlocks) {
+            this(data, info, stripeIndex, shardIndex, parity, logicalSize,
+                    dataBlocks, parityBlocks, -1L);
+        }
+
         @Override
         public StorageUnit withData(Flux<DataBuffer> newData) {
             return new ECShardUnit(newData, info, stripeIndex, shardIndex, parity,
-                    logicalSize, dataBlocks, parityBlocks);
+                    logicalSize, dataBlocks, parityBlocks, stripeLogicalLength);
         }
     }
 

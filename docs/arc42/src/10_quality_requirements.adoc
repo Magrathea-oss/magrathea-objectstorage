@@ -32,7 +32,12 @@ ifndef::imagesdir[:imagesdir: ../images]
 |Reliability / Consistency / Observability
 |Bounded periodic current-reference anti-entropy
 |Serially page only current references, probe only the fixed local node's named obligations, and delegate missing/corrupt targets to the existing fenced repair path without durable cursor or payload in Ratis
-|`REQ-CLUSTER-027` implemented and validated by 2 scenarios / 36 steps; rebalance, automated orphan cleanup, wider healing/topologies, ADR 0030 chaos, and production readiness excluded
+|`REQ-CLUSTER-027` implemented and validated by 2 scenarios / 36 steps; rebalance, automated orphan cleanup, wider healing/topologies, ADR 0030 faults, and production readiness excluded
+
+|Integrity / Performance / Testability
+|Bounded local EC reconstruction
+|Bind schema-3 committed reconstruction facts and reconstruct one EC 4+2 stripe from exactly four valid survivors without publication or object-sized retention
+|`REQ-PIPELINE-017` implemented and validated by 5 scenarios / 46 steps, including all 15 four-of-six combinations; distributed placement/transfer and self-healing excluded
 
 |Performance / Reliability
 |Repository-wide bounded reactive payload processing
@@ -41,8 +46,8 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 |Reliability / Testability
 |Deterministic storage-pipeline fault evidence
-|Replayable typed corruption at named integrity/publication boundaries without degraded writes, false durable acknowledgements, payload in Ratis, or secret-bearing evidence
-|ADR 0030 accepted target; identical plan/event input must produce an identical decision trace, and all implementation/Cucumber/fault-safety evidence remains `planned / needs-validation`
+|Replayable typed corruption at named integrity/publication/committed-shard boundaries without degraded writes, false acknowledgements, metadata mutation, payload in Ratis, raw-path targeting, or secret-bearing evidence
+|ADR 0030 accepted amended target; the bounded kernel/committed-shard subset is planned before EC self-healing, generalized chaos remains final, and all fault implementation/Cucumber evidence remains `planned / needs-validation`
 
 |Testability
 |Layered testing
@@ -70,7 +75,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 
 [WARNING]
 ====
-Status: *deferred / needs-validation while EP-10 remains active*. The 2026-07-14 link:../audits/2026-07-14-reactive-streaming-and-pipeline-chaos-source-audit.adoc[source audit] identifies static review items but does not replace the EP roadmap or revoke earlier semantic evidence. Signed authentication, SSE-S3, and named blocking/ownership paths require reproduction in supported Storage Engine compositions. The legacy in-memory adapter is not the owner-confirmed single-node/default backend, is isolated behind `legacy-in-memory-test`, and may be retired separately.
+Status: *partly activated by EP-10 dependency / needs-validation*. ADR 0032's local decoder evidence is complete. The bounded ADR 0030 kernel/committed-shard test subset may begin only after distributed placement/transfer and before EC self-healing; generalized chaos remains final. The 2026-07-14 link:../audits/2026-07-14-reactive-streaming-and-pipeline-chaos-source-audit.adoc[source audit] does not replace the EP roadmap or revoke earlier semantic evidence. Signed authentication, SSE-S3, and named blocking/ownership paths require reproduction in supported Storage Engine compositions. The legacy in-memory adapter is not the owner-confirmed single-node/default backend, is isolated behind `legacy-in-memory-test`, and may be retired separately.
 ====
 
 The quality tree for this roadmap is:
@@ -82,7 +87,7 @@ The quality tree for this roadmap is:
 - *determinism*: the same canonical plan and logical event sequence produce the same bounded decision trace despite concurrent scheduling; and
 - *publication safety*: injected corruption cannot create a checksum-valid durable acknowledgement, bypass `W=2`, enable a degraded write, put payload in Ratis, or publish a reachable partial artifact.
 
-P1 must freeze numeric frame, queue, concurrency, scheduler, and memory-budget values before normal-path P3 can validate them. Until then, the absence of a full-payload aggregator and the finiteness of every budget term are mandatory architecture gates, but no portable peak-memory or throughput number is claimed. ADR 0030 chaos evidence is final P4 and cannot substitute for P3.
+P1 must freeze numeric frame, queue, concurrency, scheduler, and memory-budget values before normal-path P3 can validate them. Until then, the absence of a full-payload aggregator and the finiteness of every budget term are mandatory architecture gates, but no portable peak-memory or throughput number is claimed. The early ADR 0030 committed-shard subset is limited test tooling and cannot substitute for P3; generalized chaos remains final.
 
 === Quality Scenarios
 
@@ -239,13 +244,22 @@ These request/repair-triggered scenarios deliberately exclude prepared-artifact 
 - **Metric (2026-07-14):** `ReqCluster027CucumberTest` passes **2 scenarios / 36 steps** with real three-voter Ratis, real filesystem targets, actual grpc-java UUID-bound mTLS repair, and page/probe/ensure/repair/overlap/replica-read counters. Existing regressions in the implementation validation set pass: `ReqCluster024CucumberTest` 7 / 168, repair control 22 / 294, and data plane 4 / 40.
 - **Limitations:** The cursor is process-local rather than consensus state; pages are not one frozen multi-page snapshot; payload is absent from Ratis; PA-6 planner output is not execution. No rebalance, automated orphan cleanup, wider healing/topologies, production scale/readiness, or ADR 0030 general chaos is claimed.
 
+==== Scenario 18b — Bounded Local EC Reconstruction (`REQ-PIPELINE-017`)
+
+- **Status:** `implementation-informed`, `@implemented-and-validated` for exactly five local scenarios; no distributed or repair-publication claim.
+- **Context:** A schema-3 EC 4+2 stripe binds all six data/parity artifacts to explicit layout, length, SHA-256, and transport-neutral location facts; exactly four checksum-valid survivor snapshots are supplied.
+- **Stimulus:** Reconstruct one or two missing/corrupt shards across representative and exhaustive survivor sets, a short final stripe, invalid metadata/survivors, and a caller-thread probe.
+- **Response:** All 15 four-of-six survivor combinations reproduce both omitted shards and exact logical bytes; regenerated output matches committed length/SHA-256; ambiguous or invalid input produces no accepted output; GF(256) work uses the dedicated bounded scheduler; no artifact/reference/location is published.
+- **Metric (2026-07-14 reconciliation):** `ReqPipeline017EcReconstructionCucumberTest` passes **5 scenarios / 46 steps**. Decoder-owned retention is at most one 4 MiB logical stripe, six 1 MiB shard buffers, and fixed matrix/index workspace; request/result snapshots are measured separately; earlier-stripe and whole-object retention equal zero. `Phase3PipelineUnitSpecsCucumberTest` keeps `REQ-PIPELINE-014/015` green.
+- **Limitations:** No shard replacement, monitor/daemon, distributed placement/transfer, Ratis job, rebalance, cleanup, ADR 0030 action, chaos, or production-readiness result is implied. `REQ-CLUSTER-015` remains not implemented and EP-10 remains partial.
+
 ==== Scenario 19 — Pooled-buffer Ownership Under Every Terminal Path
 
 - **Status:** `planned / needs-validation`; no leak-test result is claimed.
 - **Context:** Signed/SSE uploads, over-limit rejection, ignored-body handling, dedup/EC stages, filesystem persistence, and response streaming use pooled buffers.
 - **Stimulus:** Exercise normal completion, upstream/downstream error, cancellation at every hand-off, discard, timeout, over-limit, and each enabled injected corruption.
 - **Response:** Every owned buffer is transferred or released exactly once; files/channels close; no late buffer is retained by fault evidence; cleanup remains reachable and no durable acknowledgement is fabricated.
-- **Metric:** Zero pooled-buffer leak reports under the selected paranoid detector, explicit ownership assertions for each hand-off, and one terminal outcome per operation. Normal-path tooling/execution is P3; injected-fault ownership paths are added only in final P4.
+- **Metric:** Zero pooled-buffer leak reports under the selected paranoid detector, explicit ownership assertions for each hand-off, and one terminal outcome per operation. Normal-path tooling/execution is P3. The planned early committed-shard subset must cover its quarantine/mutation/restoration ownership before EC self-healing; all generalized injected-fault ownership paths remain final.
 
 ==== Scenario 20 — Reactive and gRPC Callback Thread Isolation
 
@@ -257,8 +271,8 @@ These request/repair-triggered scenarios deliberately exclude prepared-artifact 
 
 ==== Scenario 21 — Deterministic Corruption Replay
 
-- **Status:** `accepted target / planned / needs-validation` under ADR 0030.
-- **Context:** A canonical version-1 plan selects one operation and a finite occurrence/byte offset or frame index for each initial action.
+- **Status:** `accepted target / planned / needs-validation` under amended ADR 0030; the common kernel is needed by the early committed-shard subset, while generalized replay remains final.
+- **Context:** A canonical versioned plan selects one operation and finite semantic coordinates for each permitted action.
 - **Stimulus:** Replay the same logical event sequence repeatedly and with unrelated operations interleaved.
 - **Response:** The selected rule fires or skips at the same semantic coordinate with the same typed outcome; unrelated operations do not consume its occurrence or fire budget.
 - **Metric:** Decision traces are identical after excluding non-oracle diagnostic timestamps and contain matching plan hash, rule/decision ID, operation, point, coordinate, fire ordinal/count, and outcome. No replay evidence exists yet.

@@ -186,6 +186,118 @@ Ability: Phase 3 staged reactive read and write pipeline
         | requirement_id     | validation_mode | storage_root                                        |
         | REQ-PIPELINE-015   | webclient       | target/storage-engine-it/REQ-PIPELINE-015-webclient |
 
+  Rule: Local EC reconstruction is explicit, bounded, and fail-closed
+    Before distributed placement or self-healing can use erasure-coded artifacts, a
+    transport-neutral local decoder MUST receive unambiguous committed stripe and shard
+    facts. CPU-intensive GF(256) work MUST execute on an explicitly supplied bounded
+    scheduler rather than a Reactor caller thread. The decoder may produce verified
+    reconstruction output for one bounded stripe, but it MUST NOT publish artifacts or
+    claim any daemon, filesystem, cluster, Ratis, rebalance, cleanup, or chaos behavior.
+
+    @REQ-PIPELINE-017 @functional-requirement @non-functional-requirement @erasure-coding @integrity @bounded-memory @reconstruction @pipeline-unit-required @pipeline-unit @implemented-and-validated
+    Scenario: Schema 3 binds every EC artifact to unambiguous reconstruction facts
+      Given validation mode "pipeline-unit" is selected for requirement "REQ-PIPELINE-017"
+      And the storage engine operator uses filesystem root "target/storage-engine-it/REQ-PIPELINE-017-unit"
+      And fixture file "target/test-fixtures/pipeline/ec-object-8m.bin" is the deterministic 8 MiB EC source from REQ-PIPELINE-015
+      And storage class "EC_4_2" selects four data shards and two parity shards in each bounded 4 MiB stripe
+      And a new EC write and legacy schema compatibility probes prepare these manifest versions:
+        | schema | prepared manifest                                                 |
+        | 0      | readable legacy whole-object manifest                            |
+        | 1      | readable legacy chunk manifest                                   |
+        | 2      | readable typed EC manifest without explicit reconstruction layout |
+        | 3      | typed EC manifest with explicit reconstruction layout             |
+      When the pipeline unit runner submits the prepared manifest and survivor set to the transport-neutral bounded EC reconstruction decoder
+      Then the new EC write uses manifest schema 3 and every typed EC artifact explicitly binds these committed facts:
+        | committed fact       | required binding                                                                 |
+        | artifact kind        | EC_DATA_SHARD or EC_PARITY_SHARD                                               |
+        | stripe index         | zero-based index of the artifact's bounded stripe                              |
+        | shard index          | unique zero-based index 0 through 5 within that stripe                         |
+        | k                     | 4                                                                             |
+        | m                     | 2                                                                             |
+        | parity flag and kind | both identify data indices 0 through 3 or parity indices 4 through 5 consistently |
+        | logical data length  | exact logical byte length represented by the artifact's stripe                 |
+        | stored length        | exact committed artifact byte length                                            |
+        | stored checksum      | committed lowercase SHA-256 of the stored artifact bytes                       |
+        | locations            | non-empty ordered transport-neutral node or device identities; this local gate binds node-001 |
+      And filesystem inspection separately finds every chunk-id data file beneath "target/storage-engine-it/REQ-PIPELINE-017-unit/nodes/node-001/chunks"
+      And manifest construction rejects an EC storage trace that omits explicit layout or contradicts the selected k and m
+      And schemas 0, 1, and 2 remain readable through their compatibility paths
+      And schema-2 EC metadata without an explicit layout is rejected for reconstruction without inferring artifact order
+
+    @REQ-PIPELINE-017 @functional-requirement @non-functional-requirement @erasure-coding @integrity @bounded-memory @reconstruction @pipeline-unit-required @pipeline-unit @implemented-and-validated
+    Scenario: EC 4+2 reconstructs exactly one or two unavailable shards from any four checksum-valid survivors
+      Given validation mode "pipeline-unit" is selected for requirement "REQ-PIPELINE-017"
+      And the storage engine operator uses filesystem root "target/storage-engine-it/REQ-PIPELINE-017-unit"
+      And fixture file "target/test-fixtures/pipeline/ec-object-8m.bin" is the deterministic 8 MiB EC source from REQ-PIPELINE-015
+      And schema-3 stripe 0 has committed 4+2 shard metadata and these independently evaluated survivor cases:
+        | case                        | missing shard indices | corrupt shard indices | checksum-valid survivor indices | expected regenerated indices |
+        | one missing data shard      | 1                     | none                  | 0,2,3,4                         | 1                            |
+        | one corrupt parity shard    | none                  | 5                     | 0,1,2,3                         | 5                            |
+        | one missing and one corrupt | 0                     | 4                     | 1,2,3,5                         | 0,4                          |
+        | two corrupt shards          | none                  | 1,5                   | 0,2,3,4                         | 1,5                          |
+      When the pipeline unit runner submits the prepared manifest and survivor set to the transport-neutral bounded EC reconstruction decoder
+      Then each case reconstructs exactly its expected one or two unavailable shard indices from the selected four survivors
+      And all 15 four-of-six survivor combinations reproduce both omitted shards byte-for-byte across data/data, data/parity, and parity/parity losses
+      And every regenerated shard byte length and SHA-256 match its committed schema-3 manifest facts before output is accepted
+      And the reconstructed stripe's logical bytes exactly match the corresponding bytes in fixture file "target/test-fixtures/pipeline/ec-object-8m.bin"
+
+    @REQ-PIPELINE-017 @functional-requirement @non-functional-requirement @erasure-coding @integrity @bounded-memory @reconstruction @pipeline-unit-required @pipeline-unit @implemented-and-validated
+    Scenario: A short final stripe preserves logical size within one bounded reconstruction workspace
+      Given validation mode "pipeline-unit" is selected for requirement "REQ-PIPELINE-017"
+      And the storage engine operator uses filesystem root "target/storage-engine-it/REQ-PIPELINE-017-unit"
+      And fixture file "target/test-fixtures/pipeline/ec-object-8m.bin" is the deterministic 8 MiB EC source from REQ-PIPELINE-015
+      And a 6291593-byte logical view of the fixture has one full 4 MiB stripe and a 2097289-byte final stripe
+      And schema-3 metadata records the exact logical data length, stored length, checksum, and location for all six final-stripe artifacts
+      And final-stripe data shard 2 is missing while checksum-valid survivor indices 0,1,3,4 are supplied
+      When the pipeline unit runner submits the prepared manifest and survivor set to the transport-neutral bounded EC reconstruction decoder
+      Then reconstruction emits exactly 6291593 logical bytes without exposing final-stripe padding
+      And retained reconstruction state never exceeds these object-size-independent bounds:
+        | retained state                    | bound                                                                                                        |
+        | decoder-owned logical assembly    | at most one 4 MiB stripe                                                                                      |
+        | decoder-owned shard workspace     | at most six bounded 1 MiB shard buffers                                                                       |
+        | immutable boundary snapshots      | four 1 MiB survivor snapshots on input plus one logical stripe and at most two 1 MiB regenerated shards on output |
+        | matrix and index workspace        | fixed EC 4+2 matrices and finite index arrays                                                                  |
+      And caller-owned source arrays and copies returned by defensive accessors are outside the decoder-owned workspace measurement
+      And no earlier stripe or whole 8 MiB fixture is materialized while the final stripe is reconstructed
+
+    @REQ-PIPELINE-017 @functional-requirement @non-functional-requirement @erasure-coding @integrity @bounded-memory @reconstruction @pipeline-unit-required @pipeline-unit @implemented-and-validated
+    Scenario: Invalid reconstruction metadata or survivors fail closed without output publication
+      Given validation mode "pipeline-unit" is selected for requirement "REQ-PIPELINE-017"
+      And the storage engine operator uses filesystem root "target/storage-engine-it/REQ-PIPELINE-017-unit"
+      And fixture file "target/test-fixtures/pipeline/ec-object-8m.bin" is the deterministic 8 MiB EC source from REQ-PIPELINE-015
+      And the following invalid reconstruction requests are evaluated independently:
+        | invalid request                  | prepared defect                                                       |
+        | fewer than k valid survivors     | only checksum-valid indices 0,1,4 are available                        |
+        | duplicate shard index            | survivor indices are 0,1,1,4                                          |
+        | out-of-range shard index         | survivor indices include 6 for EC 4+2                                 |
+        | inconsistent k and m             | one artifact declares k=4,m=3 while the stripe declares k=4,m=2        |
+        | inconsistent stripe metadata     | one survivor declares a different stripe index or logical data length   |
+        | wrong shard size                 | one survivor stored length differs from the committed schema-3 length   |
+        | wrong shard checksum             | one survivor SHA-256 differs from the committed schema-3 checksum       |
+        | unsupported future schema        | the manifest declares schema 4                                         |
+      When the pipeline unit runner submits the prepared manifest and survivor set to the transport-neutral bounded EC reconstruction decoder
+      Then every invalid request fails closed with no accepted reconstructed shard or logical stripe
+      And no artifact, manifest, object reference, or replacement location is published in filesystem root "target/storage-engine-it/REQ-PIPELINE-017-unit"
+
+    @REQ-PIPELINE-017 @functional-requirement @non-functional-requirement @erasure-coding @integrity @bounded-memory @reconstruction @pipeline-unit-required @pipeline-unit @implemented-and-validated
+    Scenario: Decoder output remains local reconstruction planning evidence only
+      Given validation mode "pipeline-unit" is selected for requirement "REQ-PIPELINE-017"
+      And the storage engine operator uses filesystem root "target/storage-engine-it/REQ-PIPELINE-017-unit"
+      And fixture file "target/test-fixtures/pipeline/ec-object-8m.bin" is the deterministic 8 MiB EC source from REQ-PIPELINE-015
+      And schema-3 stripe 1 is prepared with missing shard index 2 and checksum-valid survivor indices 0,1,3,5
+      When the pipeline unit runner submits the prepared manifest and survivor set to the transport-neutral bounded EC reconstruction decoder
+      Then accepted output contains only verified stripe and regenerated-shard reconstruction results
+      And reconstruction work leaves a Reactor caller thread and runs on a dedicated scheduler bounded to one worker and 16 queued tasks
+      And this requirement makes none of these later-slice claims:
+        | excluded claim                     |
+        | self-healing scanner or daemon     |
+        | filesystem shard replacement       |
+        | cluster shard placement or transfer |
+        | Ratis repair job, claim, or result |
+        | rebalance execution                |
+        | orphan cleanup                     |
+        | distributed or ADR 0030 chaos      |
+
   Rule: Write objects pass through explicit stages in a deterministic order
     A PutObject write MUST be composed from StorageStage instances connected by a
     StorageContext. The write pipeline MUST publish its whole-object unit or allowed

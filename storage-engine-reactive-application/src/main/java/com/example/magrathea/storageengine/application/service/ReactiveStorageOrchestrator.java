@@ -36,6 +36,7 @@ import com.example.magrathea.storageengine.domain.valueobject.ContentHash;
 import com.example.magrathea.storageengine.domain.pipeline.DataProcessingSpec;
 import com.example.magrathea.storageengine.domain.pipeline.StepSpec;
 import com.example.magrathea.storageengine.domain.valueobject.DedupConfig;
+import com.example.magrathea.storageengine.domain.valueobject.EcShardLayout;
 import com.example.magrathea.storageengine.domain.valueobject.EffectiveStoragePolicy;
 import com.example.magrathea.storageengine.domain.valueobject.EncryptionConfig;
 import com.example.magrathea.storageengine.domain.valueobject.Fingerprint;
@@ -66,8 +67,12 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
@@ -332,18 +337,28 @@ public class ReactiveStorageOrchestrator {
                                             StorageArtifactReferenceDescriptor existing = optional.orElseThrow(() ->
                                                     new IllegalStateException(
                                                             "Dedup reuse but fingerprint not found in index"));
-                                            return toChunkPersistenceTrace(trace, plan, existing.chunkId());
+                                            return toPersistedArtifactTrace(
+                                                    trace, plan, existing.chunkId(), existing.locations());
                                         });
                             }
-                            return Mono.just(toChunkPersistenceTrace(trace, plan));
+                            return Mono.just(toPersistedArtifactTrace(trace, plan));
                         })
                         .collectList()
-                        .map(traces -> context
-                                .withChunkTraces(traces)
-                                .withStageDecision("chunk-persistence",
-                                        "chunk-trace-count=" + traces.size())
-                                .addCleanupHandle(StorageCleanupHandle.named(
-                                        "chunk-persistence", cleanupPersistedArtifacts(context, traces)))),
+                        .map(persistedArtifacts -> {
+                            List<ChunkPersistenceTrace> traces = persistedArtifacts.stream()
+                                    .map(PersistedArtifactTrace::persistenceTrace)
+                                    .toList();
+                            List<StorageArtifactReferenceDescriptor> descriptors =
+                                    buildDescriptors(context, persistedArtifacts);
+                            return context
+                                    .withChunkTraces(traces)
+                                    .withChunkDescriptors(descriptors)
+                                    .withStageDecision("chunk-persistence",
+                                            "chunk-trace-count=" + traces.size())
+                                    .addCleanupHandle(StorageCleanupHandle.named(
+                                            "chunk-persistence",
+                                            cleanupPersistedArtifacts(context, traces)));
+                        }),
                 ignored -> Mono.empty(),
                 (state, error) -> cleanupPersistedStorageTraces(context, state.traces()),
                 state -> cleanupPersistedStorageTraces(context, state.traces()));
@@ -399,27 +414,21 @@ public class ReactiveStorageOrchestrator {
     }
 
     /**
-     * Converts a StorageTrace produced by the DataProcessingPipeline into a
-     * ChunkPersistenceTrace compatible with buildDescriptors() and persistManifest().
-     * <p>
-     * For FileUnit traces (non-dedup path), the trace carries a fingerprint set by
-     * StorePort. For ChunkUnit traces (dedup path), the fingerprint is set by the
-     * DeduplicationStep and passed through by StorePort.
-     * <p>
-     * All NoOp transform steps share the same checksum (data is unmodified).
-     * REPLICATION and STORE are always EXECUTED per PersistencePlan.create().
+     * Converts a StorageTrace produced by the DataProcessingPipeline into persistence
+     * evidence while preserving any explicit EC layout through descriptor construction.
+     * For dedup reuse, the existing chunk identifier and locations come from the committed
+     * content-address entry.
      */
-    /**
-     * Converts a StorageTrace to ChunkPersistenceTrace, using the given chunkId
-     * for dedup reuse traces (retrieved from the content address index).
-     */
-    private ChunkPersistenceTrace toChunkPersistenceTrace(
+    private PersistedArtifactTrace toPersistedArtifactTrace(
             StorageTrace storageTrace, PersistencePlan plan) {
-        return toChunkPersistenceTrace(storageTrace, plan, null);
+        return toPersistedArtifactTrace(storageTrace, plan, null, List.of());
     }
 
-    private ChunkPersistenceTrace toChunkPersistenceTrace(
-            StorageTrace storageTrace, PersistencePlan plan, ChunkId existingChunkId) {
+    private PersistedArtifactTrace toPersistedArtifactTrace(
+            StorageTrace storageTrace,
+            PersistencePlan plan,
+            ChunkId existingChunkId,
+            List<com.example.magrathea.storageengine.domain.valueobject.NodeId> existingLocations) {
         // Extract fingerprint from trace — always present for both FileUnit and ChunkUnit paths.
         // The pipeline guarantees a fingerprint on every StorageTrace; absence is a pipeline bug.
         Fingerprint fingerprint = storageTrace.fingerprint()
@@ -462,7 +471,7 @@ public class ReactiveStorageOrchestrator {
                 // without actual data transformation.
                 if (expectedStatus == StepExecutionStatus.EXECUTED) {
                     steps.add(buildExecutedStep(stepId,
-                            noOpOutcomeForDedupReuse(stepPlan, plan),
+                            noOpOutcomeForDedupReuse(stepPlan, plan, existingLocations),
                             contentHash, contentHash));
                 } else {
                     steps.add(buildSkippedStep(stepId, contentHash));
@@ -476,7 +485,7 @@ public class ReactiveStorageOrchestrator {
                         StepId.STORE,
                         new StepOutcome.StoreOutcome(
                                 plan.targetDevice(),
-                                List.of(),
+                                storageTrace.locations(),
                                 storageTrace.storedSize()),
                         contentHash, contentHash));
             } else if (expectedStatus == StepExecutionStatus.EXECUTED) {
@@ -490,8 +499,12 @@ public class ReactiveStorageOrchestrator {
             }
         }
 
-        return new ChunkPersistenceTrace(
-                artifactKindFor(storageTrace), chunkId, fingerprint, storageTrace.originalSize(), steps);
+        StorageArtifactKind artifactKind = artifactKindFor(storageTrace);
+        Optional<EcShardLayout> explicitLayout = validatedEcShardLayout(
+                storageTrace, plan, artifactKind);
+        ChunkPersistenceTrace persistenceTrace = new ChunkPersistenceTrace(
+                artifactKind, chunkId, fingerprint, storageTrace.originalSize(), steps);
+        return new PersistedArtifactTrace(persistenceTrace, explicitLayout);
     }
 
     /**
@@ -528,7 +541,10 @@ public class ReactiveStorageOrchestrator {
      * Synthesises a NoOp StepOutcome for EXECUTED steps when a chunk is deduplicated.
      * Locations from the existing chunk are reused for REPLICATION and STORE.
      */
-    private StepOutcome noOpOutcomeForDedupReuse(StepPlan stepPlan, PersistencePlan plan) {
+    private StepOutcome noOpOutcomeForDedupReuse(
+            StepPlan stepPlan,
+            PersistencePlan plan,
+            List<com.example.magrathea.storageengine.domain.valueobject.NodeId> existingLocations) {
         return switch (stepPlan.stepId()) {
             case COMPRESS -> new StepOutcome.CompressOutcome(
                     com.example.magrathea.storageengine.domain.valueobject.CompressionAlgorithm.GZIP, 0, 0);
@@ -548,7 +564,8 @@ public class ReactiveStorageOrchestrator {
                         .orElseThrow().factor();
                 yield new StepOutcome.ReplicationOutcome(factor, List.of());
             }
-            case STORE -> new StepOutcome.StoreOutcome(plan.targetDevice(), List.of(), 0);
+            case STORE -> new StepOutcome.StoreOutcome(
+                    plan.targetDevice(), existingLocations, 0);
             case DEDUP -> new StepOutcome.DedupOutcome(true, Optional.empty());
         };
     }
@@ -563,7 +580,11 @@ public class ReactiveStorageOrchestrator {
 
     private Mono<StorageContext> persistManifest(StorageContext context) {
         return Mono.fromCallable(() -> {
-                    List<StorageArtifactReferenceDescriptor> descriptors = buildDescriptors(context);
+                    List<StorageArtifactReferenceDescriptor> descriptors = context.chunkDescriptors();
+                    if (descriptors.size() != context.chunkTraces().size()) {
+                        throw new IllegalStateException(
+                                "Persisted artifact descriptors do not match persistence traces");
+                    }
                     long totalOriginalSize = descriptors.stream()
                             .mapToLong(StorageArtifactReferenceDescriptor::originalSize)
                             .sum();
@@ -638,6 +659,17 @@ public class ReactiveStorageOrchestrator {
                                     + " reason=" + error.getMessage());
                     return Mono.empty();
                 });
+    }
+
+    private record PersistedArtifactTrace(
+            ChunkPersistenceTrace persistenceTrace,
+            Optional<EcShardLayout> ecShardLayout) {
+        private PersistedArtifactTrace {
+            java.util.Objects.requireNonNull(
+                    persistenceTrace, "persistenceTrace must not be null");
+            java.util.Objects.requireNonNull(
+                    ecShardLayout, "ecShardLayout must not be null");
+        }
     }
 
     private record PersistedTraceState(List<StorageTrace> traces) {
@@ -781,9 +813,16 @@ public class ReactiveStorageOrchestrator {
                 Optional.of(inputHash));
     }
 
-    private List<StorageArtifactReferenceDescriptor> buildDescriptors(StorageContext context) {
+    private List<StorageArtifactReferenceDescriptor> buildDescriptors(
+            StorageContext context,
+            List<PersistedArtifactTrace> persistedArtifacts) {
+        validateEcTraceSet(
+                context.plan().orElseThrow(),
+                context.command().orElseThrow().context().contentDescriptor().objectSize(),
+                persistedArtifacts);
         List<StorageArtifactReferenceDescriptor> descriptors = new ArrayList<>();
-        for (ChunkPersistenceTrace trace : context.chunkTraces()) {
+        for (PersistedArtifactTrace persistedArtifact : persistedArtifacts) {
+            ChunkPersistenceTrace trace = persistedArtifact.persistenceTrace();
             List<StepChecksumDescriptor> stepChecksums = new ArrayList<>();
             for (StepExecutionRecord step : trace.steps()) {
                 stepChecksums.add(StepChecksumDescriptor.of(
@@ -792,12 +831,12 @@ public class ReactiveStorageOrchestrator {
                         step.outputChecksum().orElseThrow()));
             }
             ContentHash finalChecksum = trace.finalChecksum();
-            // Collect locations from the STORE step
-            List<com.example.magrathea.storageengine.domain.valueobject.NodeId> locations = trace.steps().get(5)
-                    .operationOutcome()
-                    .filter(o -> o instanceof StepOutcome.StoreOutcome)
-                    .map(o -> ((StepOutcome.StoreOutcome) o).locations())
-                    .orElse(List.of());
+            List<com.example.magrathea.storageengine.domain.valueobject.NodeId> locations =
+                    trace.steps().get(5)
+                            .operationOutcome()
+                            .filter(o -> o instanceof StepOutcome.StoreOutcome)
+                            .map(o -> ((StepOutcome.StoreOutcome) o).locations())
+                            .orElse(List.of());
 
             long storedSize = trace.steps().get(5)
                     .operationOutcome()
@@ -813,9 +852,182 @@ public class ReactiveStorageOrchestrator {
                     storedSize,
                     stepChecksums,
                     finalChecksum,
-                    locations));
+                    locations,
+                    persistedArtifact.ecShardLayout()));
         }
-        return descriptors;
+        return List.copyOf(descriptors);
+    }
+
+    private Optional<EcShardLayout> validatedEcShardLayout(
+            StorageTrace storageTrace,
+            PersistencePlan plan,
+            StorageArtifactKind artifactKind) {
+        boolean ecShard = isEcShard(artifactKind);
+        if (!ecShard) {
+            if (storageTrace.ecShardLayout().isPresent()) {
+                throw new IllegalStateException(
+                        "Non-EC storage trace carries EC shard layout: " + artifactKind);
+            }
+            return Optional.empty();
+        }
+
+        EcShardLayout layout = storageTrace.ecShardLayout().orElseThrow(() ->
+                new IllegalStateException(
+                        "Persisted EC shard is missing explicit layout; emission order is not inferred"));
+        var config = plan.effectivePolicy().erasureCoding().orElseThrow(() ->
+                new IllegalStateException(
+                        "Persisted EC shard has no effective erasure-coding policy"));
+        if (layout.dataBlocks() != config.dataBlocks()
+                || layout.parityBlocks() != config.parityBlocks()) {
+            throw new IllegalStateException(
+                    "Persisted EC shard layout contradicts the effective k+m policy");
+        }
+
+        StorageArtifactKind expectedKind = layout.parity()
+                ? StorageArtifactKind.EC_PARITY_SHARD
+                : StorageArtifactKind.EC_DATA_SHARD;
+        if (artifactKind != expectedKind) {
+            throw new IllegalStateException(
+                    "Persisted EC shard layout contradicts its artifact kind");
+        }
+        long expectedOriginalSize = layout.parity()
+                ? 0L
+                : Math.max(0L, Math.min(
+                        EcShardLayout.SHARD_SIZE_BYTES,
+                        layout.stripeLogicalLength()
+                                - (long) layout.shardIndex()
+                                * EcShardLayout.SHARD_SIZE_BYTES));
+        if (storageTrace.originalSize() != expectedOriginalSize) {
+            throw new IllegalStateException(
+                    "Persisted EC shard logical size contradicts its explicit stripe layout");
+        }
+        if (storageTrace.storedSize() != EcShardLayout.SHARD_SIZE_BYTES) {
+            throw new IllegalStateException(
+                    "Persisted EC shard stored size contradicts the fixed shard geometry");
+        }
+        if (storageTrace.locations().isEmpty()) {
+            throw new IllegalStateException(
+                    "Persisted EC shard has no ordered node or device identity");
+        }
+        return Optional.of(layout);
+    }
+
+    private void validateEcTraceSet(
+            PersistencePlan plan,
+            long objectLogicalLength,
+            List<PersistedArtifactTrace> persistedArtifacts) {
+        List<PersistedArtifactTrace> ecArtifacts = persistedArtifacts.stream()
+                .filter(artifact -> isEcShard(artifact.persistenceTrace().artifactKind()))
+                .toList();
+        if (ecArtifacts.isEmpty()) {
+            return;
+        }
+        if (ecArtifacts.size() != persistedArtifacts.size()) {
+            throw new IllegalStateException(
+                    "EC persistence produced a mixture of shard and non-shard traces");
+        }
+
+        var config = plan.effectivePolicy().erasureCoding().orElseThrow(() ->
+                new IllegalStateException(
+                        "Persisted EC shards have no effective erasure-coding policy"));
+        int artifactsPerStripe = config.dataBlocks() + config.parityBlocks();
+        long stripeCapacity = Math.multiplyExact(
+                (long) config.dataBlocks(), EcShardLayout.SHARD_SIZE_BYTES);
+        // The HTTP adapter currently uses 0 when Content-Length is absent, while a true
+        // empty upload produces no EC traces. For a non-empty EC trace set, only a positive
+        // request length is authoritative; otherwise the explicit stripe layouts own length.
+        boolean objectLogicalLengthKnown = objectLogicalLength > 0;
+        long expectedStripeCount = objectLogicalLengthKnown
+                ? (objectLogicalLength == 0
+                        ? 0
+                        : Math.addExact(objectLogicalLength, stripeCapacity - 1) / stripeCapacity)
+                : -1;
+        Map<Long, List<PersistedArtifactTrace>> byStripe = new LinkedHashMap<>();
+        for (PersistedArtifactTrace artifact : ecArtifacts) {
+            EcShardLayout layout = artifact.ecShardLayout().orElseThrow(() ->
+                    new IllegalStateException(
+                            "Persisted EC shard is missing explicit layout"));
+            byStripe.computeIfAbsent(layout.stripeIndex(), ignored -> new ArrayList<>())
+                    .add(artifact);
+        }
+
+        if (objectLogicalLengthKnown && byStripe.size() != expectedStripeCount) {
+            throw new IllegalStateException(
+                    "Persisted EC stripe count contradicts the object's logical length");
+        }
+        long validatedStripeCount = objectLogicalLengthKnown
+                ? expectedStripeCount
+                : byStripe.size();
+        for (Map.Entry<Long, List<PersistedArtifactTrace>> stripeEntry : byStripe.entrySet()) {
+            long stripeIndex = stripeEntry.getKey();
+            if (stripeIndex < 0 || stripeIndex >= validatedStripeCount) {
+                throw new IllegalStateException(
+                        "Persisted EC stripe index contradicts the object's logical length: "
+                                + stripeIndex);
+            }
+            List<PersistedArtifactTrace> stripe = stripeEntry.getValue();
+            if (stripe.size() != artifactsPerStripe) {
+                throw new IllegalStateException(
+                        "Persisted EC stripe " + stripeEntry.getKey()
+                                + " does not contain exactly k+m=" + artifactsPerStripe + " shards");
+            }
+            Set<Integer> shardIndices = new HashSet<>();
+            long stripeLogicalLength = -1;
+            long declaredDataLength = 0;
+            for (PersistedArtifactTrace artifact : stripe) {
+                EcShardLayout layout = artifact.ecShardLayout().orElseThrow();
+                if (!shardIndices.add(layout.shardIndex())) {
+                    throw new IllegalStateException(
+                            "Persisted EC stripe contains duplicate shard index "
+                                    + layout.shardIndex());
+                }
+                if (stripeLogicalLength < 0) {
+                    stripeLogicalLength = layout.stripeLogicalLength();
+                } else if (stripeLogicalLength != layout.stripeLogicalLength()) {
+                    throw new IllegalStateException(
+                            "Persisted EC stripe carries contradictory logical lengths");
+                }
+                if (!layout.parity()) {
+                    declaredDataLength += artifact.persistenceTrace().originalSize();
+                }
+            }
+            for (int shardIndex = 0; shardIndex < artifactsPerStripe; shardIndex++) {
+                if (!shardIndices.contains(shardIndex)) {
+                    throw new IllegalStateException(
+                            "Persisted EC stripe is missing explicit shard index " + shardIndex);
+                }
+            }
+            if (declaredDataLength != stripeLogicalLength) {
+                throw new IllegalStateException(
+                        "Persisted EC stripe logical length contradicts its data-shard sizes");
+            }
+            if (objectLogicalLengthKnown) {
+                long expectedStripeLogicalLength = Math.min(
+                        stripeCapacity,
+                        objectLogicalLength - Math.multiplyExact(stripeIndex, stripeCapacity));
+                if (stripeLogicalLength != expectedStripeLogicalLength) {
+                    throw new IllegalStateException(
+                            "Persisted EC stripe logical length contradicts its explicit stripe index");
+                }
+            } else if (stripeIndex < validatedStripeCount - 1
+                    && stripeLogicalLength != stripeCapacity) {
+                throw new IllegalStateException(
+                        "Non-final EC stripe is short while object length is streaming-unknown");
+            }
+        }
+        if (!objectLogicalLengthKnown) {
+            for (long stripeIndex = 0; stripeIndex < validatedStripeCount; stripeIndex++) {
+                if (!byStripe.containsKey(stripeIndex)) {
+                    throw new IllegalStateException(
+                            "Persisted streaming EC layout is missing stripe index " + stripeIndex);
+                }
+            }
+        }
+    }
+
+    private static boolean isEcShard(StorageArtifactKind artifactKind) {
+        return artifactKind == StorageArtifactKind.EC_DATA_SHARD
+                || artifactKind == StorageArtifactKind.EC_PARITY_SHARD;
     }
 
     private StorageArtifactKind artifactKindFor(StorageTrace trace) {

@@ -6,7 +6,7 @@
 
 **Magrathea ObjectStore** is an AWS S3-compatible object store built with Spring Boot 4 WebFlux and Java 21. The public object API is the S3 REST API exposed by the pluggable `s3-reactive-api-adapter` module. In addition, `admin-api-adapter` exposes `/admin/**` endpoints for storage policy, device, and configuration management — these are internal/administrative APIs, separate from the S3 object API.
 
-> **Current cluster status:** EP-10 is **partial**. Fixed A/B/C consensus publication/failover, bounded current-generation whole-object repair, and bounded periodic current-reference anti-entropy are implemented and validated for `REQ-CLUSTER-001..005`, `008..013`, and `019..027`; focused `027` evidence is **2 scenarios / 36 steps**, and `024` retains its seven-point real-filesystem/gRPC interruption scope. `REQ-CLUSTER-014` is separately implemented and validated only as an internal repository-rooted source/build architecture contract; it is not S3 behavior and proves no runtime side effect. Broad `017` remains partial because rebalance, automated orphan cleanup, and wider healing/topology coverage remain absent; `006/007/015/016/018` remain not implemented. General chaos, broad partition tolerance, rolling upgrade, dynamic membership, broader transfer semantics, and production readiness remain outside the validated scope.
+> **Current cluster status:** EP-10 is **partial**. Fixed A/B/C consensus publication/failover, bounded current-generation whole-object repair, and bounded periodic current-reference anti-entropy are implemented and validated for `REQ-CLUSTER-001..005`, `008..013`, and `019..027`; focused `027` evidence is **2 scenarios / 36 steps**, and `024` retains its seven-point real-filesystem/gRPC interruption scope. `REQ-CLUSTER-014` is separately implemented and validated only as an internal repository-rooted source/build architecture contract. Local output-only EC reconstruction (`REQ-PIPELINE-017`, ADR 0032) is also validated at **5 scenarios / 46 steps**, including all **15 four-of-six** EC 4+2 survivor combinations, but it provides no repair publication, daemon, or distributed evidence. `REQ-CLUSTER-015` remains not implemented and broad cluster `017` remains partial. The active order is distributed shard placement/transfer, the bounded ADR 0030 committed-shard test subset, EC self-healing, shard rebalance, and fenced cleanup; generalized chaos remains final. Whole-object replication remains valid below the arranged EC minimum; inter-cluster/NAS-backed replication is later and NAS-dependent. Production readiness is not claimed.
 
 **Architecture:** [ARC42 entry point](docs/arc42/arc42-template.adoc) · [C4 model](docs/c4/README.md) · [Executable requirements appendix](docs/arc42/generated/gherkin-requirements.adoc) · [Focused evidence](docs/test-report.md)
 
@@ -31,7 +31,8 @@
 - **Jackson 3 XML** — `tools.jackson.dataformat:jackson-dataformat-xml` with custom WebFlux encoder
 - **Pure domain** — no Spring, no JPA, no reactive types in `object-store-domain`
 - **In-memory infrastructure** — reactive in-memory bucket, object, and multipart repositories
-- **Testing** — JUnit, Cucumber, targeted AWS CLI compatibility; the Java 21 EP-10 shared real-process gate passes 14 scenarios / 188 steps for `001..005/019/020` (repair-only `019/020`: 4 / 80). The 2026-07-14 focused `024` gate passes 7 / 168, focused periodic current-reference `027` passes **2 / 36**, repair control passes 22 / 294, and data-plane regression passes 4 / 40; full S3 and cluster capability parity is not complete. **JaCoCo is the current coverage baseline** (Clover/OpenClover is optional/legacy)
+- **Local bounded EC reconstruction** — schema-3 manifests bind explicit stripe/shard/k/m/parity/length/SHA-256/location facts; a transport-neutral output-only decoder reconstructs one EC 4+2 stripe on a dedicated one-worker/16-queue scheduler and fails closed without publishing artifacts
+- **Testing** — JUnit, Cucumber, targeted AWS CLI compatibility; `ReqPipeline017EcReconstructionCucumberTest` passes **5 scenarios / 46 steps** and all **15 four-of-six** survivor combinations, while `Phase3PipelineUnitSpecsCucumberTest` keeps `REQ-PIPELINE-014/015` green. The Java 21 EP-10 shared real-process gate separately passes 14 / 188 for `001..005/019/020` (repair-only: 4 / 80); focused `024` passes 7 / 168 and `027` passes 2 / 36. Full S3 and cluster capability parity is not complete. **JaCoCo is the current coverage baseline** (Clover/OpenClover is optional/legacy)
 
 ---
 
@@ -82,14 +83,14 @@ independent of the S3 API domain. It defines:
 - **StepPlan / StepExecutionTrace** — fixed 6-step pipeline with EXECUTED/SKIPPED/BYPASSED
 - **ObjectManifest** — persisted chunk layout, separate from StoredObject aggregate
 - **CompleteUpload** — common phase for PutObject and MultipartUpload
-- **Chaos engineering** — alter step after checksum, before verify, with FaultInjectingStorageCluster
+- **Deterministic fault-injection architecture** — ADR 0030 defines a no-op-default bounded plan/evidence kernel; implementation remains planned, with only an exact committed-EC-shard subset moved before self-healing and generalized chaos retained for final work
 
 The pipeline order is fixed: DEDUP → COMPRESS → CRYPT → ERASURE_CODING → REPLICATION → STORE.
 EC differentiates DedupDevice; replication does not.
 
 ### `MINIO_STANDARD` policy semantics
 
-`MINIO_STANDARD` is the first executable Storage Engine policy use case. Its S3-facing storage class is `STANDARD` (`storageClassId: STANDARD`). Phase 5 semantics are explicit and test-backed: deduplication disabled, erasure-coding planning enabled as `4 data / 2 parity`, replication factor `1`, compression disabled, and encryption disabled by default. The current evidence verifies YAML catalog loading, device selection, and deterministic persistence planning; it does **not** yet claim end-to-end storage-engine read/write wiring or verified physical EC shard placement.
+`MINIO_STANDARD` is the first executable Storage Engine policy use case. Its S3-facing storage class is `STANDARD` (`storageClassId: STANDARD`). Phase 5 semantics are explicit and test-backed: deduplication disabled, erasure coding enabled as `4 data / 2 parity`, replication factor `1`, compression disabled, and encryption disabled by default. Local storage-engine evidence now verifies physical EC shards, schema-3 reconstruction facts, exact readback, and output-only bounded decoding. It does **not** claim distributed shard placement/transfer (`REQ-CLUSTER-015`), repair publication, a self-healing daemon, rebalance, cleanup, or chaos.
 
 ### Admin API (configuration-as-code)
 
@@ -209,9 +210,10 @@ aws --endpoint-url http://localhost:8080 s3api get-object --bucket test-bucket -
 | 1 | All unit + integration tests | `mvn test` |
 | 2 | Domain JUnit only | `mvn test -pl object-store-domain` |
 | 3 | S3 API Cucumber only | `mvn test -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false` (latest evidence: 248 tests, 0 failures/errors/skips) |
-| 3b | EP-7 Admin API Cucumber | `mvn -B -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false -Dtest=PhaseEp7AdminApiRequirementsCucumberTest test` (18 scenarios / 132 steps passed) |
-| 3c | Frontend unit/component/accessibility | `cd magrathea-ui && npm test` (72/72 passed) |
-| 3d | Real-browser Playwright/axe | `cd magrathea-ui && npm run test:e2e:ci` (39/39 at 360/768/1440 passed) |
+| 3b | Focused local EC reconstruction | `mvn -B -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false -Dtest=ReqPipeline017EcReconstructionCucumberTest test` (5 scenarios / 46 steps passed) |
+| 3c | EP-7 Admin API Cucumber | `mvn -B -pl s3-reactive-api-adapter -am -Dsurefire.failIfNoSpecifiedTests=false -Dtest=PhaseEp7AdminApiRequirementsCucumberTest test` (18 scenarios / 132 steps passed) |
+| 3d | Frontend unit/component/accessibility | `cd magrathea-ui && npm test` (72/72 passed) |
+| 3e | Real-browser Playwright/axe | `cd magrathea-ui && npm run test:e2e:ci` (39/39 at 360/768/1440 passed) |
 | 4 | JaCoCo coverage (current baseline) | `mvn verify` (JaCoCo runs automatically with the default lifecycle) |
 | 4b | Clover coverage (optional/legacy) | `mvn -Pcoverage clover:setup test clover:aggregate clover:clover` |
 | 5 | AWS CLI compatibility | `bash test-aws-cli.sh` |
@@ -219,7 +221,7 @@ aws --endpoint-url http://localhost:8080 s3api get-object --bucket test-bucket -
 
 Consolidated Markdown report: [`docs/test-report.md`](docs/test-report.md)
 
-The EP-10 semantic claim comes from its focused shared real-process WebTestClient/AWS CLI gates and focused Ratis/gRPC/cross-module runners documented there. An ordinary root `mvn test` pass is supporting integration evidence only and must not be substituted for the 14-scenario / 188-step shared result, 4-scenario / 80-step repair-only result, 7-scenario / 168-step `024` result, 2-scenario / 36-step `027` result, or 22-scenario / 294-step current repair-control regression, nor used to upgrade later EP-10 scope. The current dirty-working-tree root pass is likewise not acceptance supply-chain evidence: `REQ-SUPPLY-001` remains implemented-not-e2e-validated until a clean-revision application SBOM/license/image packet covers all four cluster modules.
+The EP-10 semantic claim comes from its focused shared real-process WebTestClient/AWS CLI gates and focused Ratis/gRPC/cross-module runners documented there. Local `REQ-PIPELINE-017` evidence is separate: an ordinary root `mvn test` pass must not replace its 5-scenario / 46-step focused result, nor may that local result upgrade `REQ-CLUSTER-015` or EP-10. Likewise, root Maven must not be substituted for the 14 / 188 shared cluster result, 4 / 80 repair-only result, 7 / 168 `024` result, 2 / 36 `027` result, or 22 / 294 repair-control regression. The current dirty-working-tree root pass is likewise not acceptance supply-chain evidence: `REQ-SUPPLY-001` remains implemented-not-e2e-validated until a clean-revision application SBOM/license/image packet covers all four cluster modules.
 
 ### Requirements appendix generation
 

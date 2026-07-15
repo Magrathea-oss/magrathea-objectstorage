@@ -102,55 +102,21 @@ public final class FixedStripeErasureCodingStep implements ErasureCodingStep {
                 }
             }
 
-            byte[][] parity = new byte[parityBlocks][SHARD_SIZE];
-            for (int parityIndex = 0; parityIndex < parityBlocks; parityIndex++) {
-                for (int dataIndex = 0; dataIndex < dataBlocks; dataIndex++) {
-                    int coefficient = gfPow(dataIndex + 1, parityIndex);
-                    for (int offset = 0; offset < SHARD_SIZE; offset++) {
-                        parity[parityIndex][offset] ^= (byte) gfMultiply(data[dataIndex][offset] & 0xff, coefficient);
-                    }
-                }
-            }
+            byte[][] parity = GaloisField256Codec.encodeParity(data, parityBlocks);
 
             List<StorageUnit> units = new ArrayList<>(dataBlocks + parityBlocks);
             for (int shard = 0; shard < dataBlocks; shard++) {
                 units.add(new StorageUnit.ECShardUnit(
                         Flux.just(BUFFER_FACTORY.wrap(data[shard])), fileUnit.info(), index, shard,
-                        false, logicalSizes[shard], dataBlocks, parityBlocks));
+                        false, logicalSizes[shard], dataBlocks, parityBlocks, logicalLength));
             }
             for (int shard = 0; shard < parityBlocks; shard++) {
                 units.add(new StorageUnit.ECShardUnit(
                         Flux.just(BUFFER_FACTORY.wrap(parity[shard])), fileUnit.info(), index,
-                        dataBlocks + shard, true, 0L, dataBlocks, parityBlocks));
+                        dataBlocks + shard, true, 0L, dataBlocks, parityBlocks, logicalLength));
             }
             return units;
         }
     }
 
-    private static int gfPow(int value, int exponent) {
-        int result = 1;
-        for (int i = 0; i < exponent; i++) {
-            result = gfMultiply(result, value);
-        }
-        return result;
-    }
-
-    /** GF(256) multiplication using the x^8+x^4+x^3+x^2+1 primitive polynomial. */
-    private static int gfMultiply(int left, int right) {
-        int result = 0;
-        int a = left;
-        int b = right;
-        while (b != 0) {
-            if ((b & 1) != 0) {
-                result ^= a;
-            }
-            boolean high = (a & 0x80) != 0;
-            a = (a << 1) & 0xff;
-            if (high) {
-                a ^= 0x1d;
-            }
-            b >>>= 1;
-        }
-        return result;
-    }
 }

@@ -2,11 +2,13 @@
 
 Date: 2026-07-14
 
+Amended: 2026-07-14
+
 ## Status
 
-Accepted — the requesting user explicitly selected this target architecture on 2026-07-14.
+Accepted — the requesting user explicitly selected this target architecture and amended its sequencing on 2026-07-14.
 
-Acceptance records the architectural decision only. Production implementation, shared executable requirements, Cucumber coverage, and semantic validation are planned and need validation. Per owner sequencing clarified on 2026-07-14, EP-10 remains active and this chaos-engineering work starts only after normal EP implementation—including the supported Storage Engine and EP-10 paths—and its semantic/load/leak/cancellation gates are complete. No implementation-completion, regression-evidence, or production-readiness claim follows from this status.
+Acceptance records the architectural decision only. Production implementation, shared executable fault requirements, Cucumber fault coverage, and semantic fault validation remain planned and need validation. The amendment splits delivery into two scopes: after distributed EC shard placement/transfer exists, an early bounded no-op-default plan/evidence kernel plus exact committed-shard unavailable/corruption actions may be implemented to support EC self-healing acceptance; generalized pipeline/cluster chaos remains final, after normal-path closure and its semantic/load/leak/cancellation gates. No fault-injection implementation, regression evidence, self-healing completion, or production-readiness claim follows from this status.
 
 ## Context
 
@@ -26,9 +28,10 @@ The target must preserve the established storage contracts:
 - ADR 0025's typed artifact representations and transform-aware integrity scopes;
 - ADR 0027's authoritative control plane, direct data path, and publication only after checksum-valid durable acknowledgements;
 - ADR 0028's fixed A/B/C baseline, `N=3`, `W=2`, no degraded writes, bounded framing, and payload exclusion from Ratis; and
-- ADR 0029's current-generation fencing, durable exact-artifact publication, single-pass integrity behavior, and bounded scheduling.
+- ADR 0029's current-generation fencing, durable exact-artifact publication, single-pass integrity behavior, and bounded scheduling; and
+- ADR 0032's schema-3 EC stripe/shard identity, verified output-only local decoder, one-stripe memory bound, and explicit prohibition on repair publication.
 
-Fault injection must also preserve single-pass streaming, explicit reactive-buffer ownership, cancellation cleanup, and finite scheduler, queue, frame, rule, and evidence budgets.
+Fault injection must also preserve single-pass streaming, explicit reactive-buffer ownership, cancellation cleanup, and finite scheduler, queue, frame, rule, evidence, target, and blast-radius budgets.
 
 ## Decision
 
@@ -81,7 +84,22 @@ Version 1 enables only these three point/action combinations:
 
 Offsets, frame indexes, in-frame offsets, bit indexes, XOR masks, occurrences, rule counts, operation budgets, evaluation budgets, and maximum fire counts are finite and validated. A runtime coordinate that is valid in the plan but absent from the actual finite representation produces a typed skipped outcome; it does not choose another byte. A rule cannot silently broaden itself to a different operation, frame, offset, target, stage, or action.
 
-These actions inject corrupt data only before the relevant publication or acknowledgement gate. They do not bypass checksum comparison, create an acknowledgement, alter quorum policy, or write an object reference.
+These version-1 actions inject corrupt data only before the relevant publication or acknowledgement gate. They do not bypass checksum comparison, create an acknowledgement, alter quorum policy, or write an object reference.
+
+### Planned early committed-EC-shard extension
+
+EC self-healing needs a later at-rest boundary that version 1 deliberately cannot express. After `REQ-CLUSTER-015` supplies authoritative distributed shard placement and direct transfer, a planned schema version `2` may add only these two action combinations before EC self-healing is implemented:
+
+| Action | Allowed semantic point | Exact semantics |
+|---|---|---|
+| `MAKE_COMMITTED_EC_SHARD_UNAVAILABLE` | `AFTER_EC_MANIFEST_COMMIT_BEFORE_SHARD_HEALTH_PROBE` | Resolve one exact schema-3 committed shard identity and atomically quarantine its data plus integrity sidecar inside the experiment-owned quarantine root so the selected location is observably absent. Preserve a restorable pristine copy and await directory durability before the health probe. Do not delete or alter the manifest/reference. |
+| `CORRUPT_COMMITTED_EC_SHARD_BYTE` | `AFTER_EC_MANIFEST_COMMIT_BEFORE_SHARD_HEALTH_PROBE` | Resolve one exact schema-3 committed shard identity, preserve a restorable pristine copy, apply one bounded non-zero XOR at one validated offset in the selected committed shard, fsync the mutation and directory as required, and await completion before the health probe. Do not update the committed checksum, manifest, reference, or location. |
+
+A version-2 target is not a raw path or wildcard. It binds the canonical plan/rule and stable experiment operation to the committed manifest/generation identity, stripe index, shard index, artifact ID, transport-neutral node/device location, stored length, and SHA-256. The owning adapter resolves that tuple under its configured storage root and rejects path escape, symlinks outside the root, a changed generation/layout/checksum, an arbitrary filename, or more targets than the finite plan declares.
+
+The ordinary recoverable blast radius is at most `m` shards in one stripe. A separately declared `EXPECT_BLOCKED` experiment may target exactly `m+1` shards only to prove insufficient-survivor detection; it forbids repair publication, remains limited to one stripe, and must restore every target during lifecycle-owned teardown. No plan may target metadata, object references, unrelated stripes/objects, an unbounded set, or a production profile. Quarantine/restoration outcomes are deterministic, fsync-aware, idempotent, and represented by closed redacted evidence codes. A failed mutation, quarantine, evidence write, or restoration fails the experiment visibly and never broadens target selection.
+
+This early subset provides test tooling, not the self-healing scanner, consensus job lifecycle, transfer, or shard publication behavior being tested. Requirements for the kernel/actions must be written or refreshed before implementation. General delays, process/network partitions, cancellation, exceptions, short I/O, arbitrary filesystem mutation, acknowledgement faults, Ratis faults, and probabilistic chaos remain later generalized work.
 
 ### Planned semantic-point catalog
 
@@ -115,6 +133,7 @@ For every `BEFORE_*` point, the named side effect has not started. For every `AF
 | `BEFORE_RATIS_REFERENCE_PROPOSAL` | Exactly three targets were selected, at least two matching durable acknowledgements are available, and fencing/epochs are current; no reference command has been submitted. |
 | `AFTER_RATIS_REFERENCE_PROPOSAL_BEFORE_COMMIT` | The command was submitted/accepted for consensus processing, but commit is not established. A timeout or cancellation here is an uncertain result that requires a committed-state query. |
 | `AFTER_RATIS_REFERENCE_COMMIT` | The new reference generation is consensus-committed and authoritative. A later local failure cannot truthfully reclassify it as uncommitted. S3 response completion is a separate boundary. |
+| `AFTER_EC_MANIFEST_COMMIT_BEFORE_SHARD_HEALTH_PROBE` | A schema-3 EC manifest/generation and its exact shard facts are committed and authoritative; the selected at-rest shard has not yet been evaluated by the bound self-healing health probe. This point is selectable only by schema version 2's two committed-shard actions. |
 
 Checksum points always name the representation being hashed, such as logical source bytes, transformed stored bytes, ciphertext, whole object, shard, or replica artifact. This preserves ADR 0025's artifact taxonomy and prevents a source-stream checksum from being presented as persisted-byte or at-rest evidence.
 
@@ -185,17 +204,19 @@ A corrupted replica never contributes a false durable acknowledgement. One rejec
 
 Injected failure or future injected cancellation must not expose a partial final artifact, manufacture a durable acknowledgement, or make an unpublished artifact reachable through a committed reference. Temporary partial bytes remain unreachable and are cleaned or quarantined according to the normal pipeline contract. A failure after successful atomic publication may leave a complete checksum-valid orphan, as already allowed by ADRs 0027 and 0028, but never a reachable partial artifact or a reference lacking the required durable acknowledgements.
 
+The planned committed-shard actions occur only after authoritative EC manifest commit and therefore model at-rest loss/corruption; they do not retroactively invalidate the original durable acknowledgement or authorize a replacement acknowledgement. Detection, consensus-owned repair work, verified transfer, atomic shard publication, and manifest/currentness fencing remain separate self-healing behavior. Experiment teardown restores the exact pre-fault bytes/location independently of whether the product repair path succeeded, failed, or reported `BLOCKED`.
+
 Fault evaluation is finite, deterministic, non-blocking, and does not sleep or perform file/network I/O. Blocking mutation and bounded evidence persistence run only at the owning infrastructure boundary on an explicitly finite blocking scheduler/queue, never on a Reactor event-loop thread. Queue saturation is an explicit active-experiment failure.
 
 The source mutation does not add a second subscription or aggregate the payload. The existing persisted-byte verification reread remains a distinct integrity gate rather than being mislabeled as another source pass. Transform and checksum events carry an explicit representation scope.
 
 A `DataBuffer`, Netty buffer, or replica frame may be mutated only while exclusively owned. If ownership is shared, pooled, sliced, retained elsewhere, or uncertain, the adapter copies the bounded selected frame before mutation. Every success, error, cancellation, discard, skipped action, and evidence-failure path must release or transfer each buffer reference exactly once. No action may retain payload buffers in the plan evaluator or evidence recorder.
 
-### Actions deferred beyond version 1
+### Actions deferred beyond the bounded schemas
 
-Version 1 does not enable generic delay, cancellation, exception, short-I/O, fsync-failure, atomic-publication-failure, acknowledgement-failure, or Ratis-publication actions.
+Version 1 does not enable generic delay, cancellation, exception, short-I/O, fsync-failure, atomic-publication-failure, acknowledgement-failure, or Ratis-publication actions. Planned version 2 adds only the two exact committed-EC-shard actions above; it does not inherit a generic mutation or failure callback.
 
-Each future action requires separate bounded semantics and validation before a new contract version permits it. In particular:
+Each other future action requires separate bounded semantics and validation before a later contract version permits it. In particular:
 
 - delay requires a finite maximum duration, deadline interaction, cancellation awareness, and bounded queued bytes/tasks;
 - cancellation requires an exact propagation boundary, ownership cleanup, and acknowledgement/publication fencing;
@@ -215,8 +236,10 @@ No generic action is silently available merely because a semantic point is prese
 - Pipeline refactoring must preserve a point's documented semantics or introduce a new versioned point; moving a hook without changing its contract is not permitted.
 - The no-op production path remains the default, while attempted production activation or malformed active plans fail before request processing.
 - Existing broad random chaos remains useful only as explicitly exploratory scaffolding and cannot upgrade deterministic requirement status.
-- The reserved point catalog creates no current authorization to inject delays, cancellation, exceptions, fsync failures, or publication failures.
-- Until the planned requirements and gates pass, this ADR changes architectural authority only and does not change any feature or requirement implementation status.
+- The early committed-shard subset enables deterministic self-healing tests without making generalized chaos an implementation prerequisite for every normal cluster path.
+- Version-2 target identity, quarantine/restoration, and blast-radius rules add infrastructure and lifecycle complexity and remain planned.
+- The reserved point catalog creates no current authorization to inject delays, cancellation, exceptions, fsync failures, publication failures, or arbitrary at-rest mutations.
+- Until the planned fault requirements and gates pass, this amendment changes architectural authority and sequencing only and does not change any fault-injection or self-healing requirement implementation status.
 
 ## Alternatives Considered
 
@@ -250,9 +273,12 @@ Planning evidence only was reviewed on 2026-07-14 at repository HEAD `2fa762c79e
 
 No Maven, Cucumber, WebTestClient, AWS CLI, multi-node, replay, fault-action, buffer-leak, scheduler-saturation, or production-profile validation was run for this ADR. The source audit is not semantic implementation evidence.
 
-Every validation gate is currently **planned / needs-validation**, including:
+Every fault-injection validation gate is currently **planned / needs-validation**, including:
 
 - fail-closed schema, selector, activation, profile, and cross-node plan-hash validation;
+- exact committed schema-3 target binding with no raw-path/wildcard selection, path escape, generation drift, or metadata mutation;
+- recoverable `m`-shard and explicit one-stripe `EXPECT_BLOCKED` blast-radius enforcement;
+- deterministic committed-shard quarantine, corruption, fsync, restoration, idempotence, teardown-failure, and redacted evidence outcomes;
 - identical decision traces for repeated plans and logical event sequences;
 - isolation of parallel operations, retries, occurrences, frames, offsets, targets, and fire budgets;
 - positive fired/skipped evidence for all three version-1 actions;
@@ -264,7 +290,9 @@ Every validation gate is currently **planned / needs-validation**, including:
 - no-op default equivalence and rejection of production activation; and
 - evidence completeness, boundedness, canonical plan hashing, and secret/payload redaction.
 
-Shared Cucumber requirements/specifications will be written or refreshed before implementation, following the repository's requirement-first policy. Externally observable S3 behavior will use shared `Business Need` scenarios and the agreed WebTestClient/AWS CLI modes where applicable; internal plan, point, buffer, filesystem, replica, and consensus-boundary mechanisms will use `Ability` specifications. No new requirement ID or validated status is assigned by this ADR.
+Shared Cucumber requirements/specifications will be written or refreshed before implementation, following the repository's requirement-first policy. Externally observable S3 behavior will use shared `Business Need` scenarios and the agreed WebTestClient/AWS CLI modes where applicable; internal plan, point, buffer, filesystem, replica, consensus-boundary, committed-shard, and restoration mechanisms will use `Ability` specifications. No new fault-injection requirement ID or validated fault status is assigned by this ADR.
+
+ADR 0032 and `REQ-PIPELINE-017` provide validated prerequisite identity/decoder evidence—5 scenarios / 46 steps, including all 15 four-of-six combinations—but they do not execute this port or either planned committed-shard action.
 
 ## Related ADRs
 
@@ -272,3 +300,4 @@ Shared Cucumber requirements/specifications will be written or refreshed before 
 - ADR 0027 — Authoritative cluster control plane and direct quorum data path.
 - ADR 0028 — First three-node cluster implementation baseline.
 - ADR 0029 — Consensus-owned durable repair for the current whole-object generation.
+- ADR 0032 — Bounded local erasure-coded reconstruction.

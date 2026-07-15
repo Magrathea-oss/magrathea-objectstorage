@@ -12,6 +12,7 @@ import com.example.magrathea.storageengine.domain.valueobject.ContentHash;
 import com.example.magrathea.storageengine.domain.valueobject.DeclaredChecksum;
 import com.example.magrathea.storageengine.domain.valueobject.DeviceConfigurationHash;
 import com.example.magrathea.storageengine.domain.valueobject.EffectiveStoragePolicy;
+import com.example.magrathea.storageengine.domain.valueobject.EcShardLayout;
 import com.example.magrathea.storageengine.domain.valueobject.Fingerprint;
 import com.example.magrathea.storageengine.domain.valueobject.FingerprintAlgorithm;
 import com.example.magrathea.storageengine.domain.valueobject.ManifestId;
@@ -68,8 +69,10 @@ import java.util.UUID;
  */
 public class FileSystemManifestRepository implements ObjectManifestRepository {
 
-    /** Current storage-engine manifest properties schema version. */
-    static final int CURRENT_SCHEMA_VERSION = 2;
+    /** Current schema with explicit EC reconstruction layout. */
+    static final int CURRENT_SCHEMA_VERSION = 3;
+    /** Typed artifact schema retained for non-EC writes and compatibility reads. */
+    static final int TYPED_ARTIFACT_SCHEMA_VERSION = 2;
     /** Chunk-only schema written before typed storage artifacts. */
     static final int CHUNK_SCHEMA_VERSION = 1;
     /** Legacy compatibility version assigned to manifests written before schemaVersion existed. */
@@ -221,7 +224,8 @@ public class FileSystemManifestRepository implements ObjectManifestRepository {
 
     private String serialize(ObjectManifest manifest) {
         Properties properties = new Properties();
-        properties.setProperty(SCHEMA_VERSION_KEY, Integer.toString(CURRENT_SCHEMA_VERSION));
+        int schemaVersion = schemaVersionFor(manifest);
+        properties.setProperty(SCHEMA_VERSION_KEY, Integer.toString(schemaVersion));
         properties.setProperty("manifestId", manifest.manifestId().value().toString());
         properties.setProperty("objectId", manifest.objectId().value());
         properties.setProperty("versionId", manifest.versionId().value());
@@ -284,6 +288,24 @@ public class FileSystemManifestRepository implements ObjectManifestRepository {
             properties.setProperty(prefix + "finalChecksum.algorithm", artifact.finalChecksum().algorithm().name());
             properties.setProperty(prefix + "finalChecksum.value", artifact.finalChecksum().value());
             properties.setProperty(prefix + "locations", joinLocations(artifact.locations()));
+            if (schemaVersion >= CURRENT_SCHEMA_VERSION) {
+                properties.setProperty(prefix + "ecLayout.present",
+                        Boolean.toString(artifact.ecShardLayout().isPresent()));
+                artifact.ecShardLayout().ifPresent(layout -> {
+                    properties.setProperty(prefix + "ecLayout.stripeIndex",
+                            Long.toString(layout.stripeIndex()));
+                    properties.setProperty(prefix + "ecLayout.shardIndex",
+                            Integer.toString(layout.shardIndex()));
+                    properties.setProperty(prefix + "ecLayout.dataBlocks",
+                            Integer.toString(layout.dataBlocks()));
+                    properties.setProperty(prefix + "ecLayout.parityBlocks",
+                            Integer.toString(layout.parityBlocks()));
+                    properties.setProperty(prefix + "ecLayout.parity",
+                            Boolean.toString(layout.parity()));
+                    properties.setProperty(prefix + "ecLayout.stripeLogicalLength",
+                            Long.toString(layout.stripeLogicalLength()));
+                });
+            }
             properties.setProperty(prefix + "stepChecksumCount", Integer.toString(artifact.stepChecksums().size()));
             for (int j = 0; j < artifact.stepChecksums().size(); j++) {
                 StepChecksumDescriptor checksum = artifact.stepChecksums().get(j);
@@ -304,6 +326,24 @@ public class FileSystemManifestRepository implements ObjectManifestRepository {
         }
     }
 
+    private static int schemaVersionFor(ObjectManifest manifest) {
+        boolean hasExplicitEcLayout = manifest.artifacts().stream()
+                .anyMatch(artifact -> artifact.ecShardLayout().isPresent());
+        if (!hasExplicitEcLayout) {
+            // REQ-PIPELINE-014 plain and historical typed outputs remain schema 2.
+            return TYPED_ARTIFACT_SCHEMA_VERSION;
+        }
+        boolean incompleteEcLayout = manifest.artifacts().stream()
+                .filter(artifact -> artifact.artifactKind() == StorageArtifactKind.EC_DATA_SHARD
+                        || artifact.artifactKind() == StorageArtifactKind.EC_PARITY_SHARD)
+                .anyMatch(artifact -> artifact.ecShardLayout().isEmpty());
+        if (incompleteEcLayout) {
+            throw new IllegalArgumentException(
+                    "Schema-3 EC manifests require explicit layout for every EC shard");
+        }
+        return CURRENT_SCHEMA_VERSION;
+    }
+
     private ObjectManifest deserialize(String manifestData) {
         Properties properties = new Properties();
         try {
@@ -319,7 +359,7 @@ public class FileSystemManifestRepository implements ObjectManifestRepository {
         StorageClassId storageClassId = StorageClassId.of(required(properties, "storageClassId"));
         DeviceConfigurationHash deviceHash = DeviceConfigurationHash.of(required(properties, "deviceHash"));
         int artifactCount = Integer.parseInt(required(properties,
-                schemaVersion >= CURRENT_SCHEMA_VERSION ? "artifactCount" : "chunkCount"));
+                schemaVersion >= TYPED_ARTIFACT_SCHEMA_VERSION ? "artifactCount" : "chunkCount"));
         long totalOriginalSize = Long.parseLong(required(properties, "totalOriginalSize"));
         long totalStoredSize = Long.parseLong(required(properties, "totalStoredSize"));
 
@@ -348,12 +388,14 @@ public class FileSystemManifestRepository implements ObjectManifestRepository {
 
         List<StorageArtifactReferenceDescriptor> artifacts = new ArrayList<>();
         for (int i = 0; i < artifactCount; i++) {
-            boolean typed = schemaVersion >= CURRENT_SCHEMA_VERSION;
+            boolean typed = schemaVersion >= TYPED_ARTIFACT_SCHEMA_VERSION;
             String prefix = (typed ? "artifact." : "chunk.") + i + ".";
+            StorageArtifactKind artifactKind = typed
+                    ? StorageArtifactKind.valueOf(required(properties, prefix + "kind"))
+                    : StorageArtifactKind.LEGACY_CHUNK;
             List<StepChecksumDescriptor> stepChecksums = readStepChecksums(properties, prefix);
             artifacts.add(new StorageArtifactReferenceDescriptor(
-                    typed ? StorageArtifactKind.valueOf(required(properties, prefix + "kind"))
-                            : StorageArtifactKind.LEGACY_CHUNK,
+                    artifactKind,
                     ChunkId.of(UUID.fromString(required(properties, prefix + (typed ? "artifactId" : "chunkId")))),
                     Fingerprint.of(
                             FingerprintAlgorithm.valueOf(required(properties, prefix + "fingerprint.algorithm")),
@@ -364,7 +406,8 @@ public class FileSystemManifestRepository implements ObjectManifestRepository {
                     ContentHash.of(
                             ChecksumAlgorithm.valueOf(required(properties, prefix + "finalChecksum.algorithm")),
                             required(properties, prefix + "finalChecksum.value")),
-                    splitLocations(properties.getProperty(prefix + "locations", ""))));
+                    splitLocations(properties.getProperty(prefix + "locations", "")),
+                    readEcShardLayout(properties, prefix, schemaVersion, artifactKind)));
         }
 
         return new ObjectManifest(
@@ -428,6 +471,34 @@ public class FileSystemManifestRepository implements ObjectManifestRepository {
         return checksums;
     }
 
+    private Optional<EcShardLayout> readEcShardLayout(
+            Properties properties,
+            String prefix,
+            int schemaVersion,
+            StorageArtifactKind artifactKind) {
+        if (schemaVersion < CURRENT_SCHEMA_VERSION) {
+            return Optional.empty();
+        }
+        boolean present = Boolean.parseBoolean(
+                properties.getProperty(prefix + "ecLayout.present", "false"));
+        boolean ecShard = artifactKind == StorageArtifactKind.EC_DATA_SHARD
+                || artifactKind == StorageArtifactKind.EC_PARITY_SHARD;
+        if (ecShard && !present) {
+            throw new IllegalArgumentException(
+                    "Schema-3 EC artifact is missing required layout: " + prefix);
+        }
+        if (!present) {
+            return Optional.empty();
+        }
+        return Optional.of(new EcShardLayout(
+                Long.parseLong(required(properties, prefix + "ecLayout.stripeIndex")),
+                Integer.parseInt(required(properties, prefix + "ecLayout.shardIndex")),
+                Integer.parseInt(required(properties, prefix + "ecLayout.dataBlocks")),
+                Integer.parseInt(required(properties, prefix + "ecLayout.parityBlocks")),
+                Boolean.parseBoolean(required(properties, prefix + "ecLayout.parity")),
+                Long.parseLong(required(properties, prefix + "ecLayout.stripeLogicalLength"))));
+    }
+
     private VirtualDevice reconstructTargetDevice(ObjectId objectId, StorageClassId storageClassId) {
         String objectValue = objectId.value();
         String bucketName = objectValue.contains("/") ? objectValue.substring(0, objectValue.indexOf('/')) : "restored";
@@ -458,12 +529,14 @@ public class FileSystemManifestRepository implements ObjectManifestRepository {
         }
         if (version != LEGACY_SCHEMA_VERSION
                 && version != CHUNK_SCHEMA_VERSION
+                && version != TYPED_ARTIFACT_SCHEMA_VERSION
                 && version != CURRENT_SCHEMA_VERSION) {
             throw new IllegalArgumentException(
                     "Unsupported manifest schema version " + version
                             + " for manifest: " + manifestId.value()
                             + "; supported versions are " + LEGACY_SCHEMA_VERSION + ", "
-                            + CHUNK_SCHEMA_VERSION + " and " + CURRENT_SCHEMA_VERSION);
+                            + CHUNK_SCHEMA_VERSION + ", " + TYPED_ARTIFACT_SCHEMA_VERSION
+                            + " and " + CURRENT_SCHEMA_VERSION);
         }
         return version;
     }

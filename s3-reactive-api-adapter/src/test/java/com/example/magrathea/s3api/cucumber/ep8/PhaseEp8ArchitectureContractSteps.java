@@ -149,7 +149,9 @@ public class PhaseEp8ArchitectureContractSteps {
                 "ADR 0031 separately makes `REQ-CLUSTER-027` implemented-and-validated for bounded periodic current-reference inspection and repair on fixed A/B/C",
                 "anti-entropy beyond current named A/B/C obligations",
                 "EP-10 remains partial. Broad `REQ-CLUSTER-017` remains `@partial`; `REQ-CLUSTER-006`, `REQ-CLUSTER-007`, `REQ-CLUSTER-015`, `REQ-CLUSTER-016`, and `REQ-CLUSTER-018` remain `@not-implemented`.",
-                "ADR 0030 remains the accepted target architecture for the final P4 chaos work and is deliberately deferred",
+                "ADR 0032 makes only local output-only EC reconstruction implemented-and-validated",
+                "The next priority is distributed shard placement and direct transfer under `REQ-CLUSTER-015`",
+                "generalized chaos remains final",
                 "No evidence above supports a production-readiness or general distributed-storage claim");
         assertThat(antiEntropyAdr).contains(
                 "# ADR 0031 — Bounded periodic current-reference anti-entropy",
@@ -160,16 +162,18 @@ public class PhaseEp8ArchitectureContractSteps {
                 "ADR 0030 deterministic storage-pipeline fault injection or general chaos",
                 "distributed production readiness");
         assertThat(arc42).contains(
-                "EP-10 (S3 Cluster, multi-node): `@partial`. Fixed A/B/C is implementation-informed and validated for `REQ-CLUSTER-001..005`, `008..013`, and `019..027`, including bounded `024` repair interruption and `027` periodic current-reference discovery. `REQ-CLUSTER-014` is separately implemented and validated only for its internal repository-rooted source/build architecture mode; broad `017` remains partial, while `006/007`, `015/016`, and `018` remain not implemented. Broader transfer semantics, dynamic membership, wider healing/topologies, rebalance, cleanup, ADR 0030 general chaos, rolling upgrades, and broader partitions remain open.",
+                "EP-10 (S3 Cluster, multi-node): `@partial`. Fixed A/B/C is implementation-informed and validated for `REQ-CLUSTER-001..005`, `008..014`, and `019..027`, with `014` architecture-only. Local pipeline `017` is not cluster evidence; cluster `015` remains not implemented and broad cluster `017` remains partial.",
+                "The sequence is distributed EC placement/transfer, bounded ADR 0030 committed-shard test tooling, EC self-healing, shard rebalance, and cleanup; generalized chaos remains final.",
                 "On 2026-07-14, the separate `ReqCluster014ArchitectureContractCucumberTest` passed 1 scenario / 17 steps in `REQ-CLUSTER-014`'s sole internal validation mode.",
                 "This validates source and build boundaries only; it is not S3 behavior and proves no runtime side effect.",
                 "Status: *implementation-informed / bounded*. `REQ-CLUSTER-019..026`, including `024`, are `@implemented-and-validated`; `REQ-CLUSTER-014` is separately `@implemented-and-validated` only for its internal repository architecture mode. Broad `REQ-CLUSTER-017` remains `@partial`, and `006/007/015/016/018` remain `@not-implemented`. No production-readiness, S3 behavior, runtime-side-effect, or broad healing claim follows from `014`.",
                 "Status: *implementation-informed / bounded*. Both `REQ-CLUSTER-027` scenarios are `@implemented-and-validated`; the focused gate passes 2 scenarios / 36 steps. Broad `REQ-CLUSTER-017` and EP-10 remain partial.",
                 "The cursor is never consensus state",
                 "This strategy makes no PA-6 `AntiEntropyPlanner` execution claim",
-                "Status: *accepted target architecture; planned / needs-validation*. No production implementation, Cucumber requirement, replay result, or fault-safety result is claimed.",
-                "This work is deferred behind active EP-10 normal-path completion",
-                "ADR 0030 chaos engineering begins only in final P4.",
+                "Status: *accepted target architecture and amended sequencing; planned / needs-validation*. No production fault implementation, Cucumber fault requirement, replay result, committed-shard action, or fault-safety result is claimed.",
+                "The owner-selected sequence is distributed EC placement/transfer, the bounded kernel/committed-shard subset, EC self-healing, shard rebalance, and fenced cleanup.",
+                "Generalized ADR 0030 actions and realistic chaos remain final",
+                "All five `REQ-PIPELINE-017` scenarios are `@implemented-and-validated`; the focused gate passes 5 scenarios / 46 steps and all 15 four-of-six EC 4+2 survivor combinations.",
                 "No production distributed-cluster claim follows from the bounded first slice; see `PLAN.md` for current status per phase.");
         assertThat(testReport).contains(
                 "The opt-in EP-10 14-scenario / 188-step shared gate, 4-scenario / 80-step repair-only run, and focused mechanism/repair-control gates remain separate and are not folded into these totals",
@@ -188,8 +192,12 @@ public class PhaseEp8ArchitectureContractSteps {
                 "Both `REQ-CLUSTER-027` scenarios are `@implemented-and-validated`; broad `017` remains partial because rebalance, automated orphan cleanup, and wider healing/topology coverage remain absent.",
                 "The non-publishing EP-10 CI job is wired to run/upload this focused JSON and Surefire evidence, but **CI has not run**.",
                 "The cursor is process-local, pages are not one frozen scan, payload remains outside Ratis, PA-6 plans remain planner output, and no production scale/readiness or ADR 0030 general chaos is claimed.",
-                "EP-10 and broad `017` remain partial; `006/007/015/016/018` remain not implemented.",
-                "Exact status is represented from source tags: `014` and `019..027`, including `024/027`, are implemented-and-validated, while broad `017` remains partial; `006/007/015/016/018` remain not implemented.");
+                "Focused `REQ-PIPELINE-017` bounded local EC reconstruction evidence (2026-07-14 reconciliation)",
+                "`ReqPipeline017EcReconstructionCucumberTest` passed exactly **5 scenarios / 46 steps**.",
+                "all 15 four-of-six survivor combinations",
+                "This is local output-only evidence",
+                "`REQ-CLUSTER-015` remains not implemented and EP-10 remains partial.",
+                "Exact status is represented from source tags: local pipeline `REQ-PIPELINE-017` is implemented-and-validated, while cluster `REQ-CLUSTER-015` remains not implemented, broad cluster `REQ-CLUSTER-017` and EP-10 remain partial, and `006/007/016/018` remain not implemented.");
     }
 
     @Given("ADR 0027 defines the planned gRPC surface for membership, control coordination, artifact transfer, verification, health evidence, and durable recovery-job execution")

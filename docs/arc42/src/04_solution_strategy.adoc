@@ -46,7 +46,7 @@ ifndef::imagesdir[:imagesdir: ../images]
 |Makes byte bounds, pooled-buffer ownership, terminal cleanup, filesystem/crypto/CPU scheduling, and integrity scopes one end-to-end contract rather than local reactive syntax (`planned / needs-validation`)
 
 |Transport-neutral deterministic storage fault injection (ADR 0030)
-|Provides replayable typed semantic points and bounded evidence without coupling application contracts to WebFlux, filesystem, gRPC, or Ratis (`accepted target; implementation planned`)
+|Provides replayable typed semantic points and bounded evidence without coupling application contracts to WebFlux, filesystem, gRPC, or Ratis. The exact committed-EC-shard test subset is planned before self-healing; generalized chaos remains final (`accepted target; implementation planned`)
 |===
 
 === Bucket Configuration Redesign (ADR 0011)
@@ -62,14 +62,29 @@ ADR 0010 records the API/composition migration from ADR 0009: application servic
 
 [NOTE]
 ====
-Status: *deferred / needs-validation*. EP-10 remains the active implementation phase. Existing bounded controls and prior scoped evidence remain in place; the static source-review sequence does not replace the EP roadmap. After normal EP work, deferred P0-P3 may review supported paths, and deterministic chaos begins only in final P4.
+Status: *accepted sequencing / needs-validation*. EP-10 remains active. After distributed shard placement/transfer, only the bounded no-op-default ADR 0030 kernel and exact committed-shard unavailable/corruption actions move before EC self-healing. Generalized deterministic and realistic chaos remains final. No fault implementation or evidence is claimed.
 ====
 
 The target establishes bounded payload frames and explicit buffer ownership from S3 ingress through security, transform, persistence, replica transfer, and response egress. Blocking filesystem/crypto/policy/audit and CPU-intensive transform work use finite role-specific bulkheads. Integrity continues to distinguish source-stream checksums, transformed representation checksums, persisted-byte verification, committed metadata, single-pass response behavior, and at-rest scrub.
 
 After source-review risks are reproduced and confirmed against supported Storage Engine compositions, conservative corrections and static architecture gates establish allowed payload representations and byte-budget formulas. Transform/dedup/EC work then proceeds under those contracts, followed by normal-path semantic, load, pooled-buffer, cancellation, and saturation evidence.
 
-Chaos engineering is deliberately last. Only after the normal pipeline gates pass does a transport-neutral `StorageFaultInjectionPort` consolidate filesystem, cluster, and replica fault seams behind versioned deterministic points. The initial actions target corruption detection rather than generic timing failures: mutate bytes after source checksum/before persistence, mutate an unpublished temp file before persisted-byte verification, and mutate a replica frame before sink verification. Activation is fail-closed and requires both a non-production profile and explicit property. See link:../../adr/0030-deterministic-storage-pipeline-fault-injection.md[ADR 0030] for normative details.
+The shared `StorageFaultInjectionPort` kernel remains transport-neutral, no-op by default, dual-guarded for non-production use, deterministic, finite, fail closed, and payload/secret free in evidence. Its planned early EC subset may resolve only exact schema-3 committed shard identities, quarantine or corrupt at most one finite stripe under explicit recoverable/`EXPECT_BLOCKED` blast-radius rules, and restore pristine bytes during lifecycle-owned teardown. It cannot target raw paths, metadata, unrelated objects, or arbitrary faults. This tooling enables self-healing acceptance but does not implement detection, consensus jobs, transfer, or publication.
+
+Broader source/temp/replica actions, delay/cancellation/failure actions, network/process disruption, interleavings, and realistic generalized chaos remain final after normal-path closure. See link:../../adr/0030-deterministic-storage-pipeline-fault-injection.md[ADR 0030] for normative details.
+
+=== Bounded Local Erasure-coded Reconstruction (accepted ADR 0032)
+
+[NOTE]
+====
+Status: *implementation-informed / implemented-and-validated*. All five `REQ-PIPELINE-017` scenarios pass in the focused 5-scenario / 46-step gate, including all 15 four-of-six EC 4+2 survivor combinations.
+====
+
+New reconstructable EC writes use manifest schema 3. Each typed data/parity shard binds explicit stripe index, shard index, `k`, `m`, parity role, logical stripe length, original/stored length, lowercase SHA-256, and ordered transport-neutral location identity. Schemas 0/1/2 retain their read compatibility paths, but schema-2 EC metadata without explicit layout is not reconstructed by inference.
+
+`BoundedEcReconstructionPort` accepts committed facts and caller-resolved checksum-valid bytes for exactly one stripe. The stateless `BoundedEcReconstructionAdapter` validates metadata/survivors, performs GF(256) work on an injected one-worker/16-queue scheduler, verifies every regenerated shard against committed length/SHA-256, and returns only a verified logical stripe plus regenerated-shard output. Decoder-owned retention is at most one 4 MiB stripe, six 1 MiB buffers, and fixed matrix/index workspace; earlier-stripe and whole-object retention remain zero.
+
+The decoder has no repository or publication capability. It neither replaces a shard nor creates a scanner/daemon, cluster transfer, Ratis repair job, rebalance, cleanup, or fault. Distributed EC placement/transfer under `REQ-CLUSTER-015` remains the next unimplemented prerequisite. See link:../../adr/0032-bounded-local-erasure-coded-reconstruction.md[ADR 0032].
 
 === Handler Minimal Pattern
 
@@ -113,7 +128,7 @@ The Java 21 shared real-process WebTestClient/AWS CLI gate validates `REQ-CLUSTE
 
 On 2026-07-14, the separate `ReqCluster014ArchitectureContractCucumberTest` passed 1 scenario / 17 steps in `REQ-CLUSTER-014`'s sole internal validation mode. It parsed 17 reactor modules, 87 direct non-test Maven dependencies plus 2 profile declarations, 473 tracked production Java sources through JDK ASTs, and one versioned proto3 contract; executed the layering script; and passed 12 missing/empty/malformed plus 4 supported POSIX unreadable fail-closed probes with exact-path and protected-input hash preservation. Coordination 7/54, control 2/19, data 4/40, repair 22/294, EP-8 architecture 13/103, source hygiene, and appendix freshness regressions passed. CI is wired but has not run. This validates source and build boundaries only; it is not S3 behavior and proves no runtime side effect.
 
-The existing Object Store-to-Storage Engine adapter remains the only S3 integration boundary, and PA-6 placement/quorum/planning types remain pure domain policy. `REQ-CLUSTER-014` is implemented and validated only for that repository-rooted architecture contract. Clustered multipart, conditional/versioned or chunked writes, erasure coding, dynamic membership and certificate lifecycle, rolling upgrades, and broader partition/fault behavior remain not implemented (`REQ-CLUSTER-006/007`, `015/016/018`). Broad `REQ-CLUSTER-017` remains partial: bounded current-generation repair and bounded periodic current-reference anti-entropy on fixed A/B/C exist, while rebalance, automated orphan cleanup, and wider healing/topology coverage remain absent. See link:../../adr/0027-authoritative-cluster-control-plane-and-direct-quorum-data-path.md[ADR 0027] for the wider authority and link:../../adr/0028-first-three-node-cluster-implementation-baseline.md[ADR 0028] for the accepted baseline.
+The existing Object Store-to-Storage Engine adapter remains the only S3 integration boundary, and PA-6 placement/quorum/planning types remain pure domain policy. `REQ-CLUSTER-014` is implemented and validated only for that repository-rooted architecture contract. Clustered multipart, conditional/versioned or chunked writes, distributed erasure coding, dynamic membership and certificate lifecycle, rolling upgrades, and broader partition/fault behavior remain not implemented (`REQ-CLUSTER-006/007`, `015/016/018`). Local ADR 0032 reconstruction does not change those cluster statuses. Broad `REQ-CLUSTER-017` remains partial: bounded current-generation repair and bounded periodic current-reference anti-entropy on fixed A/B/C exist, while rebalance, automated orphan cleanup, and wider healing/topology coverage remain absent. See link:../../adr/0027-authoritative-cluster-control-plane-and-direct-quorum-data-path.md[ADR 0027] for the wider authority and link:../../adr/0028-first-three-node-cluster-implementation-baseline.md[ADR 0028] for the accepted baseline.
 
 === Consensus-owned Durable Current-generation Repair (accepted ADR 0029)
 
@@ -147,7 +162,9 @@ Each fixed node runs one process-local discovery scheduler under `ClusterNodeRun
 
 The cursor advances only after every record and required durable ensure in the page completes. Query, probe, or ensure failure leaves it unadvanced for a later cycle; a terminal page and process reconstruction both restart from the first page. The cursor is never consensus state, pages are not one frozen multi-page snapshot, payload is absent from Ratis, and repeated observations deduplicate through the repair identity. Bounded counters expose cycle/page/record/target/failure/retry/reset/stale/dedup/overlap state without payloads or credentials.
 
-This strategy makes no PA-6 `AntiEntropyPlanner` execution claim and does not implement rebalance, automated orphan cleanup, wider healing/topologies, dynamic membership, production scale/readiness, or ADR 0030 general chaos. See link:../../adr/0031-bounded-periodic-current-reference-anti-entropy.md[accepted ADR 0031].
+This strategy makes no PA-6 `AntiEntropyPlanner` execution claim and does not implement rebalance, automated orphan cleanup, wider healing/topologies, dynamic membership, production scale/readiness, or ADR 0030 faults. See link:../../adr/0031-bounded-periodic-current-reference-anti-entropy.md[accepted ADR 0031].
+
+The active continuation is distributed EC shard placement/transfer, the planned bounded ADR 0030 committed-shard test subset, EC self-healing, shard rebalance, and fenced cleanup; generalized chaos remains final. Whole-object `N=3/W=2` replication remains valid below the arranged EC minimum. Inter-cluster/NAS-backed replication remains later and NAS-dependent.
 
 === Quality Strategy
 

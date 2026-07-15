@@ -19,7 +19,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 === Summary
 
 * Feature files scanned: 34
-* Scenarios discovered: 529
+* Scenarios discovered: 534
 * Protocol-smoke scenarios: 122
 
 ==== Status tag counts
@@ -29,7 +29,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |Tag |Scenario count
 |`@absent` |3
 |`@config-only` |69
-|`@implemented-and-validated` |237
+|`@implemented-and-validated` |242
 |`@implemented-not-e2e-validated` |22
 |`@not-implemented` |11
 |`@partial` |5
@@ -58,7 +58,7 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 |`@live-monitoring-required` |1
 |`@log-inspection-required` |3
 |`@metrics-inspection-required` |3
-|`@pipeline-unit-required` |15
+|`@pipeline-unit-required` |20
 |`@real-process-required` |1
 |`@runtime-backpressure-required` |1
 |`@s3-diagnostic-contract-required` |1
@@ -75,8 +75,8 @@ Generated from `s3-reactive-api-adapter/src/test/features` using `python3 script
 [cols="1,1",options="header"]
 |===
 |Tag |Scenario count
-|`@functional-requirement` |279
-|`@non-functional-requirement` |192
+|`@functional-requirement` |284
+|`@non-functional-requirement` |197
 |`unknown/not-tagged` |205
 |===
 
@@ -13055,6 +13055,209 @@ EC chunks, and modeled plans alone MUST NOT be reported as physical shard persis
 | REQ-PIPELINE-015 | webclient | target/storage-engine-it/REQ-PIPELINE-015-webclient
 |===
 
+===== REQ-PIPELINE-017
+
+====== Scenario: Schema 3 binds every EC artifact to unambiguous reconstruction facts
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:198`
+|Rule |Local EC reconstruction is explicit, bounded, and fail-closed
+|Requirement ID(s) |`REQ-PIPELINE-017`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@spec`, `@reactive-pipeline`, `@storage-engine`, `@erasure-coding`, `@integrity`, `@bounded-memory`, `@reconstruction`, `@pipeline-unit`
+|Validation mode tags |`@pipeline-unit-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@REQ-PIPELINE-017`, `@functional-requirement`, `@non-functional-requirement`, `@erasure-coding`, `@integrity`, `@bounded-memory`, `@reconstruction`, `@pipeline-unit-required`, `@pipeline-unit`, `@implemented-and-validated`
+|===
+
+.Rule description
+----
+Before distributed placement or self-healing can use erasure-coded artifacts, a
+transport-neutral local decoder MUST receive unambiguous committed stripe and shard
+facts. CPU-intensive GF(256) work MUST execute on an explicitly supplied bounded
+scheduler rather than a Reactor caller thread. The decoder may produce verified
+reconstruction output for one bounded stripe, but it MUST NOT publish artifacts or
+claim any daemon, filesystem, cluster, Ratis, rebalance, cleanup, or chaos behavior.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given validation mode "pipeline-unit" is selected for requirement "REQ-PIPELINE-017"
+  And the storage engine operator uses filesystem root "target/storage-engine-it/REQ-PIPELINE-017-unit"
+  And fixture file "target/test-fixtures/pipeline/ec-object-8m.bin" is the deterministic 8 MiB EC source from REQ-PIPELINE-015
+  And storage class "EC_4_2" selects four data shards and two parity shards in each bounded 4 MiB stripe
+  And a new EC write and legacy schema compatibility probes prepare these manifest versions:
+  When the pipeline unit runner submits the prepared manifest and survivor set to the transport-neutral bounded EC reconstruction decoder
+  Then the new EC write uses manifest schema 3 and every typed EC artifact explicitly binds these committed facts:
+  And filesystem inspection separately finds every chunk-id data file beneath "target/storage-engine-it/REQ-PIPELINE-017-unit/nodes/node-001/chunks"
+  And manifest construction rejects an EC storage trace that omits explicit layout or contradicts the selected k and m
+  And schemas 0, 1, and 2 remain readable through their compatibility paths
+  And schema-2 EC metadata without an explicit layout is rejected for reconstruction without inferring artifact order
+----
+
+====== Scenario: EC 4+2 reconstructs exactly one or two unavailable shards from any four checksum-valid survivors
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:228`
+|Rule |Local EC reconstruction is explicit, bounded, and fail-closed
+|Requirement ID(s) |`REQ-PIPELINE-017`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@spec`, `@reactive-pipeline`, `@storage-engine`, `@erasure-coding`, `@integrity`, `@bounded-memory`, `@reconstruction`, `@pipeline-unit`
+|Validation mode tags |`@pipeline-unit-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@REQ-PIPELINE-017`, `@functional-requirement`, `@non-functional-requirement`, `@erasure-coding`, `@integrity`, `@bounded-memory`, `@reconstruction`, `@pipeline-unit-required`, `@pipeline-unit`, `@implemented-and-validated`
+|===
+
+.Rule description
+----
+Before distributed placement or self-healing can use erasure-coded artifacts, a
+transport-neutral local decoder MUST receive unambiguous committed stripe and shard
+facts. CPU-intensive GF(256) work MUST execute on an explicitly supplied bounded
+scheduler rather than a Reactor caller thread. The decoder may produce verified
+reconstruction output for one bounded stripe, but it MUST NOT publish artifacts or
+claim any daemon, filesystem, cluster, Ratis, rebalance, cleanup, or chaos behavior.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given validation mode "pipeline-unit" is selected for requirement "REQ-PIPELINE-017"
+  And the storage engine operator uses filesystem root "target/storage-engine-it/REQ-PIPELINE-017-unit"
+  And fixture file "target/test-fixtures/pipeline/ec-object-8m.bin" is the deterministic 8 MiB EC source from REQ-PIPELINE-015
+  And schema-3 stripe 0 has committed 4+2 shard metadata and these independently evaluated survivor cases:
+  When the pipeline unit runner submits the prepared manifest and survivor set to the transport-neutral bounded EC reconstruction decoder
+  Then each case reconstructs exactly its expected one or two unavailable shard indices from the selected four survivors
+  And all 15 four-of-six survivor combinations reproduce both omitted shards byte-for-byte across data/data, data/parity, and parity/parity losses
+  And every regenerated shard byte length and SHA-256 match its committed schema-3 manifest facts before output is accepted
+  And the reconstructed stripe's logical bytes exactly match the corresponding bytes in fixture file "target/test-fixtures/pipeline/ec-object-8m.bin"
+----
+
+====== Scenario: A short final stripe preserves logical size within one bounded reconstruction workspace
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:245`
+|Rule |Local EC reconstruction is explicit, bounded, and fail-closed
+|Requirement ID(s) |`REQ-PIPELINE-017`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@spec`, `@reactive-pipeline`, `@storage-engine`, `@erasure-coding`, `@integrity`, `@bounded-memory`, `@reconstruction`, `@pipeline-unit`
+|Validation mode tags |`@pipeline-unit-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@REQ-PIPELINE-017`, `@functional-requirement`, `@non-functional-requirement`, `@erasure-coding`, `@integrity`, `@bounded-memory`, `@reconstruction`, `@pipeline-unit-required`, `@pipeline-unit`, `@implemented-and-validated`
+|===
+
+.Rule description
+----
+Before distributed placement or self-healing can use erasure-coded artifacts, a
+transport-neutral local decoder MUST receive unambiguous committed stripe and shard
+facts. CPU-intensive GF(256) work MUST execute on an explicitly supplied bounded
+scheduler rather than a Reactor caller thread. The decoder may produce verified
+reconstruction output for one bounded stripe, but it MUST NOT publish artifacts or
+claim any daemon, filesystem, cluster, Ratis, rebalance, cleanup, or chaos behavior.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given validation mode "pipeline-unit" is selected for requirement "REQ-PIPELINE-017"
+  And the storage engine operator uses filesystem root "target/storage-engine-it/REQ-PIPELINE-017-unit"
+  And fixture file "target/test-fixtures/pipeline/ec-object-8m.bin" is the deterministic 8 MiB EC source from REQ-PIPELINE-015
+  And a 6291593-byte logical view of the fixture has one full 4 MiB stripe and a 2097289-byte final stripe
+  And schema-3 metadata records the exact logical data length, stored length, checksum, and location for all six final-stripe artifacts
+  And final-stripe data shard 2 is missing while checksum-valid survivor indices 0,1,3,4 are supplied
+  When the pipeline unit runner submits the prepared manifest and survivor set to the transport-neutral bounded EC reconstruction decoder
+  Then reconstruction emits exactly 6291593 logical bytes without exposing final-stripe padding
+  And retained reconstruction state never exceeds these object-size-independent bounds:
+  And caller-owned source arrays and copies returned by defensive accessors are outside the decoder-owned workspace measurement
+  And no earlier stripe or whole 8 MiB fixture is materialized while the final stripe is reconstructed
+----
+
+====== Scenario: Invalid reconstruction metadata or survivors fail closed without output publication
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:264`
+|Rule |Local EC reconstruction is explicit, bounded, and fail-closed
+|Requirement ID(s) |`REQ-PIPELINE-017`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@spec`, `@reactive-pipeline`, `@storage-engine`, `@erasure-coding`, `@integrity`, `@bounded-memory`, `@reconstruction`, `@pipeline-unit`
+|Validation mode tags |`@pipeline-unit-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@REQ-PIPELINE-017`, `@functional-requirement`, `@non-functional-requirement`, `@erasure-coding`, `@integrity`, `@bounded-memory`, `@reconstruction`, `@pipeline-unit-required`, `@pipeline-unit`, `@implemented-and-validated`
+|===
+
+.Rule description
+----
+Before distributed placement or self-healing can use erasure-coded artifacts, a
+transport-neutral local decoder MUST receive unambiguous committed stripe and shard
+facts. CPU-intensive GF(256) work MUST execute on an explicitly supplied bounded
+scheduler rather than a Reactor caller thread. The decoder may produce verified
+reconstruction output for one bounded stripe, but it MUST NOT publish artifacts or
+claim any daemon, filesystem, cluster, Ratis, rebalance, cleanup, or chaos behavior.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given validation mode "pipeline-unit" is selected for requirement "REQ-PIPELINE-017"
+  And the storage engine operator uses filesystem root "target/storage-engine-it/REQ-PIPELINE-017-unit"
+  And fixture file "target/test-fixtures/pipeline/ec-object-8m.bin" is the deterministic 8 MiB EC source from REQ-PIPELINE-015
+  And the following invalid reconstruction requests are evaluated independently:
+  When the pipeline unit runner submits the prepared manifest and survivor set to the transport-neutral bounded EC reconstruction decoder
+  Then every invalid request fails closed with no accepted reconstructed shard or logical stripe
+  And no artifact, manifest, object reference, or replacement location is published in filesystem root "target/storage-engine-it/REQ-PIPELINE-017-unit"
+----
+
+====== Scenario: Decoder output remains local reconstruction planning evidence only
+
+[cols="1h,3",options="header"]
+|===
+|Metadata |Value
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:283`
+|Rule |Local EC reconstruction is explicit, bounded, and fail-closed
+|Requirement ID(s) |`REQ-PIPELINE-017`
+|Classification |`@functional-requirement`, `@non-functional-requirement`
+|Capability area tags |`@spec`, `@reactive-pipeline`, `@storage-engine`, `@erasure-coding`, `@integrity`, `@bounded-memory`, `@reconstruction`, `@pipeline-unit`
+|Validation mode tags |`@pipeline-unit-required`
+|Declared/validated status |`@implemented-and-validated`
+|Protocol smoke |`no`
+|All tags |`@spec`, `@phase-3`, `@reactive-pipeline`, `@storage-engine`, `@REQ-PIPELINE-017`, `@functional-requirement`, `@non-functional-requirement`, `@erasure-coding`, `@integrity`, `@bounded-memory`, `@reconstruction`, `@pipeline-unit-required`, `@pipeline-unit`, `@implemented-and-validated`
+|===
+
+.Rule description
+----
+Before distributed placement or self-healing can use erasure-coded artifacts, a
+transport-neutral local decoder MUST receive unambiguous committed stripe and shard
+facts. CPU-intensive GF(256) work MUST execute on an explicitly supplied bounded
+scheduler rather than a Reactor caller thread. The decoder may produce verified
+reconstruction output for one bounded stripe, but it MUST NOT publish artifacts or
+claim any daemon, filesystem, cluster, Ratis, rebalance, cleanup, or chaos behavior.
+----
+
+.Gherkin steps
+[source,gherkin]
+----
+  Given validation mode "pipeline-unit" is selected for requirement "REQ-PIPELINE-017"
+  And the storage engine operator uses filesystem root "target/storage-engine-it/REQ-PIPELINE-017-unit"
+  And fixture file "target/test-fixtures/pipeline/ec-object-8m.bin" is the deterministic 8 MiB EC source from REQ-PIPELINE-015
+  And schema-3 stripe 1 is prepared with missing shard index 2 and checksum-valid survivor indices 0,1,3,5
+  When the pipeline unit runner submits the prepared manifest and survivor set to the transport-neutral bounded EC reconstruction decoder
+  Then accepted output contains only verified stripe and regenerated-shard reconstruction results
+  And reconstruction work leaves a Reactor caller thread and runs on a dedicated scheduler bounded to one worker and 16 queued tasks
+  And this requirement makes none of these later-slice claims:
+----
+
 ===== REQ-PIPELINE-001
 
 ====== Scenario Outline: Write pipeline records the required stage order before publishing an object reference
@@ -13062,7 +13265,7 @@ EC chunks, and modeled plans alone MUST NOT be reported as physical shard persis
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:196`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:308`
 |Rule |Write objects pass through explicit stages in a deterministic order
 |Requirement ID(s) |`REQ-PIPELINE-001`
 |Classification |`@functional-requirement`
@@ -13121,7 +13324,7 @@ order. Later stages MUST NOT run before earlier required stages have succeeded.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:237`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:349`
 |Rule |Dedup chunk persistence preserves backpressure and bounded memory
 |Requirement ID(s) |`REQ-PIPELINE-002`
 |Classification |`@non-functional-requirement`
@@ -13181,7 +13384,7 @@ production object-content paths. This rule does not authorize chunking plain upl
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:273`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:385`
 |Rule |Upload ETag computation and dedup windowing preserve streaming request-body paths
 |Requirement ID(s) |`REQ-PIPELINE-007`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -13223,7 +13426,7 @@ materializing the complete FileUnit.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:285`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:397`
 |Rule |Upload ETag computation and dedup windowing preserve streaming request-body paths
 |Requirement ID(s) |`REQ-PIPELINE-008`
 |Classification |`@non-functional-requirement`
@@ -13264,7 +13467,7 @@ materializing the complete FileUnit.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:302`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:414`
 |Rule |Read objects stream chunks in manifest order without aggregating the object
 |Requirement ID(s) |`REQ-PIPELINE-009`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -13301,7 +13504,7 @@ before response streaming begins.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:311`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:423`
 |Rule |Read objects stream chunks in manifest order without aggregating the object
 |Requirement ID(s) |`REQ-PIPELINE-010`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -13341,7 +13544,7 @@ before response streaming begins.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:323`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:435`
 |Rule |Read objects stream chunks in manifest order without aggregating the object
 |Requirement ID(s) |`REQ-PIPELINE-003`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -13391,7 +13594,7 @@ before response streaming begins.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:358`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:470`
 |Rule |HTTP reads validate metadata and stream persisted bytes once
 |Requirement ID(s) |`REQ-PIPELINE-003`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -13444,7 +13647,7 @@ Periodic at-rest detection and repair belongs to EP-4 scrubbing.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:392`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:504`
 |Rule |Multipart part persistence streams upload and copy inputs without complete-part aggregation
 |Requirement ID(s) |`REQ-PIPELINE-011`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -13484,7 +13687,7 @@ without loading each part file as one byte array.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:404`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:516`
 |Rule |Multipart part persistence streams upload and copy inputs without complete-part aggregation
 |Requirement ID(s) |`REQ-PIPELINE-012`
 |Classification |`@non-functional-requirement`
@@ -13525,7 +13728,7 @@ without loading each part file as one byte array.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:423`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:535`
 |Rule |Existing S3 streaming boundaries apply a finite runtime demand window
 |Requirement ID(s) |`REQ-PIPELINE-013`
 |Classification |`@non-functional-requirement`
@@ -13565,7 +13768,7 @@ boundary does not validate stage ordering, manifest publication, or StorageEvent
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:440`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:552`
 |Rule |Stage failures propagate deterministically and clean up completed resources
 |Requirement ID(s) |`REQ-PIPELINE-004`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -13623,7 +13826,7 @@ a deterministic S3 error without publishing a readable object.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:469`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:581`
 |Rule |Stage failures propagate deterministically and clean up completed resources
 |Requirement ID(s) |`REQ-PIPELINE-004`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -13664,7 +13867,7 @@ a deterministic S3 error without publishing a readable object.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:488`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:600`
 |Rule |Cancellation before publication cleans up pipeline-owned resources
 |Requirement ID(s) |`REQ-PIPELINE-005`
 |Classification |`@functional-requirement`, `@non-functional-requirement`
@@ -13725,7 +13928,7 @@ unpublished chunks or temporary files, and leave no readable object behind.
 [cols="1h,3",options="header"]
 |===
 |Metadata |Value
-|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:523`
+|Source line |`s3-reactive-api-adapter/src/test/features/specs/phase-3-reactive-pipeline.feature:635`
 |Rule |Each pipeline stage emits independent typed instrumentation events
 |Requirement ID(s) |`REQ-PIPELINE-006`
 |Classification |`@non-functional-requirement`

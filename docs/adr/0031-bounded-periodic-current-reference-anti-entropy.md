@@ -160,4 +160,5 @@ Ordinary root Maven success is supporting integration evidence only. None of thi
 - ADR 0027 — Authoritative cluster control plane and direct quorum data path.
 - ADR 0028 — First three-node cluster implementation baseline.
 - ADR 0029 — Consensus-owned durable repair for the current whole-object generation.
-- ADR 0030 — Deterministic storage-pipeline fault injection; accepted as final/deferred chaos work and explicitly not implemented by this decision.
+- ADR 0030 — Deterministic storage-pipeline fault injection; an early bounded committed-shard test subset is planned for later EC self-healing, generalized chaos remains final, and neither scope is implemented by this decision.
+- ADR 0032 — Bounded local erasure-coded reconstruction; separate local output-only prerequisite evidence.

@@ -4,6 +4,7 @@ import com.example.magrathea.storageengine.application.pipeline.StorePort;
 import com.example.magrathea.storageengine.application.pipeline.StorageTrace;
 import com.example.magrathea.storageengine.application.pipeline.StorageUnit;
 import com.example.magrathea.storageengine.domain.valueobject.ChunkId;
+import com.example.magrathea.storageengine.domain.valueobject.EcShardLayout;
 import com.example.magrathea.storageengine.domain.valueobject.Fingerprint;
 import com.example.magrathea.storageengine.domain.valueobject.FingerprintAlgorithm;
 import com.example.magrathea.storageengine.domain.valueobject.NodeId;
@@ -23,6 +24,7 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -45,7 +47,7 @@ import static java.nio.file.StandardOpenOption.WRITE;
  * Unit type dispatch (single instanceof point in the pipeline):
  *   FileUnit     → directObjectsRoot / &lt;uuid&gt; (with &lt;uuid&gt;.sha256 sidecar)
  *   ChunkUnit    → chunksRoot / &lt;uuid&gt; (with &lt;uuid&gt;.sha256 sidecar)
- *   ECStripeUnit → NOT YET IMPLEMENTED (TODO criticality 3)
+ *   ECStripeUnit/ECShardUnit → chunksRoot / &lt;uuid&gt; with a committed node identity
  *   PartUnit     → NOT YET IMPLEMENTED (future multipart support)
  *
  * FileUnit naming convention: the file is stored as &lt;uuid&gt; in the dedicated
@@ -53,30 +55,47 @@ import static java.nio.file.StandardOpenOption.WRITE;
  * reads use that kind to select the namespace. The SHA-256 sidecar preserves the same
  * atomic publication and integrity protocol used by segmented artifacts.
  *
- * TODO (criticality 3): ECStripeUnit and PartUnit not yet implemented.
+ * TODO (criticality 3): PartUnit storage remains a later multipart slice.
  * TODO (criticality 4): Temp-file cleanup on mid-pipeline failure is per-call only
  *   (handled by onErrorResume below). Cross-cutting cleanup port not yet added.
  */
 public class FileSystemStorePort implements StorePort {
 
+    private static final NodeId DEFAULT_NODE_ID = NodeId.of("node-001");
+
     private final Path directObjectsRoot;
     private final Path chunksRoot;
     private final FileSystemWriteFaultInjector faultInjector;
+    private final NodeId nodeId;
 
     /** No-fault-injection constructor (unit tests and non-reliability integration paths). */
     public FileSystemStorePort(Path directObjectsRoot, Path chunksRoot) {
-        this(directObjectsRoot, chunksRoot, FileSystemWriteFaultInjector.disabled());
+        this(directObjectsRoot, chunksRoot, FileSystemWriteFaultInjector.disabled(),
+                DEFAULT_NODE_ID);
     }
 
-    /** Full constructor for production wiring with fault injection support. */
+    /** Compatibility constructor using the local filesystem node identity. */
     public FileSystemStorePort(
             Path directObjectsRoot,
             Path chunksRoot,
             FileSystemWriteFaultInjector faultInjector) {
-        this.directObjectsRoot = directObjectsRoot;
-        this.chunksRoot = chunksRoot;
+        this(directObjectsRoot, chunksRoot, faultInjector, DEFAULT_NODE_ID);
+    }
+
+    /** Full constructor for production wiring with fault injection and explicit identity. */
+    public FileSystemStorePort(
+            Path directObjectsRoot,
+            Path chunksRoot,
+            FileSystemWriteFaultInjector faultInjector,
+            NodeId nodeId) {
+        this.directObjectsRoot = java.util.Objects.requireNonNull(
+                directObjectsRoot, "directObjectsRoot must not be null");
+        this.chunksRoot = java.util.Objects.requireNonNull(
+                chunksRoot, "chunksRoot must not be null");
         this.faultInjector = java.util.Objects.requireNonNull(faultInjector,
                 "faultInjector must not be null");
+        this.nodeId = java.util.Objects.requireNonNull(nodeId,
+                "nodeId must not be null");
     }
 
     @Override
@@ -105,14 +124,19 @@ public class FileSystemStorePort implements StorePort {
                             c.fingerprint(),
                             t.storageRef(),
                             t.deduplicatedReuse(),
-                            t.originalSize(), t.storedSize()));
+                            t.originalSize(), t.storedSize(), t.locations()));
             }
             case StorageUnit.ECStripeUnit stripe -> streamToStore(stripe, chunksRoot, "ec-stripe");
-            case StorageUnit.ECShardUnit shard    -> streamToStore(
-                    shard, chunksRoot, shard.parity() ? "ec-parity-shard" : "ec-data-shard")
-                    .map(trace -> new StorageTrace(
-                            trace.info(), trace.unitKind(), trace.fingerprint(), trace.storageRef(),
-                            false, shard.logicalSize(), trace.storedSize()));
+            case StorageUnit.ECShardUnit shard    -> {
+                EcShardLayout layout = explicitEcShardLayout(shard);
+                yield streamToStore(
+                        shard, chunksRoot,
+                        shard.parity() ? "ec-parity-shard" : "ec-data-shard")
+                        .map(trace -> new StorageTrace(
+                                trace.info(), trace.unitKind(), trace.fingerprint(),
+                                trace.storageRef(), false, shard.logicalSize(),
+                                trace.storedSize(), trace.locations(), Optional.of(layout)));
+            }
             case StorageUnit.PartUnit ignored     -> Mono.error(
                 new UnsupportedOperationException(
                     "PartUnit storage not yet implemented — future multipart support"));
@@ -157,7 +181,7 @@ public class FileSystemStorePort implements StorePort {
                                 long stored = Files.size(pending.tempData());
                                 faultInjector.afterChunkTempFileWritten(
                                         new FileSystemWriteFaultInjector.ChunkWriteContext(
-                                                NodeId.of("node-001"), pending.chunkId(),
+                                                nodeId, pending.chunkId(),
                                                 pending.tempData(), pending.finalData(), stored));
                                 String checksum = HexFormat.of().formatHex(digest.get().digest());
                                 String persistedChecksum = sha256(pending.tempData());
@@ -179,7 +203,8 @@ public class FileSystemStorePort implements StorePort {
                                         Optional.of(Fingerprint.of(FingerprintAlgorithm.SHA256, checksum)),
                                         Optional.of(pending.chunkId().value().toString()),
                                         false,
-                                        size.get(), stored);
+                                        size.get(), stored,
+                                        List.of(nodeId));
                             }).subscribeOn(Schedulers.boundedElastic()))
                             .onErrorResume(error -> {
                                 boolean preserve = error instanceof FileSystemWriteInterruptedException interrupted
@@ -203,6 +228,25 @@ public class FileSystemStorePort implements StorePort {
                         }
                     });
                 });
+    }
+
+    private static EcShardLayout explicitEcShardLayout(StorageUnit.ECShardUnit shard) {
+        if (shard.stripeLogicalLength() < 0) {
+            throw new IllegalStateException(
+                    "EC shard storage requires explicit stripe logical length; emission order is not inferred");
+        }
+        try {
+            return new EcShardLayout(
+                    shard.stripeIndex(),
+                    shard.shardIndex(),
+                    shard.dataBlocks(),
+                    shard.parityBlocks(),
+                    shard.parity(),
+                    shard.stripeLogicalLength());
+        } catch (IllegalArgumentException error) {
+            throw new IllegalStateException(
+                    "EC shard storage received contradictory explicit layout", error);
+        }
     }
 
     private static void cleanupCancelledWrite(AtomicChunkWriteProtocol.PendingWrite pending) {

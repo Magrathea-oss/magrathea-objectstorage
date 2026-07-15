@@ -155,7 +155,22 @@ Query, probe, or ensure failure aborts the page without cursor progress and is r
 
 Process-local status exposes bounded cycle/page/record, exact/missing/corrupt, query/probe/ensure/repair failure, retry, reset, stale, deduplication, overlap, active, and closed counters/flags without payloads, cursor values, or credentials. These values are observability, not durable authority.
 
-PA-6 `AntiEntropyPlanner` findings/plans remain pure planner output and are never execution evidence. Object payloads remain outside Ratis. This concept adds no rebalance, automated orphan cleanup, reference rewriting, wider topology/healing, production-scale fairness/capacity, ADR 0030 general chaos, or production-readiness claim. See link:../../adr/0031-bounded-periodic-current-reference-anti-entropy.md[ADR 0031].
+PA-6 `AntiEntropyPlanner` findings/plans remain pure planner output and are never execution evidence. Object payloads remain outside Ratis. This concept adds no rebalance, automated orphan cleanup, reference rewriting, wider topology/healing, production-scale fairness/capacity, ADR 0030 fault, or production-readiness claim. See link:../../adr/0031-bounded-periodic-current-reference-anti-entropy.md[ADR 0031].
+
+=== Bounded Local Erasure-coded Reconstruction (accepted ADR 0032)
+
+[NOTE]
+====
+Status: *implementation-informed / bounded*. All five `REQ-PIPELINE-017` scenarios are `@implemented-and-validated`; the focused gate passes 5 scenarios / 46 steps and all 15 four-of-six EC 4+2 survivor combinations.
+====
+
+Schema 3 makes reconstruction identity explicit. Each committed EC data/parity reference binds stripe index, shard index, `k`, `m`, parity role, stripe logical length, per-data-shard original length, stored length, lowercase SHA-256, and ordered transport-neutral node/device locations. The local gate uses identity `node-001` and inspects chunk-id files separately; it never stores a filesystem path as location authority. Schemas 0/1/2 keep their read compatibility paths, while ambiguous schema-2 EC metadata is rejected for reconstruction without ordinal inference.
+
+`BoundedEcReconstructionPort` is an application boundary for one stripe. The caller supplies committed descriptors, exactly `k` checksum-valid survivor snapshots, and one or two unavailable indexes. The stateless adapter validates every fact and survivor, uses the shared GF(256) codec, verifies regenerated length/SHA-256, and returns only verified logical-stripe and regenerated-shard snapshots plus workspace measurements. Invalid schema, duplicate/out-of-range indexes, inconsistent metadata, wrong lengths/checksums, or fewer than `k` valid survivors fail closed.
+
+Decoder-owned retention is object-size independent: at most one 4 MiB stripe, six 1 MiB shard buffers, and fixed matrix/index workspace; earlier-stripe and whole-object retention are zero. Immutable request/result boundary snapshots are measured separately. Spring injects one dedicated worker with a 16-task queue so GF(256) execution leaves the Reactor caller thread.
+
+The port cannot publish, replace, or locate a shard and has no repository/filesystem dependency. It creates no scanner/daemon, transfer, Ratis repair lifecycle, rebalance, cleanup, or fault. Distributed shard placement/transfer (`REQ-CLUSTER-015`) remains not implemented. See link:../../adr/0032-bounded-local-erasure-coded-reconstruction.md[ADR 0032].
 
 [[concept-reactive-payload-pipeline]]
 === Repository-wide Reactive Payload Pipeline
@@ -206,14 +221,14 @@ Integrity claims name the exact representation and boundary:
 
 `FileSystemStorePort` is a positive control: it streams with `DataBufferUtils.write`, calculates an incremental source digest, fsyncs the temporary artifact, and performs distinct persisted-byte verification before publication. Single-node GET deliberately remains one-open/single-pass and performs no complete payload preflight or second read. `FileSystemStorageNode.streamFrom` currently does not calculate/compare the payload checksum online; this is an explicit limitation, not a claim that EP-3 promised preflight. Any future incremental GET verification must preserve one pass and document the late-failure client contract.
 
-Dedup and EC are bounded but need operational budgets. A permitted 1 GiB dedup window plus copy is not an acceptable default production byte discipline even though it is finite. EC retains a stripe copy plus data/parity arrays and permits `k + m <= 32`; P2 must couple stripe size, shard count, downstream demand, and CPU concurrency to one explicit byte/CPU budget.
+Dedup and general EC policy ranges still need operational budgets. A permitted 1 GiB dedup window plus copy is not an acceptable default production byte discipline even though it is finite. ADR 0032 now validates the local EC 4+2 decoder's one-stripe/six-shard workspace and one-worker/16-queue scheduling, but wider `k + m <= 32`, encoding/downstream concurrency, and distributed repair still require coupled byte/CPU/network budgets.
 
 [[concept-deterministic-storage-fault-injection]]
 === Deterministic Storage-pipeline Fault Injection (ADR 0030)
 
 [NOTE]
 ====
-Status: *accepted target architecture; planned / needs-validation*. No production implementation, Cucumber requirement, replay result, or fault-safety result is claimed. See link:../../adr/0030-deterministic-storage-pipeline-fault-injection.md[ADR 0030].
+Status: *accepted target architecture and amended sequencing; planned / needs-validation*. No production fault implementation, Cucumber fault requirement, replay result, committed-shard action, or fault-safety result is claimed. See link:../../adr/0030-deterministic-storage-pipeline-fault-injection.md[ADR 0030].
 ====
 
 A transport-neutral application `StorageFaultInjectionPort` provides the sole deterministic decision boundary. Production composition uses a no-op default. The contract contains no `DataBuffer`, protobuf, gRPC, Ratis, `Path`, channel, HTTP, payload, key, credential, or secret type; owning adapters apply a typed decision to exclusively owned bytes or side effects.
@@ -226,6 +241,10 @@ Version 1 initially permits only:
 - corruption of one unpublished temporary-file byte after writing and before persisted-byte verification; and
 - mutation of one received replica-frame byte before sink digest/length update, staging, and verification.
 
+After distributed EC placement/transfer exists, a planned version 2 may add only `MAKE_COMMITTED_EC_SHARD_UNAVAILABLE` and `CORRUPT_COMMITTED_EC_SHARD_BYTE` at `AFTER_EC_MANIFEST_COMMIT_BEFORE_SHARD_HEALTH_PROBE`. Targets bind an exact schema-3 manifest/generation, stripe/shard/artifact identity, transport-neutral location, length, and SHA-256—not a raw path or wildcard. The adapter preserves a pristine copy, uses experiment-owned quarantine or one bounded XOR mutation, fsyncs the effect, restores idempotently during teardown, and emits closed redacted outcomes.
+
+The normal blast radius is at most `m` targets in one stripe. An explicit one-stripe `EXPECT_BLOCKED` experiment may select exactly `m+1` only to prove insufficient-survivor behavior and may publish no repair. Metadata/reference mutation, unrelated targets, path escape, unbounded selection, and production activation fail closed.
+
 The typed catalog also defines before/after boundaries around checksum calculation, transforms, temp write, persisted verification, file and parent-directory fsync, atomic publication, replica send/receive/sink acceptance, durable-ack emission/acceptance, and Ratis reference proposal/commit. Catalog presence does not enable an action. Delay, cancellation, exception, short I/O, fsync failure, atomic-publication failure, acknowledgement failure, and Ratis failure remain deferred until a later contract version gives each finite, cancellation-aware, before/after semantics.
 
 Activation requires both an explicitly non-production fault-injection profile and a separate opt-in property. A production profile conflict, missing/mismatched node plan, malformed plan, or inability to retain required bounded evidence fails the experiment closed. Evidence includes schema/plan ID and hash, rule/decision ID, operation and opaque target identity, point, representation, occurrence/offset/frame, bounded fire count, fired/skipped reason, and typed outcome. It contains no payload excerpts, object keys, paths, headers, credentials, tokens, certificates, secrets, keys, or free-form exception messages.
@@ -234,7 +253,7 @@ Activation requires both an explicitly non-production fault-injection profile an
 
 Faults never weaken the normal safety protocol: no degraded writes; fixed `N=3/W=2`; payload bytes outside Ratis; no durable acknowledgement for corrupt/unverified bytes; and no reference proposal before checksum-valid durable acknowledgements and current fencing/epoch checks. An injected terminal condition may leave only unreachable temporary or complete orphaned bytes allowed by the existing publication model; it must never expose a reachable partial artifact or manufacture a durable acknowledgement.
 
-This work is deferred behind active EP-10 normal-path completion and follows the P0-P4 sequence in link:11_technical_risks.adoc#reactive-streaming-remediation-roadmap[section 11] only when activated. It does not replace the EP roadmap. Deferred P0-P3 review supported normal Storage Engine paths; ADR 0030 chaos engineering begins only in final P4.
+The owner-selected sequence is distributed EC placement/transfer, the bounded kernel/committed-shard subset, EC self-healing, shard rebalance, and fenced cleanup. Generalized ADR 0030 actions and realistic chaos remain final after normal-path semantic/resource closure. The early subset is test tooling only and cannot substitute for self-healing behavior or broader P3/P4 evidence.
 
 === Domain Purity
 
@@ -573,12 +592,12 @@ AWS CLI v2 does NOT send `Content-Type` by default unless `--content-type` is ex
 
 [NOTE]
 ====
-Status: *planned / not implemented beyond the bounded ADR 0028, ADR 0029, and ADR 0031 slices*. The implemented identity, transport, publication, current-generation repair, and fixed A/B/C periodic current-reference discovery subsets are documented above; this section records only the remaining target.
+Status: *planned / not implemented beyond bounded ADR 0028/0029/0031 cluster slices*. ADR 0032 adds local output-only EC decoding, not cluster execution. The implemented identity, whole-object transport/publication, current-generation repair, and fixed A/B/C discovery subsets are documented above; this section records the remaining cluster target.
 ====
 
 **Membership and authority.** Consensus-controlled admission, catch-up, promotion, demotion, replacement, removal, topology/policy epochs, fencing, tombstones, wider namespace/configuration generations, and durable jobs beyond bounded repair remain future work. Health suspicion must not become membership mutation.
 
-**Transfer and reads.** Chunked, multipart, conditional/versioned, and EC transfer/reconstruction are not implemented in cluster mode. Bounded current-generation whole-object repair is implemented under ADR 0029, and bounded periodic inspection of fixed A/B/C current named obligations is implemented under ADR 0031. Wider anti-entropy/healing topologies, rebalance, and automated orphan cleanup remain absent rather than inferred from those slices or from `N=3/W=2` replication.
+**Transfer and reads.** Local output-only EC reconstruction is implemented under ADR 0032, but chunked, multipart, conditional/versioned, and distributed EC placement/transfer/self-healing are not implemented in cluster mode. The next order is distributed shard placement/transfer, bounded committed-shard fault tooling, consensus-owned EC self-healing, shard rebalance, and fenced cleanup; generalized chaos remains final. Bounded whole-object repair/discovery remain under ADR 0029/0031, and whole-object replication stays valid below the arranged EC minimum. Inter-cluster/NAS-backed replication remains later and NAS-dependent.
 
 **Operations and security.** Production certificate enrollment/rotation/revocation/recovery, rolling and mixed-version upgrades, broader partition handling, online multi-node backup/DR, and deployment hardening require separate evidence. Test-local mTLS and one-coordinator-stop validation do not satisfy these obligations.
 

@@ -127,9 +127,13 @@ All architectural decisions are documented as Architecture Decision Records (ADR
 
 |link:../../adr/0030-deterministic-storage-pipeline-fault-injection.md[0030]
 |Deterministic storage-pipeline fault injection
-|✅ Accepted target architecture — final P4 chaos work, deliberately deferred until normal Storage Engine pipeline closure; implementation and fault evidence planned / needs-validation
+|✅ Accepted target, amended sequence — bounded committed-EC-shard test subset planned before self-healing; generalized chaos final; implementation/fault evidence needs validation
 
 |link:../../adr/0031-bounded-periodic-current-reference-anti-entropy.md[0031]
 |Bounded periodic current-reference anti-entropy
 |✅ Accepted — implementation-informed for fixed A/B/C `REQ-CLUSTER-027` (2 scenarios / 36 steps); broad `017` and EP-10 remain partial
+
+|link:../../adr/0032-bounded-local-erasure-coded-reconstruction.md[0032]
+|Bounded local erasure-coded reconstruction
+|✅ Accepted — implementation-informed for local output-only `REQ-PIPELINE-017` (5 scenarios / 46 steps; all 15 four-of-six combinations); cluster `015` remains not implemented
 |===
